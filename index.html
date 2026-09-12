@@ -495,6 +495,18 @@
         </div>
     </div>
 
+    <div id="reuse-picker-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+        <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-lg w-full space-y-4 my-8">
+            <h3 class="text-white font-bold text-base flex items-center gap-2"><span class="icon-gold">🔄</span> Reuse Selections</h3>
+            <p class="text-[10px] text-zinc-500">Untick anything you don't want to bring across — the combined odds recalculate from only what's checked.</p>
+            <div id="reuse-picker-legs" class="space-y-2 max-h-96 overflow-y-auto pr-1"></div>
+            <div class="flex gap-2 pt-2">
+                <button type="button" onclick="confirmReusePicker()" class="flex-1 bg-[#d9b571] hover:bg-[#e8cd97] text-black font-bold py-2 rounded-xl text-xs transition">Add to Bet Slip</button>
+                <button type="button" onclick="closeReusePicker()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs transition">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const CURRENT_VERSION = 'v14_full_fixture_audit';
         if (localStorage.getItem('hawk_code_version') !== CURRENT_VERSION) {
@@ -1271,6 +1283,13 @@
 
             const league = document.getElementById('league-selector').value || 'Custom / Manual';
 
+            // Preserve each individual piece's own odds, not just the combined total — this is
+            // what lets "Reuse" later offer to drop just one selection with an accurate
+            // recalculated price, instead of only being able to take the whole merged leg as-is.
+            const newSubSelections = selectedChips.length > 0
+                ? selectedChips.map(c => ({ label: c.label, odds: c.odds }))
+                : [{ label: selection, odds: odds }];
+
             // If there's already a leg for this exact fixture (and same Builder/Acca type),
             // offer to fold this new selection into it as one combined leg instead of always
             // stacking a separate leg card for the same match.
@@ -1283,14 +1302,20 @@
                     `OK = merge into same leg   |   Cancel = add as a new separate leg`
                 );
                 if (mergeInto) {
+                    // Capture the existing leg's breakdown BEFORE mutating its combined text/odds.
+                    // If it predates this feature (no subSelections yet), treat its current
+                    // combined selection as one legacy unit — still splittable going forward,
+                    // just not further back than this point.
+                    const existingSubs = existing.subSelections || [{ label: existing.selection, odds: existing.odds }];
                     existing.selection = `${existing.selection} & ${selection}`;
                     existing.odds = existing.odds * odds;
+                    existing.subSelections = existingSubs.concat(newSubSelections);
                     if (angle) existing.angle = existing.angle ? `${existing.angle}; ${angle}` : angle;
                 } else {
-                    ticketLegs.push({ fixture, selection, angle, odds, type: builderMode, league });
+                    ticketLegs.push({ fixture, selection, angle, odds, type: builderMode, league, subSelections: newSubSelections });
                 }
             } else {
-                ticketLegs.push({ fixture, selection, angle, odds, type: builderMode, league });
+                ticketLegs.push({ fixture, selection, angle, odds, type: builderMode, league, subSelections: newSubSelections });
             }
 
             document.getElementById('builder-selection').value = "";
@@ -1388,20 +1413,89 @@
         }
 
         // --- REUSE SELECTION / ACCA FEATURE ---
-        function reuseLeg(fixture, selection, odds, type) {
-            ticketLegs.push({ fixture, selection, angle: "Reused from history", odds, type: type || 'builder' });
+        // --- REUSE PICKER: lets you deselect individual sub-selections before they load in,
+        // using each piece's own preserved odds to recalculate an accurate combined price. ---
+        let reusePickerLegs = []; // working copy of {fixture, type, subSelections: [{label, odds, checked}]}
+
+        function legSubSelections(leg) {
+            // Falls back to treating the whole thing as one unsplittable unit for legs that
+            // predate this feature (no per-piece odds were ever recorded for them).
+            return leg.subSelections && leg.subSelections.length > 0
+                ? leg.subSelections.map(s => ({ ...s }))
+                : [{ label: leg.selection, odds: leg.odds }];
+        }
+
+        function openReusePicker(legs) {
+            reusePickerLegs = legs.map(l => ({
+                fixture: l.fixture,
+                type: l.type || 'builder',
+                subSelections: legSubSelections(l).map(s => ({ ...s, checked: true }))
+            }));
+            renderReusePicker();
+            document.getElementById('reuse-picker-modal').classList.remove('hidden');
+        }
+
+        function renderReusePicker() {
+            const container = document.getElementById('reuse-picker-legs');
+            container.innerHTML = reusePickerLegs.map((leg, li) => `
+                <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3">
+                    <div class="text-[11px] text-[#d9b571] font-bold mb-1.5">${leg.fixture}</div>
+                    <div class="space-y-1">
+                        ${leg.subSelections.map((s, si) => `
+                            <label class="flex items-center gap-2 text-xs text-zinc-200 cursor-pointer py-0.5">
+                                <input type="checkbox" ${s.checked ? 'checked' : ''} onchange="toggleReusePickerItem(${li}, ${si})" class="accent-[#d9b571]">
+                                <span class="flex-1">${s.label}</span>
+                                <span class="text-zinc-500">@${s.odds.toFixed(2)}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleReusePickerItem(legIdx, subIdx) {
+            reusePickerLegs[legIdx].subSelections[subIdx].checked = !reusePickerLegs[legIdx].subSelections[subIdx].checked;
+        }
+
+        function closeReusePicker() {
+            document.getElementById('reuse-picker-modal').classList.add('hidden');
+        }
+
+        function confirmReusePicker() {
+            reusePickerLegs.forEach(leg => {
+                const kept = leg.subSelections.filter(s => s.checked);
+                if (kept.length === 0) return; // nothing checked for this match — skip it entirely
+
+                const selection = kept.map(s => s.label).join(' & ');
+                const odds = kept.reduce((t, s) => t * s.odds, 1.0);
+                const subSelections = kept.map(s => ({ label: s.label, odds: s.odds }));
+
+                const existingIdx = ticketLegs.findIndex(l => l.fixture === leg.fixture && l.type === leg.type);
+                if (existingIdx !== -1) {
+                    const existing = ticketLegs[existingIdx];
+                    const existingSubs = existing.subSelections || [{ label: existing.selection, odds: existing.odds }];
+                    existing.selection = `${existing.selection} & ${selection}`;
+                    existing.odds = existing.odds * odds;
+                    existing.subSelections = existingSubs.concat(subSelections);
+                } else {
+                    ticketLegs.push({ fixture: leg.fixture, selection, angle: "Reused from history", odds, type: leg.type, league: 'Custom / Manual', subSelections });
+                }
+            });
             renderTicketLegs();
+            closeReusePicker();
             switchView('builder');
+        }
+
+        function reuseLeg(betId, legIndex) {
+            const bet = bets.find(b => b.id === betId);
+            if (!bet || !bet.legs[legIndex]) return;
+            openReusePicker([bet.legs[legIndex]]);
         }
 
         function reuseEntireBet(betId) {
             const bet = bets.find(b => b.id === betId);
             if (!bet) return;
-            bet.legs.forEach(l => {
-                ticketLegs.push({ fixture: l.fixture, selection: l.selection, angle: l.angle || "", odds: l.odds, type: l.type || 'builder' });
-            });
-            renderTicketLegs();
-            switchView('builder');
+            openReusePicker(bet.legs);
         }
 
         function setFilter(filter) {
@@ -1474,7 +1568,7 @@
                         </div>
                     </div>
                     <div class="space-y-1.5">
-                        ${bet.legs.map(l => {
+                        ${bet.legs.map((l, li) => {
                             const parts = l.selection.split(' & ').map(p => p.trim()).filter(Boolean);
                             const selHtml = parts.length > 1
                                 ? `<ul class="text-white font-medium space-y-0.5">${parts.map(p => `<li class="flex items-start gap-1.5"><span class="text-[#d9b571] shrink-0">·</span>${p}</li>`).join('')}</ul>`
@@ -1487,7 +1581,7 @@
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <span class="text-xs text-zinc-400 font-bold">@ ${l.odds.toFixed(2)}</span>
-                                    <button onclick="reuseLeg('${l.fixture.replace(/'/g, "\\'")}', '${l.selection.replace(/'/g, "\\'")}', ${l.odds}, '${l.type}')" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded text-[10px] transition" title="Reuse this selection">Reuse</button>
+                                    <button onclick="reuseLeg('${bet.id}', ${li})" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded text-[10px] transition" title="Reuse this selection">Reuse</button>
                                 </div>
                             </div>
                         `; }).join('')}

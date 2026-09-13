@@ -150,8 +150,15 @@ _ALIASES = {
 }
 
 
+# Letters that don't break down into a base letter + accent, so the ASCII
+# step below would drop them ("Højlund" -> "hjlund").
+_SPECIAL_LETTERS = str.maketrans({"ø": "o", "Ø": "O", "æ": "ae", "Æ": "AE", "ß": "ss", "đ": "d", "Đ": "D",
+                                  "ł": "l", "Ł": "L", "ı": "i", "œ": "oe", "Œ": "OE", "þ": "th"})
+
+
 def _norm(name):
-    s = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode().lower()
+    s = str(name or "").translate(_SPECIAL_LETTERS)
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
     s = s.replace("&", " and ").replace("'", "").replace(".", "")
     s = re.sub(r"[^a-z0-9 ]+", " ", s)
     s = " ".join(t for t in s.split() if t not in _STOPWORDS)
@@ -594,7 +601,10 @@ def sh_players(team_id, limit=20):
                 matches.append({**info, "minutes": minutes, "shots": s.get("shots") or 0,
                                 "sot": s.get("onTargetScoringAttempt") or 0, "goals": s.get("goals") or 0, "xg": xg,
                                 "yellow": 1 if s.get("yellowCard") else 0, "red": 1 if s.get("redCard") else 0,
-                                "sub_in": bool(s.get("substitutedIn"))})
+                                # StatsHub's names are back to front: substitutedOut holds
+                                # the player HE replaced (so he came off the bench), while
+                                # substitutedIn holds whoever replaced him.
+                                "sub_in": bool(s.get("substitutedOut"))})
             matches.sort(key=lambda m: m["ts"], reverse=True)
             players.append({"name": p.get("name"), "position": p.get("position"), "matches": matches})
         return {"players": players}

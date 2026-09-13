@@ -97,8 +97,12 @@
     "paris sg": "paris saint germain", "psg": "paris saint germain",
     "inter milan": "inter", "internazionale": "inter",
   };
+  const SPECIAL_LETTERS = { "ø": "o", "Ø": "O", "æ": "ae", "Æ": "AE", "ß": "ss", "đ": "d", "Đ": "D", "ł": "l", "Ł": "L",
+                            "ı": "i", "œ": "oe", "Œ": "OE", "þ": "th" };
   function norm(name) {
-    let s = String(name || "").normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
+    // ø, æ, ß... don't break down into base letter + accent, so map them first ("Højlund" -> "hojlund").
+    let s = String(name || "").replace(/[øØæÆßđĐłŁıœŒþ]/g, (c) => SPECIAL_LETTERS[c])
+      .normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
     s = s.replace(/&/g, " and ").replace(/['.]/g, "").replace(/[^a-z0-9 ]+/g, " ");
     s = s.split(/\s+/).filter((t) => t && !STOPWORDS.has(t)).join(" ");
     return ALIASES[s] || s;
@@ -487,7 +491,8 @@
         pos = pos || (match && byName[match].position) || "M";
         const r = rates(matches, priors[pos] || DEFAULT_RATES.M, pos);
         return { ...r, name, pos, status, photo, start_p: START_PROB[confirmed][status],
-                 sub_p: status === "Substitute" ? SUB_APPEAR_PROB : 0, has_data: !!match, recent: matches.slice(0, 10) };
+                 sub_p: status === "Substitute" ? SUB_APPEAR_PROB : 0, has_data: !!match, recent: matches.slice(0, 10),
+                 recent_starts: matches.filter((m) => !m.sub_in).slice(0, 10) };
       });
     }
     return squads;
@@ -641,7 +646,9 @@
       if (p.pos === "G" || p.start_p < 0.5) continue;
       const pid = `p:${side}:${i}`;
       const common = { kind: "player", player: p.name, side, pos: p.pos, photo: p.photo, low_data: p.minutes < MIN_AUTO_MINUTES };
-      const hist = (stat, k) => { const vals = p.recent.map((m) => m[stat]); return { recent: vals, hits: vals.filter((v) => v >= k).length, games: vals.length, threshold: k }; };
+      // Hit rates from games he started (cameos say little about a starter), unless under 3 recent starts.
+      const [basisGames, basis] = p.recent_starts.length >= 3 ? [p.recent_starts, "starts"] : [p.recent, "games"];
+      const hist = (stat, k) => { const vals = basisGames.map((m) => m[stat]); return { recent: vals, hits: vals.filter((v) => v >= k).length, games: vals.length, threshold: k, basis }; };
       for (const k of [1, 2, 3]) add(`${pid}:shots${k}`, `${p.name}: ${k}+ Shots`, "Player Shots", `${pid}:shots`, mask(n, (s) => a.shots[s] >= k), { ...common, ...hist("shots", k) });
       for (const k of [1, 2]) add(`${pid}:sot${k}`, `${p.name}: ${k}+ Shots on Target`, "Player Shots on Target", `${pid}:sot`, mask(n, (s) => a.sot[s] >= k), { ...common, ...hist("sot", k) });
       add(`${pid}:score`, `${p.name} to Score`, "To Score at Any Time", `${pid}:score`, mask(n, (s) => a.goals[s] >= 1), { ...common, ...hist("goals", 1) });

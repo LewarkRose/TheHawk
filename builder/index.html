@@ -482,7 +482,7 @@ function playerCard(side, p) {
   const legs = legsFor(side, p.name);
   const pick = (suffix) => legs.find(l => l.id.endsWith(suffix));
   const sot = pick(":sot1");
-  const spark = sot && sot.recent ? `<div class="spark" title="Shots on target, last ${sot.recent.length} games (newest first)">${
+  const spark = sot && sot.recent ? `<div class="spark" title="Shots on target, last ${sot.recent.length} ${sot.basis === "starts" ? "starts" : "games"} (newest first)">${
       sot.recent.map(v => `<i class="${v >= 1 ? "hit" : ""}" style="height:${4 + Math.min(v, 5) * 3}px"></i>`).join("")}</div>` : "";
   const quick = [[":sot1", "1+ SoT"], [":sot2", "2+ SoT"], [":shots2", "2+ shots"], [":score", "Score"], [":booked", "Booked"]]
     .map(([s, lab]) => { const l = pick(s); return l ? `<span class="qc ${S.slip.includes(l.id) ? "in" : ""}" data-add="${l.id}" title="Fair odds ${odds(l.fair)}">${lab} ${pct(l.p)}</span>` : ""; }).join("");
@@ -524,7 +524,7 @@ function renderSlip() {
   const legRows = S.slip.map((id, n) => {
     const l = S.legs[id]; if (!l) return "";
     const row = r && r.legs ? r.legs.find(x => x.id === id) : null;
-    const hist = l.games ? `<span class="mk"> · hit ${l.hits}/${l.games} recent</span>` : "";
+    const hist = l.games ? `<span class="mk"> · hit ${l.hits}/${l.games} recent${l.basis === "starts" ? " starts" : ""}</span>` : "";
     return `<div class="leg" style="animation-delay:${n * 60}ms"><div class="ck">✓</div>
       <div class="l1"><div><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)}${hist}</div></div>
         <div class="rt"><div class="pp">${pct(l.p)}</div>${row && n > 0 ? `<div class="fo">${pct(row.cond)} given above</div>` : ""}

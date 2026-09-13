@@ -18,10 +18,11 @@
   // ---------------------------------------------------------------------------
   // Config
   // ---------------------------------------------------------------------------
-  const LEAGUES = ["Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "Champions League"];
+  const LEAGUES = ["Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "Champions League", "Europa League", "Conference League"];
   const S365 = "https://webws.365scores.com/web";
   const S365_PARAMS = { appTypeId: 5, langId: 1, timezoneName: "Europe/London", userCountryId: -1 };
-  const COMPETITIONS = { "Premier League": 7, "La Liga": 11, "Serie A": 17, "Bundesliga": 25, "Ligue 1": 35, "Champions League": 572 };
+  const COMPETITIONS = { "Premier League": 7, "La Liga": 11, "Serie A": 17, "Bundesliga": 25, "Ligue 1": 35, "Champions League": 572,
+                         "Europa League": 573, "Conference League": 7685 };
   const ODDS_COUNTRIES = [21, 31, 37]; // each exposes a different bookmaker set
   const PM_BASE = "https://gamma-api.polymarket.com";
   const DATA_URL = new URL("../data/", document.baseURI).href;
@@ -39,7 +40,7 @@
   // sim.py
   const N_SIMS = 12000, PRIOR_MINUTES = 450, REST_SHARE = 0.05, XG_WEIGHT = 0.6;
   const START_PROB = { true: { Starting: 1.0, Substitute: 0.0 }, false: { Starting: 1.0, Substitute: 0.08 } };
-  const SUB_APPEAR_PROB = 0.35, SUB_MINUTES = 22;
+  const SUB_APPEAR_PROB = 0.35, SUB_MINUTES = 22, DOUBTFUL_START = 0.45;
   const START_MINUTES = { F: 78, M: 82, D: 88, G: 90 }, PRIOR_STARTS = 4;
   const POSITIONS = { Goalkeeper: "G", Defender: "D", Midfielder: "M", Attacker: "F" };
   const DEFAULT_RATES = { F: [2.6, 1.0, 0.40, 0.15], M: [1.2, 0.40, 0.12, 0.20], D: [0.6, 0.18, 0.05, 0.20], G: [0, 0, 0, 0.05] };
@@ -512,18 +513,29 @@
     const members = Object.fromEntries((an.detail.members || []).map((m) => [m.id, m]));
     const sh = { home: playerRows(an.players[0]), away: playerRows(an.players[1]) };
     const priors = positionPriors([...sh.home, ...sh.away]), xpriors = extraPriors([...sh.home, ...sh.away]);
-    const squads = {};
+    const squads = {}, missing = {};
+    an.missing = missing;
     for (const [side, key] of [["home", "homeCompetitor"], ["away", "awayCompetitor"]]) {
       const lineup = (an.detail[key] || {}).lineups || {};
       const confirmed = lineup.status === "Confirmed";
       const byName = Object.fromEntries(sh[side].filter((p) => p.name).map((p) => [p.name, p]));
       const teamHasExtras = sh[side].some((p) => hasExtras(p.matches));
+      // Team news: 365Scores lists injured/suspended ("Missing") and doubtful players.
+      const news = (lineup.members || []).filter((m) => m.statusText === "Missing" || m.statusText === "Doubtful").map((m) => {
+        const info = members[m.id] || {}, inj = m.injury || {};
+        return { name: info.name || "?", status: m.statusText, reason: inj.reason && inj.reason !== "-" ? inj.reason : null,
+                 back: inj.expectedReturn && inj.expectedReturn !== "Unknown" ? inj.expectedReturn : null, pos: POSITIONS[(m.position || {}).name] || null };
+      });
+      missing[side] = news;
+      const listed = (name, status) => news.some((o) => o.status === status && nameSimilarity(o.name, name) >= 0.85);
       let entries = (lineup.members || []).filter((m) => m.statusText === "Starting" || m.statusText === "Substitute").map((m) => {
         const info = members[m.id] || {};
         return [info.name || "?", m.statusText, POSITIONS[(m.position || {}).name], info.athleteId ? athletePhoto(info) : null];
       });
       if (!entries.some((e) => e[1] === "Starting") && sh[side].length) {
-        const recent = sh[side].slice().sort((a, b) => b.matches.slice(0, 5).reduce((s, m) => s + m.minutes, 0) - a.matches.slice(0, 5).reduce((s, m) => s + m.minutes, 0));
+        // No lineup from 365Scores: the most-used players lately, minus the injured and suspended.
+        const mins = (p) => p.matches.slice(0, 5).reduce((s, m) => s + m.minutes, 0);
+        const recent = sh[side].filter((p) => !listed(p.name, "Missing")).sort((a, b) => mins(b) - mins(a));
         entries = recent.slice(0, 18).map((p, i) => [p.name, i < 11 ? "Starting" : "Substitute", p.position, null]);
       }
       squads[side] = entries.map(([name, status, pos, photo]) => {
@@ -531,7 +543,9 @@
         const matches = match ? byName[match].matches : [];
         pos = pos || (match && byName[match].position) || "M";
         const r = rates(matches, priors[pos] || DEFAULT_RATES.M, pos, teamHasExtras ? xpriors[pos] || EXTRA_DEFAULTS.M : null);
-        return { ...r, name, pos, status, photo, start_p: START_PROB[confirmed][status],
+        // A doubtful player in a predicted lineup may well not start (and gets no legs).
+        const doubt = !confirmed && listed(name, "Doubtful") ? DOUBTFUL_START : 1;
+        return { ...r, name, pos, status, photo, start_p: START_PROB[confirmed][status] * doubt, doubtful: doubt < 1,
                  sub_p: status === "Substitute" ? SUB_APPEAR_PROB : 0, has_data: !!match, recent: matches.slice(0, 10),
                  recent_starts: matches.filter((m) => !m.sub_in).slice(0, 10) };
       });
@@ -852,9 +866,34 @@
       }
       for (const k of [1, 2]) add(`${pid}:offsides${k}`, `${p.name}: ${k}+ Offsides`, "Player Offsides", `${pid}:offsides`, mask(n, (s) => a.offsides[s] >= k), { ...common, ...hist("offsides", k) });
     }
-    for (const leg of Object.values(legs)) if (EXTRA_MARKETS.has(leg.market)) leg.extra = true;
+    for (const leg of Object.values(legs)) {
+      if (EXTRA_MARKETS.has(leg.market)) leg.extra = true;
+      // Learning: shift a market's chances by what your settled bets showed.
+      // The simulation is untouched; `adj` rescales this leg in ticket maths.
+      leg.pRaw = leg.p;
+      const key = learnKey(leg.id, leg.market), shift = key && learning[key];
+      if (shift) {
+        const p = 1 / (1 + Math.exp(-(logit(leg.p) + shift)));
+        leg.adj = p / leg.p; leg.p = p; leg.fair = 1 / p;
+      }
+    }
     return legs;
   }
+
+  // Per-market shifts in log-odds, worked out by the page from your settled
+  // HAWK bets (see "learning" in index.html). Empty = no adjustment.
+  let learning = {};
+  function setLearning(shifts) { learning = shifts && typeof shifts === "object" ? shifts : {}; }
+  // Which group a leg learns with, or null. Only HAWK's own estimates learn:
+  // player props, and corners/cards/shots-on-target lines split by Over and
+  // Under (shifting both the same way would be contradictory). Results and
+  // goals come from the bookmakers' prices, so they're left alone.
+  function learnKey(id, market) {
+    if (String(id).startsWith("p:")) return market;
+    const m = /^(?:corners|cards|sot|tcorners:\w+|tcards:\w+):([ou])/.exec(id || "");
+    return m ? `${market} · ${m[1] === "o" ? "Over" : "Under"}` : null;
+  }
+  const adjOf = (legs, ids) => ids.reduce((s, id) => s * ((legs[id] && legs[id].adj) || 1), 1);
 
   const FIXED_BOOK_LINES = { "res:home": [1, "", "1"], "res:draw": [1, "", "X"], "res:away": [1, "", "2"], "dc:home": [14, "", "1X"],
     "dc:away": [14, "", "X2"], "btts:yes": [12, "", "Yes"], "btts:no": [12, "", "No"], "cs:home": [144, "", "Yes"], "cs:away": [145, "", "Yes"],
@@ -893,12 +932,14 @@
     const chosen = ids.filter((i) => legs[i]);
     if (!chosen.length) return { p: null, fair: null, legs: [] };
     const n = legs[chosen[0]].arr.length, m = new Uint8Array(n).fill(1), rows = [];
+    let adj = 1;   // learning adjustments of the legs so far
     for (const id of chosen) {
-      const before = mean(m), a = legs[id].arr;
+      const before = mean(m) * adj, a = legs[id].arr;
       for (let s = 0; s < n; s++) m[s] &= a[s];
-      rows.push({ id, p: legs[id].p, cond: before ? mean(m) / before : 0 });
+      adj *= legs[id].adj || 1;
+      rows.push({ id, p: legs[id].p, cond: before ? Math.min(1, (mean(m) * adj) / before) : 0 });
     }
-    const p = mean(m);
+    const p = Math.min(1, mean(m) * adj, ...chosen.map((id) => legs[id].p));
     return { p, fair: p > 0 ? 1 / p : null, legs: rows };
   }
   function pruneImplied(legs, chosen, keep, n) {
@@ -923,7 +964,7 @@
     const keep = new Set(chosen);
     let m = maskOf(legs, chosen, n);
     while (chosen.length < maxLegs) {
-      const pNow = mean(m);
+      const adjNow = adjOf(legs, chosen), pNow = mean(m) * adjNow;
       if (pNow === 0 || 1 / pNow >= target) break;
       const groups = new Set(chosen.map((i) => legs[i].group)), perPlayer = {};
       for (const i of chosen) { const k = playerKey(legs[i]); if (k) perPlayer[k] = (perPlayer[k] || 0) + 1; }
@@ -938,7 +979,7 @@
         if (k && (perPlayer[k] || 0) >= MAX_LEGS_PER_PLAYER) continue;
         let c = 0; const a = leg.arr;
         for (let s = 0; s < n; s++) c += m[s] & a[s];
-        const joint = c / n, cond = joint / pNow;
+        const joint = (c / n) * adjNow * (leg.adj || 1), cond = joint / pNow;
         if (cond < lo || cond > hi) continue;
         const reaches = joint > 0 && 1 / joint >= target;
         const score = [reaches ? 1 : 0, reaches ? joint : cond];
@@ -1009,9 +1050,9 @@
       expected: sim.exp, grid, table: { home: tableRow(an.homeComp), away: tableRow(an.awayComp) }, form: an.form,
       legs: legJSON, priceBook: PRICE_BOOK,
       players: Object.fromEntries(Object.entries(squads).map(([side, sq]) => [side, sq.map((p) => ({
-        name: p.name, pos: p.pos, status: p.status, photo: p.photo, start_p: p.start_p, sh90: p.sh90, sot90: p.sot90,
+        name: p.name, pos: p.pos, status: p.status, photo: p.photo, start_p: p.start_p, doubtful: p.doubtful, sh90: p.sh90, sot90: p.sot90,
         g90: p.g90, c90: p.c90, x: p.x, sv90: p.sv90, minutes: p.minutes, has_data: p.has_data, recent: p.recent }))])),
-      warnings: an.warnings, value: { book: PRICE_BOOK, legs: value }, sims: sim.n,
+      warnings: an.warnings, value: { book: PRICE_BOOK, legs: value }, sims: sim.n, missing: an.missing || { home: [], away: [] },
     };
   }
   function entryFor(id) {
@@ -1085,7 +1126,7 @@
   // What an acca needs to remember about one leg once the match isn't loaded.
   function legSummary(e, json, id) {
     const l = e.legs[id], j = json.legs.find((x) => x.id === id) || {};
-    return { id, label: l.label, market: l.market, kind: l.kind, p: l.p, fair: l.fair, bookPrice: j.bookPrice || null,
+    return { id, label: l.label, market: l.market, kind: l.kind, p: l.p, pRaw: l.pRaw, fair: l.fair, bookPrice: j.bookPrice || null,
              player: l.player || null, side: l.side || null };
   }
 
@@ -1286,7 +1327,7 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices,
+  global.HAWK = { LEAGUES, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, learnKey,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },

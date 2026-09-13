@@ -122,6 +122,12 @@ img{max-width:100%}
 .live-odds .dot.on{background:var(--accent);box-shadow:0 0 0 0 rgba(20,227,161,.6);animation:livepulse 2s infinite}
 @keyframes livepulse{70%{box-shadow:0 0 0 6px rgba(20,227,161,0)}100%{box-shadow:0 0 0 0 rgba(20,227,161,0)}}
 .linkbtn{background:none;border:0;padding:0 2px;color:var(--accent);cursor:pointer;font:inherit;text-decoration:underline}
+.tn{font-size:13px;padding:4px 0;display:flex;align-items:baseline;flex-wrap:wrap;gap:2px}
+.tn .tag{font-size:10px;font-weight:800;letter-spacing:.06em;padding:1px 6px;border-radius:5px;margin-right:6px}
+.tn.out .tag{background:rgba(255,107,107,.15);color:#ff8a8a}
+.tn.doubt .tag{background:rgba(255,196,0,.14);color:var(--gold)}
+.learn{margin-top:10px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}
+.learn b{color:var(--text)}
 .star{cursor:pointer;color:#3a4a55;margin-left:6px;font-size:13px}
 .star:hover{color:var(--gold)}
 .star.on{color:var(--gold)}
@@ -380,6 +386,7 @@ async function init() {
   S.scan.leagues = new Set(leagues);
   S.value.leagues = new Set(leagues);
   S.monster.leagues = new Set(leagues);
+  applyLearning();
   $("#valueBtn").onclick = showValue;
   $("#accaBtn").onclick = showAcca;
   renderAccaBtn();
@@ -485,6 +492,7 @@ function renderMatch() {
       <div class="bar3"><div class="h" style="flex:${p.home}">${pct(p.home)}</div><div class="d" style="flex:${p.draw}">${pct(p.draw)}</div><div class="a" style="flex:${p.away}">${pct(p.away)}</div></div>
       <div class="srcs">${srcs.map(esc).map(s => `<span>${s}</span>`).join("")}</div>
     </div>
+    ${teamNews(m)}
     <div class="section"><div class="tiles">
       <div class="tile"><div class="k">Expected goals</div><div class="v">${e.goals[0].toFixed(2)} – ${e.goals[1].toFixed(2)}</div></div>
       <div class="tile"><div class="k">Shots on target</div><div class="v">${e.sot[0].toFixed(1)} – ${e.sot[1].toFixed(1)}</div></div>
@@ -555,6 +563,23 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden && S.live.on && S.live.checked && Date.now() - S.live.checked.getTime() > LIVE_MS) checkLive();
 });
 
+// Injured/suspended ("out") and doubtful players, from 365Scores. HAWK leaves
+// the out players out of its predicted lineups and gives doubtful ones no legs.
+function teamNews(m) {
+  const miss = m.missing || {};
+  if (!(miss.home || []).length && !(miss.away || []).length) return "";
+  const col = (side) => {
+    const list = miss[side] || [];
+    const row = (p) => `<div class="tn ${p.status === "Missing" ? "out" : "doubt"}" title="${esc([p.reason, p.back && "back: " + p.back].filter(Boolean).join(" · "))}">
+      <span class="tag">${p.status === "Missing" ? "OUT" : "DOUBT"}</span>${esc(p.name)}${p.pos ? `<span class="pos">${esc(p.pos)}</span>` : ""}
+      ${p.reason ? `<span class="muted"> · ${esc(p.reason)}${p.back ? `, ${esc(p.back)}` : ""}</span>` : ""}</div>`;
+    return `<div><div class="team-head" style="margin-bottom:6px">${esc(side === "home" ? m.home : m.away)}</div>
+      ${list.length ? list.map(row).join("") : '<div class="note" style="margin:0">No absences listed.</div>'}</div>`;
+  };
+  return `<div class="section"><h3>🚑 Team news</h3><div class="two">${col("home")}${col("away")}</div>
+    <div class="note">Out players are left out of HAWK's predicted lineups; doubtful ones get no player legs until lineups are confirmed.</div></div>`;
+}
+
 function valueCard(v) {
   if (!v) return "";
   if (!v.legs.length) return `<div class="note">No leg at ${esc(v.book)} beats the bookmaker consensus by 2%+ right now. Normal — genuine value is rare.</div>`;
@@ -611,7 +636,8 @@ function playerCard(side, p) {
     : p.has_data ? `${p.sh90.toFixed(1)} shots · ${p.sot90.toFixed(1)} SoT · ${p.g90.toFixed(2)} xG per 90 · ${Math.round(p.minutes)} min` : "no recent data — position average";
   const more = legs.length > chips.length ? `<span class="qc" ${open}>+${legs.length - chips.length} more</span>` : "";
   return `<div class="pl"><div class="ph" ${open}>${p.photo ? `<img src="${esc(p.photo)}" alt="" onerror="this.remove()">` : ""}</div>
-    <div><div class="top1"><div><span class="nm" ${open}>${esc(p.name)}</span><span class="pos">${esc(p.pos)}</span></div>${spark}</div>
+    <div><div class="top1"><div><span class="nm" ${open}>${esc(p.name)}</span><span class="pos">${esc(p.pos)}</span>${
+      p.doubtful ? '<span class="badge warn" style="margin-left:6px" title="Listed as doubtful — no legs until lineups are confirmed">doubtful</span>' : ""}</div>${spark}</div>
       <div class="rates">${rates}</div>
       <div class="qchips">${quick}${more}</div></div></div>`;
 }
@@ -713,7 +739,8 @@ function renderSlip() {
     ${m && m.warnings.length ? m.warnings.map(w => `<div class="warn">${esc(w)}</div>`).join("") : ""}
     <div class="note">Fair odds = 1 ÷ chance to land, from ${m ? m.sims.toLocaleString() : "12,000"} simulated matches.
       Match legs are calibrated to the bookmakers; player legs are HAWK's own estimates (no free feed has player-prop prices).
-      ${S.dataAge ? `Player &amp; team data updated ${esc(S.dataAge)}.` : ""}</div>`;
+      ${S.dataAge ? `Player &amp; team data updated ${esc(S.dataAge)}.` : ""}</div>
+    ${learningNote()}`;
 
   $("#rng").oninput = (e) => { S.target = sliderToOdds(+e.target.value); $("#tgt").textContent = S.target.toFixed(2); };
   $("#rng").onchange = () => renderSlip();
@@ -773,7 +800,8 @@ function sendToVault() {
 // leg's id, player and HAWK's chance.
 function hawkPart(info, legs, p) {
   return { game: String(info.id), league: info.league, home: info.home, away: info.away, kickoff: info.kickoff, p,
-           legs: legs.map(l => ({ id: l.id, label: l.label, market: l.market, p: l.p, player: l.player || null, side: l.side || null })) };
+           legs: legs.map(l => ({ id: l.id, label: l.label, market: l.market, p: l.p, pRaw: l.pRaw != null ? l.pRaw : l.p,
+                                  player: l.player || null, side: l.side || null })) };
 }
 // Adds a PENDING bet to the Vault and takes the stake off its bankroll.
 function saveToVault(legs, stake, price, extra = {}) {
@@ -1097,7 +1125,7 @@ function accaToast(replaced, home, away) {
 function addSlipToAcca() {
   const m = S.match, r = S.result;
   if (!m || !S.slip.length || !r || !r.p) return toast("Build a ticket first.");
-  const legs = S.slip.map(id => { const l = S.legs[id]; return { id, label: l.label, market: l.market, kind: l.kind, p: l.p, fair: l.fair,
+  const legs = S.slip.map(id => { const l = S.legs[id]; return { id, label: l.label, market: l.market, kind: l.kind, p: l.p, pRaw: l.pRaw, fair: l.fair,
     bookPrice: l.bookPrice || null, player: l.player || null, side: l.side || null }; });
   accaToast(putPart(makePart(m, legs, r.p)), m.home, m.away);
   renderSlip();
@@ -1329,6 +1357,63 @@ function monsterClick(e) {
   const s = e.target.closest("[data-mskip]");
   if (s) { S.monster.skip.add(s.dataset.mskip); updateMonster(); }
 }
+
+/* ---------- learning from your results ---------- */
+// The Vault settles your HAWK bets, so it knows how often each market's legs
+// really landed. Once a market has 30+ settled legs, HAWK nudges that
+// market's chances towards what happened (in log-odds, shrunk towards "no
+// change" while the sample is small, and capped). Uses each leg's raw
+// chance, so earlier adjustments aren't counted twice. Which legs learn, and
+// in which group, is HAWK.learnKey (player props; corners/cards/SoT by Over/Under).
+const LEARN_MIN = 30, LEARN_SHRINK = 60, LEARN_CAP = 0.6;
+const lg = (p) => Math.log(p / (1 - p)), ilg = (x) => 1 / (1 + Math.exp(-x));
+function computeLearning() {
+  let bets = [];
+  try { bets = JSON.parse(localStorage.getItem("hawk_bets")) || []; } catch { /* no Vault data */ }
+  const by = {};
+  for (const b of bets) for (const l of b.legs || []) for (const h of (l.hawk && l.hawk.legs) || []) {
+    const p = h.pRaw != null ? h.pRaw : h.p, key = HAWK.learnKey(h.id, h.market);
+    if ((h.result !== "won" && h.result !== "lost") || !(p > 0 && p < 1) || !key) continue;
+    const g = (by[key] ||= { n: 0, said: 0, won: 0 });
+    g.n++; g.said += p; if (h.result === "won") g.won++;
+  }
+  const shifts = {}, changes = [];
+  let total = 0;
+  for (const [market, g] of Object.entries(by)) {
+    total += g.n;
+    if (g.n < LEARN_MIN) continue;
+    const said = g.said / g.n, got = Math.min(Math.max(g.won / g.n, 0.02), 0.98);
+    const shift = Math.max(-LEARN_CAP, Math.min(LEARN_CAP, (g.n / (g.n + LEARN_SHRINK)) * (lg(got) - lg(said))));
+    if (Math.abs(shift) < 0.02) continue;
+    shifts[market] = shift;
+    changes.push({ market, n: g.n, pts: 100 * (ilg(lg(said) + shift) - said) });
+  }
+  return { shifts, changes: changes.sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts)), total,
+           best: Math.max(0, ...Object.values(by).map((g) => g.n)) };
+}
+function applyLearning() {
+  S.learn = { on: loadPref("hawk.learn", true), ...computeLearning() };
+  HAWK.setLearning(S.learn.on ? S.learn.shifts : {});
+}
+function learningNote() {
+  const L = S.learn;
+  if (!L) return "";
+  if (!L.changes.length)
+    return `<div class="learn">🧠 HAWK learns from your settled bets: once a market has ${LEARN_MIN}+ settled legs it adjusts that market's chances.
+      ${L.total ? `You have ${L.total} so far (best market: ${L.best}).` : "Send bets with 🦅 Send to Vault to start."}</div>`;
+  return `<div class="learn">🧠 ${L.on ? "Adjusted" : "Could adjust"} from your ${L.total} settled legs:
+    ${L.changes.slice(0, 4).map((c) => `<b>${esc(c.market)}</b> ${c.pts >= 0 ? "+" : ""}${c.pts.toFixed(1)} pts`).join(" · ")}
+    <button class="linkbtn" onclick="toggleLearning()">${L.on ? "turn off" : "turn on"}</button></div>`;
+}
+function toggleLearning() {
+  savePref("hawk.learn", !S.learn.on);
+  applyLearning();
+  toast(S.learn.on ? "🧠 Learning on." : "Learning off — HAWK's plain chances.");
+  if (S.match && S.view === "match") openMatch(S.match.id, true);   // re-price the open match (keeps your slip)
+  else renderSlip();
+}
+// A bet settled in the Vault (another tab) may change what HAWK has learned.
+window.addEventListener("storage", (e) => { if (e.key === "hawk_bets") { applyLearning(); renderSlip(); } });
 
 /* ---------- price alerts ---------- */
 // Star a leg that has a Bet365 price and HAWK tells you (sound, title flash,

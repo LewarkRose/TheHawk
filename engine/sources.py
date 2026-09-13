@@ -32,7 +32,8 @@ HEADERS = {
 }
 TIMEOUT = 12
 
-LEAGUES = ("Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "Champions League")
+LEAGUES = ("Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "Champions League",
+           "Europa League", "Conference League")
 
 # ---------------------------------------------------------------------------
 # Small helpers: HTTP, caching, team-name matching
@@ -206,6 +207,7 @@ S365_PARAMS = {"appTypeId": 5, "langId": 1, "timezoneName": "Europe/London", "us
 S365_COMPETITIONS = {
     "Premier League": 7, "La Liga": 11, "Serie A": 17,
     "Bundesliga": 25, "Ligue 1": 35, "Champions League": 572,
+    "Europa League": 573, "Conference League": 7685,
 }
 # Odds are geo-gated by userCountryId (-1 returns none). Each of these
 # countries exposes a different bookmaker set, confirmed live:
@@ -328,7 +330,9 @@ def dedupe_quotes(quotes):
 # ---------------------------------------------------------------------------
 FD_BASE = "https://www.football-data.co.uk"
 FD_LEAGUE_CODES = {"Premier League": "E0", "La Liga": "SP1", "Serie A": "I1", "Bundesliga": "D1", "Ligue 1": "F1"}
-# Extra top divisions, only searched for Champions League teams.
+# Extra top divisions, only searched for teams in the European cups. Cup
+# teams from leagues football-data doesn't cover are priced from the
+# bookmakers alone.
 FD_EXTRA_CODES = ("P1", "N1", "B1", "SC0", "T1", "G1")
 # Column prefixes in fixtures.csv. B365 is skipped: 365Scores already has
 # Bet365 live, and the CSV is only a snapshot.
@@ -425,7 +429,8 @@ def fd_upcoming_quotes(code, home_fd, away_fd, kickoff_date):
 # ---------------------------------------------------------------------------
 PM_BASE = "https://gamma-api.polymarket.com"
 PM_SERIES = {"Premier League": "10188", "La Liga": "10193", "Serie A": "10203",
-             "Bundesliga": "10194", "Ligue 1": "10195", "Champions League": "10204"}
+             "Bundesliga": "10194", "Ligue 1": "10195", "Champions League": "10204",
+             "Europa League": "10209", "Conference League": "10437"}
 _PM_MAIN_EVENT = re.compile(r"^[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-(\d{4}-\d{2}-\d{2})$")
 
 
@@ -517,7 +522,7 @@ def sh_referee(home, away):
 
 # StatsHub's competition ids (the same numbering Sofascore uses).
 SH_TOURNAMENTS = {"Premier League": 17, "La Liga": 8, "Serie A": 23, "Bundesliga": 35, "Ligue 1": 34,
-                  "Champions League": 7}
+                  "Champions League": 7, "Europa League": 679, "Conference League": 17015}
 
 
 def sh_league_teams(league):

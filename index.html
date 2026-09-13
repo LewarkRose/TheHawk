@@ -128,6 +128,8 @@
                                 <option value="Bundesliga">🇩🇪 Bundesliga</option>
                                 <option value="Ligue 1">🇫🇷 Ligue 1</option>
                                 <option value="UEFA Champions League">🇪🇺 UEFA Champions League</option>
+                    <option value="UEFA Europa League">🇪🇺 UEFA Europa League</option>
+                    <option value="UEFA Conference League">🇪🇺 UEFA Conference League</option>
                                 <option value="Other Matches">⭐ Custom / Other Matches</option>
                             </select>
                             <select id="league-match-dropdown" onchange="onLeagueMatchSelect()" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#d9b571]" disabled>
@@ -283,7 +285,7 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
                     <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🎯</span> HAWK Track Record</h3>
-                    <p class="text-[10px] text-zinc-500">Bets sent from the HAWK builder settle themselves after the match. This checks whether HAWK's chances come true — its 70% legs should land about 70% of the time.</p>
+                    <p class="text-[10px] text-zinc-500">Bets sent from the HAWK builder settle themselves after the match. This checks whether HAWK's chances come true — its 70% legs should land about 70% of the time. 🧠 Once a market has 30+ settled legs, the builder corrects that market's chances by what actually happened.</p>
                     <div id="track-record-container" class="space-y-2 pt-1"></div>
                 </div>
                 <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
@@ -386,6 +388,8 @@
                     <option value="Bundesliga">🇩🇪 Bundesliga</option>
                     <option value="Ligue 1">🇫🇷 Ligue 1</option>
                     <option value="UEFA Champions League">🇪🇺 UEFA Champions League</option>
+                    <option value="UEFA Europa League">🇪🇺 UEFA Europa League</option>
+                    <option value="UEFA Conference League">🇪🇺 UEFA Conference League</option>
                     <option value="Other Matches">⭐ Custom / Other Matches</option>
                 </select>
             </div>
@@ -612,7 +616,12 @@
             "Other Matches": []
         };
 
-        const FEED_LEAGUES = ["Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "UEFA Champions League", "Other Matches"];
+        const FEED_LEAGUES = ["Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "UEFA Champions League",
+                              "UEFA Europa League", "UEFA Conference League", "Other Matches"];
+        // The builder calls the cups by their short names; the Vault uses the full ones.
+        const LEAGUE_ALIASES = { 'Champions League': 'UEFA Champions League', 'Europa League': 'UEFA Europa League',
+                                 'Conference League': 'UEFA Conference League' };
+        const leagueName = (l) => LEAGUE_ALIASES[l] || l;
         const isLegacyFixture = (m) => (LEGACY_FIXTURES[m.league] || Object.values(LEGACY_FIXTURES).flat())
             .some(x => x.name === m.name && x.date === m.date);
 
@@ -668,7 +677,8 @@
         // --- LIVE FIXTURE FEED: 365Scores, the same source the HAWK builder uses ---
         const S365 = 'https://webws.365scores.com/web';
         const S365_PARAMS = { appTypeId: 5, langId: 1, timezoneName: 'Europe/London', userCountryId: -1 };
-        const S365_COMPETITIONS = { 'Premier League': 7, 'La Liga': 11, 'Serie A': 17, 'Bundesliga': 25, 'Ligue 1': 35, 'UEFA Champions League': 572 };
+        const S365_COMPETITIONS = { 'Premier League': 7, 'La Liga': 11, 'Serie A': 17, 'Bundesliga': 25, 'Ligue 1': 35, 'UEFA Champions League': 572,
+                                    'UEFA Europa League': 573, 'UEFA Conference League': 7685 };
         async function s365(path, params) {
             for (let attempt = 0; attempt < 3; attempt++) {
                 try {
@@ -1552,7 +1562,7 @@
         // older legs from before this feature don't have that tag, so as a fallback we try
         // matching the fixture text against known fixture lists to infer it.
         function inferLegLeague(leg) {
-            if (leg.league) return leg.league;
+            if (leg.league) return leagueName(leg.league);
             for (const [league, matches] of Object.entries(customMatches)) {
                 if (matches.some(m => m.name === leg.fixture)) return league;
             }
@@ -2101,7 +2111,8 @@
 
             const legsContainer = document.getElementById('edit-ticket-legs');
             legsContainer.innerHTML = '';
-            const leagueOptions = ['Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'UEFA Champions League', 'Other Matches', 'Custom / Manual', 'Unknown / Custom'];
+            const leagueOptions = ['Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'UEFA Champions League', 'UEFA Europa League',
+                                   'UEFA Conference League', 'Other Matches', 'Custom / Manual', 'Unknown / Custom'];
 
             const ticketLeagueSelect = document.getElementById('edit-ticket-league');
             const currentTicketLeague = getBetLeague(bet); // resolves to a shared league, or 'Multi-League Acca' if legs differ

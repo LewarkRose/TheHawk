@@ -1,0 +1,60 @@
+# Builds HAWK's data files and publishes the whole site to GitHub Pages.
+#
+# Runs every 3 hours, whenever you upload/commit to main, and on demand
+# (Actions tab -> "HAWK data + site" -> Run workflow).
+#
+# One-time setup: Settings -> Pages -> Build and deployment -> Source:
+# "GitHub Actions".
+name: HAWK data + site
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python packages
+        run: pip install -r engine/requirements.txt
+
+      - name: Build data files (player stats, team ratings, fixture links)
+        # If a source is down, the site still publishes with whatever was built.
+        continue-on-error: true
+        working-directory: engine
+        run: python build_data.py ../data
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

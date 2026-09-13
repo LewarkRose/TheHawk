@@ -377,7 +377,7 @@
                 </div>
                 <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
                     <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🧾</span> Profit by Bet Type</h3>
-                    <p class="text-[10px] text-zinc-500">Which kind of bet actually pays: HAWK builders, HAWK accas, or bets you built yourself.</p>
+                    <p class="text-[10px] text-zinc-500">Your settled tickets grouped by their badge (Bet Builder / Acca / Mixed) and by who built them: 🦅 HAWK = sent from the HAWK builder, "Your" = built here in the Ticket Builder. Profit = what came back minus what you staked.</p>
                     <div id="type-breakdown-container" class="space-y-2 pt-1"></div>
                 </div>
             </div>
@@ -1531,10 +1531,10 @@
                             bet.status === 'CASHED_OUT' ? '<span class="bg-[#c9a05c]/10 text-[#d9b571] border border-[#c9a05c]/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">CASHED OUT</span>' :
                             '<span class="bg-red-500/10 text-red-400 border border-red-500/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">LOST</span>';
 
-                const legTypes = new Set(bet.legs.map(l => l.type || 'builder'));
-                const typeBadge = legTypes.size > 1
+                const kind = ticketType(bet);
+                const typeBadge = kind === 'Mixed'
                     ? '<span class="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded text-[10px] font-bold">MIXED</span>'
-                    : legTypes.has('acca')
+                    : kind === 'Acca'
                         ? '<span class="bg-blue-500/15 text-blue-300 px-2 py-0.5 rounded text-[10px] font-bold">Acca</span>'
                         : '<span class="bg-[#c9a05c]/15 text-[#d9b571] px-2 py-0.5 rounded text-[10px] font-bold">Bet Builder</span>';
 
@@ -1818,10 +1818,13 @@
         }
 
         // --- PROFIT BY BET TYPE ---
-        function betKind(b) {
-            const acca = (b.legs || []).length > 1 || (b.legs || []).some(l => l.type === 'acca');
-            return isHawkBet(b) ? (acca ? 'HAWK accas' : 'HAWK builders') : (acca ? 'Your accas' : 'Your builders & singles');
+        // A ticket's type is exactly the badge it shows in the history: Bet Builder,
+        // Acca, or Mixed (its legs are a mix of both).
+        function ticketType(b) {
+            const types = new Set((b.legs || []).map(l => l.type || 'builder'));
+            return types.size > 1 ? 'Mixed' : types.has('acca') ? 'Acca' : 'Bet Builder';
         }
+        const TYPE_PLURAL = { 'Bet Builder': 'Bet Builders', 'Acca': 'Accas', 'Mixed': 'Mixed tickets' };
         function renderTypeBreakdown() {
             const el = document.getElementById('type-breakdown-container');
             if (!el) return;
@@ -1829,19 +1832,20 @@
             if (!settled.length) { el.innerHTML = '<div class="text-center py-6 text-zinc-500 text-xs">Settle some tickets to see this.</div>'; return; }
             const groups = {};
             settled.forEach(b => {
-                const g = (groups[betKind(b)] ||= { n: 0, wins: 0, decided: 0, staked: 0, returned: 0 });
+                const hawk = isHawkBet(b), type = ticketType(b);
+                const key = `${hawk ? '🦅 HAWK' : 'Your'} ${TYPE_PLURAL[type]}`;
+                const g = (groups[key] ||= { n: 0, wins: 0, staked: 0, returned: 0 });
                 g.n++; g.staked += b.stake; g.returned += betReturn(b);
                 if (b.status === 'WON') g.wins++;
-                if (b.status === 'WON' || b.status === 'LOST') g.decided++;
             });
             el.innerHTML = Object.entries(groups).sort((a, b) => (b[1].returned - b[1].staked) - (a[1].returned - a[1].staked)).map(([k, g]) => {
                 const net = g.returned - g.staked, roi = g.staked ? (100 * net) / g.staked : 0;
                 return `<div class="flex items-center justify-between bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs gap-3">
-                    <div class="font-semibold text-white">${k} <span class="text-zinc-500 font-normal">(${g.n})</span></div>
-                    <div class="flex items-center gap-4 text-right">
-                        <span class="text-zinc-400">${g.decided ? Math.round((100 * g.wins) / g.decided) : 0}% won</span>
-                        <span class="text-zinc-400">ROI ${roi >= 0 ? '+' : ''}${roi.toFixed(0)}%</span>
-                        <span class="font-bold ${net >= 0 ? 'text-emerald-400' : 'text-red-400'}">€${net >= 0 ? '+' : ''}${net.toFixed(2)}</span>
+                    <div><div class="font-semibold text-white">${k}</div>
+                        <div class="text-zinc-500 mt-0.5">${g.n} ticket${g.n === 1 ? '' : 's'} · ${g.wins} won (${Math.round((100 * g.wins) / g.n)}%) · €${g.staked.toFixed(2)} staked</div></div>
+                    <div class="text-right shrink-0">
+                        <div class="font-bold text-sm ${net >= 0 ? 'text-emerald-400' : 'text-red-400'}">${net >= 0 ? '+' : '−'}€${Math.abs(net).toFixed(2)}</div>
+                        <div class="text-zinc-500" title="Profit as a share of what you staked">${roi >= 0 ? '+' : ''}${roi.toFixed(0)}% return</div>
                     </div></div>`;
             }).join('');
         }

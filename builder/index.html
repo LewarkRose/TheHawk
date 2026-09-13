@@ -122,6 +122,19 @@ img{max-width:100%}
 .live-odds .dot.on{background:var(--accent);box-shadow:0 0 0 0 rgba(20,227,161,.6);animation:livepulse 2s infinite}
 @keyframes livepulse{70%{box-shadow:0 0 0 6px rgba(20,227,161,0)}100%{box-shadow:0 0 0 0 rgba(20,227,161,0)}}
 .linkbtn{background:none;border:0;padding:0 2px;color:var(--accent);cursor:pointer;font:inherit;text-decoration:underline}
+.kelly{margin-top:8px;font-size:13px;padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line)}
+.kelly b{color:var(--gold)}
+.kfrac{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:2px 4px;font-size:12px;margin-left:4px}
+.ip-score{font-size:44px;font-weight:900;letter-spacing:.04em;text-align:center;line-height:1}
+.ip-clock{color:#ff6b6b;font-weight:800;text-align:center;margin-top:4px}
+.ip-stat{display:grid;grid-template-columns:48px 1fr 48px;gap:8px;align-items:center;font-size:12.5px;margin:5px 0}
+.ip-stat .bar{display:flex;height:7px;border-radius:5px;overflow:hidden;background:#22303a}
+.ip-stat .bar i{display:block;height:100%}
+.ip-stat .nm{grid-column:1/-1;text-align:center;color:var(--muted);font-size:11px;margin-bottom:-3px}
+.ip-row{display:grid;grid-template-columns:1fr 64px 60px 60px 64px 84px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.ip-row.head{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.ip-row.val{background:rgba(20,227,161,.06)}
+@media (max-width:640px){.ip-row{grid-template-columns:1fr 56px 56px 70px}.ip-row .hide-sm{display:none}}
 .tn{font-size:13px;padding:4px 0;display:flex;align-items:baseline;flex-wrap:wrap;gap:2px}
 .tn .tag{font-size:10px;font-weight:800;letter-spacing:.06em;padding:1px 6px;border-radius:5px;margin-right:6px}
 .tn.out .tag{background:rgba(255,107,107,.15);color:#ff8a8a}
@@ -327,6 +340,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             chk: { price: "", boost: "", stake: "5" }, extras: false, cat: "All",
             live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
+            inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25),
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },
             view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "legs", data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null },
@@ -360,6 +374,7 @@ async function api(path, body) {
     case "/api/match": return HAWK.match(q.league, q.id, q.refresh === "1");
     case "/api/lineups": return HAWK.lineups(q.id);
     case "/api/prices": return HAWK.livePrices(q.id);
+    case "/api/live": return HAWK.liveMatch(q.id);
     case "/api/legprices": return HAWK.legPrices(body.items);
     case "/api/monster": return body ? HAWK.startMonster(body) : HAWK.monsterStatus();
     case "/api/monster/stop": return HAWK.stopMonster();
@@ -425,7 +440,7 @@ function renderFixtures() {
     <div class="fx ${String(f.id) === openId ? "on" : ""}" data-id="${f.id}">
       <div class="team"><img src="${esc(f.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(f.home)}${isWatched(f.id) ? '<span class="bellmark" title="Lineup alert on">🔔</span>' : ""}</div>
       <div class="team"><img src="${esc(f.awayCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(f.away)}</div>
-      <div class="when">${f.started ? '<span class="badge live">STARTED</span>' : esc(fmtKick(f.kickoff)).replace(" · ", "<br>")}</div>
+      <div class="when">${f.started ? '<span class="badge live" title="In play — opens the live view">🔴 LIVE</span>' : esc(fmtKick(f.kickoff)).replace(" · ", "<br>")}</div>
     </div>`).join("") : `<div class="empty">No upcoming fixtures.</div>`;
   $("#fixtures").onclick = (e) => { const f = e.target.closest(".fx"); if (f) openMatch(f.dataset.id); };
 }
@@ -438,7 +453,10 @@ async function goToMatch(league, id) {
   if (S.league !== league) await selectLeague(league);
   await openMatch(id);
 }
-async function openMatch(id, refresh = false) {
+async function openMatch(id, refresh = false, prematch = false) {
+  // A match in play opens the live view (the pre-match builder is one click away there).
+  const fx = S.fixtures.find(f => String(f.id) === String(id));
+  if (!refresh && !prematch && fx && fx.started) return showInPlay(id);
   S.view = "match";
   document.querySelectorAll(".fx").forEach(f => f.classList.toggle("on", f.dataset.id === String(id)));
   let i = 0;
@@ -839,7 +857,37 @@ function verdict() {
     ${boost ? `<small>With your ${boost}% boost, ${odds(price)} pays like <b>${odds(eff)}</b>.</small>` : ""}
     <small>That price implies a ${pct(1 / eff, 1)} chance — HAWK says ${pct(r.p, 1)}.</small>
     <small>${good ? `Expected profit ≈ €${(ev * stake).toFixed(2)} on €${stake.toFixed(2)} (wins ${pct(r.p, 1)} of the time, pays €${(eff * stake).toFixed(2)}).`
-                  : `The bookmaker keeps ≈ €${(-ev * stake).toFixed(2)} of every €${stake.toFixed(2)} on average. It needs ${odds(needed)}+${boost ? " with this boost" : ""} to be fair — try swapping legs or another book.`}</small></div>`;
+                  : `The bookmaker keeps ≈ €${(-ev * stake).toFixed(2)} of every €${stake.toFixed(2)} on average. It needs ${odds(needed)}+${boost ? " with this boost" : ""} to be fair — try swapping legs or another book.`}</small></div>
+    ${stakeAdvice(r.p, eff)}`;
+  bindStakeAdvice(out, (v) => { if (v) { S.chk.stake = v; $("#stake").value = v; } verdict(); });
+}
+
+/* ---------- recommended stake (Kelly) ---------- */
+// Kelly: the share of your bankroll that grows it fastest when HAWK's chance
+// is right. HAWK uses a fraction of it (¼ by default) and never more than 5%
+// of the bankroll, because the chance is an estimate. Bankroll = your Vault's.
+const KELLY_CAP = 0.05, KELLY_FRACS = [[0.125, "⅛"], [0.25, "¼"], [0.5, "½"]];
+function vaultBankroll() { try { return parseFloat(localStorage.getItem("hawk_bankroll")) || 1000; } catch { return 1000; } }
+function kellyStake(p, price) {
+  if (!(p > 0 && p < 1 && price > 1)) return null;
+  const b = price - 1, full = (b * p - (1 - p)) / b, bankroll = vaultBankroll();
+  if (full <= 0) return { stake: 0, pct: 0, bankroll };
+  const pct = Math.min(full * S.kellyFrac, KELLY_CAP);
+  return { stake: Math.floor(bankroll * pct * 100) / 100, pct, bankroll, capped: full * S.kellyFrac > KELLY_CAP };
+}
+function stakeAdvice(p, price) {
+  const k = kellyStake(p, price);
+  if (!k) return "";
+  const frac = `<select class="kfrac" title="How much of the full Kelly stake to use">${KELLY_FRACS.map(([f, t]) =>
+    `<option value="${f}" ${f === S.kellyFrac ? "selected" : ""}>${t} Kelly</option>`).join("")}</select>`;
+  if (!k.stake) return `<div class="kelly">💡 Recommended stake: <b>none</b> — at this price it isn't value. ${frac}</div>`;
+  return `<div class="kelly">💡 Recommended stake: <b>€${k.stake.toFixed(2)}</b> = ${(100 * k.pct).toFixed(1)}% of your €${k.bankroll.toFixed(0)} Vault bankroll
+    ${k.capped ? "(capped at 5%)" : ""} ${frac} <button class="linkbtn" data-usestake="${k.stake.toFixed(2)}">use it</button></div>`;
+}
+function bindStakeAdvice(root, useStake) {
+  const sel = root.querySelector(".kfrac"), use = root.querySelector("[data-usestake]");
+  if (sel) sel.onchange = (e) => { S.kellyFrac = +e.target.value; savePref("hawk.kellyFrac", S.kellyFrac); useStake(null); };
+  if (use) use.onclick = () => useStake(use.dataset.usestake);
 }
 
 async function build() {
@@ -1257,7 +1305,9 @@ function accaVerdict() {
     ${a.boost ? `<small>With your ${a.boost}% boost, ${odds(a.price)} pays like <b>${odds(a.eff)}</b>.</small>` : ""}
     <small>HAWK: lands ${pct(a.p, a.p < 0.1 ? 2 : 1)} of the time — about 1 in ${Math.round(1 / a.p)}. Pays €${(a.eff * a.stake).toFixed(2)} on €${a.stake.toFixed(2)}.</small>
     <small>${good ? `Expected profit ≈ €${(ev * a.stake).toFixed(2)} per €${a.stake.toFixed(2)} over many accas like it — most will still lose.`
-      : `Bet365's margin adds up over ${a.legs} legs: you'd lose ≈ €${(-ev * a.stake).toFixed(2)} per €${a.stake.toFixed(2)} on average.${boostNeeded && !a.boost ? ` An acca boost of ${Math.ceil(boostNeeded)}%+ would make it fair.` : ""}`}</small></div>`;
+      : `Bet365's margin adds up over ${a.legs} legs: you'd lose ≈ €${(-ev * a.stake).toFixed(2)} per €${a.stake.toFixed(2)} on average.${boostNeeded && !a.boost ? ` An acca boost of ${Math.ceil(boostNeeded)}%+ would make it fair.` : ""}`}</small></div>
+    ${stakeAdvice(a.p, a.eff)}`;
+  bindStakeAdvice(out, (v) => { if (v) { S.accaChk.stake = v; $("#aStake").value = v; } accaVerdict(); });
 }
 function copyAcca() {
   const t = accaTotals();
@@ -1356,6 +1406,92 @@ function updateMonster() {
 function monsterClick(e) {
   const s = e.target.closest("[data-mskip]");
   if (s) { S.monster.skip.add(s.dataset.mskip); updateMonster(); }
+}
+
+/* ---------- live (in-play) ---------- */
+// For a match in progress: score, clock and live stats, HAWK's live chances,
+// and every Bet365 in-play price against them (value first, with a stake).
+// Refreshes every 30 seconds while it's on screen.
+const INPLAY_MS = 30 * 1000;
+async function showInPlay(id) {
+  S.view = "inplay";
+  if (!S.inplay || S.inplay.id !== String(id)) S.inplay = { id: String(id), data: null, timer: null };
+  document.querySelectorAll(".fx").forEach(f => f.classList.toggle("on", f.dataset.id === String(id)));
+  $("#match").innerHTML = `<div class="skel"><div class="loading-msg">Reading the live match…</div>${'<div class="ln"></div>'.repeat(6)}</div>`;
+  clearInterval(S.inplay.timer);
+  await refreshInPlay();
+  S.inplay.timer = setInterval(refreshInPlay, INPLAY_MS);
+  if (narrow()) $("#match").scrollIntoView({ behavior: "smooth" });
+}
+async function refreshInPlay() {
+  const ip = S.inplay;
+  if (!ip) return;
+  if (S.view !== "inplay") { clearInterval(ip.timer); return; }
+  if (document.hidden && ip.data) return;
+  try { ip.data = await api(`/api/live?id=${ip.id}`); ip.error = null; }
+  catch (err) { ip.error = err.message; }
+  if (S.view === "inplay" && S.inplay === ip) renderInPlay();
+}
+function renderInPlay() {
+  const ip = S.inplay, d = ip.data;
+  if (!d) { $("#match").innerHTML = `<div class="empty"><h2>Couldn't read this match</h2>${esc(ip.error || "")}</div>`; return; }
+  const fx = S.fixtures.find(f => String(f.id) === ip.id);
+  const prematch = `<button class="ghost" style="width:auto;padding:5px 10px;margin-top:8px" onclick="openMatch('${ip.id}', false, true)">Pre-match builder</button>`;
+  const head = `<div class="hero"><div class="vs">
+      <div class="side"><img src="${esc(d.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(d.home)}</div>${d.reds && d.reds[0] ? `<div>${"🟥".repeat(d.reds[0])}</div>` : ""}</div>
+      <div class="mid">${d.live ? `<div class="ip-score">${d.score[0]} – ${d.score[1]}</div><div class="ip-clock">🔴 ${esc(d.clock || "")} ${esc(d.statusText || "")}</div>`
+        : `<div class="x">VS</div><div class="ko">${esc(d.statusText || "")}</div>`}
+        <div class="ko" style="margin-top:6px">${d.checked ? `checked ${new Date(d.checked).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · every 30s` : ""}</div>
+        ${prematch}</div>
+      <div class="side"><img src="${esc(d.awayCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(d.away)}</div>${d.reds && d.reds[1] ? `<div>${"🟥".repeat(d.reds[1])}</div>` : ""}</div>
+    </div></div>`;
+  if (!d.live) {
+    $("#match").innerHTML = head + `<div class="section"><div class="note">${d.status === 4 ? "This match has finished." : "Not in play right now."}
+      The live view works while a match is being played.</div></div>`;
+    return;
+  }
+  const st = d.stats || {};
+  const statRow = (name, label, fmt = (x) => x) => {
+    const v = st[name]; if (!v || (v[0] == null && v[1] == null)) return "";
+    const a = v[0] || 0, b = v[1] || 0, tot = a + b || 1;
+    return `<div class="ip-stat"><div class="nm">${label}</div><div style="text-align:right;font-weight:700">${fmt(a)}</div>
+      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:#7aa2ff"></i></div>
+      <div style="font-weight:700">${fmt(b)}</div></div>`;
+  };
+  const p = d.probs || {};
+  const rows = [...(d.rows || [])];
+  // Value = Bet365 pays 2%+ over HAWK's chance, on selections of 20%+ (longshot
+  // "edges" are mostly an artefact of how bookmaker margins are removed).
+  const isValue = (r) => r.edge >= 0.02 && r.p >= 0.2;
+  const value = rows.filter(isValue).sort((a, b) => b.edge - a.edge);
+  const order = [1, 14, 15, 3, 12, 144, 145, 126];
+  const rest = rows.filter(r => !isValue(r) && r.type !== 126).sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type) || b.p - a.p);
+  const row = (r) => {
+    const k = isValue(r) ? kellyStake(r.p, r.price) : null;
+    return `<div class="ip-row ${isValue(r) ? "val" : ""}"><div><b>${esc(r.label)}</b><div class="muted" style="font-size:11px">${esc(r.basis)}${r.push ? " · stake back on a push" : ""}</div></div>
+      <div style="font-weight:800">${odds(r.price)}</div><div class="muted hide-sm">${odds(r.fair)}</div><div class="hide-sm">${pct(r.p, r.p < 0.1 ? 1 : 0)}</div>
+      <div style="font-weight:800;color:${isValue(r) ? "var(--accent)" : r.edge >= 0 ? "var(--muted)" : "#ff8a8a"}">${r.edge >= 0 ? "+" : ""}${(100 * r.edge).toFixed(1)}%</div>
+      <div>${k && k.stake ? `<b style="color:var(--gold)">€${k.stake.toFixed(2)}</b>` : '<span class="muted">—</span>'}</div></div>`;
+  };
+  const headRow = `<div class="ip-row head"><div>Bet</div><div>Bet365</div><div class="hide-sm">Fair</div><div class="hide-sm">Chance</div><div>Edge</div><div>Stake</div></div>`;
+  $("#match").innerHTML = head + `
+    <div class="section"><h3>Live win chances</h3>
+      <div class="bar3"><div class="h" style="flex:${p.home}">${pct(p.home)}</div><div class="d" style="flex:${p.draw}">${pct(p.draw)}</div><div class="a" style="flex:${p.away}">${pct(p.away)}</div></div>
+      <div class="note">From ${d.basis === "live prices" ? `the live prices of ${d.books || "several"} bookmakers` : "HAWK's pre-match ratings (no live prices yet)"}${
+        d.tilt && (d.tilt[0] !== 1 || d.tilt[1] !== 1) ? `, tilted by live xG (${esc(d.home)} ×${d.tilt[0].toFixed(2)}, ${esc(d.away)} ×${d.tilt[1].toFixed(2)})` : ""}.
+        About ${Math.round(d.remaining || 0)} minutes left incl. stoppage time.</div></div>
+    <div class="section"><h3>Live stats</h3>
+      ${statRow("Expected Goals", "Expected goals (xG)", (x) => x.toFixed(2))}${statRow("Shots On Target", "Shots on target")}${statRow("Total Shots", "Shots")}
+      ${statRow("Big Chances Created", "Big chances")}${statRow("Corners", "Corners")}${statRow("Possession", "Possession", (x) => x + "%")}
+      ${!Object.keys(st).length ? '<div class="note">No live stats yet.</div>' : ""}</div>
+    <div class="section"><h3>💰 Live value at Bet365</h3>
+      ${value.length ? headRow + value.map(row).join("") : `<div class="note">Nothing at Bet365 beats HAWK's live chances by 2%+ right now. That's normal — in-play prices are sharp. Checking again every 30 seconds.</div>`}
+    </div>
+    <div class="section"><h3>All live prices</h3>${rest.length ? headRow + rest.map(row).join("") : '<div class="note">Bet365 has no live prices for this match right now (often suspended just after a goal or a chance).</div>'}
+      <div class="note">Stake = ${KELLY_FRACS.find(([f]) => f === S.kellyFrac)[1]} Kelly on your Vault bankroll, max 5%. In-play prices change every few seconds and get suspended after chances, so check the price is still there.
+        Only selections with a 20%+ chance count as value. Asian handicaps aren't listed (in play they're settled on goals scored after you bet),
+        and nor are corners and cards (bookmakers update those live lines too unevenly to compare).
+        <b>Losing a bet on this match? Don't chase it</b> — only bet what shows as value, at the stake shown.</div></div>`;
 }
 
 /* ---------- learning from your results ---------- */

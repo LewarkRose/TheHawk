@@ -1316,6 +1316,144 @@
     }
     return rows;
   }
+  // ---------------------------------------------------------------------------
+  // Live (in-play)
+  //
+  // The match's remaining goals are two Poisson counts added to the current
+  // score. Their rates are fitted to the live prices of all bookmakers
+  // (result + goal lines), so they already know the score, red cards and
+  // momentum; HAWK then tilts them by the live xG against what the teams
+  // were expected to create so far. The blend with the bookmakers'
+  // consensus gives the chance for each live selection, compared with
+  // Bet365's in-play price. Before any live price exists, the rates come
+  // from HAWK's pre-match ratings, scaled to the time left.
+  // ---------------------------------------------------------------------------
+  // Corners and cards are left out: bookmakers update those live lines at very
+  // different speeds (some still offer lines already decided), so there's no
+  // trustworthy live consensus to compare against.
+  const LIVE_MARKET_WEIGHT = 0.7, LIVE_TYPES = new Set([1, 14, 15, 3, 12, 144, 145, 126]);
+  // Live consensus = the MEDIAN of the bookmakers' margin-free chances, so one
+  // book that hasn't updated yet can't drag it off.
+  function liveConsensus(quotes) {
+    const groups = {};
+    for (const q of quotes) {
+      const opts = Object.entries(q.prices);
+      if (opts.length < 2) continue;
+      const inv = opts.map(([o, p]) => [o, 1 / p]), over = inv.reduce((s, [, x]) => s + x, 0) / (OPTION_TOTAL[q.type] || 1);
+      if (over < 0.98) continue;
+      const g = (groups[`${q.type}|${q.value}`] ||= { books: new Set(), probs: {} });
+      g.books.add(q.book);
+      for (const [o, x] of inv) (g.probs[o] ||= []).push(x / over);
+    }
+    const median = (xs) => { const s = xs.slice().sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+    const out = {};
+    for (const [k, g] of Object.entries(groups)) out[k] = { probs: Object.fromEntries(Object.entries(g.probs).map(([o, xs]) => [o, median(xs)])), books: g.books.size };
+    return out;
+  }
+  function remainingMinutes(minute, statusText) {
+    const m = Number(minute) || 0, s = String(statusText || "");
+    if (/half.?time|break/i.test(s)) return 50;
+    if (/1st/i.test(s) || m < 45) return Math.max(2, 47 - m) + 50;
+    return Math.max(1, 96 - m);
+  }
+  // Final-score matrix from the current score plus remaining-goal rates.
+  function finalMatrix(sh, sa, rh, ra) {
+    const ph = pmfRow(rh), pa = pmfRow(ra);
+    const M = Array.from({ length: MAX_GOALS + 1 }, () => new Array(MAX_GOALS + 1).fill(0));
+    for (let i = 0; i + sh <= MAX_GOALS; i++) for (let j = 0; j + sa <= MAX_GOALS; j++) M[i + sh][j + sa] += ph[i] * pa[j];
+    let s = 0; for (const row of M) for (const v of row) s += v;
+    return M.map((row) => row.map((v) => v / s));
+  }
+  function fitRemaining(sh, sa, p1x2, totals) {
+    const loss = (rh, ra) => {
+      const M = finalMatrix(sh, sa, rh, ra);
+      let l = 0;
+      if (p1x2) l += (sumCells(M, (i, j) => i > j) - p1x2[0]) ** 2 + (sumCells(M, (i, j) => i === j) - p1x2[1]) ** 2 + (sumCells(M, (i, j) => i < j) - p1x2[2]) ** 2;
+      for (const [line, pOver] of totals) l += (sumCells(M, (i, j) => i + j > line) - pOver) ** 2;
+      return l;
+    };
+    const solve = (hs, as) => { let best = null, bl = Infinity; for (const a of hs) for (const b of as) { const l = loss(a, b); if (l < bl) { bl = l; best = [a, b]; } } return best; };
+    const range = (a, b, st) => { const o = []; for (let x = a; x <= b + 1e-9; x += st) o.push(+x.toFixed(4)); return o; };
+    const [h, a] = solve(range(0.01, 3.2, 0.05), range(0.01, 3.2, 0.05));
+    return solve(range(Math.max(0.005, h - 0.05), h + 0.05, 0.005), range(Math.max(0.005, a - 0.05), a + 0.05, 0.005));
+  }
+  async function preMatchLambdas(meta) {
+    if (!meta) return null;
+    const fd = meta.fd || {};
+    const [profH, profA] = await Promise.all([fd.home ? data(`profiles/${fd.home[0]}.json`) : null, fd.away ? data(`profiles/${fd.away[0]}.json`) : null]);
+    const model = profH && profA ? expectedPair(profH, fd.home[1], profA, fd.away[1], "goals") : null;
+    const c = consensus(meta.uk || [])["1|"];   // football-data's pre-match odds snapshot
+    const p1x2 = c && ["1", "X", "2"].every((k) => k in c.probs) ? [c.probs["1"], c.probs.X, c.probs["2"]] : null;
+    const market = p1x2 ? fitGoalLambdas(p1x2, []) : null;
+    if (!model && !market) return null;
+    return [0, 1].map((k) => blend(model ? model[k] : null, market ? market[k] : null));
+  }
+  async function liveMatch(id) {
+    id = String(id);
+    const [d, st, quotes, file] = await Promise.all([s365("game", { gameId: id }), s365("game/stats", { games: id }), odds365(id), data("fixtures.json")]);
+    const game = d && d.game;
+    if (!game) throw new Error("365Scores didn't return this match");
+    const hc = game.homeCompetitor, ac = game.awayCompetitor;
+    const base = { id, home: hc.name, away: ac.name, homeCrest: crest(hc), awayCrest: crest(ac), status: game.statusGroup,
+                   statusText: game.statusText, minute: game.gameTime, clock: game.gameTimeDisplay };
+    if (game.statusGroup !== 3) return { ...base, live: false };
+    const sh = Math.max(0, Math.trunc(hc.score) || 0), sa = Math.max(0, Math.trunc(ac.score) || 0);
+    const reds = [hc.id, ac.id].map((cid) => (game.events || []).filter((e) => e.competitorId === cid && /red/i.test((e.eventType || {}).name || "")).length);
+    const stats = {};
+    for (const s of (st && st.statistics) || []) {
+      const k = s.competitorId === hc.id ? 0 : s.competitorId === ac.id ? 1 : -1;
+      if (k >= 0) (stats[s.name] ||= [null, null])[k] = parseFloat(String(s.value).replace("%", "")) || 0;
+    }
+    const rem = remainingMinutes(game.gameTime, game.statusText), elapsed = Math.min(95, Math.max(0, Number(game.gameTime) || 0));
+    const cons = liveConsensus(quotes), c1 = cons["1|"];
+    const p1x2 = c1 && ["1", "X", "2"].every((k) => k in c1.probs) ? [c1.probs["1"], c1.probs.X, c1.probs["2"]] : null;
+    const totals = Object.entries(cons).filter(([k, c]) => k.startsWith("3|") && halfLine(k.slice(2)) != null && "Over" in c.probs)
+      .map(([k, c]) => [parseFloat(k.slice(2)), c.probs.Over]);
+    const pre = await preMatchLambdas(file && file.fixtures && file.fixtures[id]);
+    let rates, basis;
+    if (p1x2 || totals.length) { rates = fitRemaining(sh, sa, p1x2, totals); basis = "live prices"; }
+    else if (pre) {
+      // No live prices: pre-match strength for the time left, nudged for the score and red cards.
+      const diff = sh - sa;
+      rates = pre.map((l, k) => {
+        const mine = k === 0 ? diff : -diff, chase = mine < 0 ? Math.min(1.25, 1 + 0.1 * -mine) : mine > 0 ? 0.92 : 1;
+        return (l * rem) / 95 * chase * Math.pow(0.75, reds[k]) * Math.pow(1.2, reds[1 - k]);
+      });
+      basis = "pre-match ratings";
+    } else return { ...base, live: true, score: [sh, sa], reds, stats, noModel: true, rows: [] };
+    // HAWK's tilt: teams creating more (or less) than expected so far keep doing so, a bit.
+    const xg = stats["Expected Goals"];
+    const tilt = [0, 1].map((k) => {
+      if (!pre || !xg || elapsed < 15) return 1;
+      const expected = (pre[k] * elapsed) / 95;
+      return Math.min(1.2, Math.max(0.85, Math.sqrt((xg[k] + expected) / (2 * expected))));
+    });
+    const M = finalMatrix(sh, sa, rates[0] * tilt[0], rates[1] * tilt[1]);
+    const anLive = { M, lamBlend: rates };
+    const liveModel = (type, value, option) => selectionModel(anLive, {}, type, value, option);
+    const rows = [];
+    const byLine = {};
+    for (const q of quotes) if (LIVE_TYPES.has(q.type) && !CONSENSUS_ONLY.has(q.book)) (byLine[`${q.type}|${q.value}`] ||= []).push(q);
+    for (const [key, qs] of Object.entries(byLine)) {
+      const b365 = qs.find((q) => q.book === PRICE_BOOK);
+      if (!b365) continue;
+      const { type, market, value } = b365, c = cons[key];
+      for (const [option, price] of Object.entries(b365.prices)) {
+        const model = liveModel(type, value, option), pMarket = c ? c.probs[option] : null;
+        const w = c && c.books >= 3 ? LIVE_MARKET_WEIGHT : 0.5;
+        const q = blend(model ? model.q : null, pMarket, w);
+        if (!(q > 0 && q < 1)) continue;
+        rows.push({ type, market, label: marketLabel(type, market, value, option, hc.name, ac.name), price, p: q, fair: 1 / q,
+                    edge: price * q - 1, push: !!model && model.d < 0.999,
+                    basis: model && pMarket != null ? "HAWK + bookmakers" : model ? "HAWK" : "bookmakers" });
+      }
+    }
+    const res = (o) => (rows.find((r) => r.type === 1 && r.label === marketLabel(1, "", "", o, hc.name, ac.name)) || {}).p;
+    return { ...base, live: true, score: [sh, sa], reds, stats, basis, remaining: rem, books: c1 ? c1.books : 0, tilt,
+             probs: { home: res("1") ?? sumCells(M, (i, j) => i > j), draw: res("X") ?? sumCells(M, (i, j) => i === j), away: res("2") ?? sumCells(M, (i, j) => i < j) },
+             rows, checked: new Date().toISOString() };
+  }
+
   const valueJob = newJob();
   function startValue(body) {
     if (valueJob.running) return jobStatus(valueJob);
@@ -1327,7 +1465,7 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, learnKey,
+  global.HAWK = { LEAGUES, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, learnKey, liveMatch,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },

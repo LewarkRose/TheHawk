@@ -4,10 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HAWK · Bet Builder</title>
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="manifest" href="manifest.webmanifest">
+<!-- Icons: new names / ?v= so browsers drop the old cached logo -->
+<link rel="icon" href="hawk-tab.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png?v=4" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
+<link rel="manifest" href="manifest.webmanifest?v=4">
 <meta name="theme-color" content="#0d1114">
 <style>
 :root{
@@ -16,6 +17,19 @@
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
+/* background: floodlight glows drifting slowly + a big faint hawk + vignette */
+.bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.bg-glow i{position:absolute;width:70vmax;height:70vmax;border-radius:50%;filter:blur(40px);will-change:transform}
+.bg-glow i:nth-child(1){background:radial-gradient(closest-side,rgba(20,227,161,.15),transparent);left:-22vmax;top:-32vmax;animation:bgDrift1 24s ease-in-out infinite alternate}
+.bg-glow i:nth-child(2){background:radial-gradient(closest-side,rgba(74,168,255,.09),transparent);right:-26vmax;top:-12vmax;animation:bgDrift2 30s ease-in-out infinite alternate}
+.bg-glow i:nth-child(3){background:radial-gradient(closest-side,rgba(20,227,161,.10),transparent);left:18vmax;bottom:-46vmax;animation:bgDrift3 34s ease-in-out infinite alternate}
+@keyframes bgDrift1{to{transform:translate(18vmax,12vmax)}}
+@keyframes bgDrift2{to{transform:translate(-16vmax,18vmax)}}
+@keyframes bgDrift3{to{transform:translate(-14vmax,-10vmax)}}
+.bg-hawk{position:absolute;left:50%;top:56%;width:min(92vh,960px);transform:translate(-30%,-50%) rotate(-8deg);fill:#7cf7cf;opacity:.05}
+.bg-vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55))}
+@media (prefers-reduced-motion:reduce){.bg-glow i{animation:none}}
+main.grid{position:relative;z-index:1}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif}
 button,input,select{font:inherit;color:inherit}
 img{max-width:100%}
@@ -59,7 +73,7 @@ img{max-width:100%}
 .grid{display:grid;grid-template-columns:290px minmax(0,1fr) 400px;gap:16px;padding:16px 22px;align-items:start}
 @media (max-width:1250px){.grid{grid-template-columns:260px minmax(0,1fr)}.slipcol{grid-column:1/-1}}
 @media (max-width:820px){.grid{grid-template-columns:1fr}}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+.panel{background:var(--panel);background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .fixtures{padding:10px;max-height:calc(100vh - var(--head) - 24px);overflow:auto;position:sticky;top:calc(var(--head) + 10px)}
 .fx{display:grid;grid-template-columns:1fr auto;gap:4px 8px;padding:10px 12px;border-radius:12px;cursor:pointer;
   border:1px solid transparent;transition:.15s}
@@ -363,10 +377,16 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 </style>
 </head>
 <body>
+<!-- Background: slow floodlight glows + a big faint hawk, behind everything -->
+<div class="bgfx" aria-hidden="true">
+  <div class="bg-glow"><i></i><i></i><i></i></div>
+  <svg class="bg-hawk" viewBox="0 0 64 64"><path d="M32 14.5L35.2 18.5L34 22.5L32 25L30 22.5L28.8 18.5Z"/><path d="M29.5 27.5L4 15L9 21.5L4.5 22.5L11 28L6.5 29.5L14 34L10.5 35.5L20 38.5L29.5 41.5Z"/><path d="M34.5 27.5L60 15L55 21.5L59.5 22.5L53 28L57.5 29.5L50 34L53.5 35.5L44 38.5L34.5 41.5Z"/><path d="M28.5 43.5L32 54.5L35.5 43.5L32 46Z"/></svg>
+  <div class="bg-vig"></div>
+</div>
 <header class="top">
   <div class="topbar">
     <a class="brand" href="./" title="HAWK bet builder">
-      <!-- HAWK logo: a hawk in flight, feathered wings spread (same as favicon.svg) -->
+      <!-- HAWK logo: a hawk in flight, feathered wings spread (same as hawk-logo.svg) -->
       <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
         <defs>
           <linearGradient id="hawkG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7cf7cf"/><stop offset="1" stop-color="#0fb884"/></linearGradient>
@@ -393,7 +413,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     <div class="topright">
       <button class="tool bell" id="watchBtn" hidden></button>
       <div class="pop" id="watchPop" hidden></div>
-      <a class="vaultlink" href="../" title="Back to the HAWK Vault"><img src="../favicon.svg" alt="">Vault</a>
+      <a class="vaultlink" href="../" title="Back to the HAWK Vault"><img src="../hawk-logo.svg" alt="">Vault</a>
     </div>
   </div>
   <nav class="leagues" id="leagues"></nav>
@@ -401,7 +421,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <main class="grid">
   <aside class="panel fixtures" id="fixtures"><div class="empty">Loading leagues…</div></aside>
   <section class="panel" id="match">
-    <div class="empty"><img class="bigmark" src="favicon.svg" alt=""><h2>Pick a fixture</h2>
+    <div class="empty"><img class="bigmark" src="hawk-logo.svg" alt=""><h2>Pick a fixture</h2>
       HAWK simulates the match thousands of times — goals, shots, shots on target, corners and cards, player by player —
       then builds you a bet builder at the odds you want.</div>
   </section>
@@ -1517,7 +1537,7 @@ function showBuilder() {
     renderMatch(); renderSlip(); startLive();
   } else {
     S.view = "match";
-    $("#match").innerHTML = `<div class="empty"><img class="bigmark" src="favicon.svg" alt=""><h2>Pick a fixture</h2>Choose a match on the left and HAWK builds you a bet builder at the odds you want.</div>`;
+    $("#match").innerHTML = `<div class="empty"><img class="bigmark" src="hawk-logo.svg" alt=""><h2>Pick a fixture</h2>Choose a match on the left and HAWK builds you a bet builder at the odds you want.</div>`;
   }
 }
 

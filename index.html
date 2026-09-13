@@ -26,9 +26,22 @@
             background-attachment: fixed !important;
             font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
         }
-        /* raised panels */
+        /* background: floodlight glows drifting slowly + a big faint gold hawk + vignette */
+        .bgfx { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+        .bg-glow i { position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%; filter: blur(40px); will-change: transform; }
+        .bg-glow i:nth-child(1) { background: radial-gradient(closest-side, rgba(217,181,113,.15), transparent); left: -22vmax; top: -32vmax; animation: bgDrift1 24s ease-in-out infinite alternate; }
+        .bg-glow i:nth-child(2) { background: radial-gradient(closest-side, rgba(255,160,90,.07), transparent); right: -26vmax; top: -12vmax; animation: bgDrift2 30s ease-in-out infinite alternate; }
+        .bg-glow i:nth-child(3) { background: radial-gradient(closest-side, rgba(217,181,113,.10), transparent); left: 18vmax; bottom: -46vmax; animation: bgDrift3 34s ease-in-out infinite alternate; }
+        @keyframes bgDrift1 { to { transform: translate(18vmax, 12vmax); } }
+        @keyframes bgDrift2 { to { transform: translate(-16vmax, 18vmax); } }
+        @keyframes bgDrift3 { to { transform: translate(-14vmax, -10vmax); } }
+        .bg-hawk { position: absolute; left: 50%; top: 56%; width: min(92vh, 960px); transform: translate(-30%, -50%) rotate(-8deg); fill: #f3d99b; opacity: .05; }
+        .bg-vig { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55)); }
+        @media (prefers-reduced-motion: reduce) { .bg-glow i { animation: none; } }
+        html body > .max-w-6xl { position: relative; z-index: 1; }
+        /* raised panels (slightly see-through so the background glows through) */
         html body .bg-zinc-900\/60, html body .bg-zinc-900.border.rounded-2xl {
-            background: linear-gradient(180deg, #182127 0%, #131a1e 100%) !important;
+            background: linear-gradient(180deg, rgba(24,33,39,.9) 0%, rgba(19,26,30,.9) 100%) !important;
             border: 1px solid var(--v-line) !important;
             box-shadow: var(--v-shadow), inset 0 1px 0 rgba(255,255,255,.05) !important;
         }
@@ -98,17 +111,24 @@
             html body #bets-container > div, html body #view-history > div, html body #view-builder > div { animation: none; }
         }
     </style>
-    <link rel="icon" href="favicon.svg" type="image/svg+xml">
-    <link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
-    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <!-- Icons: new names / ?v= so browsers drop the old cached logo -->
+    <link rel="icon" href="hawk-tab.svg" type="image/svg+xml">
+    <link rel="icon" href="icon-192.png?v=4" sizes="192x192" type="image/png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
 </head>
 <body class="bg-black text-zinc-100 min-h-screen font-sans p-4 md:p-8">
+    <!-- Background: slow floodlight glows + a big faint hawk, behind everything -->
+    <div class="bgfx" aria-hidden="true">
+        <div class="bg-glow"><i></i><i></i><i></i></div>
+        <svg class="bg-hawk" viewBox="0 0 64 64"><path d="M32 14.5L35.2 18.5L34 22.5L32 25L30 22.5L28.8 18.5Z"/><path d="M29.5 27.5L4 15L9 21.5L4.5 22.5L11 28L6.5 29.5L14 34L10.5 35.5L20 38.5L29.5 41.5Z"/><path d="M34.5 27.5L60 15L55 21.5L59.5 22.5L53 28L57.5 29.5L50 34L53.5 35.5L44 38.5L34.5 41.5Z"/><path d="M28.5 43.5L32 54.5L35.5 43.5L32 46Z"/></svg>
+        <div class="bg-vig"></div>
+    </div>
 
     <div class="max-w-6xl mx-auto">
         <!-- Header & Bankroll -->
         <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b border-zinc-800 gap-4">
             <div class="flex items-center gap-3">
-                <img src="favicon.svg" alt="HAWK" class="vault-logo">
+                <img src="hawk-logo.svg" alt="HAWK" class="vault-logo">
                 <div>
                     <h1 class="text-3xl font-black tracking-wider text-[#d9b571]">HAWK</h1>
                     <p id="header-date-label" class="text-xs text-zinc-400">Ticket Center</p>

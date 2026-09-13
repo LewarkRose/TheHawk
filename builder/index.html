@@ -157,7 +157,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .sum .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 .sum .v{font-size:20px;font-weight:900}
 .check{margin-top:12px;padding:12px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}
-.check .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.check .row{display:grid;grid-template-columns:1.2fr .8fr .9fr;gap:8px}
 .check label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 .check input{width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--line);background:#12181c;font-size:16px;font-weight:700}
 .verdict{margin-top:10px;padding:10px 12px;border-radius:10px;font-weight:700}
@@ -297,6 +297,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <script>
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
             target: 3.25, style: "Balanced", focus: "Mix", maxLegs: 10, favourite: true, result: null, tab: "players", q: "",
+            chk: { price: "", boost: "", stake: "5" },
             view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "legs", data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null },
             watch: [] };
@@ -579,8 +580,9 @@ function renderSlip() {
         <div><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${r && r.fair ? odds(r.fair) : "–"}</div></div></div>
     </div>
     <div class="check"><div class="row">
-      <div><label>Bookmaker's price</label><input id="price" inputmode="decimal" placeholder="e.g. 3.25"></div>
-      <div><label>Stake (€)</label><input id="stake" inputmode="decimal" value="5"></div></div>
+      <div><label>Bookmaker's price</label><input id="price" inputmode="decimal" placeholder="e.g. 3.25" value="${esc(S.chk.price)}"></div>
+      <div><label title="Winnings boost, e.g. 25 for a 25% boost">Boost %</label><input id="boost" inputmode="decimal" placeholder="0" value="${esc(S.chk.boost)}"></div>
+      <div><label>Stake (€)</label><input id="stake" inputmode="decimal" value="${esc(S.chk.stake)}"></div></div>
       <div id="verdict"></div></div>
     <button class="ghost" id="copy">📋 Copy slip</button>
     <button class="ghost vault" id="vault" title="Log this builder in your Vault's Bankroll & History">🦅 Send to Vault</button>
@@ -602,8 +604,19 @@ function renderSlip() {
   $("#slip").querySelectorAll("[data-lock]").forEach(b => b.onclick = () => { const id = b.dataset.lock;
     S.locked.has(id) ? S.locked.delete(id) : S.locked.add(id); renderSlip(); });
   $("#jump").textContent = S.slip.length && r && r.fair ? `🎟 Slip · ${odds(r.fair)}` : "🎟 Slip";
-  const price = $("#price"), stake = $("#stake");
-  if (price) { price.oninput = verdict; stake.oninput = verdict; $("#copy").onclick = copySlip; $("#vault").onclick = sendToVault; verdict(); }
+  if ($("#price")) {
+    // Remember what you typed, so adding or removing a leg doesn't clear it.
+    for (const key of ["price", "boost", "stake"]) $("#" + key).oninput = (e) => { S.chk[key] = e.target.value; verdict(); };
+    $("#copy").onclick = copySlip; $("#vault").onclick = sendToVault; verdict();
+  }
+}
+
+// The price the builder really pays: a winnings boost multiplies the profit
+// part only (a 25% boost on 3.60 pays like 1 + 2.60 × 1.25 = 4.25).
+function checkerInputs() {
+  const num = (s) => parseFloat(String(s || "").replace(",", "."));
+  const price = num(S.chk.price), boost = Math.max(0, num(S.chk.boost) || 0), stake = num(S.chk.stake) || 0;
+  return { price, boost, stake, eff: price > 1 ? 1 + (price - 1) * (1 + boost / 100) : NaN };
 }
 
 // Logs the builder in the HAWK Vault (the main page of this site). Both pages
@@ -612,8 +625,9 @@ function renderSlip() {
 // stake taken off the bankroll — exactly like "Lock In Bet" in the Vault.
 function sendToVault() {
   const m = S.match, r = S.result;
-  const price = parseFloat(($("#price").value || "").replace(",", "."));
-  const stake = parseFloat(($("#stake").value || "").replace(",", "."));
+  // Saved at the boosted price, so the Vault's return and profit are right.
+  const { price: quoted, boost, stake, eff } = checkerInputs();
+  const price = Math.round(eff * 100) / 100;
   if (!m || !S.slip.length || !r) return toast("Build a ticket first.");
   if (!(price > 1)) return toast("Enter the bookmaker's price for this builder first.");
   if (!(stake > 0)) return toast("Enter a valid stake.");
@@ -631,7 +645,8 @@ function sendToVault() {
     legs: [{
       fixture: `${m.home} vs ${m.away}`,
       selection: legs.map(l => l.label).join(" & "),
-      angle: `HAWK: ${pct(r.p, 1)} to land · fair ${odds(r.fair)} · ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}% at ${odds(price)}`,
+      angle: `HAWK: ${pct(r.p, 1)} to land · fair ${odds(r.fair)} · ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}% at ${odds(price)}` +
+             (boost ? ` (${odds(quoted)} + ${boost}% boost)` : ""),
       odds: price, type: "builder", league: m.league,
       subSelections: legs.map(l => ({ label: l.label, odds: +(l.bookPrice || l.fair).toFixed(2) })),
     }],
@@ -641,19 +656,26 @@ function sendToVault() {
     localStorage.setItem("hawk_bankroll", (bankroll - stake).toFixed(2));
     localStorage.setItem("hawk_bets", JSON.stringify(bets));
   } catch { return toast("Couldn't save to the Vault's storage."); }
-  toast(`🦅 Logged in your Vault: €${stake.toFixed(2)} @ ${odds(price)}. If the Vault is open in another tab, refresh it.`);
+  toast(`🦅 Logged in your Vault: €${stake.toFixed(2)} @ ${odds(price)}${boost ? ` (boosted from ${odds(quoted)})` : ""}. If the Vault is open in another tab, refresh it.`);
 }
 
 function verdict() {
   const out = $("#verdict"), r = S.result;
-  const price = parseFloat(($("#price").value || "").replace(",", ".")), stake = parseFloat(($("#stake").value || "").replace(",", ".")) || 0;
-  if (!r || !r.p || !price || price <= 1) { out.innerHTML = r && r.fair ? `<div class="note">Enter the price your bookmaker offers for this exact builder. Break-even is <b>${odds(r.fair)}</b>; aim for ${odds(r.fair * 1.05)}+.</div>` : ""; return; }
-  const ev = r.p * price - 1;
+  const { price, boost, stake, eff } = checkerInputs();
+  // With a boost, the bookmaker's quoted price only has to reach this to be fair.
+  const needed = r && r.fair ? 1 + (r.fair - 1) / (1 + boost / 100) : null;
+  if (!r || !r.p || !(price > 1)) {
+    out.innerHTML = r && r.fair ? `<div class="note">Enter the price your bookmaker offers for this exact builder. Break-even is
+      <b>${odds(needed)}</b>${boost ? ` with your ${boost}% boost (${odds(r.fair)} without)` : ""}; aim for ${odds(needed * 1.05)}+.</div>` : "";
+    return;
+  }
+  const ev = r.p * eff - 1;
   const good = ev > 0;
   out.innerHTML = `<div class="verdict ${good ? "good" : "bad"}">${good ? "✅ VALUE" : "❌ OVERPRICED"} ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}%
-    <small>Their price implies a ${pct(1 / price, 1)} chance — HAWK says ${pct(r.p, 1)}.</small>
-    <small>${good ? `Expected profit ≈ €${(ev * stake).toFixed(2)} on €${stake.toFixed(2)} (wins ${pct(r.p, 1)} of the time, pays €${(price * stake).toFixed(2)}).`
-                  : `The bookmaker keeps ≈ €${(-ev * stake).toFixed(2)} of every €${stake.toFixed(2)} on average. It needs ${odds(r.fair)}+ to be fair — try swapping legs or another book.`}</small></div>`;
+    ${boost ? `<small>With your ${boost}% boost, ${odds(price)} pays like <b>${odds(eff)}</b>.</small>` : ""}
+    <small>That price implies a ${pct(1 / eff, 1)} chance — HAWK says ${pct(r.p, 1)}.</small>
+    <small>${good ? `Expected profit ≈ €${(ev * stake).toFixed(2)} on €${stake.toFixed(2)} (wins ${pct(r.p, 1)} of the time, pays €${(eff * stake).toFixed(2)}).`
+                  : `The bookmaker keeps ≈ €${(-ev * stake).toFixed(2)} of every €${stake.toFixed(2)} on average. It needs ${odds(needed)}+${boost ? " with this boost" : ""} to be fair — try swapping legs or another book.`}</small></div>`;
 }
 
 async function build() {

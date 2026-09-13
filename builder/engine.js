@@ -609,6 +609,22 @@
   // ---------------------------------------------------------------------------
   // Legs, prices and tickets (sim.py)
   // ---------------------------------------------------------------------------
+  // "(3+)" / "(2 or fewer)" after a line, in plain numbers — bookmaker bet
+  // builders word lines differently ("Over 3 Cards" in a 3-way market means
+  // 4+), so this makes copying a leg across unambiguous. Whole and quarter
+  // lines also say what happens on the boundary number.
+  function plainCount(option, line) {
+    const x = Number(line);
+    if (!Number.isFinite(x) || (option !== "Over" && option !== "Under")) return "";
+    const n = Math.floor(x), frac = Math.round((x - n) * 100) / 100, over = option === "Over";
+    const fewer = (k) => (k <= 0 ? "0" : `${k} or fewer`);
+    if (frac === 0.5) return over ? `(${n + 1}+)` : `(${fewer(n)})`;
+    if (frac === 0) return over ? `(${n + 1}+, ${n} = stake back)` : `(${fewer(n - 1)}, ${n} = stake back)`;
+    if (frac === 0.25) return over ? `(${n + 1}+; ${n} = half stake back)` : `(${fewer(n - 1)}; ${n} = half win)`;
+    return over ? `(${n + 2}+; ${n + 1} = half win)` : `(${fewer(n)}; ${n + 1} = half stake back)`;
+  }
+  const withCount = (text, option, line) => `${text} ${plainCount(option, line)}`.trim();
+
   function mask(n, test) { const m = new Uint8Array(n); for (let s = 0; s < n; s++) m[s] = test(s) ? 1 : 0; return m; }
   const mean = (m) => { let c = 0; for (let s = 0; s < m.length; s++) c += m[s]; return c / m.length; };
 
@@ -624,25 +640,25 @@
     add("dc:home", `${home} or Draw`, "Double Chance", "result", mask(n, (s) => hg[s] >= ag[s]));
     add("dc:away", `${away} or Draw`, "Double Chance", "result", mask(n, (s) => ag[s] >= hg[s]));
     for (const line of [1.5, 2.5, 3.5, 4.5]) {
-      add(`goals:o${line}`, `Over ${line} Goals`, "Total Goals", "goals", mask(n, (s) => hg[s] + ag[s] > line));
-      add(`goals:u${line}`, `Under ${line} Goals`, "Total Goals", "goals", mask(n, (s) => hg[s] + ag[s] < line));
+      add(`goals:o${line}`, withCount(`Over ${line} Goals`, "Over", line), "Total Goals", "goals", mask(n, (s) => hg[s] + ag[s] > line));
+      add(`goals:u${line}`, withCount(`Under ${line} Goals`, "Under", line), "Total Goals", "goals", mask(n, (s) => hg[s] + ag[s] < line));
     }
     add("btts:yes", "Both Teams to Score", "Both Teams to Score", "btts", mask(n, (s) => hg[s] > 0 && ag[s] > 0));
     add("btts:no", "Both Teams to Score: No", "Both Teams to Score", "btts", mask(n, (s) => !(hg[s] > 0 && ag[s] > 0)));
     for (const [side, name, g] of [["home", home, hg], ["away", away, ag]]) {
       for (const line of [0.5, 1.5, 2.5])
-        add(`team:${side}:o${line}`, `${name} Over ${line} Goals`, "Team Goals", `team_goals:${side}`, mask(n, (s) => g[s] > line));
+        add(`team:${side}:o${line}`, withCount(`${name} Over ${line} Goals`, "Over", line), "Team Goals", `team_goals:${side}`, mask(n, (s) => g[s] > line));
       const other = side === "home" ? ag : hg;
       add(`cs:${side}`, `${name} Clean Sheet`, "Clean Sheet", `team_goals:${side === "home" ? "away" : "home"}`, mask(n, (s) => other[s] === 0));
     }
     for (const line of [7.5, 8.5, 9.5, 10.5, 11.5]) {
-      add(`corners:o${line}`, `Over ${line} Corners`, "Corners", "corners", mask(n, (s) => sim.corners[s] > line));
-      add(`corners:u${line}`, `Under ${line} Corners`, "Corners", "corners", mask(n, (s) => sim.corners[s] < line));
+      add(`corners:o${line}`, withCount(`Over ${line} Corners`, "Over", line), "Corners", "corners", mask(n, (s) => sim.corners[s] > line));
+      add(`corners:u${line}`, withCount(`Under ${line} Corners`, "Under", line), "Corners", "corners", mask(n, (s) => sim.corners[s] < line));
     }
     const tc = (s) => sim.teamCards.home[s] + sim.teamCards.away[s];
     for (const line of [2.5, 3.5, 4.5, 5.5]) {
-      add(`cards:o${line}`, `Over ${line} Cards`, "Total Cards", "cards", mask(n, (s) => tc(s) > line));
-      add(`cards:u${line}`, `Under ${line} Cards`, "Total Cards", "cards", mask(n, (s) => tc(s) < line));
+      add(`cards:o${line}`, withCount(`Over ${line} Cards`, "Over", line), "Total Cards", "cards", mask(n, (s) => tc(s) > line));
+      add(`cards:u${line}`, withCount(`Under ${line} Cards`, "Under", line), "Total Cards", "cards", mask(n, (s) => tc(s) < line));
     }
     for (const [key, a] of Object.entries(sim.player)) {
       const [side, i] = key.split(":"), p = sim.squads[side][+i];
@@ -946,7 +962,7 @@
       case 1: return `Result: ${team(option)}`;
       case 14: return { "1X": `${home} or Draw`, X2: `${away} or Draw`, "12": `${home} or ${away}` }[option] || option;
       case 15: return `Draw No Bet: ${team(option)}`;
-      case 3: return `${option} ${value} Goals`;
+      case 3: return withCount(`${option} ${value} Goals`, option, value);
       case 11: return `Asian Handicap: ${option === "Home" ? `${home} ${fmt(v)}` : `${away} ${fmt(-v)}`}`;
       case 12: return `Both Teams to Score: ${option}`;
       case 144: return `${home} Clean Sheet: ${option}`;
@@ -955,14 +971,14 @@
       case 126: return `Correct Score ${value}`;
       case 5: return `1st Half Result: ${team(option)}`;
       case 6: return `2nd Half Result: ${team(option)}`;
-      case 9: return `1st Half ${option} ${value} Goals`;
+      case 9: return withCount(`1st Half ${option} ${value} Goals`, option, value);
       case 13: return `BTTS 2nd Half: ${option}`;
       case 127: return `Half-Time Score ${value}`;
-      case 137: return `${option} ${value} Corners`;
-      case 141: return `${option} ${value} Cards`;
-      case 139: return `${option} ${value} Shots on Target`;
+      case 137: return withCount(`${option} ${value} Corners`, option, value);
+      case 141: return withCount(`${option} ${value} Cards`, option, value);
+      case 139: return withCount(`${option} ${value} Shots on Target`, option, value);
     }
-    return `${market}: ${option}${value ? " " + value : ""}`;
+    return withCount(`${market}: ${option}${value ? " " + value : ""}`, option, value);
   }
 
   // Value finder rows for one match: every live bookmaker price on every

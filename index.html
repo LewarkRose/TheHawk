@@ -14,6 +14,93 @@
             display: inline-block;
         }
     </style>
+    <style>
+        /* ---- 3D skin: the HAWK builder's depth (raised cards, recessed inputs,
+           glow, tilt) in the Vault's gold. Layered over the Tailwind classes, so
+           the page's markup is unchanged. "html body" outranks Tailwind's own
+           rules, which it injects after this. ---- */
+        :root { --v-bg:#0b0f12; --v-line:#26323b; --v-gold:#d9b571; --v-shadow:0 18px 40px -14px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.35); }
+        html body {
+            background: radial-gradient(1100px 520px at 12% -12%, rgba(217,181,113,.12), transparent 60%),
+                        radial-gradient(900px 480px at 100% -5%, rgba(20,227,161,.06), transparent 60%), var(--v-bg) !important;
+            background-attachment: fixed !important;
+            font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        }
+        /* raised panels */
+        html body .bg-zinc-900\/60, html body .bg-zinc-900.border.rounded-2xl {
+            background: linear-gradient(180deg, #182127 0%, #131a1e 100%) !important;
+            border: 1px solid var(--v-line) !important;
+            box-shadow: var(--v-shadow), inset 0 1px 0 rgba(255,255,255,.05) !important;
+        }
+        /* recessed wells: inputs and inner boxes */
+        html body .bg-zinc-950, html body input, html body select {
+            background-color: #0f1519 !important;
+            border-color: #222d35 !important;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,.5), inset 0 -1px 0 rgba(255,255,255,.02) !important;
+        }
+        html body input:focus, html body select:focus { border-color: var(--v-gold) !important; box-shadow: inset 0 2px 6px rgba(0,0,0,.5), 0 0 0 3px rgba(217,181,113,.15) !important; }
+        /* gold buttons: lit from above, press in when clicked */
+        html body .bg-\[\#d9b571\] {
+            background: linear-gradient(180deg, #f3dca6 0%, #d9b571 55%, #b48d4b 100%) !important;
+            color: #1b1305 !important;
+            box-shadow: 0 10px 22px -8px rgba(217,181,113,.6), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(0,0,0,.2) !important;
+        }
+        /* dark buttons */
+        html body button.bg-zinc-900, html body label.bg-zinc-900, html body button.bg-zinc-800, html body .bg-zinc-800.rounded-lg {
+            background: linear-gradient(180deg, #1e282e, #151c20) !important;
+            border-color: var(--v-line) !important;
+            box-shadow: 0 6px 14px -6px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06) !important;
+        }
+        html body button, html body a.bg-\[\#d9b571\], html body label.bg-zinc-900 { transition: transform .12s ease, box-shadow .12s ease, filter .12s ease !important; }
+        html body button:hover, html body a.bg-\[\#d9b571\]:hover, html body label.bg-zinc-900:hover { transform: translateY(-1px); filter: brightness(1.08); }
+        html body button:active, html body a.bg-\[\#d9b571\]:active, html body label.bg-zinc-900:active { transform: translateY(1px); filter: brightness(.96); }
+        /* header: frosted, sticky, glowing mark and gold title */
+        /* sticky on wide screens only: on a phone the header wraps to several rows */
+        @media (min-width: 768px) {
+            html body header {
+                position: sticky; top: 0; z-index: 40; padding-top: 14px; margin-top: -14px;
+                background: linear-gradient(180deg, rgba(11,15,18,.92), rgba(11,15,18,.78));
+                backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            }
+        }
+        html body header .w-11.h-11 {
+            background: conic-gradient(from 200deg, #d9b571, #f7e3b3, #a8813f, #d9b571) !important;
+            border: 0 !important; box-shadow: 0 0 22px rgba(217,181,113,.45), inset 0 1px 0 rgba(255,255,255,.5);
+        }
+        html body header .w-11.h-11 .icon-gold { filter: grayscale(1) brightness(.25) sepia(.4); }
+        html body header h1 {
+            background: linear-gradient(180deg, #f8e6b8, #d9b571 60%, #a8813f);
+            -webkit-background-clip: text; background-clip: text; color: transparent !important;
+            filter: drop-shadow(0 2px 10px rgba(217,181,113,.25));
+        }
+        html body #bankroll-display { text-shadow: 0 0 18px rgba(217,181,113,.35); }
+        /* big numbers feel embossed */
+        html body #view-history .text-lg.font-bold { text-shadow: 0 2px 10px rgba(0,0,0,.6); }
+        /* modals: glass over a blurred page */
+        html body .bg-black\/80 { background: rgba(4,6,8,.7) !important; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+        html body .bg-black\/80 > div { box-shadow: 0 40px 80px -20px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.06) !important; }
+        /* ticket cards sit raised on their panel rather than sunk into it */
+        html body #bets-container > div.bg-zinc-950 {
+            background: linear-gradient(180deg, #1a2328, #141b1f) !important;
+            border-color: var(--v-line) !important;
+            box-shadow: 0 12px 26px -12px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.05) !important;
+        }
+        /* tilt: cards lean towards the mouse, with a light that follows it */
+        .tilt { transform-style: preserve-3d; transition: transform .18s ease, box-shadow .18s ease; will-change: transform; position: relative; }
+        .tilt::after {
+            content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .2s;
+            background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(255,236,190,.09), transparent 45%);
+        }
+        .tilt.tilting::after { opacity: 1; }
+        .tilt.tilting { box-shadow: 0 28px 50px -18px rgba(0,0,0,.85), 0 0 0 1px rgba(217,181,113,.18) !important; }
+        /* cards rise into place */
+        @keyframes vaultRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        html body #bets-container > div, html body #view-history > div, html body #view-builder > div { animation: vaultRise .35s ease both; }
+        @media (prefers-reduced-motion: reduce) {
+            .tilt, .tilt::after, html body button { transition: none !important; }
+            html body #bets-container > div, html body #view-history > div, html body #view-builder > div { animation: none; }
+        }
+    </style>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%2318181b'/%3E%3Crect x='4' y='4' width='92' height='92' rx='18' fill='none' stroke='%23d9b571' stroke-width='4'/%3E%3Ctext x='50' y='68' font-size='56' text-anchor='middle'%3E%F0%9F%A6%85%3C/text%3E%3C/svg%3E">
     <link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -1452,7 +1539,7 @@
                         : '<span class="bg-[#c9a05c]/15 text-[#d9b571] px-2 py-0.5 rounded text-[10px] font-bold">Bet Builder</span>';
 
                 const card = document.createElement('div');
-                card.className = "bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-3";
+                card.className = "bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-3 tilt";
                 card.innerHTML = `
                     <div class="flex justify-between items-center pb-2 border-b border-zinc-900 text-xs">
                         <div class="flex items-center gap-2 flex-wrap"><span class="text-zinc-400">${bet.date}</span><span class="text-[#d9b571] font-bold">Odds: ${bet.odds.toFixed(2)}</span>${typeBadge}${
@@ -2253,6 +2340,28 @@
         onCategoryChange();
         onLeagueChange();
         onKellyEngineInput();
+        // 3D tilt for the stat tiles and ticket cards: they lean towards the mouse
+        // (mouse only — phones just get the depth; off if you prefer reduced motion).
+        (function tiltCards() {
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            document.querySelectorAll('#view-history > div:first-child > div').forEach(el => el.classList.add('tilt'));
+            let current = null;
+            const reset = (el) => { el.classList.remove('tilting'); el.style.transform = ''; };
+            document.addEventListener('pointermove', (e) => {
+                if (e.pointerType !== 'mouse') return;
+                const el = e.target.closest ? e.target.closest('.tilt') : null;
+                if (current && current !== el) reset(current);
+                current = el;
+                if (!el) return;
+                const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+                const max = r.width > 500 ? 2.5 : 7;   // wide cards lean less
+                el.classList.add('tilting');
+                el.style.transform = `perspective(900px) rotateX(${((0.5 - y) * max).toFixed(2)}deg) rotateY(${((x - 0.5) * max).toFixed(2)}deg) translateY(-3px)`;
+                el.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`);
+                el.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
+            }, { passive: true });
+            document.addEventListener('pointerleave', () => { if (current) reset(current); current = null; });
+        })();
         loadAllFixtures();                        // fills the fixture search box for every league
         setTimeout(autoSettle, 1500);             // settle finished HAWK bets…
         setInterval(autoSettle, 10 * 60 * 1000);  // …and keep checking every 10 minutes

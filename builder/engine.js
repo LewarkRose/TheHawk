@@ -1454,6 +1454,49 @@
              rows, checked: new Date().toISOString() };
   }
 
+  // ---------------------------------------------------------------------------
+  // Scores: every game in HAWK's competitions on one day, and a match report
+  // (goals, cards, key stats) for a game that has started.
+  // ---------------------------------------------------------------------------
+  const LEAGUE_OF = Object.fromEntries(Object.entries(COMPETITIONS).map(([name, cid]) => [cid, name]));
+  async function scores(day) {   // day = "YYYY-MM-DD" (your local date)
+    const [y, m, d] = String(day).split("-"), date = `${d}/${m}/${y}`;
+    const res = await s365("games/allscores", { competitions: Object.values(COMPETITIONS).join(","), startDate: date, endDate: date }, 20 * 1000);
+    if (!res) throw new Error("365Scores didn't return scores — try again in a moment");
+    const score = (c, g) => (g.statusGroup === 2 || !(c.score >= 0) ? null : Math.trunc(c.score));
+    return (res.games || []).map((g) => ({
+      id: String(g.id), league: LEAGUE_OF[g.competitionId] || g.competitionDisplayName || "", home: g.homeCompetitor.name, away: g.awayCompetitor.name,
+      homeCrest: crest(g.homeCompetitor), awayCrest: crest(g.awayCompetitor), kickoff: g.startTime, status: g.statusGroup,
+      statusText: g.shortStatusText || g.statusText || "", clock: g.gameTimeDisplay || "", score: [score(g.homeCompetitor, g), score(g.awayCompetitor, g)],
+      winner: g.winner || 0,
+    })).sort((a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""));
+  }
+  const REPORT_STATS = [["Expected Goals", "Expected goals (xG)"], ["Total Shots", "Shots"], ["Shots On Target", "Shots on target"],
+                        ["Big Chances Created", "Big chances"], ["Possession", "Possession"], ["Corners", "Corners"], ["Fouls", "Fouls"],
+                        ["Yellow Cards", "Yellow cards"], ["Red Cards", "Red cards"], ["Offsides", "Offsides"], ["Goalkeeper Saves", "Saves"]];
+  async function matchReport(id) {
+    const [d, st] = await Promise.all([s365("game", { gameId: id }), s365("game/stats", { games: id })]);
+    const game = d && d.game;
+    if (!game) throw new Error("365Scores didn't return this match");
+    const hc = game.homeCompetitor, ac = game.awayCompetitor, names = Object.fromEntries((game.members || []).map((m) => [m.id, m.name]));
+    const ht = (game.stages || []).find((s) => s.id === 7);
+    const events = (game.events || []).filter((e) => e.eventType && /goal|card/i.test(e.eventType.name || "")).map((e) => ({
+      side: e.competitorId === hc.id ? "home" : "away", minute: e.gameTimeDisplay || "", type: /goal/i.test(e.eventType.name) ? "goal" : /red/i.test(e.eventType.name) ? "red" : "yellow",
+      detail: e.eventType.subTypeName && !/field goal/i.test(e.eventType.subTypeName) ? e.eventType.subTypeName : "",
+      player: names[e.playerId] || "", assist: (e.extraPlayers || []).map((p) => names[p]).filter(Boolean)[0] || "",
+    }));
+    const stats = [];
+    for (const [key, label] of REPORT_STATS) {
+      const pair = [null, null];
+      for (const s of (st && st.statistics) || []) if (s.name === key) pair[s.competitorId === hc.id ? 0 : 1] = s.value;
+      if (pair[0] != null || pair[1] != null) stats.push({ label, home: pair[0] ?? "0", away: pair[1] ?? "0" });
+    }
+    return { id: String(id), home: hc.name, away: ac.name, homeCrest: crest(hc), awayCrest: crest(ac), status: game.statusGroup,
+             statusText: game.statusText, clock: game.gameTimeDisplay, score: [Math.max(0, Math.trunc(hc.score) || 0), Math.max(0, Math.trunc(ac.score) || 0)],
+             ht: ht && ht.isEnded ? [ht.homeCompetitorScore, ht.awayCompetitorScore] : null, venue: (game.venue || {}).name || "",
+             competition: game.competitionDisplayName || "", events, stats };
+  }
+
   const valueJob = newJob();
   function startValue(body) {
     if (valueJob.running) return jobStatus(valueJob);
@@ -1466,6 +1509,7 @@
   }
 
   global.HAWK = { LEAGUES, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, learnKey, liveMatch,
+                  scores, matchReport,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },

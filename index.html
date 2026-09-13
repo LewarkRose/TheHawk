@@ -76,8 +76,37 @@
                 backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             }
         }
+        /* header: brand · actions · bankroll, one height and one style */
+        .vault-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .vault-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; margin-right: auto; }
         html body header .vault-logo { width: 46px; height: 46px; flex-shrink: 0; filter: drop-shadow(0 0 14px rgba(217,181,113,.45)); transition: transform .2s; }
-        html body header .vault-logo:hover { transform: rotate(-4deg) scale(1.05); }
+        .vault-brand:hover .vault-logo { transform: rotate(-4deg) scale(1.05); }
+        .vault-wordmark { display: flex; flex-direction: column; line-height: 1; }
+        .vault-wordmark b { font-size: 26px; font-weight: 900; letter-spacing: .2em;
+            background: linear-gradient(180deg, #f8e6b8, #d9b571 60%, #a8813f); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .vault-wordmark small { font-size: 10px; font-weight: 700; letter-spacing: .3em; color: #8a8f93; margin-top: 6px; text-transform: uppercase; }
+        .vault-actions { display: flex; align-items: center; gap: 8px; }
+        .vgroup { display: flex; gap: 2px; padding: 3px; border-radius: 13px; background: rgba(15,21,25,.85); border: 1px solid var(--v-line); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
+        html body .vbtn { height: 38px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px; border-radius: 10px; font-size: 12.5px; font-weight: 700;
+            color: #d4d4d8; background: transparent; border: 0; cursor: pointer; text-decoration: none; white-space: nowrap; }
+        html body .vgroup .vbtn:hover { background: rgba(255,255,255,.06); color: #fff; }
+        html body .vbtn-gold { height: 44px; padding: 0 18px; border-radius: 12px; color: #1b1305;
+            background: linear-gradient(180deg, #f3dca6 0%, #d9b571 55%, #b48d4b 100%);
+            box-shadow: 0 10px 22px -8px rgba(217,181,113,.6), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(0,0,0,.2); }
+        .vbtn-gold img { width: 18px; height: 18px; filter: brightness(.25) saturate(0); }
+        html body .vicon { width: 38px; padding: 0; justify-content: center; }
+        .vault-bank { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 8px 0 16px; border-radius: 14px;
+            background: linear-gradient(180deg, #1e282e, #151c20); border: 1px solid rgba(217,181,113,.35);
+            box-shadow: 0 10px 24px -10px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06); }
+        .vault-bank .lbl { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: #8a8f93; }
+        .vault-bank .amt { display: block; font-size: 22px; font-weight: 900; color: #ecc98a; line-height: 1.1; }
+        .vault-bank .vicon { background: rgba(255,255,255,.05); }
+        @media (max-width: 767px) {
+            .vault-brand { margin-right: 0; flex: 1; }
+            .vault-bank { height: 50px; }
+            .vault-actions { order: 3; width: 100%; justify-content: space-between; }
+            .vault-wordmark b { font-size: 22px; }
+        }
         html body header h1 {
             background: linear-gradient(180deg, #f8e6b8, #d9b571 60%, #a8813f);
             -webkit-background-clip: text; background-clip: text; color: transparent !important;
@@ -126,42 +155,22 @@
 
     <div class="max-w-6xl mx-auto">
         <!-- Header & Bankroll -->
-        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b border-zinc-800 gap-4">
-            <div class="flex items-center gap-3">
+        <header class="vault-top mb-6 pb-4 border-b border-zinc-800">
+            <a href="./" class="vault-brand" title="HAWK Vault">
                 <img src="hawk-logo.svg" alt="HAWK" class="vault-logo">
-                <div>
-                    <h1 class="text-3xl font-black tracking-wider text-[#d9b571]">HAWK</h1>
-                    <p id="header-date-label" class="text-xs text-zinc-400">Ticket Center</p>
+                <span class="vault-wordmark"><b>HAWK</b><small id="header-date-label">Vault</small></span>
+            </a>
+            <div class="vault-actions">
+                <a href="builder/" class="vbtn vbtn-gold" title="Open the HAWK bet builder"><img src="builder/hawk-tab.svg" alt=""> HAWK Builder</a>
+                <div class="vgroup">
+                    <button onclick="exportData()" class="vbtn" title="Download a backup of your Vault"><span class="icon-gold">💾</span> Export</button>
+                    <label class="vbtn" title="Load a backup (replaces your current data)"><span class="icon-gold">📂</span> Import<input type="file" id="import-file" onchange="importData(event)" class="hidden" accept=".json"></label>
+                    <button onclick="resetVault()" class="vbtn vicon" title="Reset the Vault (downloads a backup first)"><span class="icon-gold">⚙️</span></button>
                 </div>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <a href="builder/" class="bg-[#d9b571] hover:bg-[#e8cd97] text-black px-3.5 py-2.5 rounded-xl text-xs transition flex items-center gap-1.5 font-extrabold" title="Open the HAWK bet builder">
-                    ⚡ HAWK Builder
-                </a>
-                <button onclick="openCustomMatchModal()" class="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 px-3 py-2.5 rounded-xl border border-zinc-800 text-xs transition flex items-center gap-1" title="Add Single Match">
-                    <span class="icon-gold">➕</span> Add Match
-                </button>
-                <button onclick="openSimulationModal()" class="bg-zinc-900 hover:bg-zinc-800 text-[#d9b571] px-3.5 py-2.5 rounded-xl border border-zinc-800 text-xs transition flex items-center gap-1.5 font-bold" title="Kelly Alpha Engine">
-                    <span class="icon-gold">🧠</span> Kelly Engine
-                </button>
-                <button onclick="exportData()" class="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 px-3.5 py-2.5 rounded-xl border border-zinc-800 text-xs transition flex items-center gap-1.5" title="Export Backup">
-                    <span class="icon-gold">💾</span> Export
-                </button>
-                <label class="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 px-3.5 py-2.5 rounded-xl border border-zinc-800 text-xs transition cursor-pointer flex items-center gap-1.5" title="Import Backup (replaces your current data)">
-                    <span class="icon-gold">📂</span> Import <input type="file" id="import-file" onchange="importData(event)" class="hidden" accept=".json">
-                </label>
-                <div class="bg-zinc-900 px-4 py-2 rounded-xl border border-zinc-800 text-right flex items-center gap-3">
-                    <div>
-                        <span class="text-[10px] text-zinc-400 block uppercase tracking-wider">Active Bankroll</span>
-                        <span id="bankroll-display" class="text-[#d9b571] font-bold text-xl">€1,000.00</span>
-                    </div>
-                    <button onclick="openEditBankrollModal()" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-1.5 rounded-lg text-xs transition" title="Edit Bankroll">
-                        <span class="icon-gold">✏️</span>
-                    </button>
-                </div>
-                <button onclick="resetVault()" class="bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white px-3 py-2.5 rounded-xl border border-zinc-800 text-xs transition" title="Reset the Vault (downloads a backup first)">
-                    <span class="icon-gold">⚙️</span>
-                </button>
+            <div class="vault-bank" title="Your betting bankroll — HAWK's recommended stakes are worked out from it">
+                <div><span class="lbl">Bankroll</span><span id="bankroll-display" class="amt">€1,000.00</span></div>
+                <button onclick="openEditBankrollModal()" class="vbtn vicon" title="Edit bankroll"><span class="icon-gold">✏️</span></button>
             </div>
         </header>
 
@@ -234,7 +243,7 @@
                                 <option value="UEFA Champions League">🇪🇺 UEFA Champions League</option>
                     <option value="UEFA Europa League">🇪🇺 UEFA Europa League</option>
                     <option value="UEFA Conference League">🇪🇺 UEFA Conference League</option>
-                                <option value="Other Matches">⭐ Custom / Other Matches</option>
+                                <option value="Other Matches">⭐ Other competition (type the match)</option>
                             </select>
                             <select id="league-match-dropdown" onchange="onLeagueMatchSelect()" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#d9b571]" disabled>
                                 <option value="">-- Choose Match --</option>
@@ -330,7 +339,6 @@
                             <button type="button" onclick="setTicketStake(5)" class="flex-1 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-[10px] py-1.5 rounded-lg text-zinc-300 transition">€5</button>
                             <button type="button" onclick="setTicketStake(10)" class="flex-1 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-[10px] py-1.5 rounded-lg text-zinc-300 transition">€10</button>
                             <button type="button" onclick="setTicketStake(25)" class="flex-1 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-[10px] py-1.5 rounded-lg text-zinc-300 transition">€25</button>
-                            <button type="button" onclick="applyVaultKellyStake()" class="flex-1 bg-[#c9a05c]/20 hover:bg-[#c9a05c]/30 border border-[#c9a05c]/40 text-[10px] py-1.5 rounded-lg text-[#d9b571] font-bold transition flex items-center justify-center gap-1" title="Apply Kelly Stake">🧠 Kelly</button>
                         </div>
                     </div>
                 </div>
@@ -430,94 +438,6 @@
     </div>
 
     <!-- Modals -->
-    <div id="simulation-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-        <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-lg w-full space-y-4">
-            <h3 class="text-white font-bold text-base flex items-center gap-2"><span class="icon-gold">🧠</span> Kelly Criterion Alpha Engine</h3>
-            <p class="text-xs text-zinc-400">Kelly only works with a real win chance — a guessed edge usually means staking too much. Use the <b class="text-zinc-200">Chance to land</b> the HAWK builder shows for this ticket. No real chance, no Kelly stake.</p>
-
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="text-[10px] text-zinc-400 block mb-1">Decimal Odds</label>
-                    <input type="number" id="kelly-odds" step="0.01" value="3.60" oninput="onKellyEngineInput()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d9b571]">
-                </div>
-                <div>
-                    <label class="text-[10px] text-zinc-400 block mb-1">Win Chance (%) <span class="text-zinc-600">from HAWK</span></label>
-                    <input type="number" id="kelly-chance" step="0.1" placeholder="e.g. 30.1" oninput="onKellyEngineInput()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d9b571]">
-                </div>
-            </div>
-
-            <div class="bg-zinc-950 p-3 rounded-xl border border-zinc-800 flex justify-between items-center text-xs">
-                <span class="text-zinc-400">Price implies: <strong id="kelly-implied-prob" class="text-zinc-200">27.78%</strong></span>
-                <span class="text-zinc-400">Your edge: <strong id="kelly-edge-out" class="text-[#d9b571]">—</strong></span>
-            </div>
-
-            <div>
-                <label class="text-[10px] text-zinc-400 block mb-1">Kelly Risk Profile</label>
-                <select id="kelly-fraction" onchange="onKellyEngineInput()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d9b571]">
-                    <option value="0.5">Full (Half-Max / Aggressive - 0.50)</option>
-                    <option value="0.25" selected>Medium (Quarter Kelly / Balanced - 0.25)</option>
-                    <option value="0.125">Easy (Eighth Kelly / Conservative - 0.125)</option>
-                </select>
-            </div>
-            
-            <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-2">
-                <div class="flex justify-between text-xs">
-                    <span class="text-zinc-400">Optimal Stake %:</span>
-                    <span id="kelly-res-pct" class="text-[#d9b571] font-bold">0.00%</span>
-                </div>
-                <div class="flex justify-between text-xs">
-                    <span class="text-zinc-400">Recommended Stake Amount:</span>
-                    <span id="kelly-res-amount" class="text-white font-bold">€0.00</span>
-                </div>
-            </div>
-
-            <div class="flex gap-2 pt-2">
-                <button type="button" onclick="syncKellyFromSlip()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-[#d9b571] font-bold py-2 rounded-xl text-xs transition">Sync Odds from Active Slip</button>
-                <button type="button" onclick="closeSimulationModal()" class="flex-1 bg-zinc-950 hover:bg-zinc-800 text-zinc-300 py-2 rounded-xl text-xs transition border border-zinc-800">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Add Match Modal -->
-    <div id="custom-match-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-        <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-md w-full space-y-4">
-            <h3 id="match-modal-title" class="text-white font-bold text-base flex items-center gap-2"><span class="icon-gold">⚽</span> Add a Match to Your Feed</h3>
-            <p class="text-[10px] text-zinc-500">The top leagues load by themselves — add matches from other competitions here.</p>
-            <div>
-                <label class="text-[10px] text-zinc-400 block mb-1">League / Category</label>
-                <select id="custom-match-league" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d9b571]">
-                    <option value="Premier League">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
-                    <option value="La Liga">🇪🇸 La Liga</option>
-                    <option value="Serie A">🇮🇹 Serie A</option>
-                    <option value="Bundesliga">🇩🇪 Bundesliga</option>
-                    <option value="Ligue 1">🇫🇷 Ligue 1</option>
-                    <option value="UEFA Champions League">🇪🇺 UEFA Champions League</option>
-                    <option value="UEFA Europa League">🇪🇺 UEFA Europa League</option>
-                    <option value="UEFA Conference League">🇪🇺 UEFA Conference League</option>
-                    <option value="Other Matches">⭐ Custom / Other Matches</option>
-                </select>
-            </div>
-            <div>
-                <label class="text-[10px] text-zinc-400 block mb-1">Fixture Name</label>
-                <input type="text" id="custom-match-name" placeholder="e.g. Juventus vs AC Milan" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d9b571]">
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="text-[10px] text-zinc-400 block mb-1">Match Date</label>
-                    <input type="date" id="custom-match-date" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d9b571]">
-                </div>
-                <div>
-                    <label class="text-[10px] text-zinc-400 block mb-1">Kick-off Time Tag</label>
-                    <input type="text" id="custom-match-time" placeholder="e.g. 21:00" value="21:00" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d9b571]">
-                </div>
-            </div>
-            <div class="flex gap-2 pt-2">
-                <button type="button" onclick="saveCustomMatch()" class="flex-1 bg-[#d9b571] hover:bg-[#e8cd97] text-black font-bold py-2 rounded-xl text-xs transition">Save & Sync to Feed</button>
-                <button type="button" onclick="closeCustomMatchModal()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs transition">Cancel</button>
-            </div>
-        </div>
-    </div>
-
     <div id="edit-bankroll-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
         <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-sm w-full space-y-4">
             <h3 class="text-white font-bold text-base flex items-center gap-2"><span class="icon-gold">✏️</span> Edit Active Bankroll</h3>
@@ -729,7 +649,8 @@
         const isLegacyFixture = (m) => (LEGACY_FIXTURES[m.league] || Object.values(LEGACY_FIXTURES).flat())
             .some(x => x.name === m.name && x.date === m.date);
 
-        // Matches you added yourself with "Add Match" (any competition).
+        // Matches added by hand in older versions (the "Add Match" button is gone:
+        // the 8 competitions load live, anything else you just type).
         let customMatches = Object.fromEntries(FEED_LEAGUES.map(l => [l, []]));
         (function loadCustomMatches() {
             let stored = {};
@@ -763,12 +684,10 @@
         rebuildSavedFixtures();
 
         function updateDateLabel() {
-            const now = new Date();
-            const options = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
-            const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-            document.getElementById('header-date-label').innerText = `Ticket Center • ${now.toLocaleDateString('en-US', options)} | Local Time: ${timeString}`;
+            const today = new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+            document.getElementById('header-date-label').textContent = `Vault · ${today}`;
         }
-        setInterval(updateDateLabel, 1000);
+        setInterval(updateDateLabel, 60 * 1000);
 
         function saveState() {
             localStorage.setItem('hawk_bankroll', bankroll.toFixed(2));
@@ -831,7 +750,7 @@
         async function showLeagueFeed(league, force = false) {
             populateMatchDropdownOnly(league);
             if (!S365_COMPETITIONS[league]) {
-                setFeedStatus(league ? '📝 Your own matches — add more with ➕ Add Match' : 'Select a league to load fixtures', null);
+                setFeedStatus(league ? '📝 Type the match in the box below' : 'Select a league to load fixtures', null);
                 return;
             }
             if (force || !liveFixtures[league]) setFeedStatus('⏳ Loading live fixtures…', null);
@@ -888,93 +807,6 @@
                 opt.textContent = `${m.name} (${m.date ? formatDateLabel(m.date) + ' ' : ''}${m.time || 'TBD'})${m.status === 'LIVE' ? ' [LIVE]' : ''}`;
                 matchDropdown.appendChild(opt);
             });
-        }
-
-        function openSimulationModal() {
-            syncKellyFromSlip();
-            document.getElementById('simulation-modal').classList.remove('hidden');
-        }
-        function closeSimulationModal() {
-            document.getElementById('simulation-modal').classList.add('hidden');
-        }
-
-        // Kelly stake from a REAL win chance (e.g. HAWK's "Chance to land"), never a
-        // guessed edge. Capped at 5% of the bankroll per bet.
-        const KELLY_CAP = 0.05;
-        function kellyStake(odds, chancePct, fraction) {
-            if (isNaN(odds) || odds <= 1.0 || isNaN(chancePct) || chancePct <= 0 || chancePct >= 100) return null;
-            const p = chancePct / 100, b = odds - 1.0;
-            const full = Math.max(0, (b * p - (1 - p)) / b);
-            const pct = Math.min(full * fraction, KELLY_CAP);
-            return { p, edge: p * odds - 1, pct, amount: bankroll * pct, capped: full * fraction > KELLY_CAP };
-        }
-        function onKellyEngineInput() {
-            const odds = parseFloat(document.getElementById('kelly-odds').value);
-            const chance = parseFloat(document.getElementById('kelly-chance').value);
-            const fraction = parseFloat(document.getElementById('kelly-fraction').value);
-            if(isNaN(odds) || odds <= 1.0) return;
-
-            document.getElementById('kelly-implied-prob').textContent = `${(100 / odds).toFixed(2)}%`;
-            const edgeEl = document.getElementById('kelly-edge-out');
-            const k = kellyStake(odds, chance, fraction);
-            if (!k) {
-                edgeEl.textContent = '—';
-                document.getElementById('kelly-res-pct').textContent = '—';
-                document.getElementById('kelly-res-amount').textContent = 'Enter a win chance';
-                return;
-            }
-            edgeEl.textContent = `${k.edge >= 0 ? '+' : ''}${(k.edge * 100).toFixed(1)}%`;
-            edgeEl.className = k.edge > 0 ? 'text-emerald-400' : 'text-red-400';
-            document.getElementById('kelly-res-pct').textContent = k.pct > 0 ? `${(k.pct * 100).toFixed(2)}%${k.capped ? ' (capped)' : ''}` : '0% — no edge';
-            document.getElementById('kelly-res-amount').textContent = k.pct > 0 ? `€${k.amount.toFixed(2)}` : "Don't bet — the price is too short";
-        }
-
-        function syncKellyFromSlip() {
-            const slipOdds = parseFloat(document.getElementById('ticket-total-odds').value);
-            if(!isNaN(slipOdds) && slipOdds > 1.0) {
-                document.getElementById('kelly-odds').value = slipOdds.toFixed(2);
-            }
-            onKellyEngineInput();
-        }
-
-        function applyVaultKellyStake() {
-            const totalOdds = parseFloat(document.getElementById('ticket-total-odds').value);
-            if (isNaN(totalOdds) || totalOdds <= 1.0) {
-                alert("Please add legs to your ticket first.");
-                return;
-            }
-            const chance = parseFloat(document.getElementById('kelly-chance').value);
-            const fraction = parseFloat(document.getElementById('kelly-fraction').value) || 0.25;
-            const k = kellyStake(totalOdds, chance, fraction);
-            if (!k) { openSimulationModal(); return; }   // needs a real win chance first
-            if (k.pct <= 0) { alert("At this price there's no edge for that win chance — Kelly says don't bet."); return; }
-            document.getElementById('ticket-stake').value = k.amount.toFixed(2);
-            calculateTicketReturn();
-        }
-
-        function openCustomMatchModal() {
-            document.getElementById('custom-match-modal').classList.remove('hidden');
-        }
-
-        function closeCustomMatchModal() {
-            document.getElementById('custom-match-modal').classList.add('hidden');
-        }
-
-        function saveCustomMatch() {
-            const league = document.getElementById('custom-match-league').value;
-            const name = document.getElementById('custom-match-name').value.trim();
-            const date = document.getElementById('custom-match-date').value;
-            const time = document.getElementById('custom-match-time').value.trim();
-
-            if(!name) { alert("Please enter a fixture name."); return; }
-
-            if(!customMatches[league]) customMatches[league] = [];
-            customMatches[league].push({ name, time, status: "UPCOMING", result: "", date });
-
-            saveState();
-            closeCustomMatchModal();
-            document.getElementById('league-selector').value = league;
-            onLeagueChange();
         }
 
         function switchView(view) {
@@ -1591,6 +1423,7 @@
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <span class="text-xs text-zinc-400 font-bold">@ ${l.odds.toFixed(2)}</span>
+                                    ${hawkLegs && l.hawk.game ? `<a href="${hawkLink(l)}" class="bg-[#c9a05c]/15 hover:bg-[#c9a05c]/25 text-[#d9b571] px-2 py-1 rounded text-[10px] font-bold transition whitespace-nowrap" title="Open this match in the HAWK builder (live view or match report if it has started)">Open in HAWK</a>` : ''}
                                     <button onclick="reuseLeg('${bet.id}', ${li})" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded text-[10px] transition" title="Reuse this selection">Reuse</button>
                                 </div>
                             </div>
@@ -1796,6 +1629,9 @@
             renderTypeBreakdown();
         }
 
+        // Link that reopens a HAWK ticket's match in the builder with the same legs.
+        const hawkLink = (l) => `builder/?match=${encodeURIComponent(l.hawk.game)}&league=${encodeURIComponent(l.hawk.league || '')}`
+            + `&legs=${encodeURIComponent((l.hawk.legs || []).map(h => h.id).join(','))}`;
         const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         const betReturn = (b) => b.status === 'WON' ? b.potentialReturn : b.status === 'CASHED_OUT' ? (b.cashOutAmount || 0) : 0;
         const isHawkBet = (b) => b.source === 'hawk' || (b.legs || []).some(l => l.hawk || /^HAWK/.test(l.angle || ''));
@@ -2360,7 +2196,6 @@
         renderUI();
         onCategoryChange();
         onLeagueChange();
-        onKellyEngineInput();
         // 3D tilt for the stat tiles and ticket cards: they lean towards the mouse
         // (mouse only — phones just get the depth; off if you prefer reduced motion).
         (function tiltCards() {

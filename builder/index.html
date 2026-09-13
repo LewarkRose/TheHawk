@@ -530,6 +530,27 @@ async function init() {
   await selectLeague(leagues[0]);
   checkLineups();
   setInterval(checkLineups, 120000);
+  openFromUrl();
+}
+// "Open in HAWK" from a Vault ticket: builder/?match=ID&league=L&legs=a,b
+// Upcoming → the match with those legs on the slip; in play → live view;
+// finished → match report.
+async function openFromUrl() {
+  const q = new URLSearchParams(location.search), id = q.get("match");
+  if (!id) return;
+  history.replaceState(null, "", location.pathname);   // so a refresh doesn't reopen it
+  const league = q.get("league"), legs = (q.get("legs") || "").split(",").filter(Boolean);
+  if (league && S.allLeagues.includes(league) && S.league !== league) await selectLeague(league);
+  const fx = S.fixtures.find(f => String(f.id) === String(id));
+  if (!fx) return showReport(id);
+  if (fx.started) return showInPlay(id);
+  await openMatch(id);
+  const keep = legs.filter(l => S.legs[l]);
+  if (keep.length) {
+    S.slip = keep; S.locked = new Set(keep);
+    await evaluateSlip();
+    toast(`Your Vault ticket is back on the slip (${keep.length} leg${keep.length === 1 ? "" : "s"}).`);
+  }
 }
 async function selectLeague(league) {
   S.league = league;

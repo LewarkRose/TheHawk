@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HAWK · Bet Builder</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d1114">
 <style>
 :root{
   --bg:#0d1114; --panel:#151b1f; --panel2:#1b2328; --line:#25313a; --text:#e8eff3; --muted:#8797a3;
@@ -218,6 +223,22 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .hits{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
 .pl .nm,.pl .ph{cursor:pointer}
 .pl .nm:hover{color:var(--accent)}
+/* value finder */
+.vhead,.vrow{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.2fr) 58px 52px 56px 64px;gap:10px;align-items:center}
+.vhead{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:0 12px 6px}
+.vrow{padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);margin-bottom:8px;cursor:pointer;
+  transition:.15s;animation:in .3s both}
+.vrow:hover{border-color:var(--accent)}
+.vrow .teams{display:flex;align-items:center;gap:6px;font-weight:700;flex-wrap:wrap}
+.vrow .teams img{width:18px;height:18px}
+.vp{font-weight:900;color:var(--gold);font-size:16px}
+.ve{font-weight:900;color:var(--accent)}
+@media (max-width:820px){
+  .vhead{display:none}
+  .vrow{grid-template-columns:1fr auto;gap:4px 10px}
+  .vrow .vm{grid-column:1/-1}
+  .vrow > div:nth-child(4),.vrow > div:nth-child(5){display:none}
+}
 /* floating "jump to slip" button, shown when the slip isn't beside the match */
 .jump{display:none;position:fixed;right:14px;bottom:18px;z-index:15;padding:11px 16px;border-radius:999px;border:0;cursor:pointer;
   font-weight:900;color:#03261b;background:linear-gradient(90deg,#10c98e,#3ff5bd);box-shadow:0 8px 24px rgba(0,0,0,.45)}
@@ -254,6 +275,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   <div class="brand"><div class="mark">H</div>HAWK <em>bet builder</em></div>
   <nav class="leagues" id="leagues"></nav>
   <div class="tools">
+    <button class="tool" id="valueBtn" title="Every bookmaker price that beats HAWK's fair odds">💰 Value finder</button>
     <button class="tool" id="scanBtn">⚡ Best builders</button>
     <button class="tool bell" id="watchBtn" hidden></button>
     <div class="pop" id="watchPop" hidden></div>
@@ -276,6 +298,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
             target: 3.25, style: "Balanced", focus: "Mix", maxLegs: 10, favourite: true, result: null, tab: "players", q: "",
             view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "legs", data: null, timer: null },
+            value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null },
             watch: [] };
 const FOCUS_LABELS = { Mix: "Mix", Players: "Player props", Match: "Match stats" };
 // Display names for the builder styles (the keys are what the server expects).
@@ -309,6 +332,8 @@ async function api(path, body) {
     case "/api/evaluate": return HAWK.evaluate(body);
     case "/api/scan": return body ? HAWK.startScan(body) : HAWK.scanStatus();
     case "/api/scan/stop": return HAWK.stopScan();
+    case "/api/value": return body ? HAWK.startValue(body) : HAWK.valueStatus();
+    case "/api/value/stop": return HAWK.stopValue();
   }
   throw new Error("unknown request " + p);
 }
@@ -324,6 +349,8 @@ async function init() {
   const { leagues } = await api("/api/leagues");
   S.allLeagues = leagues;
   S.scan.leagues = new Set(leagues);
+  S.value.leagues = new Set(leagues);
+  $("#valueBtn").onclick = showValue;
   $("#leagues").innerHTML = leagues.map(l => `<button class="pill" data-l="${esc(l)}">${esc(l)}</button>`).join("");
   $("#leagues").onclick = (e) => { const b = e.target.closest(".pill"); if (b) selectLeague(b.dataset.l); };
   $("#scanBtn").onclick = showScan;
@@ -758,6 +785,120 @@ async function openFromScan(id) {
   await goToMatch(r.league, r.id);
   S.slip = r.legs.map(l => l.id).filter(i => S.legs[i]);
   await evaluateSlip();
+}
+
+/* ---------- value finder ---------- */
+function showValue() {
+  S.view = "value";
+  document.querySelectorAll(".fx").forEach(f => f.classList.remove("on"));
+  renderValue();
+  pollValue();
+}
+function renderValue() {
+  const v = S.value;
+  const sel = (id, opts, cur) => `<select id="${id}">${opts.map(([val, t]) => `<option value="${val}" ${String(val) === String(cur) ? "selected" : ""}>${t}</option>`).join("")}</select>`;
+  $("#match").innerHTML = `
+    <div class="section" style="border-top:0">
+      <h3>💰 Value finder</h3>
+      <div class="note" style="margin-top:0">Checks <b>every market</b> the bookmakers list — result, double chance, draw no bet, Asian handicaps,
+        every goals line, both teams to score, clean sheets, first to score, correct score, half-time markets, corners, cards, shots on
+        target, offsides, penalties, red cards — at all 6 bookmakers, and lists every price that beats HAWK's fair odds. <b>Edge</b> = how much
+        more the price pays than it should: +5% means that over many bets you'd expect about €5 profit per €100 staked. These are <b>single bets</b>.</div>
+      <div class="leagues" id="valLeagues" style="flex-wrap:wrap;margin:12px 0">${S.allLeagues.map(l =>
+        `<button class="pill ${v.leagues.has(l) ? "on" : ""}" data-vl="${esc(l)}">${esc(l)}</button>`).join("")}</div>
+      <div class="opts" style="justify-content:flex-start;gap:14px;flex-wrap:wrap">
+        <label>Kick-off within ${sel("vHrs", [[24, "24 hours"], [48, "48 hours"], [168, "7 days"]], v.hours)}</label>
+        <button class="build" id="valGo" style="width:auto;margin:0 0 0 auto;padding:10px 20px"></button>
+      </div>
+      <div class="opts" style="justify-content:flex-start;gap:14px;flex-wrap:wrap;margin-top:10px">
+        <label>Bookmaker <span id="vBookWrap"></span></label>
+        <label>Market <span id="vMarketWrap"></span></label>
+        <label>Chance ${sel("vMinP", [[0, "any"], [0.25, "25%+"], [0.4, "40%+"], [0.6, "60%+"]], v.minP)}</label>
+        <label>Edge ${sel("vMinE", [[0.02, "+2%+"], [0.05, "+5%+"], [0.1, "+10%+"]], v.minEdge)}</label>
+        <label><input type="checkbox" id="vBest" ${v.bestOnly ? "checked" : ""}> Best price only</label>
+      </div>
+      <div id="valProg"></div>
+    </div>
+    <div class="section" id="valRes"></div>`;
+  $("#valLeagues").onclick = (e) => {
+    const b = e.target.closest("[data-vl]"); if (!b) return;
+    const l = b.dataset.vl; v.leagues.has(l) ? v.leagues.delete(l) : v.leagues.add(l);
+    b.classList.toggle("on", v.leagues.has(l));
+  };
+  $("#vHrs").onchange = (e) => { v.hours = +e.target.value; };
+  $("#vMinP").onchange = (e) => { v.minP = +e.target.value; updateValue(); };
+  $("#vMinE").onchange = (e) => { v.minEdge = +e.target.value; updateValue(); };
+  $("#vBest").onchange = (e) => { v.bestOnly = e.target.checked; updateValue(); };
+  $("#valGo").onclick = toggleValue;
+  $("#valRes").onclick = (e) => { const r = e.target.closest("[data-vopen]"); if (r) openFromValue(+r.dataset.vopen); };
+  updateValue();
+}
+function valueRows() {
+  const v = S.value, d = v.data;
+  let rows = ((d && d.results) || []).filter(r => r.edge >= v.minEdge && r.p >= v.minP && (v.book === "All" || r.book === v.book)
+                                                  && (v.market === "All" || r.market === v.market));
+  if (v.bestOnly) {  // keep only the best price for each match + market
+    const best = {};
+    for (const r of rows) { const k = r.id + "|" + r.label; if (!best[k] || r.price > best[k].price) best[k] = r; }
+    rows = Object.values(best);
+  }
+  return rows.sort((a, b) => b.edge - a.edge);
+}
+function updateValue() {
+  if (S.view !== "value" || !$("#valRes")) return;
+  const v = S.value, d = v.data || { running: false, total: 0, done: 0, errors: 0, results: [] };
+  const books = [...new Set(d.results.map(r => r.book))].sort();
+  $("#vBookWrap").innerHTML = `<select id="vBook">${["All", ...books].map(b => `<option ${b === v.book ? "selected" : ""}>${esc(b)}</option>`).join("")}</select>`;
+  $("#vBook").onchange = (e) => { v.book = e.target.value; updateValue(); };
+  const markets = [...new Set(d.results.map(r => r.market))].sort();
+  $("#vMarketWrap").innerHTML = `<select id="vMarket">${["All", ...markets].map(m => `<option ${m === v.market ? "selected" : ""}>${esc(m)}</option>`).join("")}</select>`;
+  $("#vMarket").onchange = (e) => { v.market = e.target.value; updateValue(); };
+  $("#valGo").textContent = d.running ? "■ STOP" : (d.total ? "💰 SCAN AGAIN" : "💰 FIND VALUE");
+  $("#valProg").innerHTML = d.running || d.total ? `<div class="prog"><span style="width:${d.total ? 100 * d.done / d.total : 3}%"></span></div>
+    <div class="note">${d.running ? `Checking odds… ${d.done} of ${d.total || "?"} fixtures` : `Checked ${d.done} fixture${d.done === 1 ? "" : "s"}`}${
+      d.errors ? ` · ${d.errors} skipped (no odds or data yet)` : ""}</div>` : "";
+  const rows = valueRows();
+  S.value.shown = rows;
+  $("#valRes").innerHTML = rows.length ? `<div class="vhead"><div>Match</div><div>Bet</div><div>Price</div><div>Fair</div><div>Chance</div><div>Edge</div></div>` +
+    rows.map((r, i) => `<div class="vrow" data-vopen="${i}" title="Open the match with this leg on your slip">
+      <div class="vm"><div class="teams"><img src="${esc(r.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(r.home)}
+        <span class="muted" style="font-weight:500">v</span> ${esc(r.away)}</div>
+        <div class="muted" style="font-size:11.5px">${esc(r.league)} · ${esc(fmtKick(r.kickoff))}</div></div>
+      <div><b>${esc(r.label)}</b><div class="muted" style="font-size:11.5px">${esc(r.book)} · ${esc(r.basis)}${r.push ? " · stake back on a push" : ""}</div></div>
+      <div class="vp">${odds(r.price)}</div><div class="muted">${odds(r.fair)}</div><div>${pct(r.p, r.p < 0.1 ? 1 : 0)}</div>
+      <div class="ve">+${(100 * r.edge).toFixed(1)}%</div></div>`).join("") +
+    `<div class="note">Fair = HAWK's odds. <b>model + market</b>: HAWK's model blended with all bookmakers' combined price.
+      <b>market</b>: markets HAWK doesn't model (offsides, penalties, red cards) — fair is the other bookmakers' combined price, so these
+      are one bookmaker out of line. <b>model</b>: only one price listed (e.g. correct scores), so it rests on HAWK's model alone — trust these least.
+      A price well above every other book is sometimes a mistake the bookmaker fixes quickly — check it's still there before betting.
+      Edges are long-run averages, not guarantees.</div>`
+    : `<div class="note">${d.running ? "Value appears here as each match is checked…"
+      : d.total ? "Nothing beats HAWK's fair odds with these filters — normal; bookmakers are sharp on main markets. Try a lower chance filter or a longer window."
+      : "Pick leagues and a window, then hit Find value. It takes a few seconds per match."}</div>`;
+}
+async function toggleValue() {
+  try {
+    if (S.value.data && S.value.data.running) S.value.data = await api("/api/value/stop", {});
+    else {
+      if (!S.value.leagues.size) return toast("Pick at least one league.");
+      S.value.data = await api("/api/value", { leagues: [...S.value.leagues], hours: S.value.hours });
+    }
+  } catch (err) { toast(err.message); }
+  updateValue();
+  pollValue();
+}
+async function pollValue() {
+  clearTimeout(S.value.timer);
+  try { S.value.data = await api("/api/value"); } catch (err) { /* keep the last status */ }
+  updateValue();
+  if (S.value.data && S.value.data.running) S.value.timer = setTimeout(pollValue, 1500);
+}
+async function openFromValue(i) {
+  const r = (S.value.shown || [])[i]; if (!r) return;
+  await goToMatch(r.league, r.id);
+  // Only markets the builder simulates can go on the slip (not handicaps, correct scores, half-time...).
+  if (r.legId && S.legs[r.legId]) { S.slip = [r.legId]; S.locked = new Set([r.legId]); await evaluateSlip(); }
+  toast(`${r.label} — ${r.book} @ ${odds(r.price)} (fair ${odds(r.fair)})`);
 }
 
 /* ---------- lineup alerts ---------- */

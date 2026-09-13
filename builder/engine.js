@@ -68,7 +68,10 @@
         if (ttlMs) cache.set(url, { t: Date.now(), v });
         return v;
       } catch (e) {
+        // Network errors include throttled replies that arrive without CORS
+        // headers (seen from 365Scores during fast scans): back off, then retry.
         if (attempt === 2) { console.warn("[hawk] request failed:", url, e.message); return null; }
+        await sleep(700 * (attempt + 1));
       } finally { clearTimeout(timer); }
     }
     return null;
@@ -812,50 +815,206 @@
              started: !!(g.startTime && new Date(g.startTime) < new Date()) };
   }
 
-  // "Best builders" scan, run in the page two matches at a time.
-  const scan = { running: false, stop: false, total: 0, done: 0, errors: 0, results: [], params: null };
-  const scanStatus = () => ({ ...scan, results: scan.results.slice() });
-  function startScan(body) {
-    if (scan.running) return scanStatus();
-    const params = { leagues: (body.leagues || []).filter((l) => LEAGUES.includes(l)), hours: Math.min(Math.max(+body.hours || 24, 1), 168),
-                     target: Math.min(Math.max(+body.target || 3, 1.2), 50), style: STYLES[body.style] ? body.style : "Balanced",
-                     focus: FOCUS[body.focus] ? body.focus : "Mix", maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12) };
-    Object.assign(scan, { running: true, stop: false, total: 0, done: 0, errors: 0, results: [], params });
-    runScan(params);
-    return scanStatus();
+  // Background jobs over every fixture in a time window, two matches at a
+  // time: the "Best builders" scan and the Value finder.
+  function newJob() { return { running: false, stop: false, total: 0, done: 0, errors: 0, results: [], params: null }; }
+  const jobStatus = (job) => ({ ...job, results: job.results.slice() });
+  function windowParams(body) {
+    return { leagues: (body.leagues || []).filter((l) => LEAGUES.includes(l)), hours: Math.min(Math.max(+body.hours || 24, 1), 168) };
   }
-  async function runScan(params) {
-    const now = Date.now(), horizon = now + params.hours * 3600 * 1000, jobs = [];
-    for (const league of params.leagues) {
+  async function runFixtureJob(job, perMatch) {
+    const now = Date.now(), horizon = now + job.params.hours * 3600 * 1000, todo = [];
+    for (const league of job.params.leagues) {
       let list = [];
-      try { list = await fixtures(league); } catch { scan.errors++; }
-      for (const f of list) { const ko = f.kickoff ? new Date(f.kickoff).getTime() : 0; if (ko > now && ko <= horizon) jobs.push([league, f]); }
+      try { list = await fixtures(league); } catch { job.errors++; }
+      for (const f of list) { const ko = f.kickoff ? new Date(f.kickoff).getTime() : 0; if (ko > now && ko <= horizon) todo.push([league, f]); }
     }
-    jobs.sort((a, b) => (a[1].kickoff || "").localeCompare(b[1].kickoff || ""));
-    scan.total = jobs.length;
+    todo.sort((a, b) => (a[1].kickoff || "").localeCompare(b[1].kickoff || ""));
+    job.total = todo.length;
     let next = 0;
     const worker = async () => {
-      while (next < jobs.length && !scan.stop) {
-        const [league, f] = jobs[next++];
-        try {
-          const json = await match(league, f.id);
-          const e = entryFor(f.id);
-          const t = autoBuild(e.legs, params.target, params.style, params.maxLegs, [], new Set(), true, params.focus);
-          scan.results.push({ league, id: String(f.id), home: f.home, away: f.away, homeCrest: f.homeCrest, awayCrest: f.awayCrest,
-            kickoff: f.kickoff, confirmed: json.lineups.home.status === "Confirmed" && json.lineups.away.status === "Confirmed",
-            legs: t.legs.map((r) => ({ id: r.id, label: e.legs[r.id].label, kind: e.legs[r.id].kind })), p: t.p, fair: t.fair,
-            value: json.value.legs.slice(0, 4).map((v) => ({ label: v.label, price: v.price, edge: v.edge })) });
-        } catch (err) { console.warn("[hawk] scan skipped", f.home, "v", f.away, err.message); scan.errors++; }
-        scan.done++;
+      while (next < todo.length && !job.stop) {
+        const [league, f] = todo[next++];
+        try { const json = await match(league, f.id); perMatch(league, f, json, entryFor(f.id)); }
+        catch (err) { console.warn("[hawk] skipped", f.home, "v", f.away, err.message); job.errors++; }
+        job.done++;
       }
     };
     await Promise.all([worker(), worker()]);
-    scan.running = false;
+    job.running = false;
   }
-  function stopScan() { scan.stop = true; return scanStatus(); }
+  const fixtureInfo = (league, f, json) => ({ league, id: String(f.id), home: f.home, away: f.away, homeCrest: f.homeCrest,
+    awayCrest: f.awayCrest, kickoff: f.kickoff, confirmed: json.lineups.home.status === "Confirmed" && json.lineups.away.status === "Confirmed" });
 
-  global.HAWK = { LEAGUES, fixtures, match, build, evaluate: evaluateBody, lineups, startScan, scanStatus, stopScan,
+  const scan = newJob();
+  function startScan(body) {
+    if (scan.running) return jobStatus(scan);
+    const params = { ...windowParams(body), target: Math.min(Math.max(+body.target || 3, 1.2), 50),
+                     style: STYLES[body.style] ? body.style : "Balanced", focus: FOCUS[body.focus] ? body.focus : "Mix",
+                     maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12) };
+    Object.assign(scan, newJob(), { running: true, params });
+    runFixtureJob(scan, (league, f, json, e) => {
+      const t = autoBuild(e.legs, params.target, params.style, params.maxLegs, [], new Set(), true, params.focus);
+      scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair,
+        legs: t.legs.map((r) => ({ id: r.id, label: e.legs[r.id].label, kind: e.legs[r.id].kind })),
+        value: json.value.legs.slice(0, 4).map((v) => ({ label: v.label, price: v.price, edge: v.edge })) });
+    });
+    return jobStatus(scan);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Every-market fair odds (Value finder)
+  //
+  // Each selection is priced exactly from the model rather than from the
+  // simulation (whose ~±0.5% noise matters when hunting 2–5% edges), then
+  // blended with the de-margined consensus of all bookmakers for that same
+  // line, like the builder does. Markets HAWK doesn't model (offsides,
+  // penalties, red cards) use the consensus alone, so a price there is
+  // "value" when one bookmaker is out of line with the others.
+  //
+  // Bets that can push (whole lines, Asian handicaps, draw no bet) are
+  // handled by q = the win share of the money that isn't refunded, so the
+  // fair price is 1 / q and the edge is price × q − 1.
+  // ---------------------------------------------------------------------------
+  const HALF_SHARE = 0.45; // share of goals in the first half (top-league average is ~44–46%)
+
+  function distFromMatrix(M, fn) {  // distribution of fn(i, j) over the score matrix
+    const d = new Map();
+    for (let i = 0; i <= MAX_GOALS; i++) for (let j = 0; j <= MAX_GOALS; j++) { const x = fn(i, j); d.set(x, (d.get(x) || 0) + M[i][j]); }
+    return d;
+  }
+  function poissonDist(lam) { const d = new Map(); for (let k = 0; k < 60; k++) d.set(k, pmf(lam, k)); return d; }
+  // {q, d} for "X over line" (or under) on a discrete distribution, with
+  // pushes on whole lines and quarter lines split into two half-stakes.
+  function lineBet(dist, line, over) {
+    const parts = Math.abs(line * 4 % 2) === 1 ? [line - 0.25, line + 0.25] : [line];
+    let win = 0, lose = 0;
+    for (const L of parts) for (const [x, p] of dist) {
+      if (x === L) continue;
+      if ((x > L) === over) win += p; else lose += p;
+    }
+    return win + lose > 0 ? { q: win / (win + lose), d: (win + lose) / parts.length } : null;
+  }
+  function halfMatrix(an, share) {
+    const ph = pmfRow(an.lamBlend[0] * share), pa = pmfRow(an.lamBlend[1] * share);
+    return ph.map((x) => pa.map((y) => x * y));
+  }
+  const score = (v) => { const m = /^(\d+)\s*-\s*(\d+)$/.exec(v || ""); return m ? [+m[1], +m[2]] : null; };
+  const result3 = (M, opt) => { const t = { 1: (i, j) => i > j, X: (i, j) => i === j, 2: (i, j) => i < j }[opt]; return t ? { q: sumCells(M, t), d: 1 } : null; };
+
+  // HAWK's model price for one selection, or null if it doesn't model it.
+  function selectionModel(an, exp, type, value, option) {
+    const M = an.M, v = parseFloat(value), yes = option === "Yes";
+    const simple = (q) => (q > 0 && q < 1 ? { q, d: 1 } : null);
+    switch (type) {
+      case 1: return result3(M, option);
+      case 14: { const t = { "1X": (i, j) => i >= j, "12": (i, j) => i !== j, X2: (i, j) => i <= j }[option]; return t ? simple(sumCells(M, t)) : null; }
+      case 15: { const w = sumCells(M, (i, j) => i > j), l = sumCells(M, (i, j) => i < j); return option === "Home" ? { q: w / (w + l), d: w + l } : option === "Away" ? { q: l / (w + l), d: w + l } : null; }
+      case 3: return Number.isFinite(v) && (option === "Over" || option === "Under") ? lineBet(distFromMatrix(M, (i, j) => i + j), v, option === "Over") : null;
+      case 11: // value = the home team's handicap
+        return Number.isFinite(v) && (option === "Home" || option === "Away") ? lineBet(distFromMatrix(M, (i, j) => i - j), -v, option === "Home") : null;
+      case 12: return simple(sumCells(M, (i, j) => (i > 0 && j > 0) === yes));
+      case 144: return simple(sumCells(M, (i, j) => (j === 0) === yes));
+      case 145: return simple(sumCells(M, (i, j) => (i === 0) === yes));
+      case 7: { // given the final score, every order of the goals is equally likely
+        if (option === "No Goal") return simple(M[0][0]);
+        if (option !== "Home" && option !== "Away") return null;
+        let s = 0;
+        for (let i = 0; i <= MAX_GOALS; i++) for (let j = 0; j <= MAX_GOALS; j++)
+          if (i + j) s += (M[i][j] * (option === "Home" ? i : j)) / (i + j);
+        return simple(s);
+      }
+      case 126: { const s = score(value); return s && yes && s[0] <= MAX_GOALS && s[1] <= MAX_GOALS ? simple(M[s[0]][s[1]]) : null; }
+      case 5: return result3(halfMatrix(an, HALF_SHARE), option);
+      case 6: return result3(halfMatrix(an, 1 - HALF_SHARE), option);
+      case 9: return Number.isFinite(v) && (option === "Over" || option === "Under") ? lineBet(distFromMatrix(halfMatrix(an, HALF_SHARE), (i, j) => i + j), v, option === "Over") : null;
+      case 13: return simple(sumCells(halfMatrix(an, 1 - HALF_SHARE), (i, j) => (i > 0 && j > 0) === yes));
+      case 127: { const s = score(value); return s && yes ? simple(halfMatrix(an, HALF_SHARE)[s[0]][s[1]]) : null; }
+      case 137: case 141: case 139: {
+        const lam = type === 137 ? exp.corners : type === 141 ? exp.cards[0] + exp.cards[1] : exp.sot[0] + exp.sot[1];
+        return Number.isFinite(v) && (option === "Over" || option === "Under") ? lineBet(poissonDist(lam), v, option === "Over") : null;
+      }
+    }
+    return null;
+  }
+
+  function marketLabel(type, market, value, option, home, away) {
+    const team = (o) => ({ 1: home, Home: home, 2: away, Away: away, X: "Draw" }[o] || o);
+    const fmt = (x) => (x > 0 ? `+${x}` : `${x}`);
+    const v = parseFloat(value);
+    switch (type) {
+      case 1: return `Result: ${team(option)}`;
+      case 14: return { "1X": `${home} or Draw`, X2: `${away} or Draw`, "12": `${home} or ${away}` }[option] || option;
+      case 15: return `Draw No Bet: ${team(option)}`;
+      case 3: return `${option} ${value} Goals`;
+      case 11: return `Asian Handicap: ${option === "Home" ? `${home} ${fmt(v)}` : `${away} ${fmt(-v)}`}`;
+      case 12: return `Both Teams to Score: ${option}`;
+      case 144: return `${home} Clean Sheet: ${option}`;
+      case 145: return `${away} Clean Sheet: ${option}`;
+      case 7: return option === "No Goal" ? "No Goalscorer" : `${team(option)} to Score First`;
+      case 126: return `Correct Score ${value}`;
+      case 5: return `1st Half Result: ${team(option)}`;
+      case 6: return `2nd Half Result: ${team(option)}`;
+      case 9: return `1st Half ${option} ${value} Goals`;
+      case 13: return `BTTS 2nd Half: ${option}`;
+      case 127: return `Half-Time Score ${value}`;
+      case 137: return `${option} ${value} Corners`;
+      case 141: return `${option} ${value} Cards`;
+      case 139: return `${option} ${value} Shots on Target`;
+    }
+    return `${market}: ${option}${value ? " " + value : ""}`;
+  }
+
+  // Value finder rows for one match: every live bookmaker price on every
+  // market, against HAWK's fair odds. Keeps prices at or above fair.
+  function priceRows(entry) {
+    const an = entry.an, exp = entry.json.expected, rows = [];
+    const byLine = {};
+    for (const q of an.quotes) {
+      // Live 365Scores books only: Polymarket and Betfair Exchange feed the
+      // consensus, and football-data's odds are a days-old snapshot.
+      if (q.source !== "365Scores" || CONSENSUS_ONLY.has(q.book)) continue;
+      (byLine[`${q.type}|${q.value}`] ||= []).push(q);
+    }
+    const legByLine = {};
+    for (const id of Object.keys(entry.legs)) { const l = bookLine(id); if (l) legByLine[l.join("|")] = id; }
+    for (const [key, quotes] of Object.entries(byLine)) {
+      const { type, market, value } = quotes[0];
+      const cons = an.cons[key];
+      for (const option of new Set(quotes.flatMap((q) => Object.keys(q.prices)))) {
+        const model = selectionModel(an, exp, type, value, option);
+        const pMarket = cons ? cons.probs[option] : null;
+        const [w, ignored] = marketTrust(model && model.q, pMarket, cons ? cons.books : 0);
+        const q = ignored ? pMarket : blend(model ? model.q : null, pMarket, w);
+        if (!(q > 0 && q < 1)) continue;
+        const basis = model && pMarket != null && !ignored ? "model + market" : model && !ignored ? "model" : "market";
+        for (const b of quotes) {
+          const price = b.prices[option];
+          if (!price || price * q < 1) continue;
+          rows.push({ label: marketLabel(type, market, value, option, an.home, an.away), market, book: b.book, price,
+                      p: q, fair: 1 / q, edge: price * q - 1, basis, push: !!model && model.d < 0.999,
+                      legId: legByLine[`${type}|${value}|${option}`] || null });
+        }
+      }
+    }
+    return rows;
+  }
+  const valueJob = newJob();
+  function startValue(body) {
+    if (valueJob.running) return jobStatus(valueJob);
+    Object.assign(valueJob, newJob(), { running: true, params: windowParams(body) });
+    runFixtureJob(valueJob, (league, f, json, e) => {
+      const info = fixtureInfo(league, f, json);
+      for (const row of priceRows(e)) valueJob.results.push({ ...info, ...row });
+    });
+    return jobStatus(valueJob);
+  }
+
+  global.HAWK = { LEAGUES, fixtures, match, build, evaluate: evaluateBody, lineups,
+                  startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
+                  startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },
                   meta: () => data("meta.json"),
                   _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas,
+                                selectionModel, priceRows, entry: (id) => matches.get(String(id)),
                                 fitTotalLambda, scoreMatrix, nameSimilarity, bestMatch } };
 })(window);

@@ -124,7 +124,7 @@ img{max-width:100%}
 .linkbtn{background:none;border:0;padding:0 2px;color:var(--accent);cursor:pointer;font:inherit;text-decoration:underline}
 .sc-league{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
 .sc-league:first-child{margin-top:0}
-.sc-row{display:grid;grid-template-columns:58px 1fr 64px 1fr 22px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;
+.sc-row{display:grid;grid-template-columns:58px 1fr 64px 1fr 64px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;
   border:1px solid transparent;transition:.12s}
 .sc-row:hover{background:var(--panel2);border-color:var(--line)}
 .sc-row.is-live{background:rgba(255,93,115,.05)}
@@ -135,13 +135,19 @@ img{max-width:100%}
 .sc-team img{width:20px;height:20px;flex-shrink:0}
 .sc-team.win{color:var(--accent)}
 .sc-score{text-align:center;font-weight:900;font-size:16px;letter-spacing:.04em}
-.sc-bet{text-align:center}
+.sc-bet{display:flex;align-items:center;justify-content:flex-end;gap:6px}
+.sc-bell{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-size:14px;
+  filter:grayscale(1);opacity:.55;transition:.12s}
+.sc-bell:hover{opacity:1;filter:none;border-color:var(--gold)}
+.sc-bell.on{opacity:1;filter:none;border-color:var(--gold);background:rgba(255,209,102,.12);box-shadow:0 0 12px rgba(255,209,102,.25)}
+.sc-xi{font-size:10.5px;font-weight:800;color:var(--accent);background:rgba(20,227,161,.12);padding:2px 6px;border-radius:6px;white-space:nowrap}
 .dot-live{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:6px;animation:livepulse 2s infinite}
 .rp-evs{display:flex;flex-direction:column;gap:4px}
 .rp-ev{display:flex;gap:8px;font-size:13px;padding:4px 0}
 .rp-ev.away{flex-direction:row-reverse;text-align:right}
 .rp-ev .min{color:var(--muted);font-weight:700;min-width:36px}
-@media (max-width:560px){.sc-row{grid-template-columns:44px 1fr 52px 1fr 16px;gap:6px;font-size:13px}.sc-team img{display:none}}
+@media (max-width:560px){.sc-row{grid-template-columns:44px 1fr 48px 1fr 34px;gap:6px;font-size:13px}.sc-team img{display:none}
+  .sc-bell{width:28px;height:28px}}
 .kelly{margin-top:8px;font-size:13px;padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line)}
 .kelly b{color:var(--gold)}
 .kfrac{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:2px 4px;font-size:12px;margin-left:4px}
@@ -1477,7 +1483,11 @@ function renderScores() {
     <div class="section" id="scList"><div class="note">Loading scores…</div></div>`;
   $("#scDays").onclick = (e) => { const b = e.target.closest("[data-day]"); if (!b) return; sc.day = b.dataset.day; sc.data = null; renderScores(); loadScores(); };
   $("#scLeagues").onclick = (e) => { const c = e.target.closest("[data-lg]"); if (!c) return; sc.league = c.dataset.lg; renderScores(); renderScoreList(); };
-  $("#scList").onclick = (e) => { const r = e.target.closest("[data-sid]"); if (r) openScore(r.dataset.sid); };
+  $("#scList").onclick = (e) => {
+    const b = e.target.closest("[data-bell]");
+    if (b) { const g = (sc.data || []).find(x => x.id === b.dataset.bell); if (g) toggleWatchFor(g); return; }
+    const r = e.target.closest("[data-sid]"); if (r) openScore(r.dataset.sid);
+  };
   if (sc.data) renderScoreList();
 }
 function renderScoreList() {
@@ -1500,12 +1510,15 @@ function renderScoreList() {
           : g.status === 2 ? `<span class="muted">${new Date(g.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>` : `<span class="muted">${esc(g.statusText)}</span>`;
         const sc0 = g.score[0] == null ? "" : g.score[0], sc1 = g.score[1] == null ? "" : g.score[1];
         const bet = mine[g.id] ? `<span title="You have a HAWK bet on this match (${esc(mine[g.id].toLowerCase())})">🎟</span>` : "";
+        // Upcoming: a bell for a lineup alert, or "XI ✓" once both lineups are out.
+        const alert = g.status !== 2 ? "" : g.lineupsConfirmed ? `<span class="sc-xi" title="Lineups confirmed">XI ✓</span>`
+          : `<button class="sc-bell ${isWatched(g.id) ? "on" : ""}" data-bell="${g.id}" title="${isWatched(g.id) ? "Lineup alert on — click to stop" : "Alert me when the lineups are confirmed"}">🔔</button>`;
         return `<div class="sc-row ${g.status === 3 ? "is-live" : ""}" data-sid="${g.id}" title="${g.status === 3 ? "Open the live view" : g.status === 4 ? "Match report" : "Open in the builder"}">
           <div class="sc-state">${state}</div>
           <div class="sc-team ${g.winner === 1 ? "win" : ""}"><img src="${esc(g.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(g.home)}</div>
           <div class="sc-score">${g.score[0] == null ? "–" : `${sc0} – ${sc1}`}</div>
           <div class="sc-team away ${g.winner === 2 ? "win" : ""}">${esc(g.away)}<img src="${esc(g.awayCrest)}" alt="" onerror="this.style.visibility='hidden'"></div>
-          <div class="sc-bet">${bet}</div></div>`;
+          <div class="sc-bet">${alert}${bet}</div></div>`;
       }).join("")}`).join("");
 }
 async function openScore(id) {
@@ -1786,13 +1799,20 @@ function renderWatch() {
 }
 async function toggleWatch() {
   const m = S.match; if (!m) return;
-  if (isWatched(m.id)) { S.watch = S.watch.filter(w => String(w.id) !== String(m.id)); toast("Lineup alert off."); }
+  await toggleWatchFor(m);
+}
+// Lineup alert on/off for any game ({id, league, home, away}) — from the match
+// page or straight from the Scores list.
+async function toggleWatchFor(g) {
+  if (isWatched(g.id)) { S.watch = S.watch.filter(w => String(w.id) !== String(g.id)); toast(`Lineup alert off: ${g.home} v ${g.away}.`); }
   else {
-    S.watch.push({ id: String(m.id), league: m.league, home: m.home, away: m.away });
+    S.watch.push({ id: String(g.id), league: g.league, home: g.home, away: g.away });
     if ("Notification" in window && Notification.permission === "default") { try { await Notification.requestPermission(); } catch {} }
-    toast("🔔 You'll get an alert when both lineups are confirmed — keep this tab open.");
+    toast(`🔔 ${g.home} v ${g.away}: you'll get an alert when both lineups are confirmed — keep a HAWK tab open.`);
   }
-  saveWatch(); renderWatch(); renderFixtures(); renderMatch();
+  saveWatch(); renderWatch(); renderFixtures();
+  if (S.view === "match" && S.match) renderMatch();
+  if (S.view === "scores") renderScoreList();
 }
 let checkingLineups = false;
 async function checkLineups() {

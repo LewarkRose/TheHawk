@@ -1469,6 +1469,8 @@
       homeCrest: crest(g.homeCompetitor), awayCrest: crest(g.awayCompetitor), kickoff: g.startTime, status: g.statusGroup,
       statusText: g.shortStatusText || g.statusText || "", clock: g.gameTimeDisplay || "", score: [score(g.homeCompetitor, g), score(g.awayCompetitor, g)],
       winner: g.winner || 0,
+      // 365Scores' lineupsStatus: 1 = only absences known, 2 = probable XI, 3 = confirmed XI
+      lineupsConfirmed: g.lineupsStatus === 3,
     })).sort((a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""));
   }
   const REPORT_STATS = [["Expected Goals", "Expected goals (xG)"], ["Total Shots", "Shots"], ["Shots On Target", "Shots on target"],

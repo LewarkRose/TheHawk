@@ -55,7 +55,7 @@
                         <span class="icon-gold">✏️</span>
                     </button>
                 </div>
-                <button onclick="resetVault()" class="bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white px-3 py-2.5 rounded-xl border border-zinc-800 text-xs transition" title="Reset All Data">
+                <button onclick="resetVault()" class="bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white px-3 py-2.5 rounded-xl border border-zinc-800 text-xs transition" title="Reset the Vault (downloads a backup first)">
                     <span class="icon-gold">⚙️</span>
                 </button>
             </div>
@@ -66,9 +66,6 @@
             <div class="flex gap-3">
                 <button onclick="switchView('builder')" id="nav-builder" class="bg-[#d9b571] text-black font-bold px-5 py-2.5 rounded-xl text-xs transition shadow-lg shadow-[#3d2f18]/20 flex items-center gap-2">
                     <span class="icon-gold">⚡</span> Ticket Builder
-                </button>
-                <button onclick="switchView('matches')" id="nav-matches" class="bg-zinc-900 text-zinc-400 hover:text-white font-semibold px-5 py-2.5 rounded-xl text-xs border border-zinc-800 transition flex items-center gap-2">
-                    <span class="icon-gold">🏟️</span> Match Schedule & Center
                 </button>
                 <button onclick="switchView('history')" id="nav-history" class="bg-zinc-900 text-zinc-400 hover:text-white font-semibold px-5 py-2.5 rounded-xl text-xs border border-zinc-800 transition flex items-center gap-2">
                     <span class="icon-gold">📊</span> Bankroll & History
@@ -85,7 +82,7 @@
                         <h2 id="chips-title" class="font-bold text-sm text-[#d9b571] uppercase tracking-wider flex items-center gap-2">
                             <span class="icon-gold">⚡</span> Quick Chips: Double Chance / Result
                         </h2>
-                        <span class="text-[10px] text-zinc-500">Click chips to combine into one leg — click again to remove</span>
+                        <span class="text-[10px] text-zinc-500">Click chips to combine into one leg, then type your bookmaker's price</span>
                     </div>
                     <div id="quick-chips-container" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-80 overflow-y-auto pr-1"></div>
                     <div id="selected-chips-strip"></div>
@@ -112,14 +109,14 @@
                     
                     <div class="bg-zinc-950 p-3 rounded-xl border border-zinc-800 space-y-2 overflow-visible">
                         <div class="flex justify-between items-center">
-                            <label class="text-[10px] text-[#d9b571] block font-bold uppercase tracking-wider">⚡ Match Feed Selector (Synced with Schedule)</label>
+                            <label class="text-[10px] text-[#d9b571] block font-bold uppercase tracking-wider">⚡ Match Feed (live fixtures)</label>
                             <span id="feed-status" class="text-[10px] text-zinc-500 italic flex items-center gap-2">
                                 Select a league to load fixtures
                                 <button type="button" onclick="refreshLiveFeed()" title="Refresh live fixtures" class="text-zinc-400 hover:text-[#d9b571] transition">🔄</button>
                             </span>
                         </div>
                         <label class="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
-                            <input type="checkbox" id="today-only-filter" checked onchange="populateMatchDropdownOnly(document.getElementById('league-selector').value)" class="accent-[#d9b571]">
+                            <input type="checkbox" id="today-only-filter" onchange="populateMatchDropdownOnly(document.getElementById('league-selector').value)" class="accent-[#d9b571]">
                             Today only
                         </label>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-visible">
@@ -244,36 +241,7 @@
             </div>
         </div>
 
-        <!-- VIEW 2: UNIFIED MATCH SCHEDULE & CENTER -->
-        <div id="view-matches" class="hidden space-y-6">
-            <div class="bg-zinc-900/60 p-5 rounded-2xl border border-zinc-800/80 space-y-5">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-zinc-800">
-                    <div>
-                        <h2 class="font-bold text-lg text-white flex items-center gap-2">
-                            <span class="icon-gold">🏟️</span> Match Schedule & Live Center
-                        </h2>
-                        <p class="text-xs text-zinc-400">Matches listed here auto-sync directly into your Ticket Builder dropdown feed.</p>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                        <select id="widget-league-selector" onchange="switchWidgetLeague(this.value)" class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-[#d9b571] font-bold focus:outline-none focus:border-[#d9b571] cursor-pointer">
-                            <option value="Premier League" selected>🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
-                            <option value="La Liga">🇪🇸 La Liga</option>
-                            <option value="Serie A">🇮🇹 Serie A</option>
-                            <option value="Bundesliga">🇩🇪 Bundesliga</option>
-                            <option value="Ligue 1">🇫🇷 Ligue 1</option>
-                            <option value="UEFA Champions League">🇪🇺 UEFA Champions League</option>
-                            <option value="Other Matches">⭐ Custom / Other Matches</option>
-                        </select>
-                        <button onclick="openCustomMatchModal()" class="bg-zinc-800 hover:bg-zinc-700 text-[#d9b571] px-3 py-2 rounded-xl border border-zinc-700 text-xs font-bold transition flex items-center gap-1">
-                            <span class="icon-gold">➕</span> Add Match
-                        </button>
-                    </div>
-                </div>
-                <div id="widget-host-container" class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 min-h-[450px] max-h-[80vh] overflow-y-auto"></div>
-            </div>
-        </div>
-
-        <!-- VIEW 3: BANKROLL & HISTORY -->
+        <!-- VIEW 2: BANKROLL & HISTORY -->
         <div id="view-history" class="hidden space-y-6">
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80">
@@ -299,6 +267,29 @@
                 <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80">
                     <span class="text-[10px] text-zinc-400 uppercase tracking-wider flex items-center gap-1"><span class="icon-gold">📉</span> Max Drawdown</span>
                     <span id="stat-drawdown" class="text-lg font-bold text-zinc-200">€0.00</span>
+                </div>
+            </div>
+
+            <div id="auto-settle-status" class="hidden bg-zinc-900/60 px-4 py-2.5 rounded-2xl border border-zinc-800/80 text-xs text-zinc-400"></div>
+
+            <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
+                <div class="flex justify-between items-baseline gap-2">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">📈</span> Profit Over Time</h3>
+                    <span id="pl-chart-caption" class="text-[10px] text-zinc-500"></span>
+                </div>
+                <div id="pl-chart" class="w-full"></div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🎯</span> HAWK Track Record</h3>
+                    <p class="text-[10px] text-zinc-500">Bets sent from the HAWK builder settle themselves after the match. This checks whether HAWK's chances come true — its 70% legs should land about 70% of the time.</p>
+                    <div id="track-record-container" class="space-y-2 pt-1"></div>
+                </div>
+                <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🧾</span> Profit by Bet Type</h3>
+                    <p class="text-[10px] text-zinc-500">Which kind of bet actually pays: HAWK builders, HAWK accas, or bets you built yourself.</p>
+                    <div id="type-breakdown-container" class="space-y-2 pt-1"></div>
                 </div>
             </div>
 
@@ -336,22 +327,22 @@
     <div id="simulation-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
         <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-lg w-full space-y-4">
             <h3 class="text-white font-bold text-base flex items-center gap-2"><span class="icon-gold">🧠</span> Kelly Criterion Alpha Engine</h3>
-            <p class="text-xs text-zinc-400">Instead of guessing win rates, enter your target Edge % above implied probability, or auto-sync directly from your current slip odds.</p>
-            
+            <p class="text-xs text-zinc-400">Kelly only works with a real win chance — a guessed edge usually means staking too much. Use the <b class="text-zinc-200">Chance to land</b> the HAWK builder shows for this ticket. No real chance, no Kelly stake.</p>
+
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="text-[10px] text-zinc-400 block mb-1">Decimal Odds</label>
                     <input type="number" id="kelly-odds" step="0.01" value="3.60" oninput="onKellyEngineInput()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d9b571]">
                 </div>
                 <div>
-                    <label class="text-[10px] text-zinc-400 block mb-1">Estimated Edge (%)</label>
-                    <input type="number" id="kelly-edge" step="0.5" value="5.0" oninput="onKellyEngineInput()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d9b571]">
+                    <label class="text-[10px] text-zinc-400 block mb-1">Win Chance (%) <span class="text-zinc-600">from HAWK</span></label>
+                    <input type="number" id="kelly-chance" step="0.1" placeholder="e.g. 30.1" oninput="onKellyEngineInput()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d9b571]">
                 </div>
             </div>
 
             <div class="bg-zinc-950 p-3 rounded-xl border border-zinc-800 flex justify-between items-center text-xs">
-                <span class="text-zinc-400">Implied Probability: <strong id="kelly-implied-prob" class="text-zinc-200">27.78%</strong></span>
-                <span class="text-zinc-400">Target Win Prob: <strong id="kelly-target-prob" class="text-[#d9b571]">32.78%</strong></span>
+                <span class="text-zinc-400">Price implies: <strong id="kelly-implied-prob" class="text-zinc-200">27.78%</strong></span>
+                <span class="text-zinc-400">Your edge: <strong id="kelly-edge-out" class="text-[#d9b571]">—</strong></span>
             </div>
 
             <div>
@@ -384,7 +375,8 @@
     <!-- Add Match Modal -->
     <div id="custom-match-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
         <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-md w-full space-y-4">
-            <h3 id="match-modal-title" class="text-white font-bold text-base flex items-center gap-2"><span class="icon-gold">⚽</span> Add Match to Schedule & Feed</h3>
+            <h3 id="match-modal-title" class="text-white font-bold text-base flex items-center gap-2"><span class="icon-gold">⚽</span> Add a Match to Your Feed</h3>
+            <p class="text-[10px] text-zinc-500">The top leagues load by themselves — add matches from other competitions here.</p>
             <div>
                 <label class="text-[10px] text-zinc-400 block mb-1">League / Category</label>
                 <select id="custom-match-league" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#d9b571]">
@@ -541,8 +533,11 @@
         let ticketLegs = [];
         let currentFilter = 'ALL';
 
-        let rawCustomMatches = JSON.parse(localStorage.getItem('hawk_custom_matches')) || {};
-        let customMatches = {
+        // The fixture list this page used to ship with (one week in Sept 2026). It's
+        // only kept to (a) recognise those entries in older saved data, so just the
+        // matches YOU added survive, and (b) work out the league of old bet legs.
+        // Live fixtures now come from 365Scores (loadLeagueFixtures).
+        const LEGACY_FIXTURES = {
             "Premier League": [
                 { name: "AFC Bournemouth vs Brentford", time: "15:00", status: "UPCOMING", result: "", date: "2026-09-12" },
                 { name: "Aston Villa vs Nottingham Forest", time: "15:00", status: "UPCOMING", result: "", date: "2026-09-12" },
@@ -617,20 +612,39 @@
             "Other Matches": []
         };
 
-        Object.keys(customMatches).forEach(league => {
-            if (Array.isArray(rawCustomMatches[league]) && rawCustomMatches[league].length > 0) {
-                customMatches[league] = rawCustomMatches[league];
-            }
-        });
+        const FEED_LEAGUES = ["Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "UEFA Champions League", "Other Matches"];
+        const isLegacyFixture = (m) => (LEGACY_FIXTURES[m.league] || Object.values(LEGACY_FIXTURES).flat())
+            .some(x => x.name === m.name && x.date === m.date);
 
+        // Matches you added yourself with "Add Match" (any competition).
+        let customMatches = Object.fromEntries(FEED_LEAGUES.map(l => [l, []]));
+        (function loadCustomMatches() {
+            let stored = {};
+            try { stored = JSON.parse(localStorage.getItem('hawk_custom_matches')) || {}; } catch (e) {}
+            FEED_LEAGUES.forEach(lg => {
+                if (Array.isArray(stored[lg])) customMatches[lg] = stored[lg].filter(m => m && m.name && !isLegacyFixture(m));
+            });
+        })();
 
+        // Older bet legs weren't tagged with a league; look it up once and keep it.
+        (function tagLegLeagues() {
+            let changed = false;
+            const lists = [LEGACY_FIXTURES, customMatches];
+            bets.forEach(b => (b.legs || []).forEach(leg => {
+                if (leg.league) return;
+                for (const list of lists) for (const [lg, ms] of Object.entries(list))
+                    if (!leg.league && ms.some(m => m.name === leg.fixture)) { leg.league = lg; changed = true; }
+            }));
+            if (changed) localStorage.setItem('hawk_bets', JSON.stringify(bets));
+        })();
+
+        let liveFixtures = {};   // league -> upcoming/live matches from 365Scores
         let savedFixtures = [];
         function rebuildSavedFixtures() {
             savedFixtures = [];
-            Object.keys(customMatches).forEach(lg => {
-                if(Array.isArray(customMatches[lg])) {
-                    customMatches[lg].forEach(m => savedFixtures.push(m));
-                }
+            FEED_LEAGUES.forEach(lg => {
+                (liveFixtures[lg] || []).forEach(m => savedFixtures.push(m));
+                (customMatches[lg] || []).forEach(m => savedFixtures.push(m));
             });
         }
         rebuildSavedFixtures();
@@ -651,92 +665,40 @@
             renderUI();
         }
 
-        let liveScrapeCache = {};
-
-        function parseHeaderDate(text) {
-            // Widget shows dates as DD/MM/YYYY (e.g. "08/09/2026")
-            const parts = (text || '').trim().split('/');
-            if (parts.length === 3 && parts.every(p => /^\d+$/.test(p))) {
-                return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        // --- LIVE FIXTURE FEED: 365Scores, the same source the HAWK builder uses ---
+        const S365 = 'https://webws.365scores.com/web';
+        const S365_PARAMS = { appTypeId: 5, langId: 1, timezoneName: 'Europe/London', userCountryId: -1 };
+        const S365_COMPETITIONS = { 'Premier League': 7, 'La Liga': 11, 'Serie A': 17, 'Bundesliga': 25, 'Ligue 1': 35, 'UEFA Champions League': 572 };
+        async function s365(path, params) {
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    const r = await fetch(`${S365}/${path}/?${new URLSearchParams({ ...S365_PARAMS, ...params })}`);
+                    if (r.ok) return await r.json();
+                    if (r.status < 500 && r.status !== 429) return null;
+                } catch (e) { /* throttled replies can arrive without CORS headers — wait and retry */ }
+                await new Promise(res => setTimeout(res, 800 * (attempt + 1)));
             }
             return null;
         }
-
-        function scrapeFixturesFromIframe(iframeEl) {
-            try {
-                const doc = iframeEl.contentWindow.document;
-                // Walk headers and match cards together IN DOCUMENT ORDER so we know which
-                // date section each card belongs to — this is what makes the scrape safe to
-                // filter by "today" instead of dumping every future match together.
-                const nodes = doc.querySelectorAll(
-                    '[class*="entity-scores-widget-group_header_date__"], [class*="game-card_game_card_link__"], [class*="game-card_game_card__"]'
-                );
-                const seen = new Set();
-                const matches = [];
-                let currentDate = null;
-
-                nodes.forEach(node => {
-                    const cls = node.className || '';
-                    if (cls.includes('entity-scores-widget-group_header_date__')) {
-                        currentDate = parseHeaderDate(node.textContent);
-                        return;
-                    }
-                    if (seen.has(node)) return;
-                    seen.add(node);
-
-                    const nameEls = node.querySelectorAll('[class*="game-card-competitor_name__"]');
-                    if (nameEls.length < 2) return;
-                    const awayEl = node.querySelector('[class*="game-card-competitor_container_away__"]');
-                    let home, away;
-                    if (awayEl) {
-                        away = awayEl.textContent.trim();
-                        const homeEl = Array.from(nameEls).find(el => el !== awayEl);
-                        home = homeEl ? homeEl.textContent.trim() : '';
-                    } else {
-                        home = nameEls[0].textContent.trim();
-                        away = nameEls[1].textContent.trim();
-                    }
-                    const timeEl = node.querySelector('[class*="game-card-center_center_score__"]');
-                    const rawText = timeEl ? timeEl.textContent.trim() : '';
-                    // The widget reuses this same field for kickoff time before a match starts
-                    // and for the live/final score once it has — a clock pattern (18:45) means
-                    // still upcoming, a score pattern (3-1) means it's live or finished. We can't
-                    // tell live apart from finished without another selector, so score-present
-                    // matches are labeled FT — closer to reality than hardcoding UPCOMING always.
-                    const isClockTime = /^\d{1,2}:\d{2}$/.test(rawText);
-                    const isScore = /^\d+\s*-\s*\d+$/.test(rawText);
-                    const status = isScore ? 'FT' : 'UPCOMING';
-                    const time = isClockTime ? rawText : (isScore ? '' : rawText);
-                    const result = isScore ? rawText : '';
-                    if (home && away) {
-                        matches.push({ name: `${home} vs ${away}`, time, status, result, date: currentDate });
-                    }
+        const localDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        async function loadLeagueFixtures(league, force = false) {
+            const comp = S365_COMPETITIONS[league];
+            if (!comp || (liveFixtures[league] && !force)) return liveFixtures[league] || [];
+            const d = await s365('games/fixtures', { competitions: comp });
+            if (!d) return liveFixtures[league] || [];
+            liveFixtures[league] = (d.games || []).filter(g => g.statusGroup !== 4)
+                .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
+                .map(g => {
+                    const ko = new Date(g.startTime);
+                    return { id: String(g.id), name: `${g.homeCompetitor.name} vs ${g.awayCompetitor.name}`, date: localDateStr(ko),
+                             time: ko.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+                             status: ko < new Date() ? 'LIVE' : 'UPCOMING', result: '' };
                 });
-                return matches;
-            } catch (e) {
-                console.warn('Widget scrape failed:', e);
-                return [];
-            }
+            rebuildSavedFixtures();
+            return liveFixtures[league];
         }
-
-        function tryLiveScrapeUpgrade(iframeEl, league) {
-            let attempts = 0;
-            const maxAttempts = 25; // ~10 seconds
-            const poll = setInterval(() => {
-                attempts++;
-                const matches = scrapeFixturesFromIframe(iframeEl);
-                if (matches.length > 0) {
-                    clearInterval(poll);
-                    liveScrapeCache[league] = matches;
-                    if (document.getElementById('league-selector').value === league) {
-                        populateMatchDropdownOnly(league);
-                    }
-                    setFeedStatus('🟢 Live from Match Center', 'live');
-                } else if (attempts >= maxAttempts) {
-                    clearInterval(poll);
-                    setFeedStatus('📋 Static schedule (live scrape unavailable)', 'fallback');
-                }
-            }, 400);
+        async function loadAllFixtures() {   // one league at a time, gently
+            for (const lg of Object.keys(S365_COMPETITIONS)) await loadLeagueFixtures(lg);
         }
 
         function setFeedStatus(text, tone) {
@@ -747,105 +709,23 @@
         }
 
         function refreshLiveFeed() {
-            const league = document.getElementById('league-selector').value || document.getElementById('widget-league-selector').value;
-            if (!league) return;
-            delete liveScrapeCache[league];
-            switchWidgetLeague(league);
+            const league = document.getElementById('league-selector').value;
+            if (league) showLeagueFeed(league, true);
         }
 
-        const poweredBy = `<div id="powered-by">Powered by<a id="powered-by-link" href="https://www.365scores.com" target="_blank">365Scores.com</a></div>`;
-        const widgetMarkup = {
-            "Premier League": `<div data-widget-type="entityScores" data-entity-type="league" data-entity-id="7" data-lang="en" data-widget-id="7d6a119c-c2fc-498d-abac-682a66a23efe" data-theme="dark"></div>${poweredBy}`,
-            "La Liga": `<div data-widget-type="entityScores" data-entity-type="league" data-entity-id="11" data-lang="en" data-widget-id="0989e484-dee9-4d32-9f07-8663cc30530a" data-theme="dark"></div>${poweredBy}`,
-            "Serie A": `<div data-widget-type="entityScores" data-entity-type="league" data-entity-id="17" data-lang="en" data-widget-id="315f38ea-9faf-46a4-8411-53807ffca7f9" data-theme="dark"></div>${poweredBy}`,
-            "Bundesliga": `<div data-widget-type="entityScores" data-entity-type="league" data-entity-id="25" data-lang="en" data-widget-id="8663589f-47df-4c96-a6d2-2c19e30a1254" data-theme="dark"></div>${poweredBy}`,
-            "Ligue 1": `<div data-widget-type="entityScores" data-entity-type="league" data-entity-id="35" data-lang="en" data-widget-id="7e69ab86-1938-47ed-b7b4-0d20338491b7" data-theme="dark"></div>${poweredBy}`,
-            "UEFA Champions League": `<div data-widget-type="entityScores" data-entity-type="league" data-entity-id="572" data-lang="en" data-widget-id="22d26c29-f9d9-4075-a910-557406615a72" data-theme="dark"></div>${poweredBy}`
-        };
-
-        // Dedicated host for the scraping iframe, appended directly to <body> so it's
-        // NEVER inside a display:none tab container. Positioned off-screen (not hidden)
-        // so the browser still fully renders/executes it regardless of which tab is active.
-        let scrapeHost = document.getElementById('scrape-host');
-        if (!scrapeHost) {
-            scrapeHost = document.createElement('div');
-            scrapeHost.id = 'scrape-host';
-            scrapeHost.style.position = 'fixed';
-            scrapeHost.style.left = '0';
-            scrapeHost.style.top = '0';
-            scrapeHost.style.width = '420px';
-            scrapeHost.style.height = '1000px';
-            scrapeHost.style.overflow = 'hidden';
-            scrapeHost.style.opacity = '0';
-            scrapeHost.style.pointerEvents = 'none';
-            scrapeHost.style.zIndex = '-1';
-            document.body.appendChild(scrapeHost);
-        }
-
-        function runScrapeInBackground(leagueKey, widgetHtml) {
-            scrapeHost.innerHTML = '';
-            const scrapeFrame = document.createElement('iframe');
-            scrapeFrame.style.width = '400px';
-            scrapeFrame.style.height = '1000px';
-            scrapeFrame.style.border = '0';
-            scrapeHost.appendChild(scrapeFrame);
-            scrapeFrame.srcdoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{margin:0;background:#09090b;font-family:sans-serif;}</style></head><body>${widgetHtml}<script src="https://widgets.365scores.com/main.js"><\/script></body></html>`;
-            tryLiveScrapeUpgrade(scrapeFrame, leagueKey);
-        }
-
-        function switchWidgetLeague(leagueKey) {
-            const container = document.getElementById('widget-host-container');
-            if (!container) return;
-
-            const builderLeagueSel = document.getElementById('league-selector');
-            if (builderLeagueSel && builderLeagueSel.value !== leagueKey) {
-                builderLeagueSel.value = leagueKey;
-                populateMatchDropdownOnly(leagueKey);
-            }
-
-            const widgetHtml = widgetMarkup[leagueKey];
-            if (!widgetHtml) {
-                container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;min-height:450px;color:#71717a;font-size:13px;text-align:center;padding:20px;">${leagueKey} schedule view is ready. Add matches below to populate your Ticket Builder.</div>`;
-                setFeedStatus('📝 Manual list only', null);
+        // Fills the match dropdown for a league: live fixtures plus your own matches.
+        async function showLeagueFeed(league, force = false) {
+            populateMatchDropdownOnly(league);
+            if (!S365_COMPETITIONS[league]) {
+                setFeedStatus(league ? '📝 Your own matches — add more with ➕ Add Match' : 'Select a league to load fixtures', null);
                 return;
             }
-
-            container.innerHTML = '';
-            const iframe = document.createElement('iframe');
-            iframe.id = 'widget-iframe';
-            iframe.style.width = '100%';
-            iframe.style.border = '0';
-            iframe.style.minHeight = '450px';
-            iframe.style.display = 'block';
-            container.appendChild(iframe);
-
-            iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{margin:0;background:#09090b;font-family:sans-serif;}</style></head><body>${widgetHtml}<script src="https://widgets.365scores.com/main.js"><\/script></body></html>`;
-
-            // Auto-resize the iframe to fit whatever height the widget actually renders at,
-            // so content isn't clipped at a fixed 450px with no way to reach the rest of it.
-            iframe.onload = function () {
-                try {
-                    const resize = () => {
-                        const h = iframe.contentWindow.document.body.scrollHeight;
-                        if (h > 0) iframe.style.height = Math.max(450, h) + 'px';
-                    };
-                    resize();
-                    setTimeout(resize, 800);
-                    setTimeout(resize, 2000);
-                } catch (e) { /* cross-origin content can block this; the min-height fallback still applies */ }
-            };
-            // Show the static list instantly, then try to upgrade to live data scraped
-            // via the dedicated off-screen scraper iframe — this works regardless of
-            // whether the visible widget above is inside a currently-hidden tab.
-            if (liveScrapeCache[leagueKey] && liveScrapeCache[leagueKey].length > 0) {
-                if (document.getElementById('league-selector').value === leagueKey) {
-                    populateMatchDropdownOnly(leagueKey);
-                }
-                setFeedStatus('🟢 Live from Match Center (cached)', 'live');
-            } else {
-                setFeedStatus('⏳ Loading live matches…', null);
-                runScrapeInBackground(leagueKey, widgetHtml);
-            }
+            if (force || !liveFixtures[league]) setFeedStatus('⏳ Loading live fixtures…', null);
+            await loadLeagueFixtures(league, force);
+            if (document.getElementById('league-selector').value !== league) return;
+            populateMatchDropdownOnly(league);
+            setFeedStatus(liveFixtures[league] ? `🟢 Live from 365Scores · ${liveFixtures[league].length} upcoming`
+                                               : '⚠️ Couldn\'t reach 365Scores — type the match instead', liveFixtures[league] ? 'live' : 'fallback');
         }
 
         function todayStr() {
@@ -870,9 +750,7 @@
             matchDropdown.innerHTML = '<option value="">-- Choose Match --</option>';
 
             const todayOnly = document.getElementById('today-only-filter')?.checked;
-            let source = (liveScrapeCache[league] && liveScrapeCache[league].length > 0)
-                ? liveScrapeCache[league]
-                : (customMatches[league] || []);
+            let source = [...(liveFixtures[league] || []), ...(customMatches[league] || [])];
 
             if (todayOnly) {
                 source = source.filter(m => isToday(m.date));
@@ -893,7 +771,7 @@
             source.forEach(m => {
                 const opt = document.createElement('option');
                 opt.value = m.name;
-                opt.textContent = `${m.name} (${m.time || 'TBD'})${m.status ? ' [' + m.status + ']' : ''}`;
+                opt.textContent = `${m.name} (${m.date ? formatDateLabel(m.date) + ' ' : ''}${m.time || 'TBD'})${m.status === 'LIVE' ? ' [LIVE]' : ''}`;
                 matchDropdown.appendChild(opt);
             });
         }
@@ -906,27 +784,35 @@
             document.getElementById('simulation-modal').classList.add('hidden');
         }
 
+        // Kelly stake from a REAL win chance (e.g. HAWK's "Chance to land"), never a
+        // guessed edge. Capped at 5% of the bankroll per bet.
+        const KELLY_CAP = 0.05;
+        function kellyStake(odds, chancePct, fraction) {
+            if (isNaN(odds) || odds <= 1.0 || isNaN(chancePct) || chancePct <= 0 || chancePct >= 100) return null;
+            const p = chancePct / 100, b = odds - 1.0;
+            const full = Math.max(0, (b * p - (1 - p)) / b);
+            const pct = Math.min(full * fraction, KELLY_CAP);
+            return { p, edge: p * odds - 1, pct, amount: bankroll * pct, capped: full * fraction > KELLY_CAP };
+        }
         function onKellyEngineInput() {
             const odds = parseFloat(document.getElementById('kelly-odds').value);
-            const edge = parseFloat(document.getElementById('kelly-edge').value) || 0;
+            const chance = parseFloat(document.getElementById('kelly-chance').value);
             const fraction = parseFloat(document.getElementById('kelly-fraction').value);
-
             if(isNaN(odds) || odds <= 1.0) return;
 
-            const impliedProb = 1.0 / odds;
-            const targetProb = impliedProb + (edge / 100.0);
-
-            document.getElementById('kelly-implied-prob').textContent = `${(impliedProb * 100).toFixed(2)}%`;
-            document.getElementById('kelly-target-prob').textContent = `${(targetProb * 100).toFixed(2)}%`;
-
-            const q = 1.0 - targetProb;
-            const b = odds - 1.0;
-            let kelly = (b * targetProb - q) / b;
-            if(kelly < 0) kelly = 0;
-            kelly *= fraction;
-
-            document.getElementById('kelly-res-pct').textContent = `${(kelly * 100).toFixed(2)}%`;
-            document.getElementById('kelly-res-amount').textContent = `€${(bankroll * kelly).toFixed(2)}`;
+            document.getElementById('kelly-implied-prob').textContent = `${(100 / odds).toFixed(2)}%`;
+            const edgeEl = document.getElementById('kelly-edge-out');
+            const k = kellyStake(odds, chance, fraction);
+            if (!k) {
+                edgeEl.textContent = '—';
+                document.getElementById('kelly-res-pct').textContent = '—';
+                document.getElementById('kelly-res-amount').textContent = 'Enter a win chance';
+                return;
+            }
+            edgeEl.textContent = `${k.edge >= 0 ? '+' : ''}${(k.edge * 100).toFixed(1)}%`;
+            edgeEl.className = k.edge > 0 ? 'text-emerald-400' : 'text-red-400';
+            document.getElementById('kelly-res-pct').textContent = k.pct > 0 ? `${(k.pct * 100).toFixed(2)}%${k.capped ? ' (capped)' : ''}` : '0% — no edge';
+            document.getElementById('kelly-res-amount').textContent = k.pct > 0 ? `€${k.amount.toFixed(2)}` : "Don't bet — the price is too short";
         }
 
         function syncKellyFromSlip() {
@@ -943,16 +829,12 @@
                 alert("Please add legs to your ticket first.");
                 return;
             }
-            const impliedProb = 1.0 / totalOdds;
-            const targetProb = impliedProb + 0.05;
-            const fraction = parseFloat(document.getElementById('kelly-fraction').value) || 0.25; 
-            const q = 1.0 - targetProb;
-            const b = totalOdds - 1.0;
-            let kelly = (b * targetProb - q) / b;
-            if (kelly < 0) kelly = 0;
-            kelly *= fraction;
-
-            document.getElementById('ticket-stake').value = (bankroll * kelly).toFixed(2);
+            const chance = parseFloat(document.getElementById('kelly-chance').value);
+            const fraction = parseFloat(document.getElementById('kelly-fraction').value) || 0.25;
+            const k = kellyStake(totalOdds, chance, fraction);
+            if (!k) { openSimulationModal(); return; }   // needs a real win chance first
+            if (k.pct <= 0) { alert("At this price there's no edge for that win chance — Kelly says don't bet."); return; }
+            document.getElementById('ticket-stake').value = k.amount.toFixed(2);
             calculateTicketReturn();
         }
 
@@ -982,7 +864,7 @@
         }
 
         function switchView(view) {
-            ['builder', 'matches', 'history'].forEach(v => {
+            ['builder', 'history'].forEach(v => {
                 document.getElementById(`view-${v}`).classList.add('hidden');
                 document.getElementById(`nav-${v}`).className = "bg-zinc-900 text-zinc-400 hover:text-white font-semibold px-5 py-2.5 rounded-xl text-xs border border-zinc-800 transition flex items-center gap-2";
             });
@@ -990,12 +872,7 @@
             document.getElementById(`view-${view}`).classList.remove('hidden');
             document.getElementById(`nav-${view}`).className = "bg-[#d9b571] text-black font-bold px-5 py-2.5 rounded-xl text-xs transition shadow-lg shadow-[#3d2f18]/20 flex items-center gap-2";
 
-            if(view === 'matches') {
-                const selector = document.getElementById('widget-league-selector');
-                if(selector) switchWidgetLeague(selector.value);
-            } else if(view === 'history') {
-                renderHistory();
-            }
+            if(view === 'history') renderHistory();
         }
 
         let builderMode = 'builder';
@@ -1021,100 +898,101 @@
             document.getElementById('builder-selection').value = text;
         }
 
+        // Selections only — no prices. Type what your bookmaker actually offers.
         const chipPresets = {
             "Double Chance / Result": [
-                { label: "Home Win", odds: 1.90, icon: "🏠" },
-                { label: "Away Win", odds: 2.75, icon: "✈️" },
-                { label: "Draw", odds: 3.40, icon: "🤝" },
-                { label: "Draw No Bet: Home", odds: 1.55, icon: "🤝" },
-                { label: "Draw No Bet: Away", odds: 2.20, icon: "🤝" },
-                { label: "Double Chance: Home/Draw", odds: 1.30, icon: "⚖️" },
-                { label: "Double Chance: Away/Draw", odds: 1.65, icon: "⚖️" },
-                { label: "Double Chance: Home/Away", odds: 1.25, icon: "⚖️" },
-                { label: "Home Win & Over 1.5", odds: 2.10, icon: "🏠" },
-                { label: "Away Win & Over 1.5", odds: 2.35, icon: "✈️" },
-                { label: "Double Chance Home/Draw & Under 3.5", odds: 1.45, icon: "⚖️" },
-                { label: "Both Teams to Score & Over 2.5", odds: 2.05, icon: "⚽" }
+                { label: "Home Win", icon: "🏠" },
+                { label: "Away Win", icon: "✈️" },
+                { label: "Draw", icon: "🤝" },
+                { label: "Draw No Bet: Home", icon: "🤝" },
+                { label: "Draw No Bet: Away", icon: "🤝" },
+                { label: "Double Chance: Home/Draw", icon: "⚖️" },
+                { label: "Double Chance: Away/Draw", icon: "⚖️" },
+                { label: "Double Chance: Home/Away", icon: "⚖️" },
+                { label: "Home Win & Over 1.5", icon: "🏠" },
+                { label: "Away Win & Over 1.5", icon: "✈️" },
+                { label: "Double Chance Home/Draw & Under 3.5", icon: "⚖️" },
+                { label: "Both Teams to Score & Over 2.5", icon: "⚽" }
             ],
             "Goals Market": [
-                { label: "Over 0.5 Goals", odds: 1.08, icon: "⚽" },
-                { label: "Over 1.5 Goals", odds: 1.30, icon: "⚽" },
-                { label: "Over 2.5 Goals", odds: 1.85, icon: "⚽" },
-                { label: "Over 3.5 Goals", odds: 2.75, icon: "⚽" },
-                { label: "Under 1.5 Goals", odds: 3.20, icon: "⚽" },
-                { label: "Under 2.5 Goals", odds: 1.95, icon: "⚽" },
-                { label: "Under 3.5 Goals", odds: 1.35, icon: "⚽" },
-                { label: "Both Teams to Score - YES", odds: 1.90, icon: "🥅" },
-                { label: "Both Teams to Score - NO", odds: 1.85, icon: "🥅" },
-                { label: "Home Team Over 1.5 Goals", odds: 2.20, icon: "🏠" },
-                { label: "Away Team Over 1.5 Goals", odds: 3.10, icon: "✈️" },
-                { label: "First Goal: Home Team", odds: 1.80, icon: "⚽" },
-                { label: "First Goal: Away Team", odds: 2.60, icon: "⚽" }
+                { label: "Over 0.5 Goals", icon: "⚽" },
+                { label: "Over 1.5 Goals", icon: "⚽" },
+                { label: "Over 2.5 Goals", icon: "⚽" },
+                { label: "Over 3.5 Goals", icon: "⚽" },
+                { label: "Under 1.5 Goals", icon: "⚽" },
+                { label: "Under 2.5 Goals", icon: "⚽" },
+                { label: "Under 3.5 Goals", icon: "⚽" },
+                { label: "Both Teams to Score - YES", icon: "🥅" },
+                { label: "Both Teams to Score - NO", icon: "🥅" },
+                { label: "Home Team Over 1.5 Goals", icon: "🏠" },
+                { label: "Away Team Over 1.5 Goals", icon: "✈️" },
+                { label: "First Goal: Home Team", icon: "⚽" },
+                { label: "First Goal: Away Team", icon: "⚽" }
             ],
             "Player Props": [
-                { label: "Player to Score Anytime", odds: 2.20, icon: "👤", customizable: true },
-                { label: "Player to Score First", odds: 3.75, icon: "👤", customizable: true },
-                { label: "Player to Score 2+", odds: 5.50, icon: "👤", customizable: true },
-                { label: "Player Over 0.5 Shots on Target", odds: 1.60, icon: "🎯", customizable: true },
-                { label: "Player Over 1.5 Shots on Target", odds: 2.40, icon: "🎯", customizable: true },
-                { label: "Player Over 2.5 Shots (Total)", odds: 2.10, icon: "🎯", customizable: true },
-                { label: "Player Over 0.5 Assists", odds: 3.20, icon: "🅰️", customizable: true },
-                { label: "Player Over 1.5 Fouls Committed", odds: 2.05, icon: "🥊", customizable: true },
-                { label: "Player to be Booked", odds: 2.90, icon: "🟨", customizable: true },
-                { label: "Player Over 2.5 Tackles Won", odds: 2.35, icon: "🛡️", customizable: true }
+                { label: "Player to Score Anytime", icon: "👤", customizable: true },
+                { label: "Player to Score First", icon: "👤", customizable: true },
+                { label: "Player to Score 2+", icon: "👤", customizable: true },
+                { label: "Player Over 0.5 Shots on Target", icon: "🎯", customizable: true },
+                { label: "Player Over 1.5 Shots on Target", icon: "🎯", customizable: true },
+                { label: "Player Over 2.5 Shots (Total)", icon: "🎯", customizable: true },
+                { label: "Player Over 0.5 Assists", icon: "🅰️", customizable: true },
+                { label: "Player Over 1.5 Fouls Committed", icon: "🥊", customizable: true },
+                { label: "Player to be Booked", icon: "🟨", customizable: true },
+                { label: "Player Over 2.5 Tackles Won", icon: "🛡️", customizable: true }
             ],
             "Disciplinary Market": [
-                { label: "Over 2.5 Match Cards", odds: 1.45, icon: "🟨" },
-                { label: "Over 3.5 Match Cards", odds: 1.85, icon: "🟨" },
-                { label: "Over 4.5 Match Cards", odds: 2.30, icon: "🟨" },
-                { label: "Over 5.5 Match Cards", odds: 3.10, icon: "🟨" },
-                { label: "Under 3.5 Match Cards", odds: 1.95, icon: "🟨" },
-                { label: "Under 4.5 Match Cards", odds: 1.55, icon: "🟨" },
-                { label: "First Card in Match", odds: 1.90, icon: "🟨" },
-                { label: "Red Card in Match", odds: 4.50, icon: "🟥" },
-                { label: "Home Team Over 1.5 Cards", odds: 1.75, icon: "🟨" },
-                { label: "Away Team Over 1.5 Cards", odds: 1.80, icon: "🟨" }
+                { label: "Over 2.5 Match Cards", icon: "🟨" },
+                { label: "Over 3.5 Match Cards", icon: "🟨" },
+                { label: "Over 4.5 Match Cards", icon: "🟨" },
+                { label: "Over 5.5 Match Cards", icon: "🟨" },
+                { label: "Under 3.5 Match Cards", icon: "🟨" },
+                { label: "Under 4.5 Match Cards", icon: "🟨" },
+                { label: "First Card in Match", icon: "🟨" },
+                { label: "Red Card in Match", icon: "🟥" },
+                { label: "Home Team Over 1.5 Cards", icon: "🟨" },
+                { label: "Away Team Over 1.5 Cards", icon: "🟨" }
             ],
             "Corners Market": [
-                { label: "Over 8.5 Match Corners", odds: 1.65, icon: "🚩" },
-                { label: "Over 9.5 Match Corners", odds: 1.90, icon: "🚩" },
-                { label: "Over 10.5 Match Corners", odds: 2.35, icon: "🚩" },
-                { label: "Under 9.5 Match Corners", odds: 1.95, icon: "🚩" },
-                { label: "Home Team Most Corners", odds: 1.70, icon: "🚩" }
+                { label: "Over 8.5 Match Corners", icon: "🚩" },
+                { label: "Over 9.5 Match Corners", icon: "🚩" },
+                { label: "Over 10.5 Match Corners", icon: "🚩" },
+                { label: "Under 9.5 Match Corners", icon: "🚩" },
+                { label: "Home Team Most Corners", icon: "🚩" }
             ],
             "Asian Handicap": [
-                { label: "Home -0.5", odds: 1.90, icon: "📐" },
-                { label: "Home -1.0", odds: 2.30, icon: "📐" },
-                { label: "Home -1.5", odds: 2.90, icon: "📐" },
-                { label: "Away +0.5", odds: 1.95, icon: "📐" },
-                { label: "Away -0.5", odds: 2.10, icon: "📐" },
-                { label: "Away -1.0", odds: 2.60, icon: "📐" }
+                { label: "Home -0.5", icon: "📐" },
+                { label: "Home -1.0", icon: "📐" },
+                { label: "Home -1.5", icon: "📐" },
+                { label: "Away +0.5", icon: "📐" },
+                { label: "Away -0.5", icon: "📐" },
+                { label: "Away -1.0", icon: "📐" }
             ],
             "Half-Time / Full-Time": [
-                { label: "HT/FT: Home/Home", odds: 1.75, icon: "⏱️" },
-                { label: "HT/FT: Away/Away", odds: 2.75, icon: "⏱️" },
-                { label: "HT/FT: Draw/Home", odds: 3.60, icon: "⏱️" },
-                { label: "HT/FT: Draw/Away", odds: 5.50, icon: "⏱️" },
-                { label: "HT/FT: Draw/Draw", odds: 5.00, icon: "⏱️" },
-                { label: "Half-Time Draw", odds: 2.10, icon: "⏱️" }
+                { label: "HT/FT: Home/Home", icon: "⏱️" },
+                { label: "HT/FT: Away/Away", icon: "⏱️" },
+                { label: "HT/FT: Draw/Home", icon: "⏱️" },
+                { label: "HT/FT: Draw/Away", icon: "⏱️" },
+                { label: "HT/FT: Draw/Draw", icon: "⏱️" },
+                { label: "Half-Time Draw", icon: "⏱️" }
             ],
             "Correct Score": [
-                { label: "Correct Score: 1-0", odds: 7.50, icon: "🔢" },
-                { label: "Correct Score: 2-0", odds: 9.00, icon: "🔢" },
-                { label: "Correct Score: 2-1", odds: 9.50, icon: "🔢" },
-                { label: "Correct Score: 1-1", odds: 6.50, icon: "🔢" },
-                { label: "Correct Score: 0-0", odds: 8.50, icon: "🔢" },
-                { label: "Correct Score: 0-1", odds: 9.50, icon: "🔢" },
-                { label: "Correct Score: 0-2", odds: 12.00, icon: "🔢" },
-                { label: "Correct Score: 1-2", odds: 11.00, icon: "🔢" }
+                { label: "Correct Score: 1-0", icon: "🔢" },
+                { label: "Correct Score: 2-0", icon: "🔢" },
+                { label: "Correct Score: 2-1", icon: "🔢" },
+                { label: "Correct Score: 1-1", icon: "🔢" },
+                { label: "Correct Score: 0-0", icon: "🔢" },
+                { label: "Correct Score: 0-1", icon: "🔢" },
+                { label: "Correct Score: 0-2", icon: "🔢" },
+                { label: "Correct Score: 1-2", icon: "🔢" }
             ],
             "Team Specials": [
-                { label: "Home Team Clean Sheet", odds: 2.45, icon: "🛡️" },
-                { label: "Away Team Clean Sheet", odds: 3.80, icon: "🛡️" },
-                { label: "Home Win to Nil", odds: 2.60, icon: "🛡️" },
-                { label: "Away Win to Nil", odds: 4.20, icon: "🛡️" },
-                { label: "Either Team Scores in Both Halves", odds: 2.30, icon: "⏳" },
-                { label: "Win Either Half", odds: 1.40, icon: "⏳" }
+                { label: "Home Team Clean Sheet", icon: "🛡️" },
+                { label: "Away Team Clean Sheet", icon: "🛡️" },
+                { label: "Home Win to Nil", icon: "🛡️" },
+                { label: "Away Win to Nil", icon: "🛡️" },
+                { label: "Either Team Scores in Both Halves", icon: "⏳" },
+                { label: "Win Either Half", icon: "⏳" }
             ]
         };
 
@@ -1130,9 +1008,9 @@
             "Team Specials": "🛡️"
         };
 
-        let selectedChips = []; // {label, odds, _uid} — persists across category switches so you can combine e.g. a Goals chip with a Corners chip into one leg
+        let selectedChips = []; // {label, _uid} — persists across category switches so you can combine e.g. a Goals chip with a Corners chip into one leg
 
-        function chipKey(item) { return `${item.label}__${item.odds}`; }
+        function chipKey(item) { return item.label; }
 
         function isChipSelected(item) {
             return selectedChips.some(c => chipKey(c) === chipKey(item));
@@ -1145,7 +1023,7 @@
                 const who = prompt(`Player name for "${item.label}"?`, '');
                 if (!who || !who.trim()) return;
                 const customLabel = item.label.replace(/^Player/, who.trim());
-                selectedChips.push({ label: customLabel, odds: item.odds, _uid: Date.now() + Math.random() });
+                selectedChips.push({ label: customLabel, _uid: Date.now() + Math.random() });
                 updateComboFromChips();
                 onCategoryChange();
                 return;
@@ -1164,10 +1042,9 @@
             onCategoryChange();
         }
 
+        // Chips only fill in the selection; the price is whatever you type from your bookmaker.
         function updateComboFromChips() {
             document.getElementById('builder-selection').value = selectedChips.map(c => c.label).join(' & ');
-            const combinedOdds = selectedChips.reduce((total, c) => total * c.odds, 1.0);
-            document.getElementById('builder-odds').value = selectedChips.length > 0 ? combinedOdds.toFixed(2) : '';
         }
 
         function clearSelectedChips() {
@@ -1191,7 +1068,7 @@
                 <div class="flex flex-wrap gap-1.5">
                     ${selectedChips.map(c => `
                         <span class="inline-flex items-center gap-1.5 bg-[#c9a05c]/10 border border-[#d9b571]/40 text-[#d9b571] text-[11px] font-medium px-2.5 py-1 rounded-lg">
-                            ${c.label} <span class="opacity-60">@${c.odds.toFixed(2)}</span>
+                            ${c.label}
                             <button type="button" onclick="removeSelectedChip(${c._uid})" class="text-[#d9b571] hover:text-red-400 ml-0.5">✕</button>
                         </span>
                     `).join('')}
@@ -1212,7 +1089,7 @@
                 btn.className = selected
                     ? "bg-[#c9a05c]/15 hover:bg-[#c9a05c]/20 border border-[#d9b571] p-2.5 rounded-xl text-left transition flex justify-between items-center gap-2 group"
                     : "bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-[#d9b571]/50 p-2.5 rounded-xl text-left transition flex justify-between items-center gap-2 group";
-                btn.innerHTML = `<span class="flex items-center gap-2 text-xs ${selected ? 'text-[#d9b571]' : 'text-zinc-300 group-hover:text-[#d9b571]'} font-medium">${selected ? '<span class="icon-gold">✓</span>' : ''}<span class="opacity-70">${item.icon || '⚡'}</span>${item.label}</span><span class="text-[#d9b571] font-bold text-xs bg-[#c9a05c]/10 px-2 py-1 rounded-lg shrink-0">${item.odds.toFixed(2)}</span>`;
+                btn.innerHTML = `<span class="flex items-center gap-2 text-xs ${selected ? 'text-[#d9b571]' : 'text-zinc-300 group-hover:text-[#d9b571]'} font-medium">${selected ? '<span class="icon-gold">✓</span>' : ''}<span class="opacity-70">${item.icon || '⚡'}</span>${item.label}</span>`;
                 btn.onclick = () => toggleChip(item);
                 container.appendChild(btn);
             });
@@ -1230,13 +1107,7 @@
         }
 
         function onLeagueChange() {
-            const league = document.getElementById('league-selector').value;
-            const widgetSel = document.getElementById('widget-league-selector');
-            if(widgetSel && league && widgetSel.value !== league) {
-                widgetSel.value = league;
-                switchWidgetLeague(league);
-            }
-            populateMatchDropdownOnly(league);
+            showLeagueFeed(document.getElementById('league-selector').value);
         }
 
         function onLeagueMatchSelect() {
@@ -1291,8 +1162,9 @@
             // Preserve each individual piece's own odds, not just the combined total — this is
             // what lets "Reuse" later offer to drop just one selection with an accurate
             // recalculated price, instead of only being able to take the whole merged leg as-is.
-            const newSubSelections = selectedChips.length > 0
-                ? selectedChips.map(c => ({ label: c.label, odds: c.odds }))
+            // With several chips there's only one combined price, so the pieces have no odds of their own.
+            const newSubSelections = selectedChips.length > 1
+                ? selectedChips.map(c => ({ label: c.label, odds: null }))
                 : [{ label: selection, odds: odds }];
 
             // If there's already a leg for this exact fixture (and same Builder/Acca type),
@@ -1434,6 +1306,8 @@
             reusePickerLegs = legs.map(l => ({
                 fixture: l.fixture,
                 type: l.type || 'builder',
+                league: l.league,
+                odds: l.odds,
                 subSelections: legSubSelections(l).map(s => ({ ...s, checked: true }))
             }));
             renderReusePicker();
@@ -1450,7 +1324,7 @@
                             <label class="flex items-center gap-2 text-xs text-zinc-200 cursor-pointer py-0.5">
                                 <input type="checkbox" ${s.checked ? 'checked' : ''} onchange="toggleReusePickerItem(${li}, ${si})" class="accent-[#d9b571]">
                                 <span class="flex-1">${s.label}</span>
-                                <span class="text-zinc-500">@${s.odds.toFixed(2)}</span>
+                                ${s.odds ? `<span class="text-zinc-500">@${s.odds.toFixed(2)}</span>` : ''}
                             </label>
                         `).join('')}
                     </div>
@@ -1472,7 +1346,14 @@
                 if (kept.length === 0) return; // nothing checked for this match — skip it entirely
 
                 const selection = kept.map(s => s.label).join(' & ');
-                const odds = kept.reduce((t, s) => t * s.odds, 1.0);
+                // Recalculate from each piece's own price when every piece has one; if you
+                // kept everything, it's the original price; otherwise ask for today's price.
+                let odds = kept.every(s => s.odds > 1) ? kept.reduce((t, s) => t * s.odds, 1.0)
+                         : kept.length === leg.subSelections.length ? leg.odds : NaN;
+                if (!(odds > 1)) {
+                    odds = parseFloat(String(prompt(`Price for "${selection}" (${leg.fixture})?`, '') || '').replace(',', '.'));
+                    if (!(odds > 1)) return;   // skipped — no valid price
+                }
                 const subSelections = kept.map(s => ({ label: s.label, odds: s.odds }));
 
                 const existingIdx = ticketLegs.findIndex(l => l.fixture === leg.fixture && l.type === leg.type);
@@ -1483,7 +1364,7 @@
                     existing.odds = existing.odds * odds;
                     existing.subSelections = existingSubs.concat(subSelections);
                 } else {
-                    ticketLegs.push({ fixture: leg.fixture, selection, angle: "Reused from history", odds, type: leg.type, league: 'Custom / Manual', subSelections });
+                    ticketLegs.push({ fixture: leg.fixture, selection, angle: "Reused from history", odds, type: leg.type, league: leg.league || 'Custom / Manual', subSelections });
                 }
             });
             renderTicketLegs();
@@ -1564,7 +1445,9 @@
                 card.className = "bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-3";
                 card.innerHTML = `
                     <div class="flex justify-between items-center pb-2 border-b border-zinc-900 text-xs">
-                        <div class="flex items-center gap-2"><span class="text-zinc-400">${bet.date}</span><span class="text-[#d9b571] font-bold">Odds: ${bet.odds.toFixed(2)}</span>${typeBadge}</div>
+                        <div class="flex items-center gap-2 flex-wrap"><span class="text-zinc-400">${bet.date}</span><span class="text-[#d9b571] font-bold">Odds: ${bet.odds.toFixed(2)}</span>${typeBadge}${
+                            isHawkBet(bet) ? '<span class="bg-zinc-800 text-[#d9b571] px-2 py-0.5 rounded text-[10px] font-bold" title="Built with HAWK">🦅 HAWK</span>' : ''}${
+                            bet.settledBy === 'HAWK' ? '<span class="bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded text-[10px]" title="Settled automatically from the final result — ✏️ Edit to change it">🤖 auto-settled</span>' : ''}</div>
                         <div class="flex items-center gap-2">
                             ${badge}
                             <button onclick="reuseEntireBet('${bet.id}')" class="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 px-2.5 py-1 rounded-lg text-[10px] border border-zinc-800 flex items-center gap-1 transition" title="Reuse entire ticket selections">🔄 Reuse Acca</button>
@@ -1574,14 +1457,22 @@
                     </div>
                     <div class="space-y-1.5">
                         ${bet.legs.map((l, li) => {
-                            const parts = l.selection.split(' & ').map(p => p.trim()).filter(Boolean);
-                            const selHtml = parts.length > 1
-                                ? `<ul class="text-white font-medium space-y-0.5">${parts.map(p => `<li class="flex items-start gap-1.5"><span class="text-[#d9b571] shrink-0">·</span>${p}</li>`).join('')}</ul>`
+                            // Legs sent from the HAWK builder carry each selection and, once
+                            // the match is over, its result.
+                            const hawkLegs = l.hawk && Array.isArray(l.hawk.legs) ? l.hawk.legs : null;
+                            const parts = hawkLegs ? hawkLegs.map(h => ({ text: escHtml(h.label), res: h.result }))
+                                : l.selection.split(' & ').map(p => ({ text: p.trim() })).filter(p => p.text);
+                            const mark = (r) => r === 'won' ? '<span class="text-emerald-400 shrink-0">✓</span>'
+                                : r === 'lost' ? '<span class="text-red-400 shrink-0">✗</span>'
+                                : r === 'void' ? '<span class="text-amber-400 shrink-0" title="Didn\'t play — void">⊘</span>'
+                                : '<span class="text-[#d9b571] shrink-0">·</span>';
+                            const selHtml = parts.length > 1 || hawkLegs
+                                ? `<ul class="text-white font-medium space-y-0.5">${parts.map(p => `<li class="flex items-start gap-1.5">${mark(p.res)}${p.text}</li>`).join('')}</ul>`
                                 : `<span class="text-white font-medium">${l.selection}</span>`;
                             return `
                             <div class="text-xs flex justify-between items-center bg-zinc-900/40 p-2 rounded-lg border border-zinc-900">
                                 <div>
-                                    <span class="text-[10px] text-[#d9b571] font-semibold block">${l.fixture}</span>
+                                    <span class="text-[10px] text-[#d9b571] font-semibold block">${l.fixture}${l.hawk && l.hawk.score ? ` <span class="text-zinc-400 font-normal">· FT ${l.hawk.score}</span>` : ''}</span>
                                     ${selHtml}
                                 </div>
                                 <div class="flex items-center gap-3">
@@ -1591,6 +1482,7 @@
                             </div>
                         `; }).join('')}
                     </div>
+                    ${bet.status === 'PENDING' && bet.needsCheck ? `<div class="text-[11px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2">⚠️ HAWK couldn't settle this one: ${escHtml(bet.needsCheck)}. Settle it yourself with what Bet365 paid (✏️ Edit lets you set the exact return).</div>` : ''}
                     <div class="flex justify-between items-center pt-2 border-t border-zinc-900 text-xs">
                         <div><span class="text-zinc-400">Stake:</span> <span class="text-white font-bold">€${bet.stake.toFixed(2)}</span><span class="text-zinc-400 ml-3">${bet.status === 'CASHED_OUT' ? 'Cashed Out:' : 'Return:'}</span> <span class="text-[#d9b571] font-bold">€${(bet.status === 'CASHED_OUT' ? (bet.cashOutAmount || 0) : bet.potentialReturn).toFixed(2)}</span></div>
                         ${bet.status === 'PENDING' ? `<div class="flex gap-1"><button onclick="settleBet('${bet.id}', 'WON')" class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg font-bold text-[10px]">Won ✓</button><button onclick="settleBet('${bet.id}', 'LOST')" class="bg-red-500/20 text-red-400 px-3 py-1 rounded-lg font-bold text-[10px]">Lost ✗</button><button onclick="openQuickCashOutModal('${bet.id}')" class="bg-[#c9a05c]/20 text-[#d9b571] px-3 py-1 rounded-lg font-bold text-[10px]">Cash Out 💰</button></div>` : ''}
@@ -1605,6 +1497,7 @@
             const bet = bets.find(b => b.id === id);
             if(!bet || bet.status !== 'PENDING') return;
             bet.status = outcome;
+            bet.settledAt = new Date().toISOString(); bet.settledBy = 'you'; delete bet.needsCheck;
             if(outcome === 'WON') bankroll += bet.potentialReturn;
             saveState();
             renderUI();
@@ -1634,6 +1527,7 @@
 
             bet.status = 'CASHED_OUT';
             bet.cashOutAmount = amount;
+            bet.settledAt = new Date().toISOString(); bet.settledBy = 'you'; delete bet.needsCheck;
             bankroll += amount; // stake was already deducted at lock-in; this is what you get back
 
             saveState();
@@ -1783,6 +1677,290 @@
             drawdownEl.className = `text-lg font-bold ${maxDrawdown > 0 ? 'text-amber-400' : 'text-zinc-200'}`;
 
             renderLeagueBreakdown();
+            renderProfitChart();
+            renderTrackRecord();
+            renderTypeBreakdown();
+        }
+
+        const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const betReturn = (b) => b.status === 'WON' ? b.potentialReturn : b.status === 'CASHED_OUT' ? (b.cashOutAmount || 0) : 0;
+        const isHawkBet = (b) => b.source === 'hawk' || (b.legs || []).some(l => l.hawk || /^HAWK/.test(l.angle || ''));
+        // When a ticket was settled (or, for older tickets, placed — the id holds that time).
+        const settleTime = (b) => (b.settledAt ? Date.parse(b.settledAt) : 0) || +((/bet_(\d+)/.exec(b.id || '') || [])[1] || 0);
+
+        // --- PROFIT OVER TIME: running profit/loss after each settled ticket ---
+        function renderProfitChart() {
+            const el = document.getElementById('pl-chart'), cap = document.getElementById('pl-chart-caption');
+            if (!el) return;
+            const settled = bets.filter(b => b.status !== 'PENDING').sort((a, b) => settleTime(a) - settleTime(b));
+            if (settled.length < 2) {
+                el.innerHTML = '<div class="text-center py-6 text-zinc-500 text-xs">Settle a couple of tickets to see your profit line.</div>';
+                cap.textContent = '';
+                return;
+            }
+            let cum = 0;
+            const vals = [0, ...settled.map(b => (cum += betReturn(b) - b.stake))];
+            const W = 600, H = 180, P = 10;
+            const lo = Math.min(0, ...vals), hi = Math.max(0, ...vals), span = hi - lo || 1;
+            const x = (i) => P + (i * (W - 2 * P)) / (vals.length - 1);
+            const y = (v) => P + ((hi - v) * (H - 2 * P)) / span;
+            const line = vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+            const up = cum >= 0, color = up ? '#34d399' : '#f87171';
+            const area = `${x(0)},${y(0)} ${line} ${x(vals.length - 1)},${y(0)}`;
+            const best = Math.max(...vals), worst = Math.min(...vals);
+            el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="w-full h-44 block">
+                <defs><linearGradient id="plfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".35"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+                <line x1="${P}" x2="${W - P}" y1="${y(0)}" y2="${y(0)}" stroke="#3f3f46" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+                <polygon points="${area}" fill="url(#plfill)"/>
+                <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+            </svg>
+            <div class="flex justify-between text-[10px] text-zinc-500 mt-1"><span>First settled ticket</span>
+                <span>Best €${best >= 0 ? '+' : ''}${best.toFixed(2)} · worst €${worst.toFixed(2)}</span>
+                <span class="${up ? 'text-emerald-400' : 'text-red-400'} font-bold">Now €${cum >= 0 ? '+' : ''}${cum.toFixed(2)}</span></div>`;
+            cap.textContent = `${settled.length} settled tickets · top-ups and bankroll edits not included`;
+        }
+
+        // --- PROFIT BY BET TYPE ---
+        function betKind(b) {
+            const acca = (b.legs || []).length > 1 || (b.legs || []).some(l => l.type === 'acca');
+            return isHawkBet(b) ? (acca ? 'HAWK accas' : 'HAWK builders') : (acca ? 'Your accas' : 'Your builders & singles');
+        }
+        function renderTypeBreakdown() {
+            const el = document.getElementById('type-breakdown-container');
+            if (!el) return;
+            const settled = bets.filter(b => b.status !== 'PENDING');
+            if (!settled.length) { el.innerHTML = '<div class="text-center py-6 text-zinc-500 text-xs">Settle some tickets to see this.</div>'; return; }
+            const groups = {};
+            settled.forEach(b => {
+                const g = (groups[betKind(b)] ||= { n: 0, wins: 0, decided: 0, staked: 0, returned: 0 });
+                g.n++; g.staked += b.stake; g.returned += betReturn(b);
+                if (b.status === 'WON') g.wins++;
+                if (b.status === 'WON' || b.status === 'LOST') g.decided++;
+            });
+            el.innerHTML = Object.entries(groups).sort((a, b) => (b[1].returned - b[1].staked) - (a[1].returned - a[1].staked)).map(([k, g]) => {
+                const net = g.returned - g.staked, roi = g.staked ? (100 * net) / g.staked : 0;
+                return `<div class="flex items-center justify-between bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs gap-3">
+                    <div class="font-semibold text-white">${k} <span class="text-zinc-500 font-normal">(${g.n})</span></div>
+                    <div class="flex items-center gap-4 text-right">
+                        <span class="text-zinc-400">${g.decided ? Math.round((100 * g.wins) / g.decided) : 0}% won</span>
+                        <span class="text-zinc-400">ROI ${roi >= 0 ? '+' : ''}${roi.toFixed(0)}%</span>
+                        <span class="font-bold ${net >= 0 ? 'text-emerald-400' : 'text-red-400'}">€${net >= 0 ? '+' : ''}${net.toFixed(2)}</span>
+                    </div></div>`;
+            }).join('');
+        }
+
+        // --- HAWK TRACK RECORD: do HAWK's chances come true? ---
+        function renderTrackRecord() {
+            const el = document.getElementById('track-record-container');
+            if (!el) return;
+            const legs = bets.flatMap(b => (b.legs || []).flatMap(l => (l.hawk && l.hawk.legs) || []))
+                .filter(h => (h.result === 'won' || h.result === 'lost') && h.p > 0);
+            const tickets = bets.filter(b => b.hawkP > 0 && (b.status === 'WON' || b.status === 'LOST'));
+            if (!legs.length) {
+                el.innerHTML = `<div class="text-center py-6 text-zinc-500 text-xs">Nothing yet. Send bets from the HAWK builder with 🦅 Send to Vault —
+                    they settle themselves after the match and show up here.</div>`;
+                return;
+            }
+            const row = (label, list) => {
+                const said = list.reduce((s, h) => s + h.p, 0) / list.length, got = list.filter(h => h.result === 'won').length / list.length;
+                const diff = got - said, tone = Math.abs(diff) < 0.05 ? 'text-zinc-300' : diff > 0 ? 'text-emerald-400' : 'text-red-400';
+                return `<div class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs">
+                    <div class="flex justify-between gap-2"><span class="text-white font-semibold">${label} <span class="text-zinc-500 font-normal">(${list.length})</span></span>
+                        <span>HAWK said <b class="text-zinc-200">${Math.round(100 * said)}%</b> · landed <b class="${tone}">${Math.round(100 * got)}%</b></span></div>
+                    <div class="relative h-1.5 bg-zinc-800 rounded mt-1.5"><div class="absolute inset-y-0 left-0 bg-[#d9b571]/70 rounded" style="width:${(100 * got).toFixed(1)}%"></div>
+                        <div class="absolute -top-0.5 h-2.5 w-0.5 bg-white" style="left:${(100 * said).toFixed(1)}%" title="What HAWK said"></div></div></div>`;
+            };
+            const bands = [[0, 0.5, 'Under 50%'], [0.5, 0.65, '50–65%'], [0.65, 0.8, '65–80%'], [0.8, 0.9, '80–90%'], [0.9, 1.01, '90%+']];
+            const byBand = bands.map(([lo, hi, label]) => [label, legs.filter(h => h.p >= lo && h.p < hi)]).filter(([, l]) => l.length);
+            const byMarket = {};
+            legs.forEach(h => (byMarket[h.market || 'Other'] ||= []).push(h));
+            const markets = Object.entries(byMarket).sort((a, b) => b[1].length - a[1].length).slice(0, 6);
+            const expWins = tickets.reduce((s, b) => s + b.hawkP, 0), wins = tickets.filter(b => b.status === 'WON').length;
+            el.innerHTML = `
+                ${legs.length < 50 ? `<div class="text-[10px] text-amber-400/80">${legs.length} settled legs so far — these numbers swing a lot until there are 50+.</div>` : ''}
+                <div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-1">By HAWK's chance</div>
+                ${byBand.map(([label, l]) => row(label, l)).join('')}
+                <div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-2">By market</div>
+                ${markets.map(([m, l]) => row(escHtml(m), l)).join('')}
+                ${tickets.length ? `<div class="text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 mt-2">Tickets: HAWK expected
+                    <b>${expWins.toFixed(1)}</b> of your ${tickets.length} settled HAWK tickets to win — <b class="${wins >= expWins ? 'text-emerald-400' : 'text-red-400'}">${wins}</b> did.</div>` : ''}`;
+        }
+
+        // --- AUTO-SETTLE: bets sent from the HAWK builder settle themselves ---
+        // After the final whistle, HAWK reads the match from 365Scores (score,
+        // half-time score, goal order, corners, cards, shots on target and every
+        // player's stats) and marks each leg won or lost. A lost leg settles the
+        // ticket as LOST; all legs won settles it as WON. A player who didn't play
+        // (Bet365 voids that leg and pays a reduced price) is left for you.
+        const matchFacts = {};   // 365Scores game id -> what happened (finished games only)
+        const countOf = (v, total = false) => {
+            if (v == null || v === '') return 0;
+            const m = /^(\d+)\s*\/\s*(\d+)/.exec(String(v));
+            if (m) return +(total ? m[2] : m[1]);   // "2/3 (67%)": won / attempted
+            const n = parseFloat(v);
+            return isNaN(n) ? 0 : n;
+        };
+        async function fetchMatchFacts(gameId) {
+            if (matchFacts[gameId]) return matchFacts[gameId];
+            const d = await s365('game', { gameId });
+            const game = d && d.game;
+            if (!game) return null;
+            if (/postpon|cancel|abandon|suspend/i.test(game.statusText || '')) return (matchFacts[gameId] = { finished: true, off: game.statusText });
+            if (game.statusGroup !== 4) return { finished: false };
+            const st = await s365('game/stats', { games: gameId });
+            const homeId = game.homeCompetitor.id, awayId = game.awayCompetitor.id;
+            const stage = (id) => (game.stages || []).find(s => s.id === id);
+            const s90 = stage(9) || stage(1), ht = stage(7);
+            const regular = (e) => e.stageId == null || e.stageId === 7 || e.stageId === 9;   // 1st and 2nd half, not extra time
+            const events = (game.events || []).filter(e => e.eventType && regular(e));
+            const goals = events.filter(e => e.eventType.id === 1).sort((a, b) => (a.order || 0) - (b.order || 0));
+            const cardEvents = events.filter(e => /card/i.test(e.eventType.name || ''));
+            const team = {};
+            for (const s of (st && st.statistics) || []) {
+                const side = s.competitorId === homeId ? 0 : s.competitorId === awayId ? 1 : -1;
+                if (side >= 0) (team[s.name] ||= [null, null])[side] = countOf(s.value);
+            }
+            const pair = (name) => team[name] && team[name][0] != null && team[name][1] != null ? team[name] : null;
+            const yellow = pair('Yellow Cards'), red = pair('Red Cards') || [0, 0];
+            const cards = yellow ? [yellow[0] + red[0], yellow[1] + red[1]]
+                : [homeId, awayId].map(id => cardEvents.filter(e => e.competitorId === id).length);
+            const names = Object.fromEntries((game.members || []).map(m => [m.id, m.name]));
+            const bookedIds = new Set(cardEvents.map(e => e.playerId));
+            const players = {};
+            for (const [side, key] of [['home', 'homeCompetitor'], ['away', 'awayCompetitor']]) {
+                players[side] = (((game[key] || {}).lineups || {}).members || []).map(m => {
+                    const stats = Object.fromEntries((m.stats || []).map(s => [s.name, s.value]));
+                    return { name: names[m.id] || '', minutes: countOf(stats['Minutes']), stats, booked: bookedIds.has(m.id) };
+                });
+            }
+            return (matchFacts[gameId] = {
+                finished: true, homeId,
+                ft: s90 ? [s90.homeCompetitorScore, s90.awayCompetitorScore] : [game.homeCompetitor.score, game.awayCompetitor.score],
+                ht: ht ? [ht.homeCompetitorScore, ht.awayCompetitorScore] : null,
+                first: goals.length ? (goals[0].competitorId === homeId ? 'home' : 'away') : null,
+                corners: pair('Corners'), sot: pair('Shots On Target'), cards, players,
+            });
+        }
+        const normName = (s) => String(s || '').replace(/[øØ]/g, 'o').replace(/ß/g, 'ss').normalize('NFKD').replace(/\p{M}/gu, '')
+            .toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+        function findPlayer(list, name) {
+            const n = normName(name);
+            if (!n) return null;
+            const exact = list.filter(p => normName(p.name) === n);
+            if (exact.length === 1) return exact[0];
+            const parts = n.split(' '), last = parts[parts.length - 1];
+            const byLast = list.filter(p => { const q = normName(p.name).split(' '); return q[q.length - 1] === last && (parts.length === 1 || q[0][0] === parts[0][0]); });
+            if (byLast.length === 1) return byLast[0];
+            const within = list.filter(p => { const q = normName(p.name); return q && (q.includes(n) || n.includes(q)); });
+            return within.length === 1 ? within[0] : null;
+        }
+        // 'won' | 'lost' | 'void' (player didn't play) | 'unknown' (no data)
+        function legResult(h, f) {
+            const id = h.id || '', W = (c) => (c ? 'won' : 'lost');
+            const [H, A] = f.ft, side = (s) => (s === 'home' ? [H, A] : [A, H]);
+            const line = (ou, value, x) => (ou === 'o' ? x > value : x < value);
+            let m;
+            if ((m = /^p:(home|away):\d+:([a-z]+?)(\d*)$/.exec(id))) {
+                const [, sd, stat, k] = m, need = +k || 1;
+                const who = h.player || String(h.label || '').split(/:| to /)[0];
+                const pl = findPlayer(f.players[sd] || [], who);
+                if (!pl) return (f.players[sd] || []).length ? 'void' : 'unknown';
+                if (!(pl.minutes > 0)) return 'void';
+                const s = pl.stats;
+                const v = { shots: countOf(s['Total Shots']), sot: countOf(s['Shots On Target']), score: countOf(s['Goals']),
+                            assist: countOf(s['Assists']), soa: countOf(s['Goals']) + countOf(s['Assists']), booked: pl.booked ? 1 : 0,
+                            fouls: countOf(s['Fouls Made']), fouled: countOf(s['Was Fouled']), tackles: countOf(s['Tackles Won'], true),
+                            offsides: countOf(s['Offsides']), saves: countOf(s['Goalkeeper Saves']) }[stat];
+                return v === undefined ? 'unknown' : W(v >= need);
+            }
+            if ((m = /^res:(home|draw|away)$/.exec(id))) return W(m[1] === 'home' ? H > A : m[1] === 'away' ? A > H : H === A);
+            if ((m = /^dc:(home|away)$/.exec(id))) return W(m[1] === 'home' ? H >= A : A >= H);
+            if ((m = /^goals:([ou])([\d.]+)$/.exec(id))) return W(line(m[1], +m[2], H + A));
+            if ((m = /^btts:(yes|no)$/.exec(id))) return W((H > 0 && A > 0) === (m[1] === 'yes'));
+            if ((m = /^team:(home|away):o([\d.]+)$/.exec(id))) return W(side(m[1])[0] > +m[2]);
+            if ((m = /^cs:(home|away)$/.exec(id))) return W(side(m[1])[1] === 0);
+            if ((m = /^cs:(\d+)-(\d+)$/.exec(id))) return W(H === +m[1] && A === +m[2]);
+            if ((m = /^wtn:(home|away)$/.exec(id))) { const [g, o] = side(m[1]); return W(g > 0 && o === 0); }
+            if ((m = /^margin:(home|away):(\d)$/.exec(id))) { const [g, o] = side(m[1]); return W(+m[2] === 3 ? g - o >= 3 : g - o === +m[2]); }
+            if ((m = /^ah:(home|away):([+-][\d.]+)$/.exec(id))) { const [g, o] = side(m[1]); return W(g - o + parseFloat(m[2]) > 0); }
+            if ((m = /^first:(home|away)$/.exec(id))) return W(f.first === m[1]);
+            if ((m = /^h([12])(res|goals):(.+)$/.exec(id))) {
+                if (!f.ht) return 'unknown';
+                const [hh, ha] = m[1] === '1' ? f.ht : [H - f.ht[0], A - f.ht[1]];
+                if (m[2] === 'res') return W(m[3] === 'home' ? hh > ha : m[3] === 'away' ? ha > hh : hh === ha);
+                const g = /^([ou])([\d.]+)$/.exec(m[3]);
+                return g ? W(line(g[1], +g[2], hh + ha)) : 'unknown';
+            }
+            const totals = { corners: f.corners, cards: f.cards, sot: f.sot };
+            if ((m = /^(corners|cards|sot):([ou])([\d.]+)$/.exec(id))) {
+                const t = totals[m[1]];
+                return t ? W(line(m[2], +m[3], t[0] + t[1])) : 'unknown';
+            }
+            if ((m = /^t(corners|cards):(home|away):([ou])([\d.]+)$/.exec(id))) {
+                const t = totals[m[1]];
+                return t ? W(line(m[3], +m[4], t[m[2] === 'home' ? 0 : 1])) : 'unknown';
+            }
+            if ((m = /^mostcorners:(home|away)$/.exec(id))) {
+                const t = f.corners;
+                return t ? W(m[1] === 'home' ? t[0] > t[1] : t[1] > t[0]) : 'unknown';
+            }
+            return 'unknown';
+        }
+
+        let settling = false;
+        async function autoSettle() {
+            if (settling) return;
+            settling = true;
+            const statusEl = document.getElementById('auto-settle-status');
+            try {
+                // 1. Fetch the finished matches (slow part), 2. apply to the freshest copy of your bets.
+                const due = (l) => l.hawk && l.hawk.game && Date.now() > Date.parse(l.hawk.kickoff || 0) + 105 * 60000;
+                const games = [...new Set(bets.filter(b => b.status === 'PENDING').flatMap(b => b.legs.filter(due).map(l => String(l.hawk.game))))];
+                for (const g of games) { try { await fetchMatchFacts(g); } catch (e) { console.warn('[vault] result check failed', g, e); } }
+
+                reloadFromStorage();
+                const settledNow = [];
+                let waiting = 0;
+                for (const bet of bets) {
+                    if (bet.status !== 'PENDING' || !bet.legs.some(l => l.hawk)) continue;
+                    let anyLost = false, allWon = bet.legs.every(l => l.hawk), allDone = true;
+                    const issues = [];
+                    for (const l of bet.legs) {
+                        if (!l.hawk) continue;
+                        const f = due(l) ? matchFacts[String(l.hawk.game)] : null;
+                        if (!f) { allDone = false; allWon = false; continue; }
+                        if (f.off) { issues.push(`${l.fixture}: ${f.off}`); allWon = false; continue; }
+                        l.hawk.score = `${f.ft[0]}-${f.ft[1]}`;
+                        for (const h of l.hawk.legs) h.result = legResult(h, f);
+                        const rs = l.hawk.legs.map(h => h.result);
+                        if (rs.includes('lost')) anyLost = true;
+                        else if (!rs.every(r => r === 'won')) {
+                            allWon = false;
+                            l.hawk.legs.forEach(h => {
+                                if (h.result === 'void') issues.push(`${h.label} — didn't play (Bet365 voids that leg)`);
+                                else if (h.result === 'unknown') issues.push(`${h.label} — no result data`);
+                            });
+                        }
+                    }
+                    if (anyLost || (allWon && allDone)) {
+                        bet.status = anyLost ? 'LOST' : 'WON';
+                        bet.settledAt = new Date().toISOString(); bet.settledBy = 'HAWK'; delete bet.needsCheck;
+                        if (bet.status === 'WON') bankroll += bet.potentialReturn;
+                        settledNow.push(bet);
+                    } else if (allDone && issues.length) bet.needsCheck = issues.join(' · ');
+                    else waiting++;
+                }
+                saveState();
+                if (!document.getElementById('view-history').classList.contains('hidden')) renderHistory();
+                const won = settledNow.filter(b => b.status === 'WON');
+                const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                if (settledNow.length || waiting) {
+                    statusEl.classList.remove('hidden');
+                    statusEl.innerHTML = `🤖 Results checked at ${time}. ` + (settledNow.length
+                        ? `<b class="text-white">Settled ${settledNow.length}</b>: ${won.length} won${won.length ? ` (+€${won.reduce((s, b) => s + b.potentialReturn, 0).toFixed(2)})` : ''}, ${settledNow.length - won.length} lost. `
+                        : '') + (waiting ? `${waiting} HAWK ticket${waiting === 1 ? '' : 's'} waiting for ${waiting === 1 ? 'its' : 'their'} matches to finish.` : '');
+                }
+            } finally { settling = false; }
         }
 
         function exportData() {
@@ -1819,9 +1997,32 @@
             reader.readAsText(file);
         }
 
+        // Downloads a backup, then deletes only the Vault's own data (keys starting
+        // "hawk_"). The builder's settings and anything else on this site are left alone.
         function resetVault() {
-            if(confirm("Reset all vault data?")) { localStorage.clear(); location.reload(); }
+            const typed = prompt(`This deletes all your Vault data: ${bets.length} tickets, your €${bankroll.toFixed(2)} bankroll and its history.\n\n`
+                + `A backup file downloads first, so you can Import it back.\n\nType RESET to continue:`);
+            if (typed === null) return;
+            if (typed.trim().toUpperCase() !== 'RESET') { alert('Nothing was deleted.'); return; }
+            exportData();
+            Object.keys(localStorage).filter(k => k.startsWith('hawk_')).forEach(k => localStorage.removeItem(k));
+            setTimeout(() => location.reload(), 1000);   // give the backup download a moment
         }
+
+        // The builder page (another tab) writes bets here too: pick its changes up
+        // straight away instead of overwriting them with this tab's older copy.
+        function reloadFromStorage() {
+            try {
+                bankroll = parseFloat(localStorage.getItem('hawk_bankroll')) || 1000.00;
+                bets = JSON.parse(localStorage.getItem('hawk_bets')) || [];
+            } catch (e) { /* keep what's in memory */ }
+        }
+        window.addEventListener('storage', (e) => {
+            if (e.key !== 'hawk_bets' && e.key !== 'hawk_bankroll') return;
+            reloadFromStorage();
+            renderUI();
+            if (!document.getElementById('view-history').classList.contains('hidden')) renderHistory();
+        });
 
         // --- EDIT BANKROLL ---
         function openEditBankrollModal() {
@@ -2017,6 +2218,8 @@
             bankroll -= newStake;
             bankroll += payoutContribution(newStatus, newPotentialReturn, newCashOutAmount);
 
+            if (newStatus === 'PENDING') { delete bet.settledAt; delete bet.settledBy; }
+            else if (newStatus !== bet.status) { bet.settledAt = new Date().toISOString(); bet.settledBy = 'you'; delete bet.needsCheck; }
             bet.stake = newStake;
             bet.legs = newLegs;
             bet.odds = newTotalOdds;
@@ -2039,6 +2242,9 @@
         onCategoryChange();
         onLeagueChange();
         onKellyEngineInput();
+        loadAllFixtures();                        // fills the fixture search box for every league
+        setTimeout(autoSettle, 1500);             // settle finished HAWK bets…
+        setInterval(autoSettle, 10 * 60 * 1000);  // …and keep checking every 10 minutes
     </script>
 </body>
 </html>

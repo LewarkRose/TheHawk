@@ -1085,7 +1085,8 @@
   // What an acca needs to remember about one leg once the match isn't loaded.
   function legSummary(e, json, id) {
     const l = e.legs[id], j = json.legs.find((x) => x.id === id) || {};
-    return { id, label: l.label, market: l.market, kind: l.kind, p: l.p, fair: l.fair, bookPrice: j.bookPrice || null };
+    return { id, label: l.label, market: l.market, kind: l.kind, p: l.p, fair: l.fair, bookPrice: j.bookPrice || null,
+             player: l.player || null, side: l.side || null };
   }
 
   // Monster Acca: one part per fixture, then the page picks the best ones.

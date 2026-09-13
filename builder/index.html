@@ -763,12 +763,20 @@ function sendToVault() {
            (boost ? ` (${odds(quoted)} + ${boost}% boost)` : ""),
     odds: price, type: "builder", league: m.league,
     subSelections: legs.map(l => ({ label: l.label, odds: +(l.bookPrice || l.fair).toFixed(2) })),
+    hawk: hawkPart(m, legs, r.p),
   };
-  if (saveToVault([leg], stake, price))
-    toast(`🦅 Logged in your Vault: €${stake.toFixed(2)} @ ${odds(price)}${boost ? ` (boosted from ${odds(quoted)})` : ""}. If the Vault is open in another tab, refresh it.`);
+  if (saveToVault([leg], stake, price, { source: "hawk", hawkP: r.p }))
+    toast(`🦅 Logged in your Vault: €${stake.toFixed(2)} @ ${odds(price)}${boost ? ` (boosted from ${odds(quoted)})` : ""}. It settles itself after the match.`);
+}
+// What the Vault needs to settle a match's legs by itself after the final
+// whistle (and to check HAWK's track record): the 365Scores game, and each
+// leg's id, player and HAWK's chance.
+function hawkPart(info, legs, p) {
+  return { game: String(info.id), league: info.league, home: info.home, away: info.away, kickoff: info.kickoff, p,
+           legs: legs.map(l => ({ id: l.id, label: l.label, market: l.market, p: l.p, player: l.player || null, side: l.side || null })) };
 }
 // Adds a PENDING bet to the Vault and takes the stake off its bankroll.
-function saveToVault(legs, stake, price) {
+function saveToVault(legs, stake, price, extra = {}) {
   let bankroll, bets;
   try {
     bankroll = parseFloat(localStorage.getItem("hawk_bankroll")) || 1000.0;
@@ -778,7 +786,7 @@ function saveToVault(legs, stake, price) {
   bets.unshift({
     id: "bet_" + Date.now(),
     date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
-    legs, stake, odds: price, potentialReturn: stake * price, status: "PENDING",
+    legs, stake, odds: price, potentialReturn: stake * price, status: "PENDING", ...extra,
   });
   try {
     localStorage.setItem("hawk_bankroll", (bankroll - stake).toFixed(2));
@@ -1089,7 +1097,8 @@ function accaToast(replaced, home, away) {
 function addSlipToAcca() {
   const m = S.match, r = S.result;
   if (!m || !S.slip.length || !r || !r.p) return toast("Build a ticket first.");
-  const legs = S.slip.map(id => { const l = S.legs[id]; return { id, label: l.label, market: l.market, kind: l.kind, p: l.p, fair: l.fair, bookPrice: l.bookPrice || null }; });
+  const legs = S.slip.map(id => { const l = S.legs[id]; return { id, label: l.label, market: l.market, kind: l.kind, p: l.p, fair: l.fair,
+    bookPrice: l.bookPrice || null, player: l.player || null, side: l.side || null }; });
   accaToast(putPart(makePart(m, legs, r.p)), m.home, m.away);
   renderSlip();
 }
@@ -1239,9 +1248,10 @@ function sendAccaToVault() {
     fixture: `${pt.home} vs ${pt.away}`, selection: pt.legs.map(l => l.label).join(" & "),
     angle: `HAWK: ${pct(pt.p, 1)} · fair ${odds(pt.fair)}`, odds: +(partPrice(pt) || pt.fair).toFixed(2), type: "acca", league: pt.league,
     subSelections: pt.legs.map(l => ({ label: l.label, odds: +(l.bookPrice || l.fair).toFixed(2) })),
+    hawk: hawkPart(pt, pt.legs, pt.p),
   }));
-  if (saveToVault(legs, a.stake, price))
-    toast(`🦅 Acca logged in your Vault: €${a.stake.toFixed(2)} @ ${odds(price)}${a.boost ? ` (boosted from ${odds(a.price)})` : ""}.`);
+  if (saveToVault(legs, a.stake, price, { source: "hawk", hawkP: a.p }))
+    toast(`🦅 Acca logged in your Vault: €${a.stake.toFixed(2)} @ ${odds(price)}${a.boost ? ` (boosted from ${odds(a.price)})` : ""}. It settles itself as the matches finish.`);
 }
 
 /* ---------- Monster Acca ---------- */

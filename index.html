@@ -63,11 +63,8 @@
                 backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             }
         }
-        html body header .w-11.h-11 {
-            background: conic-gradient(from 200deg, #d9b571, #f7e3b3, #a8813f, #d9b571) !important;
-            border: 0 !important; box-shadow: 0 0 22px rgba(217,181,113,.45), inset 0 1px 0 rgba(255,255,255,.5);
-        }
-        html body header .w-11.h-11 .icon-gold { filter: grayscale(1) brightness(.25) sepia(.4); }
+        html body header .vault-logo { width: 46px; height: 46px; flex-shrink: 0; filter: drop-shadow(0 0 14px rgba(217,181,113,.45)); transition: transform .2s; }
+        html body header .vault-logo:hover { transform: rotate(-4deg) scale(1.05); }
         html body header h1 {
             background: linear-gradient(180deg, #f8e6b8, #d9b571 60%, #a8813f);
             -webkit-background-clip: text; background-clip: text; color: transparent !important;
@@ -101,7 +98,7 @@
             html body #bets-container > div, html body #view-history > div, html body #view-builder > div { animation: none; }
         }
     </style>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%2318181b'/%3E%3Crect x='4' y='4' width='92' height='92' rx='18' fill='none' stroke='%23d9b571' stroke-width='4'/%3E%3Ctext x='50' y='68' font-size='56' text-anchor='middle'%3E%F0%9F%A6%85%3C/text%3E%3C/svg%3E">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
 </head>
@@ -111,7 +108,7 @@
         <!-- Header & Bankroll -->
         <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b border-zinc-800 gap-4">
             <div class="flex items-center gap-3">
-                <div class="w-11 h-11 rounded-xl border border-[#d9b571]/40 bg-zinc-900 flex items-center justify-center text-xl shrink-0"><span class="icon-gold">🦅</span></div>
+                <img src="favicon.svg" alt="HAWK" class="vault-logo">
                 <div>
                     <h1 class="text-3xl font-black tracking-wider text-[#d9b571]">HAWK</h1>
                     <p id="header-date-label" class="text-xs text-zinc-400">Ticket Center</p>

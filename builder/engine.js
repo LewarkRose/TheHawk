@@ -1510,7 +1510,7 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, learnKey, liveMatch,
+  global.HAWK = { LEAGUES, COMPETITIONS, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, learnKey, liveMatch,
                   scores, matchReport,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },

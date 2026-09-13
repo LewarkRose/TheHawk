@@ -117,6 +117,14 @@ img{max-width:100%}
 .bp{font-size:12px;color:var(--muted)}
 .bp b{color:var(--text);font-weight:700}
 .bp.val b{color:var(--accent)}
+.live-odds{margin-top:6px;display:flex;align-items:center;justify-content:center;gap:5px;flex-wrap:wrap}
+.live-odds .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.live-odds .dot.on{background:var(--accent);box-shadow:0 0 0 0 rgba(20,227,161,.6);animation:livepulse 2s infinite}
+@keyframes livepulse{70%{box-shadow:0 0 0 6px rgba(20,227,161,0)}100%{box-shadow:0 0 0 0 rgba(20,227,161,0)}}
+.linkbtn{background:none;border:0;padding:0 2px;color:var(--accent);cursor:pointer;font:inherit;text-decoration:underline}
+.mv{font-size:10px;margin-left:3px}
+.mv.up{color:var(--accent)}
+.mv.down{color:#ff6b6b}
 .slip{padding:16px}
 .target{display:flex;align-items:baseline;justify-content:space-between}
 .target .big{font-size:34px;font-weight:900;color:var(--gold);letter-spacing:.02em}
@@ -295,9 +303,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 
 <script src="engine.js"></script>
 <script>
+function loadPref(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } }
+function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
             target: 3.25, style: "Balanced", focus: "Mix", maxLegs: 10, favourite: true, result: null, tab: "players", q: "",
-            chk: { price: "", boost: "", stake: "5" },
+            chk: { price: "", boost: "", stake: "5" }, extras: false, cat: "All",
+            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "legs", data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null },
             watch: [] };
@@ -329,6 +340,7 @@ async function api(path, body) {
     case "/api/fixtures": return { fixtures: await HAWK.fixtures(q.league) };
     case "/api/match": return HAWK.match(q.league, q.id, q.refresh === "1");
     case "/api/lineups": return HAWK.lineups(q.id);
+    case "/api/prices": return HAWK.livePrices(q.id);
     case "/api/build": return HAWK.build(body);
     case "/api/evaluate": return HAWK.evaluate(body);
     case "/api/scan": return body ? HAWK.startScan(body) : HAWK.scanStatus();
@@ -407,8 +419,12 @@ async function openMatch(id, refresh = false) {
   try {
     const m = await api(`/api/match?league=${encodeURIComponent(S.league)}&id=${id}${refresh ? "&refresh=1" : ""}`);
     S.match = m; S.legs = Object.fromEntries(m.legs.map(l => [l.id, l]));
-    if (!refresh) { S.slip = []; S.locked = new Set(); S.banned = new Set(); S.result = null; }
+    if (!refresh) { S.slip = []; S.locked = new Set(); S.banned = new Set(); S.result = null; S.cat = "All"; }
+    S.slip = S.slip.filter(id => S.legs[id]);
+    S.live.checked = new Date();
     renderMatch(); renderSlip();
+    if (refresh && S.slip.length) evaluateSlip();   // fair odds may have moved with the new prices
+    startLive();
     if (!refresh && narrow()) $("#match").scrollIntoView({ behavior: "smooth" });
   } catch (err) {
     $("#match").innerHTML = `<div class="empty"><h2>Couldn't analyse this match</h2>${esc(err.message)}</div>`;
@@ -434,7 +450,8 @@ function renderMatch() {
         <div class="mid"><div class="x">VS</div><div class="ko">${esc(fmtKick(m.kickoff))}</div>
           ${m.started ? '<div class="chips"><span class="badge live">STARTED — pre-match model</span></div>' : ""}
           ${m.referee && m.referee.name ? `<div class="ko" style="margin-top:6px">Ref: ${esc(m.referee.name)}${m.referee.avg ? ` · ${m.referee.avg.toFixed(2)} cards/g` : ""}</div>` : ""}
-          <button class="ghost" style="width:auto;padding:5px 10px;margin-top:8px" onclick="openMatch('${m.id}', true)">↻ Refresh</button>
+          <button class="ghost" style="width:auto;padding:5px 10px;margin-top:8px" onclick="openMatch('${m.id}', true)" title="Re-run everything: odds, lineups and the simulation">↻ Refresh</button>
+          <div class="ko live-odds" id="liveOdds"></div>
           ${!m.started && !(m.lineups.home.status === "Confirmed" && m.lineups.away.status === "Confirmed") ?
             `<br><button class="ghost" style="width:auto;padding:5px 10px;margin-top:6px;${isWatched(m.id) ? "color:var(--gold);border-color:var(--gold)" : ""}"
               onclick="toggleWatch()">${isWatched(m.id) ? "🔕 Stop lineup alert" : "🔔 Alert me when lineups are confirmed"}</button>` : ""}</div>
@@ -467,7 +484,51 @@ function renderMatch() {
     </div>`;
   $("#match").querySelector(".tabs").onclick = (ev) => { const t = ev.target.closest(".tab"); if (t) { S.tab = t.dataset.t; renderMatch(); } };
   renderTab();
+  renderLive();
 }
+
+/* ---------- live Bet365 prices ---------- */
+// While a match is open, HAWK re-reads Bet365's prices every 2 minutes
+// (odds only; the fair odds update when you press Refresh). Moves show as
+// ▲/▼ on the legs, and a leg in your slip that moves gets a message.
+const LIVE_MS = 2 * 60 * 1000;
+function startLive() {
+  clearInterval(S.live.timer);
+  S.live.timer = S.live.on && S.match && !S.match.started ? setInterval(checkLive, LIVE_MS) : null;
+  renderLive();
+}
+function renderLive() {
+  const el = $("#liveOdds"); if (!el || !S.match) return;
+  if (S.match.started) { el.innerHTML = ""; return; }
+  const at = S.live.checked ? S.live.checked.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "–";
+  el.innerHTML = `<span class="dot ${S.live.on ? "on" : ""}"></span>${esc(S.match.priceBook || "Bet365")} odds checked ${at}
+    <button class="linkbtn" onclick="toggleLive()">${S.live.on ? "auto: on" : "auto: off"}</button>`;
+}
+function toggleLive() { S.live.on = !S.live.on; savePref("hawk.liveOdds", S.live.on); startLive(); if (S.live.on) checkLive(); }
+async function checkLive() {
+  const m = S.match;
+  if (!m || S.live.busy || document.hidden || S.view !== "match") return;
+  S.live.busy = true;
+  try {
+    const res = await api(`/api/prices?id=${m.id}`);
+    if (!res || S.match !== m) return;
+    const moved = [];
+    for (const [id, price] of Object.entries(res.prices)) {
+      const l = S.legs[id]; if (!l) continue;
+      if (l.bookPrice && price !== l.bookPrice) { l.prevPrice = l.bookPrice; if (S.slip.includes(id)) moved.push(l); }
+      l.bookPrice = price;
+    }
+    S.live.checked = new Date(res.checked);
+    renderLive(); refreshTab();
+    // Don't redraw the slip under someone typing a price into it.
+    if (!(document.activeElement && document.activeElement.closest && document.activeElement.closest("#slip"))) renderSlip();
+    if (moved.length) toast(`${res.book} moved: ${moved.slice(0, 2).map(l => `${l.label} ${odds(l.prevPrice)} → ${odds(l.bookPrice)}`).join(" · ")}${moved.length > 2 ? ` +${moved.length - 2} more` : ""}`);
+  } catch (err) { console.warn("[hawk] live odds:", err.message); }
+  finally { S.live.busy = false; }
+}
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && S.live.on && S.live.checked && Date.now() - S.live.checked.getTime() > LIVE_MS) checkLive();
+});
 
 function valueCard(v) {
   if (!v) return "";
@@ -496,8 +557,10 @@ function renderTab() {
     };
     body.innerHTML = `<div class="two">${col("home")}${col("away")}</div>`;
   } else {
-    body.innerHTML = `<input class="search" id="q" placeholder="Search legs — player, corners, goals…" value="${esc(S.q)}"><div id="lglist"></div>`;
+    body.innerHTML = `<input class="search" id="q" placeholder="Search legs — player, corners, goals…" value="${esc(S.q)}">
+      <div class="qchips" id="lgcats" style="margin:0 0 12px"></div><div id="lglist"></div>`;
     $("#q").oninput = (e) => { S.q = e.target.value; renderLegList(); };
+    $("#lgcats").onclick = (e) => { const c = e.target.closest("[data-cat]"); if (c) { S.cat = c.dataset.cat; renderLegList(); } };
     renderLegList();
   }
   body.onclick = (e) => {
@@ -512,28 +575,57 @@ function playerCard(side, p) {
   const sot = pick(":sot1");
   const spark = sot && sot.recent ? `<div class="spark" title="Shots on target, last ${sot.recent.length} ${sot.basis === "starts" ? "starts" : "games"} (newest first)">${
       sot.recent.map(v => `<i class="${v >= 1 ? "hit" : ""}" style="height:${4 + Math.min(v, 5) * 3}px"></i>`).join("")}</div>` : "";
-  const quick = [[":sot1", "1+ SoT"], [":sot2", "2+ SoT"], [":shots2", "2+ shots"], [":score", "Score"], [":booked", "Booked"]]
+  const keeper = p.pos === "G";
+  const chips = keeper ? [[":saves2", "2+ saves"], [":saves3", "3+ saves"], [":saves4", "4+ saves"]]
+    : [[":sot1", "1+ SoT"], [":sot2", "2+ SoT"], [":shots2", "2+ shots"], [":score", "Score"], [":assist", "Assist"], [":booked", "Booked"]];
+  const quick = chips
     .map(([s, lab]) => { const l = pick(s); return l ? `<span class="qc ${S.slip.includes(l.id) ? "in" : ""}" data-add="${l.id}" title="Fair odds ${odds(l.fair)}">${lab} ${pct(l.p)}</span>` : ""; }).join("");
-  const open = `data-pl="${side}" data-name="${esc(p.name)}" title="Open ${esc(p.name)}'s last 10 games"`;
+  const open = `data-pl="${side}" data-name="${esc(p.name)}" title="Open ${esc(p.name)}'s last 10 games and every leg"`;
+  const rates = keeper ? (p.sv90 != null ? `${p.sv90.toFixed(1)} saves per 90 · ${Math.round(p.minutes)} min` : "saves come from the shots HAWK expects against")
+    : p.has_data ? `${p.sh90.toFixed(1)} shots · ${p.sot90.toFixed(1)} SoT · ${p.g90.toFixed(2)} xG per 90 · ${Math.round(p.minutes)} min` : "no recent data — position average";
+  const more = legs.length > chips.length ? `<span class="qc" ${open}>+${legs.length - chips.length} more</span>` : "";
   return `<div class="pl"><div class="ph" ${open}>${p.photo ? `<img src="${esc(p.photo)}" alt="" onerror="this.remove()">` : ""}</div>
     <div><div class="top1"><div><span class="nm" ${open}>${esc(p.name)}</span><span class="pos">${esc(p.pos)}</span></div>${spark}</div>
-      <div class="rates">${p.has_data ? `${p.sh90.toFixed(1)} shots · ${p.sot90.toFixed(1)} SoT · ${p.g90.toFixed(2)} xG per 90 · ${Math.round(p.minutes)} min` : "no recent data — position average"}</div>
-      <div class="qchips">${quick}</div></div></div>`;
+      <div class="rates">${rates}</div>
+      <div class="qchips">${quick}${more}</div></div></div>`;
 }
+
+// Leg categories for the "All legs" tab, each market listed in display order.
+const CATEGORIES = {
+  "Result": ["Full Time Result", "Double Chance", "Win to Nil", "Winning Margin", "Handicap", "Correct Score", "First Team to Score"],
+  "Goals": ["Total Goals", "Both Teams to Score", "Team Goals", "Clean Sheet"],
+  "Halves": ["1st Half Result", "1st Half Goals", "2nd Half Result", "2nd Half Goals"],
+  "Corners, cards & SoT": ["Corners", "Team Corners", "Most Corners", "Total Cards", "Team Cards", "Match Shots on Target"],
+  "Players": ["Player Shots", "Player Shots on Target", "To Score at Any Time", "Player to Assist", "Score or Assist", "Player to be Booked", "Goalkeeper Saves"],
+  "Fouls & tackles": ["Player Fouls Committed", "Player Fouls Won", "Player Tackles", "Player Offsides"],
+};
+const MARKET_ORDER = Object.values(CATEGORIES).flat();
+const categoryOf = (market) => Object.keys(CATEGORIES).find(c => CATEGORIES[c].includes(market)) || "Result";
+
+// ▲/▼ when Bet365 has moved this leg's price since the match was opened.
+const moveMark = (l) => l.prevPrice && l.bookPrice && l.prevPrice !== l.bookPrice
+  ? `<span class="mv ${l.bookPrice > l.prevPrice ? "up" : "down"}" title="Bet365 was ${odds(l.prevPrice)}">${l.bookPrice > l.prevPrice ? "▲" : "▼"}</span>` : "";
 
 function renderLegList() {
   const q = S.q.trim().toLowerCase();
+  const all = Object.values(S.legs);
+  const counts = {};
+  for (const l of all) counts[categoryOf(l.market)] = (counts[categoryOf(l.market)] || 0) + 1;
   const groups = {};
-  Object.values(S.legs).filter(l => !q || (l.label + " " + l.market).toLowerCase().includes(q))
-    .sort((a, b) => b.p - a.p).forEach(l => (groups[l.kind === "player" ? l.market : l.market] ||= []).push(l));
+  all.filter(l => (S.cat === "All" || categoryOf(l.market) === S.cat) && (!q || (l.label + " " + l.market).toLowerCase().includes(q)))
+    .sort((a, b) => b.p - a.p).forEach(l => (groups[l.market] ||= []).push(l));
+  const rank = (g) => { const i = MARKET_ORDER.indexOf(g); return i < 0 ? 999 : i; };
   const book = (S.match && S.match.priceBook) || "Bet365";
   const head = `<div class="lrow lhead"><div></div><div style="text-align:right">Chance</div><div style="text-align:right">Fair</div>
     <div style="text-align:right">${esc(book)}</div><div></div></div>`;
-  $("#lglist").innerHTML = Object.entries(groups).map(([g, ls]) => `<div class="lg"><h4>${esc(g)}</h4>${head}${ls.slice(0, 40).map(l => `
+  const cats = ["All", ...Object.keys(CATEGORIES).filter(c => counts[c])];
+  $("#lgcats").innerHTML = cats.map(c => `<span class="qc ${S.cat === c ? "in" : ""}" data-cat="${esc(c)}">${esc(c)} ${c === "All" ? all.length : counts[c]}</span>`).join("");
+  $("#lglist").innerHTML = Object.entries(groups).sort((a, b) => rank(a[0]) - rank(b[0])).map(([g, ls]) => `<div class="lg"><h4>${esc(g)}</h4>${head}${ls.slice(0, 40).map(l => `
     <div class="lrow"><div>${esc(l.label)}${l.low_data ? ' <span class="badge warn">low data</span>' : ""}<div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div></div>
       <div style="text-align:right;font-weight:700">${pct(l.p, 1)}</div><div class="muted" style="text-align:right">${odds(l.fair)}</div>
-      <div style="text-align:right;font-weight:700;color:${l.bookPrice ? (l.bookPrice > l.fair ? "var(--accent)" : "var(--text)") : "var(--muted)"}">${l.bookPrice ? odds(l.bookPrice) : "–"}</div>
-      <button class="add" data-add="${l.id}" title="Add to slip">${S.slip.includes(l.id) ? "✓" : "+"}</button></div>`).join("")}</div>`).join("")
+      <div style="text-align:right;font-weight:700;color:${l.bookPrice ? (l.bookPrice > l.fair ? "var(--accent)" : "var(--text)") : "var(--muted)"}">${l.bookPrice ? odds(l.bookPrice) : "–"}${moveMark(l)}</div>
+      <button class="add" data-add="${l.id}" title="Add to slip">${S.slip.includes(l.id) ? "✓" : "+"}</button></div>`).join("")}
+      ${ls.length > 40 ? `<div class="note" style="margin:4px 0 0">+ ${ls.length - 40} more — search a player or team to find them.</div>` : ""}</div>`).join("")
     || `<div class="note">No legs match.</div>`;
 }
 
@@ -544,7 +636,7 @@ function priceLine(l) {
   const book = (S.match && S.match.priceBook) || "Bet365";
   if (!l.bookPrice) return `<div class="bp">fair <b>${odds(l.fair)}</b></div>`;
   const val = l.bookPrice > l.fair;
-  return `<div class="bp ${val ? "val" : ""}" title="${val ? book + "'s price beats HAWK's fair odds" : book + " pays less than HAWK's fair odds"}">fair ${odds(l.fair)} · ${esc(book)} <b>${odds(l.bookPrice)}</b></div>`;
+  return `<div class="bp ${val ? "val" : ""}" title="${val ? book + "'s price beats HAWK's fair odds" : book + " pays less than HAWK's fair odds"}">fair ${odds(l.fair)} · ${esc(book)} <b>${odds(l.bookPrice)}</b>${moveMark(l)}</div>`;
 }
 
 function renderSlip() {
@@ -571,6 +663,8 @@ function renderSlip() {
     <div class="seg" id="focus" style="margin-top:0" title="What the builder is made of">${[["Mix", "Mix"], ["Players", "Player props"], ["Match", "Match stats"]].map(([f, lab]) => `<button class="${S.focus === f ? "on" : ""}" data-f="${f}">${lab}</button>`).join("")}</div>
     <div class="opts"><label><input type="checkbox" id="fav" ${S.favourite ? "checked" : ""}> Start with the favourite to win</label>
       <label>Max legs <select id="mx">${[3,4,5,6,7,8,9,10,12].map(n => `<option ${n === S.maxLegs ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>
+    <div class="opts" style="margin-top:6px"><label title="These are counted from each player's own record, with no allowance for the opponent or referee, so HAWK is less sure of them. You can always add them yourself.">
+      <input type="checkbox" id="xtra" ${S.extras ? "checked" : ""}> Auto-build can use fouls, tackles &amp; offsides</label></div>
     <button class="build" id="go" ${m ? "" : "disabled"}>⚡ BUILD MY BET BUILDER</button>
     ${S.slip.length ? `
     <div class="ticket">
@@ -598,6 +692,7 @@ function renderSlip() {
   $("#seg").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.style = b.dataset.s; renderSlip(); } };
   $("#focus").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.focus = b.dataset.f; renderSlip(); } };
   $("#fav").onchange = (e) => { S.favourite = e.target.checked; };
+  $("#xtra").onchange = (e) => { S.extras = e.target.checked; };
   $("#mx").onchange = (e) => { S.maxLegs = +e.target.value; };
   $("#go").onclick = build;
   $("#slip").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => removeLeg(b.dataset.rm));
@@ -684,7 +779,7 @@ async function build() {
   try {
     const locked = S.slip.filter(id => S.locked.has(id));
     S.result = await api("/api/build", { id: String(S.match.id), target: S.target, style: S.style, focus: S.focus, maxLegs: S.maxLegs,
-                                         favourite: S.favourite, locked, banned: [...S.banned] });
+                                         favourite: S.favourite, extras: S.extras, locked, banned: [...S.banned] });
     S.slip = S.result.legs.map(l => l.id);
     if (!S.slip.length) toast("No legs fit this style — try another style or target.");
     else if (S.result.fair < S.target * 0.97) toast(`Best found: ${odds(S.result.fair)} — raise max legs or change style to go higher.`);
@@ -790,7 +885,7 @@ async function toggleScan() {
     else {
       if (!S.scan.leagues.size) return toast("Pick at least one league.");
       S.scan.data = await api("/api/scan", { leagues: [...S.scan.leagues], hours: S.scan.hours, target: S.target,
-                                             style: S.style, focus: S.focus, maxLegs: S.maxLegs });
+                                             style: S.style, focus: S.focus, maxLegs: S.maxLegs, extras: S.extras });
     }
   } catch (err) { toast(err.message); }
   updateScan();
@@ -1015,16 +1110,20 @@ function flashTitle(text) {
 }
 
 /* ---------- player deep-dive ---------- */
+// From his team's point of view: "2-0" at home, or "0-2" away, is a clean sheet.
+function cleanSheet(g) { const s = /^(\d+)-(\d+)$/.exec(g.score || ""); return !!s && +(g.home ? s[2] : s[1]) === 0; }
 function openPlayer(side, name) {
   const m = S.match, p = (m.players[side] || []).find(x => x.name === name); if (!p) return;
   const games = [...(p.recent || [])].reverse();   // oldest -> newest, left to right
-  const top = Math.max(4, ...games.map(g => g.shots));
+  const keeper = p.pos === "G", bars = keeper ? "saves" : "shots";   // a keeper's chart shows saves
+  const top = Math.max(4, ...games.map(g => g[bars] || 0));
   const team = side === "home" ? m.home : m.away;
   const date = (ts) => ts ? new Date(ts * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
-  const cols = games.map(g => `<div class="col" title="${esc(`${date(g.ts)} · ${g.comp}\n${g.home ? "vs" : "at"} ${g.opp} ${g.score}\n${g.minutes}' played${g.sub_in ? " (off the bench)" : ""} · ${g.shots} shots · ${g.sot} on target · ${g.goals} goal${g.goals === 1 ? "" : "s"} · xG ${(g.xg || 0).toFixed(2)}${g.yellow ? " · booked" : ""}`)}">
-      <div class="marks">${"⚽".repeat(Math.min(g.goals, 3))}${g.yellow ? "🟨" : ""}${g.red ? "🟥" : ""}</div>
-      <div class="num">${g.shots}</div>
-      <div class="bw"><div class="bar" style="height:${100 * g.shots / top}%"><div class="sotb" style="height:${g.shots ? 100 * g.sot / g.shots : 0}%"></div></div></div>
+  const extras = (g) => g.fouls === undefined ? "" : `\n${g.assists} assist${g.assists === 1 ? "" : "s"} · ${g.fouls} fouls · fouled ${g.fouled}× · ${g.tackles} tackles · ${g.offsides} offside${g.offsides === 1 ? "" : "s"}${keeper ? ` · ${g.saves} saves` : ""}`;
+  const cols = games.map(g => `<div class="col" title="${esc(`${date(g.ts)} · ${g.comp}\n${g.home ? "vs" : "at"} ${g.opp} ${g.score}\n${g.minutes}' played${g.sub_in ? " (off the bench)" : ""} · ${g.shots} shots · ${g.sot} on target · ${g.goals} goal${g.goals === 1 ? "" : "s"} · xG ${(g.xg || 0).toFixed(2)}${g.yellow ? " · booked" : ""}${extras(g)}`)}">
+      <div class="marks">${"⚽".repeat(Math.min(g.goals, 3))}${"🅰️".repeat(Math.min(g.assists || 0, 2))}${g.yellow ? "🟨" : ""}${g.red ? "🟥" : ""}</div>
+      <div class="num">${g[bars] || 0}</div>
+      <div class="bw"><div class="bar" style="height:${100 * (g[bars] || 0) / top}%">${keeper ? "" : `<div class="sotb" style="height:${g.shots ? 100 * g.sot / g.shots : 0}%"></div>`}</div></div>
     </div>`).join("");
   const labels = games.map(g => `<div title="${esc(g.opp)}">${g.home ? "" : "@"}${esc(g.opp)}<br>${g.minutes}'${g.sub_in ? " sub" : ""}</div>`).join("");
   const n = games.length, count = (f) => games.filter(f).length;
@@ -1032,14 +1131,19 @@ function openPlayer(side, name) {
   const legs = legsFor(side, name).sort((a, b) => b.p - a.p);
   modal(`<div class="mhead"><div class="ph">${p.photo ? `<img src="${esc(p.photo)}" alt="" onerror="this.remove()">` : ""}</div>
       <div><div style="font-size:20px;font-weight:800">${esc(p.name)} <span class="pos">${esc(p.pos)}</span></div>
-        <div class="muted">${esc(team)} · ${p.status === "Starting" ? "starting" : "on the bench"} · ${p.has_data
-          ? `${p.sh90.toFixed(1)} shots · ${p.sot90.toFixed(1)} on target · ${p.g90.toFixed(2)} xG per 90 · ${Math.round(p.minutes)} min in his last 20 games`
-          : "no recent data"}</div></div>
+        <div class="muted">${esc(team)} · ${p.status === "Starting" ? "starting" : "on the bench"} · ${!p.has_data ? "no recent data"
+          : keeper ? (p.sv90 != null ? `${p.sv90.toFixed(1)} saves per 90 · ${Math.round(p.minutes)} min in his last 20 games` : `${Math.round(p.minutes)} min in his last 20 games`)
+          : `${p.sh90.toFixed(1)} shots · ${p.sot90.toFixed(1)} on target · ${p.g90.toFixed(2)} xG per 90${p.x ? ` · ${p.x.assists.toFixed(2)} assists · ${p.x.fouls.toFixed(1)} fouls · ${p.x.tackles.toFixed(1)} tackles` : ""} · ${Math.round(p.minutes)} min in his last 20 games`}</div></div>
       <button class="x" data-close title="Close">✕</button></div>
     ${n ? `<div class="chart">${cols}</div><div class="xlabels">${labels}</div>
-      <div class="legend"><span><i style="background:var(--accent)"></i>on target</span><span><i style="background:#3a4a55"></i>off target / blocked</span>
-        <span>⚽ goal · 🟨 booked · hover a bar for details</span><span style="margin-left:auto">oldest → newest</span></div>
-      <div class="hits">${hit("1+ shots", count(g => g.shots >= 1))}${hit("2+ shots", count(g => g.shots >= 2))}${hit("1+ on target", count(g => g.sot >= 1))}${hit("Scored", count(g => g.goals >= 1))}</div>`
+      <div class="legend">${keeper ? `<span><i style="background:#3a4a55"></i>saves</span>`
+          : `<span><i style="background:var(--accent)"></i>on target</span><span><i style="background:#3a4a55"></i>off target / blocked</span>`}
+        <span>⚽ goal · 🅰️ assist · 🟨 booked · hover a bar for details</span><span style="margin-left:auto">oldest → newest</span></div>
+      <div class="hits">${keeper && games[0].saves !== undefined
+          ? hit("2+ saves", count(g => g.saves >= 2)) + hit("3+ saves", count(g => g.saves >= 3)) + hit("4+ saves", count(g => g.saves >= 4)) + hit("Clean sheet", count(g => cleanSheet(g)))
+          : hit("1+ shots", count(g => g.shots >= 1)) + hit("1+ on target", count(g => g.sot >= 1)) + hit("Scored", count(g => g.goals >= 1))
+            + (games[0].assists !== undefined ? hit("Assisted", count(g => g.assists >= 1)) : hit("2+ shots", count(g => g.shots >= 2)))}</div>
+      ${!keeper && games[0].fouls !== undefined ? `<div class="hits" style="margin-top:8px">${hit("1+ fouls", count(g => g.fouls >= 1))}${hit("Fouled 1+", count(g => g.fouled >= 1))}${hit("1+ tackles", count(g => g.tackles >= 1))}${hit("2+ tackles", count(g => g.tackles >= 2))}</div>` : ""}`
       : `<div class="note">No recent match data for this player.</div>`}
     <div style="margin-top:16px"><h3 style="margin:0 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">HAWK legs for ${esc(p.name)}</h3>
       ${legs.length ? legs.map(l => `<div class="lrow" style="grid-template-columns:1fr 64px 56px 30px">

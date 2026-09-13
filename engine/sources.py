@@ -150,15 +150,8 @@ _ALIASES = {
 }
 
 
-# Letters that don't break down into a base letter + accent, so the ASCII
-# step below would drop them ("Højlund" -> "hjlund").
-_SPECIAL_LETTERS = str.maketrans({"ø": "o", "Ø": "O", "æ": "ae", "Æ": "AE", "ß": "ss", "đ": "d", "Đ": "D",
-                                  "ł": "l", "Ł": "L", "ı": "i", "œ": "oe", "Œ": "OE", "þ": "th"})
-
-
 def _norm(name):
-    s = str(name or "").translate(_SPECIAL_LETTERS)
-    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
+    s = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode().lower()
     s = s.replace("&", " and ").replace("'", "").replace(".", "")
     s = re.sub(r"[^a-z0-9 ]+", " ", s)
     s = " ".join(t for t in s.split() if t not in _STOPWORDS)
@@ -568,7 +561,8 @@ def sh_players(team_id, limit=20):
     """Per-player, per-match stats for a team's last `limit` matches (all
     competitions): {"players": [{"name", "position" (G/D/M/F), "matches":
     [{"ts", "opp", "home", "score", "comp", "minutes", "shots", "sot",
-    "goals", "xg", "yellow", "red", "sub_in"}, ...] newest first}]}.
+    "goals", "xg", "yellow", "red", "sub_in", "assists", "xa", "fouls",
+    "fouled", "tackles", "offsides", "saves"}, ...] newest first}]}.
     Cached 30 min (StatsHub rate-limits)."""
     def load():
         data = _get_json(f"{SH_BASE}/api/team/{team_id}/players/performance",
@@ -598,13 +592,17 @@ def sh_players(team_id, limit=20):
                 except (TypeError, ValueError):
                     xg = 0.0
                 info = events.get(str(event_id), {"ts": 0, "opp": "?", "home": True, "score": "", "comp": ""})
+                try:
+                    xa = float(s.get("expectedAssists") or 0)
+                except (TypeError, ValueError):
+                    xa = 0.0
                 matches.append({**info, "minutes": minutes, "shots": s.get("shots") or 0,
                                 "sot": s.get("onTargetScoringAttempt") or 0, "goals": s.get("goals") or 0, "xg": xg,
                                 "yellow": 1 if s.get("yellowCard") else 0, "red": 1 if s.get("redCard") else 0,
-                                # StatsHub's names are back to front: substitutedOut holds
-                                # the player HE replaced (so he came off the bench), while
-                                # substitutedIn holds whoever replaced him.
-                                "sub_in": bool(s.get("substitutedOut"))})
+                                "sub_in": bool(s.get("substitutedIn")),
+                                "assists": s.get("goalAssist") or 0, "xa": xa, "fouls": s.get("fouls") or 0,
+                                "fouled": s.get("wasFouled") or 0, "tackles": s.get("totalTackle") or 0,
+                                "offsides": s.get("totalOffside") or 0, "saves": s.get("saves") or 0})
             matches.sort(key=lambda m: m["ts"], reverse=True)
             players.append({"name": p.get("name"), "position": p.get("position"), "matches": matches})
         return {"players": players}

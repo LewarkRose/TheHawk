@@ -28,7 +28,8 @@ DAYS_AHEAD = 8
 # Player rows are stored as arrays to keep the files small; the website reads
 # them in this order.
 PLAYER_MATCH_FIELDS = ["ts", "opp", "home", "score", "comp", "minutes", "shots", "sot", "goals", "xg",
-                       "yellow", "red", "sub_in"]
+                       "yellow", "red", "sub_in", "assists", "xa", "fouls", "fouled", "tackles", "offsides", "saves"]
+ROUNDED = {"xg", "xa"}
 
 
 def find_team(name, codes, today):
@@ -54,7 +55,7 @@ def profile_json(profile):
 def players_json(team_id, data):
     out = []
     for p in data["players"]:
-        rows = [[m[f] if f != "xg" else round(m["xg"], 2) for f in PLAYER_MATCH_FIELDS] for m in p["matches"]]
+        rows = [[round(m[f], 2) if f in ROUNDED else m[f] for f in PLAYER_MATCH_FIELDS] for m in p["matches"]]
         out.append({"name": p["name"], "position": p["position"], "m": rows})
     return {"team": team_id, "fields": PLAYER_MATCH_FIELDS, "players": out}
 

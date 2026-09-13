@@ -47,6 +47,21 @@
   const FOCUS = { Mix: [2, 4], Players: [4, 2], Match: [0, 99] };
   const MAX_LEGS_PER_PLAYER = 3, MIN_LEG_P = 0.04, MAX_LEG_P = 0.97, MIN_AUTO_MINUTES = 270;
   const MATCH_TTL = 10 * 60 * 1000;
+  // Extra player stats, per 90 (position averages until the data says
+  // otherwise). Assists are shared out from the simulated goals; the others
+  // are counted per player. Saves come from the opponent's shots on target.
+  const ASSIST_SHARE = 0.72; // share of goals with an assist (top leagues ~70–75%)
+  const EXTRA_STATS = ["assists", "fouls", "fouled", "tackles", "offsides"];
+  const EXTRA_DEFAULTS = {
+    F: { assists: 0.14, fouls: 1.2, fouled: 1.3, tackles: 0.6, offsides: 0.55 },
+    M: { assists: 0.14, fouls: 1.1, fouled: 1.2, tackles: 1.6, offsides: 0.15 },
+    D: { assists: 0.07, fouls: 1.0, fouled: 0.7, tackles: 1.8, offsides: 0.05 },
+    G: { assists: 0.005, fouls: 0.05, fouled: 0.3, tackles: 0.02, offsides: 0 },
+  };
+  // Legs the auto-builder leaves out unless asked: counted per player with no
+  // link to the opponent or the referee, so they're the least certain.
+  const EXTRA_MARKETS = new Set(["Player Fouls Committed", "Player Fouls Won", "Player Tackles", "Player Offsides"]);
+  const MATCHES_KEPT = 8; // simulated matches kept in memory (each holds ~12 MB of legs)
 
   // ---------------------------------------------------------------------------
   // HTTP with retries and a small cache
@@ -460,7 +475,24 @@
     for (const [pos, [mins, ...rest]] of Object.entries(pooled)) priors[pos] = rest.map((v) => (90 * v) / mins);
     return priors;
   }
-  function rates(matches, prior, pos) {
+  // Data files built before the extra stats were added don't have them.
+  const hasExtras = (matches) => matches.length > 0 && matches[0].fouls !== undefined;
+  const extraValue = (m, k) => (k === "assists" ? XG_WEIGHT * (m.xa || 0) + (1 - XG_WEIGHT) * (m.assists || 0) : m[k] || 0);
+  function extraPriors(players) {
+    const pooled = {};
+    for (const p of players) {
+      if (!hasExtras(p.matches) || !EXTRA_DEFAULTS[p.position]) continue;
+      const mins = p.matches.reduce((s, m) => s + m.minutes, 0);
+      if (mins < 300) continue;
+      const acc = (pooled[p.position] ||= { mins: 0 });
+      acc.mins += mins;
+      for (const k of EXTRA_STATS) acc[k] = (acc[k] || 0) + p.matches.reduce((s, m) => s + extraValue(m, k), 0);
+    }
+    const priors = { ...EXTRA_DEFAULTS };
+    for (const [pos, acc] of Object.entries(pooled)) priors[pos] = Object.fromEntries(EXTRA_STATS.map((k) => [k, (90 * acc[k]) / acc.mins]));
+    return priors;
+  }
+  function rates(matches, prior, pos, xprior) {
     const [mins, shots, sot, goals, cards] = totalsOf(matches);
     const w = (mins + PRIOR_MINUTES) / 90, v = PRIOR_MINUTES / 90;
     let [sh90, sot90, g90, c90] = [shots, sot, goals, cards].map((x, i) => (x + prior[i] * v) / w);
@@ -469,17 +501,23 @@
     const starts = matches.filter((m) => !m.sub_in).map((m) => m.minutes);
     const typical = START_MINUTES[pos] || 82;
     const startMin = Math.min(90, Math.max(55, (starts.reduce((s, x) => s + x, 0) + PRIOR_STARTS * typical) / (starts.length + PRIOR_STARTS)));
-    return { sh90, sot90, g90, c90, start_min: startMin, minutes: mins, apps: matches.length };
+    // Per-90 extras, shrunk to the position average the same way; null when
+    // the team's data file predates them (legs shouldn't rest on averages alone).
+    const x = xprior && (!matches.length || hasExtras(matches))
+      ? Object.fromEntries(EXTRA_STATS.map((k) => [k, (matches.reduce((s, m) => s + extraValue(m, k), 0) + xprior[k] * v) / w])) : null;
+    const sv90 = x && mins > 0 ? (90 * matches.reduce((s, m) => s + (m.saves || 0), 0)) / mins : null;
+    return { sh90, sot90, g90, c90, x, sv90, start_min: startMin, minutes: mins, apps: matches.length };
   }
   function buildSquads(an) {
     const members = Object.fromEntries((an.detail.members || []).map((m) => [m.id, m]));
     const sh = { home: playerRows(an.players[0]), away: playerRows(an.players[1]) };
-    const priors = positionPriors([...sh.home, ...sh.away]);
+    const priors = positionPriors([...sh.home, ...sh.away]), xpriors = extraPriors([...sh.home, ...sh.away]);
     const squads = {};
     for (const [side, key] of [["home", "homeCompetitor"], ["away", "awayCompetitor"]]) {
       const lineup = (an.detail[key] || {}).lineups || {};
       const confirmed = lineup.status === "Confirmed";
       const byName = Object.fromEntries(sh[side].filter((p) => p.name).map((p) => [p.name, p]));
+      const teamHasExtras = sh[side].some((p) => hasExtras(p.matches));
       let entries = (lineup.members || []).filter((m) => m.statusText === "Starting" || m.statusText === "Substitute").map((m) => {
         const info = members[m.id] || {};
         return [info.name || "?", m.statusText, POSITIONS[(m.position || {}).name], info.athleteId ? athletePhoto(info) : null];
@@ -492,7 +530,7 @@
         const match = Object.keys(byName).length ? bestMatch(name, Object.keys(byName), 0.6) : null;
         const matches = match ? byName[match].matches : [];
         pos = pos || (match && byName[match].position) || "M";
-        const r = rates(matches, priors[pos] || DEFAULT_RATES.M, pos);
+        const r = rates(matches, priors[pos] || DEFAULT_RATES.M, pos, teamHasExtras ? xpriors[pos] || EXTRA_DEFAULTS.M : null);
         return { ...r, name, pos, status, photo, start_p: START_PROB[confirmed][status],
                  sub_p: status === "Substitute" ? SUB_APPEAR_PROB : 0, has_data: !!match, recent: matches.slice(0, 10),
                  recent_starts: matches.filter((m) => !m.sub_in).slice(0, 10) };
@@ -535,7 +573,10 @@
     let cards = pair("cards");
     cards = cards ? cards.map((c) => c * an.referee.factor) : [2.1, 2.1];
     cards = scaled(cards, an.statBlend.cards);
-    return { goals, sot, shots, cards, corners: an.statBlend.corners || 9.8 };
+    // Each team's share of the (market-calibrated) corner total, from the ratings.
+    const corners = an.statBlend.corners || 9.8;
+    const cornersTeam = scaled(pair("corners"), corners) || [corners * 0.55, corners * 0.45];
+    return { goals, sot, shots, cards, corners, cornersTeam };
   }
   // Share each simulation's `counts` events among players (weights per sim
   // and player, row-major) plus a small "rest of team" bucket.
@@ -557,21 +598,58 @@
     }
     return out;
   }
+  // Goals and their assists, event by event, so nobody assists his own goal.
+  // Each goal gets an assist with probability ASSIST_SHARE.
+  function allocateGoals(rng, counts, wGoal, wAssist, k) {
+    const n = counts.length, goals = new Int16Array(n * k), assists = new Int16Array(n * k);
+    const meanOf = (w) => { let m = 0; for (let x = 0; x < w.length; x++) m += w[x]; return m / n; };
+    const restG = REST_SHARE * Math.max(meanOf(wGoal), 1e-6), restA = REST_SHARE * Math.max(meanOf(wAssist), 1e-6);
+    const pick = (w, s, total, skip) => {
+      let u = rng() * total;
+      for (let i = 0; i < k; i++) { if (i === skip) continue; u -= w[s * k + i]; if (u < 0) return i; }
+      return -1; // rest of the team
+    };
+    for (let s = 0; s < n; s++) {
+      const c = counts[s];
+      if (!c) continue;
+      let totG = restG, totA = restA;
+      for (let i = 0; i < k; i++) { totG += wGoal[s * k + i]; totA += wAssist[s * k + i]; }
+      for (let e = 0; e < c; e++) {
+        const scorer = pick(wGoal, s, totG, -1);
+        if (scorer >= 0) goals[s * k + scorer]++;
+        if (rng() >= ASSIST_SHARE) continue;
+        const helper = pick(wAssist, s, totA - (scorer >= 0 ? wAssist[s * k + scorer] : 0), scorer);
+        if (helper >= 0) assists[s * k + helper]++;
+      }
+    }
+    return { goals, assists };
+  }
   function simulate(an, squads) {
     const rng = mulberry32(7), n = N_SIMS, exp = teamExpectations(an), M = an.M;
     const cells = [], cum = [];
     let acc = 0;
     for (let i = 0; i <= MAX_GOALS; i++) for (let j = 0; j <= MAX_GOALS; j++) { acc += M[i][j]; cells.push([i, j]); cum.push(acc); }
     const goals = { home: new Int16Array(n), away: new Int16Array(n) };
+    const half1 = { home: new Int16Array(n), away: new Int16Array(n) }; // first-half goals
+    const first = new Int8Array(n); // 1 = home scored first, 2 = away, 0 = no goal
     for (let s = 0; s < n; s++) {
       const u = rng() * acc;
       let lo = 0, hi = cum.length - 1;
       while (lo < hi) { const mid = (lo + hi) >> 1; if (cum[mid] < u) lo = mid + 1; else hi = mid; }
-      goals.home[s] = cells[lo][0]; goals.away[s] = cells[lo][1];
+      const h = cells[lo][0], a = cells[lo][1];
+      goals.home[s] = h; goals.away[s] = a;
+      // Each goal falls in the first half with probability HALF_SHARE, and
+      // given the score every order of the goals is equally likely.
+      for (let e = 0; e < h; e++) if (rng() < HALF_SHARE) half1.home[s]++;
+      for (let e = 0; e < a; e++) if (rng() < HALF_SHARE) half1.away[s]++;
+      first[s] = h + a ? (rng() * (h + a) < h ? 1 : 2) : 0;
     }
-    const corners = new Int16Array(n);
-    for (let s = 0; s < n; s++) corners[s] = poisson(rng, exp.corners);
-    const player = {}, teamCards = {};
+    const cornersTeam = { home: new Int16Array(n), away: new Int16Array(n) }, corners = new Int16Array(n);
+    for (let s = 0; s < n; s++) {
+      cornersTeam.home[s] = poisson(rng, exp.cornersTeam[0]); cornersTeam.away[s] = poisson(rng, exp.cornersTeam[1]);
+      corners[s] = cornersTeam.home[s] + cornersTeam.away[s];
+    }
+    const teamSot = {}, teamShots = {}, teamCards = {};
     ["home", "away"].forEach((side, t) => {
       const g = goals[side], sot = new Int16Array(n), shots = new Int16Array(n), cards = new Int16Array(n);
       for (let s = 0; s < n; s++) {
@@ -579,7 +657,12 @@
         shots[s] = sot[s] + poisson(rng, Math.max(exp.shots[t] - exp.sot[t], 0.8));
         cards[s] = poisson(rng, exp.cards[t]);
       }
-      teamCards[side] = cards;
+      teamSot[side] = sot; teamShots[side] = shots; teamCards[side] = cards;
+    });
+    const player = {};
+    ["home", "away"].forEach((side) => {
+      const other = side === "home" ? "away" : "home";
+      const g = goals[side], sot = teamSot[side], shots = teamShots[side], cards = teamCards[side];
       const squad = squads[side] || [], k = squad.length;
       if (!k) return;
       const frac = new Float64Array(n * k);
@@ -590,20 +673,42 @@
       }
       const weighted = (fn) => { const w = new Float64Array(n * k); for (let s = 0; s < n; s++) for (let i = 0; i < k; i++) w[s * k + i] = frac[s * k + i] * fn(squad[i]); return w; };
       const diff = (a, b) => { const d = new Int16Array(n); for (let s = 0; s < n; s++) d[s] = a[s] - b[s]; return d; };
-      const pGoals = allocate(rng, g, weighted((p) => p.g90), k);
+      const xr = (p, key) => (p.x ? p.x[key] : EXTRA_DEFAULTS[p.pos] ? EXTRA_DEFAULTS[p.pos][key] : EXTRA_DEFAULTS.M[key]);
+      const pg = allocateGoals(rng, g, weighted((p) => p.g90), weighted((p) => Math.max(xr(p, "assists"), 0.005)), k);
       const pExtraSot = allocate(rng, diff(sot, g), weighted((p) => Math.max(p.sot90 - p.g90, 0.02)), k);
       const pOff = allocate(rng, diff(shots, sot), weighted((p) => Math.max(p.sh90 - p.sot90, 0.05)), k);
-      const pCards = allocate(rng, cards, weighted((p) => p.c90), k);
+      // Fouls, fouls won, tackles and offsides are counted per player. A player
+      // who fouls more than usual in a simulation is likelier to be the one booked.
+      const counted = {};
+      for (const key of ["fouls", "fouled", "tackles", "offsides"]) {
+        const arr = new Int16Array(n * k);
+        for (let s = 0; s < n; s++) for (let i = 0; i < k; i++) { const f = frac[s * k + i]; if (f) arr[s * k + i] = poisson(rng, f * xr(squad[i], key)); }
+        counted[key] = arr;
+      }
+      const wCards = weighted((p) => p.c90);
+      for (let s = 0; s < n; s++) for (let i = 0; i < k; i++) {
+        const x = s * k + i, lam = frac[x] * xr(squad[i], "fouls");
+        wCards[x] *= (0.5 + counted.fouls[x]) / (0.5 + lam); // averages to 1 for a Poisson count
+      }
+      const pCards = allocate(rng, cards, wCards, k);
+      // Saves: the opponent's shots on target that weren't goals, for whoever is in goal.
+      const oppSot = teamSot[other], oppGoals = goals[other];
       for (let i = 0; i < k; i++) {
-        const a = { goals: new Int16Array(n), sot: new Int16Array(n), shots: new Int16Array(n), cards: new Int16Array(n) };
+        const p = squad[i], keeper = p.pos === "G";
+        const a = { goals: new Int16Array(n), sot: new Int16Array(n), shots: new Int16Array(n), cards: new Int16Array(n),
+                    assists: new Int16Array(n), fouls: new Int16Array(n), fouled: new Int16Array(n), tackles: new Int16Array(n),
+                    offsides: new Int16Array(n), saves: keeper ? new Int16Array(n) : null };
         for (let s = 0; s < n; s++) {
           const x = s * k + i;
-          a.goals[s] = pGoals[x]; a.sot[s] = pGoals[x] + pExtraSot[x]; a.shots[s] = a.sot[s] + pOff[x]; a.cards[s] = pCards[x];
+          a.goals[s] = pg.goals[x]; a.sot[s] = pg.goals[x] + pExtraSot[x]; a.shots[s] = a.sot[s] + pOff[x]; a.cards[s] = pCards[x];
+          a.assists[s] = pg.assists[x]; a.fouls[s] = counted.fouls[x]; a.fouled[s] = counted.fouled[x];
+          a.tackles[s] = counted.tackles[x]; a.offsides[s] = counted.offsides[x];
+          if (keeper && frac[x] >= 0.5) a.saves[s] = Math.max(0, oppSot[s] - oppGoals[s]);
         }
         player[`${side}:${i}`] = a;
       }
     });
-    return { n, exp, goals, corners, player, teamCards, squads };
+    return { n, exp, goals, half1, first, corners, cornersTeam, teamSot, player, teamCards, squads };
   }
 
   // ---------------------------------------------------------------------------
@@ -660,29 +765,114 @@
       add(`cards:o${line}`, withCount(`Over ${line} Cards`, "Over", line), "Total Cards", "cards", mask(n, (s) => tc(s) > line));
       add(`cards:u${line}`, withCount(`Under ${line} Cards`, "Under", line), "Total Cards", "cards", mask(n, (s) => tc(s) < line));
     }
+
+    // Result extras
+    for (const [side, name, g, o] of [["home", home, hg, ag], ["away", away, ag, hg]]) {
+      add(`wtn:${side}`, `${name} to Win to Nil`, "Win to Nil", "result", mask(n, (s) => g[s] > 0 && o[s] === 0));
+      add(`margin:${side}:1`, `${name} to Win by 1`, "Winning Margin", "result", mask(n, (s) => g[s] - o[s] === 1));
+      add(`margin:${side}:2`, `${name} to Win by 2`, "Winning Margin", "result", mask(n, (s) => g[s] - o[s] === 2));
+      add(`margin:${side}:3`, `${name} to Win by 3+`, "Winning Margin", "result", mask(n, (s) => g[s] - o[s] >= 3));
+    }
+    for (const line of [1.5, 2.5]) {  // Asian handicap on half lines: no stake back, so it fits a builder
+      const by = line + 0.5;
+      add(`ah:home:-${line}`, `${home} -${line} Handicap (win by ${by}+)`, "Handicap", "handicap", mask(n, (s) => hg[s] - ag[s] > line));
+      add(`ah:away:+${line}`, `${away} +${line} Handicap (not beaten by ${by}+)`, "Handicap", "handicap", mask(n, (s) => hg[s] - ag[s] < line));
+      add(`ah:away:-${line}`, `${away} -${line} Handicap (win by ${by}+)`, "Handicap", "handicap", mask(n, (s) => ag[s] - hg[s] > line));
+      add(`ah:home:+${line}`, `${home} +${line} Handicap (not beaten by ${by}+)`, "Handicap", "handicap", mask(n, (s) => ag[s] - hg[s] < line));
+    }
+    for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++)
+      add(`cs:${i}-${j}`, `Correct Score ${i}-${j}`, "Correct Score", "result", mask(n, (s) => hg[s] === i && ag[s] === j));
+    add("first:home", `${home} to Score First`, "First Team to Score", "first", mask(n, (s) => sim.first[s] === 1));
+    add("first:away", `${away} to Score First`, "First Team to Score", "first", mask(n, (s) => sim.first[s] === 2));
+
+    // Halves
+    const h1 = sim.half1, h2 = (side, s) => sim.goals[side][s] - h1[side][s];
+    for (const [half, fh, fa] of [[1, (s) => h1.home[s], (s) => h1.away[s]], [2, (s) => h2("home", s), (s) => h2("away", s)]]) {
+      const tag = half === 1 ? "1st" : "2nd";
+      add(`h${half}res:home`, `${tag} Half Result: ${home}`, `${tag} Half Result`, `h${half}result`, mask(n, (s) => fh(s) > fa(s)));
+      add(`h${half}res:draw`, `${tag} Half Result: Draw`, `${tag} Half Result`, `h${half}result`, mask(n, (s) => fh(s) === fa(s)));
+      add(`h${half}res:away`, `${tag} Half Result: ${away}`, `${tag} Half Result`, `h${half}result`, mask(n, (s) => fh(s) < fa(s)));
+      for (const line of [0.5, 1.5, 2.5]) {
+        add(`h${half}goals:o${line}`, withCount(`${tag} Half Over ${line} Goals`, "Over", line), `${tag} Half Goals`, `h${half}goals`, mask(n, (s) => fh(s) + fa(s) > line));
+        add(`h${half}goals:u${line}`, withCount(`${tag} Half Under ${line} Goals`, "Under", line), `${tag} Half Goals`, `h${half}goals`, mask(n, (s) => fh(s) + fa(s) < line));
+      }
+    }
+
+    // Team corners and cards, shots on target
+    for (const [side, name] of [["home", home], ["away", away]]) {
+      const c = sim.cornersTeam[side], k = sim.teamCards[side];
+      for (const line of [2.5, 3.5, 4.5, 5.5, 6.5, 7.5]) {
+        add(`tcorners:${side}:o${line}`, withCount(`${name} Over ${line} Corners`, "Over", line), "Team Corners", `team_corners:${side}`, mask(n, (s) => c[s] > line));
+        add(`tcorners:${side}:u${line}`, withCount(`${name} Under ${line} Corners`, "Under", line), "Team Corners", `team_corners:${side}`, mask(n, (s) => c[s] < line));
+      }
+      for (const line of [0.5, 1.5, 2.5, 3.5])
+        add(`tcards:${side}:o${line}`, withCount(`${name} Over ${line} Cards`, "Over", line), "Team Cards", `team_cards:${side}`, mask(n, (s) => k[s] > line));
+      for (const line of [1.5, 2.5])
+        add(`tcards:${side}:u${line}`, withCount(`${name} Under ${line} Cards`, "Under", line), "Team Cards", `team_cards:${side}`, mask(n, (s) => k[s] < line));
+    }
+    add("mostcorners:home", `${home} Most Corners`, "Most Corners", "most_corners", mask(n, (s) => sim.cornersTeam.home[s] > sim.cornersTeam.away[s]));
+    add("mostcorners:away", `${away} Most Corners`, "Most Corners", "most_corners", mask(n, (s) => sim.cornersTeam.away[s] > sim.cornersTeam.home[s]));
+    const tsot = (s) => sim.teamSot.home[s] + sim.teamSot.away[s];
+    for (const line of [5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5]) {
+      add(`sot:o${line}`, withCount(`Over ${line} Shots on Target`, "Over", line), "Match Shots on Target", "sot", mask(n, (s) => tsot(s) > line));
+      add(`sot:u${line}`, withCount(`Under ${line} Shots on Target`, "Under", line), "Match Shots on Target", "sot", mask(n, (s) => tsot(s) < line));
+    }
+
     for (const [key, a] of Object.entries(sim.player)) {
       const [side, i] = key.split(":"), p = sim.squads[side][+i];
-      if (p.pos === "G" || p.start_p < 0.5) continue;
+      if (p.start_p < 0.5) continue;
       const pid = `p:${side}:${i}`;
       const common = { kind: "player", player: p.name, side, pos: p.pos, photo: p.photo, low_data: p.minutes < MIN_AUTO_MINUTES };
       // Hit rates from games he started (cameos say little about a starter), unless under 3 recent starts.
       const [basisGames, basis] = p.recent_starts.length >= 3 ? [p.recent_starts, "starts"] : [p.recent, "games"];
-      const hist = (stat, k) => { const vals = basisGames.map((m) => m[stat]); return { recent: vals, hits: vals.filter((v) => v >= k).length, games: vals.length, threshold: k, basis }; };
+      const hist = (stat, k) => {
+        const vals = basisGames.map((m) => (typeof stat === "function" ? stat(m) : m[stat]));
+        if (vals.some((v) => v === undefined)) return {}; // not in this data file yet
+        return { recent: vals, hits: vals.filter((v) => v >= k).length, games: vals.length, threshold: k, basis };
+      };
+      if (p.pos === "G") {
+        // Saves follow from the simulated shots against, so they don't need his own record.
+        for (const k of [1, 2, 3, 4, 5, 6])
+          add(`${pid}:saves${k}`, `${p.name}: ${k}+ Saves`, "Goalkeeper Saves", `${pid}:saves`, mask(n, (s) => a.saves[s] >= k),
+              { ...common, low_data: false, ...hist("saves", k) });
+        continue;
+      }
       for (const k of [1, 2, 3]) add(`${pid}:shots${k}`, `${p.name}: ${k}+ Shots`, "Player Shots", `${pid}:shots`, mask(n, (s) => a.shots[s] >= k), { ...common, ...hist("shots", k) });
       for (const k of [1, 2]) add(`${pid}:sot${k}`, `${p.name}: ${k}+ Shots on Target`, "Player Shots on Target", `${pid}:sot`, mask(n, (s) => a.sot[s] >= k), { ...common, ...hist("sot", k) });
       add(`${pid}:score`, `${p.name} to Score`, "To Score at Any Time", `${pid}:score`, mask(n, (s) => a.goals[s] >= 1), { ...common, ...hist("goals", 1) });
       add(`${pid}:booked`, `${p.name} to be Booked`, "Player to be Booked", `${pid}:booked`, mask(n, (s) => a.cards[s] >= 1), { ...common, ...hist("yellow", 1) });
+      if (!p.x) continue; // this team's data file doesn't have the extra stats yet
+      add(`${pid}:assist`, `${p.name} to Assist`, "Player to Assist", `${pid}:assist`, mask(n, (s) => a.assists[s] >= 1), { ...common, ...hist("assists", 1) });
+      add(`${pid}:soa`, `${p.name} to Score or Assist`, "Score or Assist", `${pid}:soa`, mask(n, (s) => a.goals[s] + a.assists[s] >= 1),
+          { ...common, ...hist((m) => (m.assists === undefined ? undefined : m.goals + m.assists), 1) });
+      for (const k of [1, 2, 3]) {
+        add(`${pid}:fouls${k}`, `${p.name}: ${k}+ Fouls Committed`, "Player Fouls Committed", `${pid}:fouls`, mask(n, (s) => a.fouls[s] >= k), { ...common, ...hist("fouls", k) });
+        add(`${pid}:fouled${k}`, `${p.name}: ${k}+ Fouls Won`, "Player Fouls Won", `${pid}:fouled`, mask(n, (s) => a.fouled[s] >= k), { ...common, ...hist("fouled", k) });
+        add(`${pid}:tackles${k}`, `${p.name}: ${k}+ Tackles`, "Player Tackles", `${pid}:tackles`, mask(n, (s) => a.tackles[s] >= k), { ...common, ...hist("tackles", k) });
+      }
+      for (const k of [1, 2]) add(`${pid}:offsides${k}`, `${p.name}: ${k}+ Offsides`, "Player Offsides", `${pid}:offsides`, mask(n, (s) => a.offsides[s] >= k), { ...common, ...hist("offsides", k) });
     }
+    for (const leg of Object.values(legs)) if (EXTRA_MARKETS.has(leg.market)) leg.extra = true;
     return legs;
   }
 
   const FIXED_BOOK_LINES = { "res:home": [1, "", "1"], "res:draw": [1, "", "X"], "res:away": [1, "", "2"], "dc:home": [14, "", "1X"],
-    "dc:away": [14, "", "X2"], "btts:yes": [12, "", "Yes"], "btts:no": [12, "", "No"], "cs:home": [144, "", "Yes"], "cs:away": [145, "", "Yes"] };
-  const LINE_TYPES = { goals: 3, corners: 137, cards: 141 };
+    "dc:away": [14, "", "X2"], "btts:yes": [12, "", "Yes"], "btts:no": [12, "", "No"], "cs:home": [144, "", "Yes"], "cs:away": [145, "", "Yes"],
+    "h1res:home": [5, "", "1"], "h1res:draw": [5, "", "X"], "h1res:away": [5, "", "2"],
+    "h2res:home": [6, "", "1"], "h2res:draw": [6, "", "X"], "h2res:away": [6, "", "2"],
+    "first:home": [7, "", "Home"], "first:away": [7, "", "Away"] };
+  const LINE_TYPES = { goals: 3, corners: 137, cards: 141, h1goals: 9, sot: 139 };
+  // 365Scores line for a leg: [line type, value, option]. Asian handicap
+  // values are the home team's handicap.
   function bookLine(id) {
     if (FIXED_BOOK_LINES[id]) return FIXED_BOOK_LINES[id];
-    const [kind, rest] = id.split(":");
+    const [kind, rest, extra] = id.split(":");
     if (LINE_TYPES[kind] && rest && (rest[0] === "o" || rest[0] === "u")) return [LINE_TYPES[kind], rest.slice(1), rest[0] === "o" ? "Over" : "Under"];
+    if (kind === "ah" && extra) {
+      const h = parseFloat(extra), homeValue = rest === "home" ? h : -h;
+      return [11, String(homeValue), rest === "home" ? "Home" : "Away"];
+    }
+    if (kind === "cs" && /^\d-\d$/.test(rest || "")) return [126, rest, "Yes"];
     return null;
   }
   function bookPrices(an, legs, book = PRICE_BOOK) {
@@ -719,7 +909,7 @@
     }
     return chosen;
   }
-  function autoBuild(legs, target, style = "Balanced", maxLegs = 10, locked = [], banned = new Set(), favourite = true, focus = "Mix") {
+  function autoBuild(legs, target, style = "Balanced", maxLegs = 10, locked = [], banned = new Set(), favourite = true, focus = "Mix", extras = false) {
     const [lo, hi] = STYLES[style] || STYLES.Balanced;
     let [minPlayers, maxMatch] = FOCUS[focus] || FOCUS.Mix;
     const all = Object.values(legs);
@@ -742,7 +932,7 @@
       if (focus === "Match") want = "match";
       let best = null, bestScore = null;
       for (const leg of all) {
-        if (chosen.includes(leg.id) || banned.has(leg.id) || groups.has(leg.group) || leg.low_data) continue;
+        if (chosen.includes(leg.id) || banned.has(leg.id) || groups.has(leg.group) || leg.low_data || (leg.extra && !extras)) continue;
         if (want && leg.kind !== want) continue;
         const k = playerKey(leg);
         if (k && (perPlayer[k] || 0) >= MAX_LEGS_PER_PLAYER) continue;
@@ -768,7 +958,11 @@
   // ---------------------------------------------------------------------------
   // Public API — same shapes as the local server's /api endpoints
   // ---------------------------------------------------------------------------
-  const matches = new Map(); // game id -> {t, an, legs, json}
+  const matches = new Map(); // game id -> {t, an, legs, json}, oldest first
+  function keep(id, entry) {
+    matches.delete(id); matches.set(id, entry);
+    while (matches.size > MATCHES_KEPT) matches.delete(matches.keys().next().value);
+  }
 
   async function gameFor(league, id) {
     if (!rawFixtures.has(String(id))) await fixtures(league);
@@ -784,8 +978,17 @@
     if (!an.M) throw new Error("no odds or ratings for this match yet");
     const squads = buildSquads(an), sim = simulate(an, squads), legs = catalogue(an, sim);
     const json = matchJSON(an, sim, squads, legs);
-    matches.set(id, { t: Date.now(), an, legs, json });
+    keep(id, { t: Date.now(), an, legs, json });
     return json;
+  }
+  // Bet365's current price for every leg of an open match: just the odds,
+  // re-fetched (3 small requests), without re-running the simulation.
+  async function livePrices(id) {
+    const e = matches.get(String(id));
+    if (!e) return null;
+    const quotes = await odds365(String(id));
+    if (!quotes.some((q) => q.book === PRICE_BOOK)) return null;
+    return { prices: bookPrices({ quotes }, e.legs), book: PRICE_BOOK, checked: new Date().toISOString() };
   }
   function matchJSON(an, sim, squads, legs) {
     const M = an.M;
@@ -807,19 +1010,20 @@
       legs: legJSON, priceBook: PRICE_BOOK,
       players: Object.fromEntries(Object.entries(squads).map(([side, sq]) => [side, sq.map((p) => ({
         name: p.name, pos: p.pos, status: p.status, photo: p.photo, start_p: p.start_p, sh90: p.sh90, sot90: p.sot90,
-        g90: p.g90, c90: p.c90, minutes: p.minutes, has_data: p.has_data, recent: p.recent }))])),
+        g90: p.g90, c90: p.c90, x: p.x, sv90: p.sv90, minutes: p.minutes, has_data: p.has_data, recent: p.recent }))])),
       warnings: an.warnings, value: { book: PRICE_BOOK, legs: value }, sims: sim.n,
     };
   }
   function entryFor(id) {
     const e = matches.get(String(id));
     if (!e) throw new Error("match not loaded — open it again");
+    keep(String(id), e);
     return e;
   }
   function build(body) {
     const e = entryFor(body.id);
     return autoBuild(e.legs, +body.target || 3, body.style, +body.maxLegs || 10, body.locked || [], new Set(body.banned || []),
-                     body.favourite !== false, body.focus || "Mix");
+                     body.favourite !== false, body.focus || "Mix", !!body.extras);
   }
   const evaluateBody = (body) => evaluate(entryFor(body.id).legs, body.legs || []);
 
@@ -850,9 +1054,11 @@
     let next = 0;
     const worker = async () => {
       while (next < todo.length && !job.stop) {
-        const [league, f] = todo[next++];
-        try { const json = await match(league, f.id); perMatch(league, f, json, entryFor(f.id)); }
+        const [league, f] = todo[next++], id = String(f.id), wasOpen = matches.has(id);
+        try { const json = await match(league, id); perMatch(league, f, json, matches.get(id)); }
         catch (err) { console.warn("[hawk] skipped", f.home, "v", f.away, err.message); job.errors++; }
+        // Don't keep scanned matches around (memory), only ones you opened.
+        if (!wasOpen) matches.delete(id);
         job.done++;
       }
     };
@@ -867,10 +1073,10 @@
     if (scan.running) return jobStatus(scan);
     const params = { ...windowParams(body), target: Math.min(Math.max(+body.target || 3, 1.2), 50),
                      style: STYLES[body.style] ? body.style : "Balanced", focus: FOCUS[body.focus] ? body.focus : "Mix",
-                     maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12) };
+                     maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12), extras: !!body.extras };
     Object.assign(scan, newJob(), { running: true, params });
     runFixtureJob(scan, (league, f, json, e) => {
-      const t = autoBuild(e.legs, params.target, params.style, params.maxLegs, [], new Set(), true, params.focus);
+      const t = autoBuild(e.legs, params.target, params.style, params.maxLegs, [], new Set(), true, params.focus, params.extras);
       scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair,
         legs: t.legs.map((r) => ({ id: r.id, label: e.legs[r.id].label, kind: e.legs[r.id].kind })),
         value: json.value.legs.slice(0, 4).map((v) => ({ label: v.label, price: v.price, edge: v.edge })) });
@@ -1026,7 +1232,7 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, fixtures, match, build, evaluate: evaluateBody, lineups,
+  global.HAWK = { LEAGUES, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices,
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },
                   meta: () => data("meta.json"),

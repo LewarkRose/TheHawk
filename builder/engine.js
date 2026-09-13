@@ -1077,11 +1077,64 @@
     Object.assign(scan, newJob(), { running: true, params });
     runFixtureJob(scan, (league, f, json, e) => {
       const t = autoBuild(e.legs, params.target, params.style, params.maxLegs, [], new Set(), true, params.focus, params.extras);
-      scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair,
-        legs: t.legs.map((r) => ({ id: r.id, label: e.legs[r.id].label, kind: e.legs[r.id].kind })),
+      scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair, legs: t.legs.map((r) => legSummary(e, json, r.id)),
         value: json.value.legs.slice(0, 4).map((v) => ({ label: v.label, price: v.price, edge: v.edge })) });
     });
     return jobStatus(scan);
+  }
+  // What an acca needs to remember about one leg once the match isn't loaded.
+  function legSummary(e, json, id) {
+    const l = e.legs[id], j = json.legs.find((x) => x.id === id) || {};
+    return { id, label: l.label, market: l.market, kind: l.kind, p: l.p, fair: l.fair, bookPrice: j.bookPrice || null };
+  }
+
+  // Monster Acca: one part per fixture, then the page picks the best ones.
+  //  1 leg per match: the single Bet365-priced match leg whose price is
+  //    closest to (or above) fair, so the acca's price is known exactly
+  //    (Bet365 multiplies the singles' prices).
+  //  2–4 legs per match: a small bet builder per match (priced by the bookmaker).
+  const monster = newJob(), MIN_ACCA_PRICE = 1.15;
+  function startMonster(body) {
+    if (monster.running) return jobStatus(monster);
+    const params = { ...windowParams(body), style: STYLES[body.style] ? body.style : "Banker", focus: FOCUS[body.focus] ? body.focus : "Mix",
+                     perMatch: Math.min(Math.max(+body.perMatch || 1, 1), 4), extras: !!body.extras };
+    Object.assign(monster, newJob(), { running: true, params });
+    const [lo, hi] = STYLES[params.style];
+    runFixtureJob(monster, (league, f, json, e) => {
+      if (json.started) return;
+      const info = fixtureInfo(league, f, json);
+      if (params.perMatch === 1) {
+        let best = null;
+        for (const leg of json.legs) {
+          // Below 1.15 a leg adds risk but hardly any odds, so it's left out.
+          if (!leg.bookPrice || leg.bookPrice < MIN_ACCA_PRICE || leg.kind !== "match" || leg.p < lo || leg.p > hi) continue;
+          const ratio = leg.bookPrice * leg.p; // above 1 = Bet365 pays more than fair
+          if (!best || ratio > best.ratio + 1e-9 || (Math.abs(ratio - best.ratio) <= 1e-9 && leg.p > best.leg.p)) best = { leg, ratio };
+        }
+        if (best) monster.results.push({ ...info, legs: [legSummary(e, json, best.leg.id)], p: best.leg.p, fair: best.leg.fair,
+                                         bookPrice: best.leg.bookPrice, ratio: best.ratio });
+      } else {
+        const t = autoBuild(e.legs, 1e6, params.style, params.perMatch, [], new Set(), true, params.focus, params.extras);
+        if (t.legs.length) monster.results.push({ ...info, legs: t.legs.map((r) => legSummary(e, json, r.id)), p: t.p, fair: t.fair,
+                                                  bookPrice: null, ratio: null });
+      }
+    });
+    return jobStatus(monster);
+  }
+
+  // Current Bet365 prices for legs in any matches (price alerts, acca legs):
+  // items [{match, leg}] -> {"match|leg": price}. One odds request per match.
+  async function legPrices(items) {
+    const byMatch = {};
+    for (const it of items || []) (byMatch[String(it.match)] ||= new Set()).add(it.leg);
+    const out = {};
+    for (const [id, legIds] of Object.entries(byMatch)) {
+      const quotes = await odds365(id);
+      const prices = bookPrices({ quotes }, Object.fromEntries([...legIds].map((l) => [l, true])));
+      for (const [leg, price] of Object.entries(prices)) out[`${id}|${leg}`] = price;
+      await sleep(250); // go easy on 365Scores
+    }
+    return out;
   }
 
   // ---------------------------------------------------------------------------
@@ -1232,7 +1285,8 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices,
+  global.HAWK = { LEAGUES, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices,
+                  startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },
                   meta: () => data("meta.json"),

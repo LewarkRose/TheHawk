@@ -122,6 +122,16 @@ img{max-width:100%}
 .live-odds .dot.on{background:var(--accent);box-shadow:0 0 0 0 rgba(20,227,161,.6);animation:livepulse 2s infinite}
 @keyframes livepulse{70%{box-shadow:0 0 0 6px rgba(20,227,161,0)}100%{box-shadow:0 0 0 0 rgba(20,227,161,0)}}
 .linkbtn{background:none;border:0;padding:0 2px;color:var(--accent);cursor:pointer;font:inherit;text-decoration:underline}
+.star{cursor:pointer;color:#3a4a55;margin-left:6px;font-size:13px}
+.star:hover{color:var(--gold)}
+.star.on{color:var(--gold)}
+.apart{display:grid;grid-template-columns:1fr auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.apart.gone{opacity:.55}
+.apart .teams{font-weight:700}
+.abtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.abtns .ghost{width:auto;flex:1 1 140px}
+.monhead{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--line)}
+@media (max-width:640px){.monhead{grid-template-columns:1fr}.apart{grid-template-columns:1fr}.apart>div:last-child{text-align:left!important}}
 .mv{font-size:10px;margin-left:3px}
 .mv.up{color:var(--accent)}
 .mv.down{color:#ff6b6b}
@@ -283,6 +293,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   <div class="brand"><div class="mark">H</div>HAWK <em>bet builder</em></div>
   <nav class="leagues" id="leagues"></nav>
   <div class="tools">
+    <button class="tool" id="accaBtn" title="Several matches on one ticket, and the Monster Acca">🧩 Acca</button>
     <button class="tool" id="valueBtn" title="Every bookmaker price that beats HAWK's fair odds">💰 Value finder</button>
     <button class="tool" id="scanBtn">⚡ Best builders</button>
     <button class="tool bell" id="watchBtn" hidden></button>
@@ -309,6 +320,8 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             target: 3.25, style: "Balanced", focus: "Mix", maxLegs: 10, favourite: true, result: null, tab: "players", q: "",
             chk: { price: "", boost: "", stake: "5" }, extras: false, cat: "All",
             live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
+            acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
+            monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },
             view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "legs", data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null },
             watch: [] };
@@ -341,6 +354,9 @@ async function api(path, body) {
     case "/api/match": return HAWK.match(q.league, q.id, q.refresh === "1");
     case "/api/lineups": return HAWK.lineups(q.id);
     case "/api/prices": return HAWK.livePrices(q.id);
+    case "/api/legprices": return HAWK.legPrices(body.items);
+    case "/api/monster": return body ? HAWK.startMonster(body) : HAWK.monsterStatus();
+    case "/api/monster/stop": return HAWK.stopMonster();
     case "/api/build": return HAWK.build(body);
     case "/api/evaluate": return HAWK.evaluate(body);
     case "/api/scan": return body ? HAWK.startScan(body) : HAWK.scanStatus();
@@ -363,7 +379,12 @@ async function init() {
   S.allLeagues = leagues;
   S.scan.leagues = new Set(leagues);
   S.value.leagues = new Set(leagues);
+  S.monster.leagues = new Set(leagues);
   $("#valueBtn").onclick = showValue;
+  $("#accaBtn").onclick = showAcca;
+  renderAccaBtn();
+  setInterval(trackPrices, ALERT_MS);
+  setTimeout(trackPrices, 5000);
   $("#leagues").innerHTML = leagues.map(l => `<button class="pill" data-l="${esc(l)}">${esc(l)}</button>`).join("");
   $("#leagues").onclick = (e) => { const b = e.target.closest(".pill"); if (b) selectLeague(b.dataset.l); };
   $("#scanBtn").onclick = showScan;
@@ -515,8 +536,12 @@ async function checkLive() {
     const moved = [];
     for (const [id, price] of Object.entries(res.prices)) {
       const l = S.legs[id]; if (!l) continue;
-      if (l.bookPrice && price !== l.bookPrice) { l.prevPrice = l.bookPrice; if (S.slip.includes(id)) moved.push(l); }
+      const old = l.bookPrice;
+      if (old && price !== old) { l.prevPrice = old; if (S.slip.includes(id)) moved.push(l); }
       l.bookPrice = price;
+      // Value alert when a slip leg's price moves above fair (starred legs are checked by trackPrices).
+      if (old && S.slip.includes(id) && price >= l.fair * VALUE_EDGE && old < l.fair * VALUE_EDGE)
+        valueAlert(`${l.label} (in your slip)`, price, l.fair);
     }
     S.live.checked = new Date(res.checked);
     renderLive(); refreshTab();
@@ -564,6 +589,7 @@ function renderTab() {
     renderLegList();
   }
   body.onclick = (e) => {
+    const st = e.target.closest("[data-star]"); if (st) return toggleStar(st.dataset.star);
     const b = e.target.closest("[data-add]"); if (b) return addLeg(b.dataset.add);
     const pl = e.target.closest("[data-pl]"); if (pl) openPlayer(pl.dataset.pl, pl.dataset.name);
   };
@@ -623,7 +649,8 @@ function renderLegList() {
   $("#lglist").innerHTML = Object.entries(groups).sort((a, b) => rank(a[0]) - rank(b[0])).map(([g, ls]) => `<div class="lg"><h4>${esc(g)}</h4>${head}${ls.slice(0, 40).map(l => `
     <div class="lrow"><div>${esc(l.label)}${l.low_data ? ' <span class="badge warn">low data</span>' : ""}<div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div></div>
       <div style="text-align:right;font-weight:700">${pct(l.p, 1)}</div><div class="muted" style="text-align:right">${odds(l.fair)}</div>
-      <div style="text-align:right;font-weight:700;color:${l.bookPrice ? (l.bookPrice > l.fair ? "var(--accent)" : "var(--text)") : "var(--muted)"}">${l.bookPrice ? odds(l.bookPrice) : "–"}${moveMark(l)}</div>
+      <div style="text-align:right;font-weight:700;color:${l.bookPrice ? (l.bookPrice > l.fair ? "var(--accent)" : "var(--text)") : "var(--muted)"}">${l.bookPrice ? odds(l.bookPrice) : "–"}${moveMark(l)}${
+        l.bookPrice ? `<span class="star ${isStarred(S.match.id, l.id) ? "on" : ""}" data-star="${l.id}" title="${isStarred(S.match.id, l.id) ? "Price alert on — click to stop" : `Alert me when Bet365 pays ${odds(l.fair * VALUE_EDGE)}+`}">★</span>` : ""}</div>
       <button class="add" data-add="${l.id}" title="Add to slip">${S.slip.includes(l.id) ? "✓" : "+"}</button></div>`).join("")}
       ${ls.length > 40 ? `<div class="note" style="margin:4px 0 0">+ ${ls.length - 40} more — search a player or team to find them.</div>` : ""}</div>`).join("")
     || `<div class="note">No legs match.</div>`;
@@ -679,6 +706,7 @@ function renderSlip() {
       <div><label>Stake (€)</label><input id="stake" inputmode="decimal" value="${esc(S.chk.stake)}"></div></div>
       <div id="verdict"></div></div>
     <button class="ghost" id="copy">📋 Copy slip</button>
+    <button class="ghost" id="toAcca" title="Put this builder on your acca, with builders from other matches">➕ Add to acca${S.acca.some(pt => m && pt.id === String(m.id)) ? " (replaces this match)" : ""}</button>
     <button class="ghost vault" id="vault" title="Log this builder in your Vault's Bankroll & History">🦅 Send to Vault</button>
     ${predicted ? `<div class="warn">Lineups are predicted. HAWK assumes the named starters start — most bookmakers void a player's legs if he doesn't play (check yours). Rebuild once lineups are confirmed, about an hour before kickoff.</div>` : ""}
     ` : `<div class="note" style="margin-top:14px">${m ? "Set your target odds and hit build — or add legs yourself from the Players tab." : "Pick a fixture to start."}</div>`}
@@ -702,7 +730,7 @@ function renderSlip() {
   if ($("#price")) {
     // Remember what you typed, so adding or removing a leg doesn't clear it.
     for (const key of ["price", "boost", "stake"]) $("#" + key).oninput = (e) => { S.chk[key] = e.target.value; verdict(); };
-    $("#copy").onclick = copySlip; $("#vault").onclick = sendToVault; verdict();
+    $("#copy").onclick = copySlip; $("#vault").onclick = sendToVault; $("#toAcca").onclick = addSlipToAcca; verdict();
   }
 }
 
@@ -726,32 +754,37 @@ function sendToVault() {
   if (!m || !S.slip.length || !r) return toast("Build a ticket first.");
   if (!(price > 1)) return toast("Enter the bookmaker's price for this builder first.");
   if (!(stake > 0)) return toast("Enter a valid stake.");
+  const legs = S.slip.map(id => S.legs[id]);
+  const ev = r.p * price - 1;
+  const leg = {
+    fixture: `${m.home} vs ${m.away}`,
+    selection: legs.map(l => l.label).join(" & "),
+    angle: `HAWK: ${pct(r.p, 1)} to land · fair ${odds(r.fair)} · ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}% at ${odds(price)}` +
+           (boost ? ` (${odds(quoted)} + ${boost}% boost)` : ""),
+    odds: price, type: "builder", league: m.league,
+    subSelections: legs.map(l => ({ label: l.label, odds: +(l.bookPrice || l.fair).toFixed(2) })),
+  };
+  if (saveToVault([leg], stake, price))
+    toast(`🦅 Logged in your Vault: €${stake.toFixed(2)} @ ${odds(price)}${boost ? ` (boosted from ${odds(quoted)})` : ""}. If the Vault is open in another tab, refresh it.`);
+}
+// Adds a PENDING bet to the Vault and takes the stake off its bankroll.
+function saveToVault(legs, stake, price) {
   let bankroll, bets;
   try {
     bankroll = parseFloat(localStorage.getItem("hawk_bankroll")) || 1000.0;
     bets = JSON.parse(localStorage.getItem("hawk_bets")) || [];
-  } catch { return toast("Couldn't open the Vault's storage in this browser."); }
-  if (bankroll < stake) return toast(`Not enough in your Vault bankroll (€${bankroll.toFixed(2)}).`);
-  const legs = S.slip.map(id => S.legs[id]);
-  const ev = r.p * price - 1;
+  } catch { toast("Couldn't open the Vault's storage in this browser."); return false; }
+  if (bankroll < stake) { toast(`Not enough in your Vault bankroll (€${bankroll.toFixed(2)}).`); return false; }
   bets.unshift({
     id: "bet_" + Date.now(),
     date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
-    legs: [{
-      fixture: `${m.home} vs ${m.away}`,
-      selection: legs.map(l => l.label).join(" & "),
-      angle: `HAWK: ${pct(r.p, 1)} to land · fair ${odds(r.fair)} · ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}% at ${odds(price)}` +
-             (boost ? ` (${odds(quoted)} + ${boost}% boost)` : ""),
-      odds: price, type: "builder", league: m.league,
-      subSelections: legs.map(l => ({ label: l.label, odds: +(l.bookPrice || l.fair).toFixed(2) })),
-    }],
-    stake, odds: price, potentialReturn: stake * price, status: "PENDING",
+    legs, stake, odds: price, potentialReturn: stake * price, status: "PENDING",
   });
   try {
     localStorage.setItem("hawk_bankroll", (bankroll - stake).toFixed(2));
     localStorage.setItem("hawk_bets", JSON.stringify(bets));
-  } catch { return toast("Couldn't save to the Vault's storage."); }
-  toast(`🦅 Logged in your Vault: €${stake.toFixed(2)} @ ${odds(price)}${boost ? ` (boosted from ${odds(quoted)})` : ""}. If the Vault is open in another tab, refresh it.`);
+  } catch { toast("Couldn't save to the Vault's storage."); return false; }
+  return true;
 }
 
 function verdict() {
@@ -845,7 +878,10 @@ function renderScan() {
   $("#hrs").onchange = (e) => { sc.hours = +e.target.value; };
   $("#srt").onchange = (e) => { sc.sort = e.target.value; updateScan(); };
   $("#scanGo").onclick = toggleScan;
-  $("#scanRes").onclick = (e) => { const c = e.target.closest("[data-open]"); if (c) openFromScan(c.dataset.open); };
+  $("#scanRes").onclick = (e) => {
+    const a = e.target.closest("[data-acca]"); if (a) return addScanToAcca(a.dataset.acca);
+    const c = e.target.closest("[data-open]"); if (c) openFromScan(c.dataset.open);
+  };
   updateScan();
 }
 function updateScan() {
@@ -877,7 +913,9 @@ function scanCard(r, params) {
       ${r.value.length ? `<div class="vline">Bet365 value: ${r.value.map(v => `${esc(v.label)} @ ${odds(v.price)} (+${(100 * v.edge).toFixed(1)}%)`).join(" · ")}</div>` : ""}</div>
     <div style="text-align:right"><div class="bigodds">${odds(r.fair)}</div>
       <div class="muted" style="font-size:12px">${r.legs.length} legs · ${pct(r.p, 1)}${short ? "<br>short of target" : ""}</div>
-      <button class="ghost" style="width:auto;padding:6px 12px">Open ›</button></div></div>`;
+      <button class="ghost" style="width:auto;padding:6px 12px">Open ›</button>
+      <button class="ghost" style="width:auto;padding:6px 12px" data-acca="${esc(r.id)}" title="Put this builder on your acca">${
+        S.acca.some(pt => pt.id === String(r.id)) ? "✓ In acca" : "➕ Acca"}</button></div></div>`;
 }
 async function toggleScan() {
   try {
@@ -1018,21 +1056,357 @@ async function openFromValue(i) {
   toast(`${r.label} — ${r.book} @ ${odds(r.price)} (fair ${odds(r.fair)})`);
 }
 
+/* ---------- acca: several matches on one ticket ---------- */
+// Each part is one match: a single leg or a same-match builder, with HAWK's
+// chance for it. Matches are independent, so the acca's chance is the
+// product of the parts'. Kept in this browser's storage.
+const VALUE_EDGE = 1.02;   // "value" = Bet365 pays at least 2% more than fair
+function saveAcca() { savePref("hawk.acca", S.acca); renderAccaBtn(); }
+const accaLegCount = () => S.acca.reduce((s, pt) => s + pt.legs.length, 0);
+function renderAccaBtn() { const n = accaLegCount(); $("#accaBtn").textContent = n ? `🧩 Acca · ${n} leg${n === 1 ? "" : "s"}` : "🧩 Acca"; }
+// A single leg's Bet365 price is known, and an acca of singles pays their
+// product. A same-match builder is priced by the bookmaker, so it's unknown.
+const partPrice = (pt) => (pt.legs.length === 1 ? pt.legs[0].bookPrice || null : null);
+function accaTotals(parts = S.acca) {
+  if (!parts.length) return { p: null, fair: null, known: null, legs: 0 };
+  const p = parts.reduce((s, pt) => s * pt.p, 1), prices = parts.map(partPrice);
+  return { p, fair: p > 0 ? 1 / p : null, known: prices.every(Boolean) ? prices.reduce((s, x) => s * x, 1) : null,
+           legs: parts.reduce((s, pt) => s + pt.legs.length, 0) };
+}
+const makePart = (info, legs, p) => ({ id: String(info.id), league: info.league, home: info.home, away: info.away,
+                                       kickoff: info.kickoff, legs, p, fair: p > 0 ? 1 / p : null });
+function putPart(part) {   // one part per match: adding a match again replaces it
+  const i = S.acca.findIndex(x => x.id === part.id);
+  if (i >= 0) S.acca[i] = part; else S.acca.push(part);
+  S.acca.sort((a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""));
+  saveAcca();
+  return i >= 0;
+}
+function accaToast(replaced, home, away) {
+  const t = accaTotals();
+  toast(`${replaced ? "Updated" : "Added"} ${home} v ${away}. Acca: ${S.acca.length} match${S.acca.length === 1 ? "" : "es"}, ${t.legs} legs, fair ${odds(t.fair)}.`);
+}
+function addSlipToAcca() {
+  const m = S.match, r = S.result;
+  if (!m || !S.slip.length || !r || !r.p) return toast("Build a ticket first.");
+  const legs = S.slip.map(id => { const l = S.legs[id]; return { id, label: l.label, market: l.market, kind: l.kind, p: l.p, fair: l.fair, bookPrice: l.bookPrice || null }; });
+  accaToast(putPart(makePart(m, legs, r.p)), m.home, m.away);
+  renderSlip();
+}
+function addScanToAcca(id) {
+  const r = ((S.scan.data && S.scan.data.results) || []).find(x => String(x.id) === String(id));
+  if (!r || !r.legs.length) return;
+  accaToast(putPart(makePart(r, r.legs, r.p)), r.home, r.away);
+  updateScan();
+}
+
+function showAcca() {
+  S.view = "acca";
+  document.querySelectorAll(".fx").forEach(f => f.classList.remove("on"));
+  renderAcca();
+  if (S.monster.data && S.monster.data.running) pollMonster();
+}
+function renderAcca() {
+  const mo = S.monster;
+  const sel = (id, opts, cur) => `<select id="${id}">${opts.map(([val, t]) => `<option value="${val}" ${String(val) === String(cur) ? "selected" : ""}>${t}</option>`).join("")}</select>`;
+  $("#match").innerHTML = `
+    <div class="section" style="border-top:0"><h3>🧩 Your acca</h3><div id="accaBody"></div></div>
+    <div class="section">
+      <h3>👹 Monster Acca</h3>
+      <div class="note" style="margin-top:0">HAWK checks every fixture in the window and takes the best leg — or a small builder — from each match.
+        With <b>1 leg per match</b> it only uses legs Bet365 prices, picking the ones where Bet365 pays closest to (or more than) HAWK's fair odds,
+        so you see the acca's real Bet365 price and whether it's worth it.</div>
+      <div class="leagues" id="monLeagues" style="flex-wrap:wrap;margin:12px 0">${S.allLeagues.map(l =>
+        `<button class="pill ${mo.leagues.has(l) ? "on" : ""}" data-ml="${esc(l)}">${esc(l)}</button>`).join("")}</div>
+      <div class="opts" style="justify-content:flex-start;gap:14px;flex-wrap:wrap">
+        <label>Legs ${sel("mLegs", [6, 8, 10, 12, 15, 20].map(n => [n, n]), mo.legs)}</label>
+        <label>Per match ${sel("mPer", [[1, "1 leg (Bet365 priced)"], [2, "2-leg builder"], [3, "3-leg builder"]], mo.perMatch)}</label>
+        <label>Kick-off within ${sel("mHrs", [[24, "24 hours"], [48, "48 hours"], [72, "3 days"], [168, "7 days"]], mo.hours)}</label>
+      </div>
+      <div class="seg" id="mStyle" style="max-width:420px">${Object.entries(STYLES).map(([s, st]) => `<button class="${mo.style === s ? "on" : ""}" data-s="${s}">${st.label}</button>`).join("")}</div>
+      <div class="opts" style="justify-content:flex-start"><button class="build" id="monGo" style="width:auto;margin:0;padding:10px 20px"></button></div>
+      <div id="monProg"></div>
+    </div>
+    <div class="section" id="monRes"></div>`;
+  $("#monLeagues").onclick = (e) => {
+    const b = e.target.closest("[data-ml]"); if (!b) return;
+    const l = b.dataset.ml; mo.leagues.has(l) ? mo.leagues.delete(l) : mo.leagues.add(l);
+    b.classList.toggle("on", mo.leagues.has(l));
+  };
+  $("#mLegs").onchange = (e) => { mo.legs = +e.target.value; updateMonster(); };
+  $("#mPer").onchange = (e) => { mo.perMatch = +e.target.value; updateMonster(); };
+  $("#mHrs").onchange = (e) => { mo.hours = +e.target.value; updateMonster(); };
+  $("#mStyle").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; mo.style = b.dataset.s;
+    $("#mStyle").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); updateMonster(); };
+  $("#monGo").onclick = toggleMonster;
+  $("#monRes").onclick = monsterClick;
+  renderAccaBody();
+  updateMonster();
+}
+
+function partRow(pt, actions) {
+  const started = pt.kickoff && new Date(pt.kickoff).getTime() < Date.now(), price = partPrice(pt);
+  return `<div class="apart ${started ? "gone" : ""}">
+    <div><div class="teams">${esc(pt.home)} <span class="muted" style="font-weight:500">v</span> ${esc(pt.away)}</div>
+      <div class="muted" style="font-size:12px">${esc(pt.league)} · ${esc(fmtKick(pt.kickoff))}${started ? ' · <span class="badge live">STARTED</span>' : ""}</div>
+      <div>${pt.legs.map(l => `<span class="lchip ${l.kind === "player" ? "pl" : ""}">${esc(l.label)}</span>`).join("")}</div></div>
+    <div style="text-align:right;white-space:nowrap"><div style="font-weight:800">${odds(pt.fair)} <span class="muted" style="font-weight:500;font-size:12px">fair</span></div>
+      <div class="muted" style="font-size:12px">${pct(pt.p, 1)}${price ? ` · Bet365 <b style="color:${price * pt.p >= VALUE_EDGE ? "var(--accent)" : "var(--text)"}">${odds(price)}</b>${moveMark(pt.legs[0])}` : ""}</div>
+      ${actions}</div></div>`;
+}
+function accaInputs() {
+  const num = (s) => parseFloat(String(s || "").replace(",", "."));
+  const c = S.accaChk, t = accaTotals();
+  const typed = num(c.price), price = typed > 1 ? typed : t.known || NaN;
+  const boost = Math.max(0, num(c.boost) || 0), stake = num(c.stake) || 0;
+  return { ...t, price, typed: typed > 1, boost, stake, eff: price > 1 ? 1 + (price - 1) * (1 + boost / 100) : NaN };
+}
+function renderAccaBody() {
+  const el = $("#accaBody"); if (!el) return;
+  if (!S.acca.length) {
+    el.innerHTML = `<div class="note">Empty. Add a builder from any match with <b>➕ Add to acca</b> under the slip, from <b>⚡ Best builders</b>,
+      or let HAWK build a Monster Acca below.</div>`;
+    return;
+  }
+  const t = accaTotals(), c = S.accaChk;
+  const builders = S.acca.filter(pt => pt.legs.length > 1).length;
+  el.innerHTML = S.acca.map((pt, i) => partRow(pt, `<div><button class="linkbtn" data-aopen="${i}">edit</button> <button class="linkbtn" data-arm="${i}">remove</button></div>`)).join("") + `
+    <div class="tiles" style="margin-top:12px">
+      <div class="tile"><div class="k">Legs</div><div class="v">${t.legs} <span class="muted" style="font-size:12px">in ${S.acca.length} match${S.acca.length === 1 ? "" : "es"}</span></div></div>
+      <div class="tile"><div class="k">Chance to land</div><div class="v">${pct(t.p, t.p < 0.1 ? 2 : 1)}</div></div>
+      <div class="tile"><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${odds(t.fair)}</div></div>
+      <div class="tile"><div class="k">Bet365 price</div><div class="v">${t.known ? odds(t.known) : "–"}</div></div>
+    </div>
+    <div class="check"><div class="row">
+      <div><label>Acca price</label><input id="aPrice" inputmode="decimal" placeholder="${t.known ? odds(t.known) : "e.g. 25.00"}" value="${esc(c.price)}"></div>
+      <div><label title="Acca boost or winnings boost, e.g. 20 for 20%">Boost %</label><input id="aBoost" inputmode="decimal" placeholder="0" value="${esc(c.boost)}"></div>
+      <div><label>Stake (€)</label><input id="aStake" inputmode="decimal" value="${esc(c.stake)}"></div></div>
+      <div id="accaVerdict"></div></div>
+    <div class="abtns"><button class="ghost" id="aCopy">📋 Copy acca</button><button class="ghost vault" id="aVault">🦅 Send to Vault</button>
+      <button class="ghost" id="aClear">🗑 Clear</button></div>
+    <div class="note">${builders ? `${builders} of these ${builders === 1 ? "is a" : "are"} same-match builder${builders === 1 ? "" : "s"}: Bet365 prices each builder itself, so type the acca price Bet365 shows. ` : ""}
+      Bet365 prices on single legs are re-checked every 3 minutes while HAWK is open. ▲/▼ = moved since you added it.</div>`;
+  for (const [id, key] of [["aPrice", "price"], ["aBoost", "boost"], ["aStake", "stake"]])
+    $("#" + id).oninput = (e) => { c[key] = e.target.value; accaVerdict(); };
+  $("#aCopy").onclick = copyAcca; $("#aVault").onclick = sendAccaToVault;
+  $("#aClear").onclick = () => { if (confirm("Clear your acca?")) { S.acca = []; S.accaChk.price = ""; saveAcca(); renderAccaBody(); } };
+  el.onclick = (e) => {
+    const rm = e.target.closest("[data-arm]");
+    if (rm) { S.acca.splice(+rm.dataset.arm, 1); saveAcca(); renderAccaBody(); updateMonster(); return; }
+    const op = e.target.closest("[data-aopen]");
+    if (op) { const pt = S.acca[+op.dataset.aopen]; openPart(pt); }
+  };
+  accaVerdict();
+}
+async function openPart(pt) {
+  await goToMatch(pt.league, pt.id);
+  S.slip = pt.legs.map(l => l.id).filter(id => S.legs[id]);
+  S.locked = new Set(S.slip);
+  await evaluateSlip();
+  toast("Change the legs, then ➕ Add to acca to update it.");
+}
+function accaVerdict() {
+  const out = $("#accaVerdict"); if (!out) return;
+  const a = accaInputs();
+  if (!(a.price > 1) || !a.p) {
+    out.innerHTML = `<div class="note">Type the price Bet365 shows for this acca. Break-even is <b>${odds(a.fair)}</b>.</div>`;
+    return;
+  }
+  const ev = a.p * a.eff - 1, good = ev > 0;
+  // The boost that would make this price fair (Bet365 runs acca boosts on 3+ legs).
+  const boostNeeded = a.price > 1 && a.fair > a.price ? 100 * ((a.fair - 1) / (a.price - 1) - 1) : 0;
+  out.innerHTML = `<div class="verdict ${good ? "good" : "bad"}">${good ? "✅ VALUE" : "❌ OVERPRICED"} ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}%
+    ${!a.typed ? `<small>Using Bet365's price: ${a.legs} singles multiplied = ${odds(a.price)}.</small>` : ""}
+    ${a.boost ? `<small>With your ${a.boost}% boost, ${odds(a.price)} pays like <b>${odds(a.eff)}</b>.</small>` : ""}
+    <small>HAWK: lands ${pct(a.p, a.p < 0.1 ? 2 : 1)} of the time — about 1 in ${Math.round(1 / a.p)}. Pays €${(a.eff * a.stake).toFixed(2)} on €${a.stake.toFixed(2)}.</small>
+    <small>${good ? `Expected profit ≈ €${(ev * a.stake).toFixed(2)} per €${a.stake.toFixed(2)} over many accas like it — most will still lose.`
+      : `Bet365's margin adds up over ${a.legs} legs: you'd lose ≈ €${(-ev * a.stake).toFixed(2)} per €${a.stake.toFixed(2)} on average.${boostNeeded && !a.boost ? ` An acca boost of ${Math.ceil(boostNeeded)}%+ would make it fair.` : ""}`}</small></div>`;
+}
+function copyAcca() {
+  const t = accaTotals();
+  const text = [`ACCA — ${t.legs} legs, ${S.acca.length} matches`,
+    ...S.acca.map(pt => `${pt.home} v ${pt.away}: ${pt.legs.map(l => l.label).join(" & ")}`),
+    `Chance ${pct(t.p, 2)} · fair odds ${odds(t.fair)}${t.known ? ` · Bet365 ${odds(t.known)}` : ""}`].join("\n");
+  navigator.clipboard.writeText(text).then(() => toast("Acca copied"), () => toast("Couldn't copy"));
+}
+function sendAccaToVault() {
+  const a = accaInputs();
+  if (!S.acca.length) return toast("Your acca is empty.");
+  if (!(a.price > 1)) return toast("Type the acca's price first.");
+  if (!(a.stake > 0)) return toast("Enter a valid stake.");
+  const price = Math.round(a.eff * 100) / 100;
+  const legs = S.acca.map(pt => ({
+    fixture: `${pt.home} vs ${pt.away}`, selection: pt.legs.map(l => l.label).join(" & "),
+    angle: `HAWK: ${pct(pt.p, 1)} · fair ${odds(pt.fair)}`, odds: +(partPrice(pt) || pt.fair).toFixed(2), type: "acca", league: pt.league,
+    subSelections: pt.legs.map(l => ({ label: l.label, odds: +(l.bookPrice || l.fair).toFixed(2) })),
+  }));
+  if (saveToVault(legs, a.stake, price))
+    toast(`🦅 Acca logged in your Vault: €${a.stake.toFixed(2)} @ ${odds(price)}${a.boost ? ` (boosted from ${odds(a.price)})` : ""}.`);
+}
+
+/* ---------- Monster Acca ---------- */
+function monsterParams() { const mo = S.monster; return { leagues: [...mo.leagues], hours: mo.hours, perMatch: mo.perMatch, style: mo.style, focus: S.focus, extras: S.extras }; }
+function monsterStale() {  // settings changed since the last build
+  const p = S.monster.data && S.monster.data.params, want = monsterParams();
+  return !!p && (p.perMatch !== want.perMatch || p.style !== want.style || p.hours !== want.hours ||
+                 [...p.leagues].sort().join() !== [...want.leagues].sort().join());
+}
+async function toggleMonster() {
+  try {
+    if (S.monster.data && S.monster.data.running) S.monster.data = await api("/api/monster/stop", {});
+    else {
+      if (!S.monster.leagues.size) return toast("Pick at least one league.");
+      S.monster.skip = new Set();
+      S.monster.data = await api("/api/monster", monsterParams());
+    }
+  } catch (err) { toast(err.message); }
+  updateMonster();
+  pollMonster();
+}
+async function pollMonster() {
+  clearTimeout(S.monster.timer);
+  try { S.monster.data = await api("/api/monster"); } catch { /* keep the last status */ }
+  updateMonster();
+  if (S.monster.data && S.monster.data.running) S.monster.timer = setTimeout(pollMonster, 1500);
+}
+// The best parts, one per match, until the ticket has the legs you asked for.
+function monsterPick() {
+  const d = S.monster.data, mo = S.monster;
+  if (!d) return { picked: [], bench: [] };
+  const now = Date.now(), single = d.params.perMatch === 1;
+  const pool = d.results.filter(r => !mo.skip.has(String(r.id)) && (!r.kickoff || new Date(r.kickoff).getTime() > now))
+    .sort(single ? (a, b) => b.ratio - a.ratio || b.p - a.p : (a, b) => b.p - a.p);
+  const picked = [], bench = [];
+  let n = 0;
+  for (const r of pool) { if (n < mo.legs) { picked.push(r); n += r.legs.length; } else bench.push(r); }
+  picked.sort((a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""));
+  return { picked, bench };
+}
+function updateMonster() {
+  if (S.view !== "acca" || !$("#monRes")) return;
+  const d = S.monster.data || { running: false, total: 0, done: 0, errors: 0, results: [] };
+  $("#monGo").textContent = d.running ? "■ STOP" : d.total ? (monsterStale() ? "👹 BUILD AGAIN (settings changed)" : "👹 BUILD AGAIN") : "👹 BUILD MONSTER ACCA";
+  $("#monProg").innerHTML = d.running || d.total ? `<div class="prog"><span style="width:${d.total ? 100 * d.done / d.total : 3}%"></span></div>
+    <div class="note">${d.running ? `Checking fixtures… ${d.done} of ${d.total || "?"}` : `Checked ${d.done} fixture${d.done === 1 ? "" : "s"}`}${
+      d.errors ? ` · ${d.errors} skipped (no odds or data yet)` : ""}</div>` : "";
+  if (!d.params) { $("#monRes").innerHTML = ""; return; }
+  const { picked, bench } = monsterPick(), t = accaTotals(picked), single = d.params.perMatch === 1;
+  if (!picked.length) {
+    $("#monRes").innerHTML = `<div class="note">${d.running ? "Legs appear here as each match is checked…" : "Nothing fits these settings — try more leagues, a longer window or bolder legs."}</div>`;
+    return;
+  }
+  const ev = t.known ? t.known * t.p - 1 : null;
+  $("#monRes").innerHTML = `
+    <div class="monhead"><div><div class="bigodds">${odds(t.known || t.fair)}</div>
+        <div class="muted" style="font-size:12px">${t.known ? `Bet365 price · fair ${odds(t.fair)}` : "fair odds · Bet365 prices builders itself"}</div></div>
+      <div><b>${t.legs} legs</b> · ${picked.length} matches<br><span class="muted">lands ${pct(t.p, t.p < 0.1 ? 2 : 1)} — about 1 in ${Math.round(1 / t.p)}</span>
+        ${ev != null ? `<br><span style="color:${ev >= 0 ? "var(--accent)" : "#ff8a8a"};font-weight:700">${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}% expected at Bet365's price</span>` : ""}</div>
+      <div class="abtns" style="margin:0"><button class="build" id="monUse" style="width:auto;margin:0;padding:10px 16px">🧩 Use as my acca</button>
+        <button class="ghost" id="monAdd" style="width:auto">➕ Add to my acca</button></div></div>
+    ${t.legs < S.monster.legs && !d.running ? `<div class="warn">Only ${t.legs} legs fit — try more leagues, a longer window or bolder legs.</div>` : ""}
+    ${picked.map(r => partRow(r, `<button class="linkbtn" data-mskip="${esc(r.id)}" title="Swap this match for the next best">swap out</button>`)).join("")}
+    ${bench.length ? `<div class="note" style="margin-top:10px">Next best: ${bench.slice(0, 6).map(r => `${esc(r.home)} v ${esc(r.away)} (${esc(r.legs.map(l => l.label).join(" & "))})`).join(" · ")}</div>` : ""}
+    <div class="note">${single ? `From each match: the Bet365-priced match leg within the ${esc(STYLES[d.params.style].label.toLowerCase())} range where Bet365 pays closest to — or more than — HAWK's fair odds.
+      Bet365 multiplies the singles, so ${odds(t.known)} is what it should show. Every leg carries a little bookmaker margin and it adds up over ${t.legs} legs,
+      so a negative figure is normal — an acca boost (Boost % in your acca) can flip it.`
+      : `Each match is a ${d.params.perMatch}-leg builder, safest first. Bet365 prices each builder itself — add it to your acca and type the price it shows.`}
+      Matches are independent, so the chance is the product of each match's chance.</div>`;
+  $("#monUse").onclick = () => { if (S.acca.length && !confirm("Replace your current acca with this one?")) return;
+    S.acca = []; picked.forEach(r => putPart(makePart(r, r.legs, r.p))); S.accaChk.price = ""; renderAccaBody(); updateMonster(); toast(`🧩 Your acca: ${t.legs} legs.`); };
+  $("#monAdd").onclick = () => { picked.forEach(r => putPart(makePart(r, r.legs, r.p))); renderAccaBody(); toast(`🧩 Added — your acca has ${accaLegCount()} legs.`); };
+}
+function monsterClick(e) {
+  const s = e.target.closest("[data-mskip]");
+  if (s) { S.monster.skip.add(s.dataset.mskip); updateMonster(); }
+}
+
+/* ---------- price alerts ---------- */
+// Star a leg that has a Bet365 price and HAWK tells you (sound, title flash,
+// notification) when Bet365 pays 2%+ more than HAWK's fair odds. Legs in your
+// acca and slip are checked the same way. Only while a HAWK tab is open.
+const ALERT_MS = 3 * 60 * 1000;
+const isStarred = (matchId, legId) => S.alerts.some(a => a.match === String(matchId) && a.leg === legId);
+async function askNotify() {
+  if ("Notification" in window && Notification.permission === "default") { try { await Notification.requestPermission(); } catch {} }
+}
+async function toggleStar(legId) {
+  const m = S.match, l = S.legs[legId]; if (!m || !l) return;
+  if (isStarred(m.id, legId)) {
+    S.alerts = S.alerts.filter(a => !(a.match === String(m.id) && a.leg === legId));
+    toast("Price alert off.");
+  } else {
+    if (!l.bookPrice) return toast("Only legs with a Bet365 price can have a price alert.");
+    S.alerts.push({ match: String(m.id), league: m.league, home: m.home, away: m.away, kickoff: m.kickoff,
+                    leg: legId, label: l.label, fair: l.fair, price: l.bookPrice, alertedAt: null });
+    await askNotify();
+    toast(`⭐ Alert set: HAWK tells you when Bet365 pays ${odds(l.fair * VALUE_EDGE)}+ for ${l.label} (now ${odds(l.bookPrice)}). Keep a HAWK tab open.`);
+  }
+  savePref("hawk.priceAlerts", S.alerts); renderWatch(); refreshTab();
+}
+function valueAlert(what, price, fair, onClick) {
+  const msg = `💰 Value: ${what} — Bet365 ${odds(price)}, fair ${odds(fair)} (+${(100 * (price / fair - 1)).toFixed(1)}%)`;
+  beep(); flashTitle("💰 Value!"); toast(msg);
+  if ("Notification" in window && Notification.permission === "granted") {
+    try { const n = new Notification("HAWK", { body: msg }); n.onclick = () => { window.focus(); if (onClick) onClick(); }; } catch {}
+  }
+}
+let trackingPrices = false;
+async function trackPrices() {
+  if (trackingPrices) return;
+  const now = Date.now(), upcoming = (k) => !k || new Date(k).getTime() > now;
+  const n = S.alerts.length;
+  S.alerts = S.alerts.filter(a => upcoming(a.kickoff));
+  if (S.alerts.length !== n) { savePref("hawk.priceAlerts", S.alerts); renderWatch(); }
+  const accaLegs = S.acca.filter(pt => upcoming(pt.kickoff)).flatMap(pt => pt.legs.filter(l => l.bookPrice).map(l => ({ pt, l })));
+  const items = [...S.alerts.map(a => ({ match: a.match, leg: a.leg })), ...accaLegs.map(x => ({ match: x.pt.id, leg: x.l.id }))];
+  if (!items.length) return;
+  trackingPrices = true;
+  try {
+    const prices = await api("/api/legprices", { items });
+    for (const a of S.alerts) {
+      const price = prices[`${a.match}|${a.leg}`]; if (!price) continue;
+      a.price = price;
+      if (price < a.fair * VALUE_EDGE) a.alertedAt = null;                 // re-arm once it drops back
+      else if (!(a.alertedAt >= price)) { a.alertedAt = price; valueAlert(`${a.label} (${a.home} v ${a.away})`, price, a.fair, () => goToMatch(a.league, a.match)); }
+    }
+    let changed = false;
+    for (const { pt, l } of accaLegs) {
+      const price = prices[`${pt.id}|${l.id}`]; if (!price || price === l.bookPrice) continue;
+      const wasValue = l.bookPrice >= l.fair * VALUE_EDGE;
+      l.prevPrice = l.bookPrice; l.bookPrice = price; changed = true;
+      if (!wasValue && price >= l.fair * VALUE_EDGE) valueAlert(`${l.label} (${pt.home} v ${pt.away}, in your acca)`, price, l.fair, showAcca);
+    }
+    savePref("hawk.priceAlerts", S.alerts);
+    if (changed) saveAcca();
+    renderWatch();
+    if (S.view === "acca") renderAccaBody();
+  } catch (err) { console.warn("[hawk] price alerts:", err.message); }
+  finally { trackingPrices = false; }
+}
+
 /* ---------- lineup alerts ---------- */
 const WATCH_KEY = "hawk.lineupWatch";
 function loadWatch() { try { return JSON.parse(localStorage.getItem(WATCH_KEY)) || []; } catch { return []; } }
 function saveWatch() { try { localStorage.setItem(WATCH_KEY, JSON.stringify(S.watch)); } catch {} }
 function isWatched(id) { return S.watch.some(w => String(w.id) === String(id)); }
 function renderWatch() {
-  const btn = $("#watchBtn"), pop = $("#watchPop");
-  btn.hidden = !S.watch.length;
-  if (!S.watch.length) pop.hidden = true;
-  btn.textContent = `🔔 ${S.watch.length} watching`;
-  pop.innerHTML = `<div class="muted" style="font-size:12px;padding:2px 4px 6px">Lineup alerts — checked every 2 minutes while this tab is open</div>` +
+  const btn = $("#watchBtn"), pop = $("#watchPop"), n = S.watch.length + S.alerts.length;
+  btn.hidden = !n;
+  if (!n) pop.hidden = true;
+  btn.textContent = `🔔 ${n} watching`;
+  pop.innerHTML = (S.watch.length ? `<div class="muted" style="font-size:12px;padding:2px 4px 6px">Lineup alerts — checked every 2 minutes while this tab is open</div>` +
     S.watch.map(w => `<div class="row"><a href="#" data-go="${esc(w.id)}" style="color:var(--text)">${esc(w.home)} v ${esc(w.away)}</a>
-      <button data-unwatch="${esc(w.id)}" title="Stop this alert">✕</button></div>`).join("");
+      <button data-unwatch="${esc(w.id)}" title="Stop this alert">✕</button></div>`).join("") : "") +
+    (S.alerts.length ? `<div class="muted" style="font-size:12px;padding:8px 4px 6px">Price alerts — Bet365 checked every 3 minutes while this tab is open</div>` +
+    S.alerts.map((a, i) => `<div class="row"><a href="#" data-goal="${i}" style="color:var(--text)">${esc(a.label)}
+        <div class="muted" style="font-size:11.5px">${esc(a.home)} v ${esc(a.away)} · now ${odds(a.price)} · alert at ${odds(a.fair * VALUE_EDGE)}+</div></a>
+      <button data-unstar="${i}" title="Stop this alert">✕</button></div>`).join("") : "");
   pop.onclick = (e) => {
     e.preventDefault();
+    const us = e.target.closest("[data-unstar]");
+    if (us) { S.alerts.splice(+us.dataset.unstar, 1); savePref("hawk.priceAlerts", S.alerts); renderWatch(); refreshTab(); return; }
+    const ga = e.target.closest("[data-goal]");
+    if (ga) { const a = S.alerts[+ga.dataset.goal]; pop.hidden = true; if (a) goToMatch(a.league, a.match); return; }
     const u = e.target.closest("[data-unwatch]");
     if (u) {
       S.watch = S.watch.filter(w => String(w.id) !== u.dataset.unwatch);

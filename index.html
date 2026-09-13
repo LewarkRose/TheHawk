@@ -1196,7 +1196,7 @@
 
         function onCategoryChange() {
             const cat = document.getElementById('builder-category').value;
-            document.getElementById('chips-title').innerHTML = `<span class="icon-gold">${categoryIcons[cat] || '⚡'}</span> Quick Chips: ${cat}`;
+            document.getElementById('chips-title').innerHTML = `<span>${categoryIcons[cat] || '⚡'}</span> Quick Chips: ${cat}`;
             const container = document.getElementById('quick-chips-container');
             container.innerHTML = "";
 
@@ -1207,7 +1207,7 @@
                 btn.className = selected
                     ? "bg-[#c9a05c]/15 hover:bg-[#c9a05c]/20 border border-[#d9b571] p-2.5 rounded-xl text-left transition flex justify-between items-center gap-2 group"
                     : "bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-[#d9b571]/50 p-2.5 rounded-xl text-left transition flex justify-between items-center gap-2 group";
-                btn.innerHTML = `<span class="flex items-center gap-2 text-xs ${selected ? 'text-[#d9b571]' : 'text-zinc-300 group-hover:text-[#d9b571]'} font-medium">${selected ? '<span class="icon-gold">✓</span>' : ''}<span class="opacity-70 icon-gold">${item.icon || '⚡'}</span>${item.label}</span><span class="text-[#d9b571] font-bold text-xs bg-[#c9a05c]/10 px-2 py-1 rounded-lg shrink-0">${item.odds.toFixed(2)}</span>`;
+                btn.innerHTML = `<span class="flex items-center gap-2 text-xs ${selected ? 'text-[#d9b571]' : 'text-zinc-300 group-hover:text-[#d9b571]'} font-medium">${selected ? '<span class="icon-gold">✓</span>' : ''}<span class="opacity-70">${item.icon || '⚡'}</span>${item.label}</span><span class="text-[#d9b571] font-bold text-xs bg-[#c9a05c]/10 px-2 py-1 rounded-lg shrink-0">${item.odds.toFixed(2)}</span>`;
                 btn.onclick = () => toggleChip(item);
                 container.appendChild(btn);
             });

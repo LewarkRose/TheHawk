@@ -1542,14 +1542,15 @@ function propLine(l) {
   const est = typed ? typed.price : HAWK.propEstimate(l), dead = est && est <= HAWK.DEAD_PRICE;
   // No typing needed: HAWK learns from the builder price in the price box. The ✎ is there if you want to give one leg's price.
   const box = S.ppEdit === l.id || typed;
-  if (!est && !box) return `<div class="pp-line"><button class="linkbtn" data-ppedit="${esc(l.id)}" title="Optional — HAWK also learns from the builder price you type below">✎ Bet365 price</button></div>`;
+  const seen = !l.refPrice && S.match && onBet365().has(no365Key(l)) ? ` <span class="muted" title="You've built ${esc(l.market)} on Bet365 in ${esc(S.match.league)} before">· ✓ on Bet365 here</span>` : "";
+  if (!est && !box) return `<div class="pp-line"><span class="muted">Bet365 price: guessed</span>${seen} <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Optional — HAWK also learns from the builder price you type below">✎</button></div>`;
   const ref = !typed && l.refPrice > 1;
   // Only Bet365 numbers on screen; where it came from is in the tooltip.
   return `<div class="pp-line ${dead ? "dead" : ""}"><span>Bet365</span>${box ? `<input data-pprice="${esc(l.id)}" inputmode="decimal" placeholder="${est ? odds(est) : "price"}" value="${typed ? odds(typed.price) : ""}">` : ""}${
     typed ? ` <span class="muted">✓ you typed it</span>`
     : ref ? ` <b class="est" title="From ${esc(l.refBook || "Unibet")}'s real price (${odds(l.refPrice)}), turned into Bet365's: Bet365 pays ${
         ((Math.exp((S.propBook.refRatio || {})[key] ?? HAWK.REF_TO_B365) - 1) * 100).toFixed(1)}% more than ${esc(l.refBook || "Unibet")} on ${(S.propBook.nRef || {})[key] ? `your ${S.propBook.nRef[key]} builder${S.propBook.nRef[key] > 1 ? "s" : ""} with these legs` : "average (measured on 307 prices, 25 matches)"}">≈ ${odds(est)}</b> <span class="muted">✓ priced</span>${box ? "" : ` <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Give Bet365's price for it (optional)">✎</button>`}`
-    : ` <b class="est" title="HAWK's estimate, from ${n} Bet365 price${n === 1 ? "" : "s"} for ${esc(propKeyLabel(key))} legs (your builder prices included)">≈ ${odds(est)}</b> <span class="muted">guess</span>${box ? "" : ` <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Give this leg's real Bet365 price (optional)">✎</button>`}`}${
+    : ` <b class="est" title="HAWK's estimate, from ${n} Bet365 price${n === 1 ? "" : "s"} for ${esc(propKeyLabel(key))} legs (your builder prices included)">≈ ${odds(est)}</b> <span class="muted">guess</span>${seen}${box ? "" : ` <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Give this leg's real Bet365 price (optional)">✎</button>`}`}${
     dead ? ` <b>· adds next to nothing at Bet365 — 🔄 swap it</b>` : est && l.p ? ` <span class="muted">· ${est * l.p >= 1 ? "value" : `${(100 * (1 - est * l.p)).toFixed(0)}% under fair`}</span>` : ""}</div>`;
 }
 // Corners and cards: Bet365's builder words the same leg with a whole number
@@ -1678,6 +1679,7 @@ function recordB365Price() {
   const detail = S.slip.map(id => { const l = S.legs[id]; return { k: HAWK.propKey(l), p: +l.p.toFixed(4), b: l.bookPrice || null, u: l.refPrice || null }; });
   list.push({ key, fair: +r.fair.toFixed(3), joint: +r.p.toFixed(5), price, legs: S.slip.length, detail, model: r.b365raw || null, t: Date.now() });
   savePref("hawk.b365prices", list.slice(-B365_KEEP));
+  markOnBet365();   // you found this builder on Bet365, so all its markets are there
   applyPropBook();
   applyAim();
 }
@@ -1862,6 +1864,7 @@ function buildBody() {
   const locked = S.slip.filter(id => S.locked.has(id));
   return { id: String(S.match.id), target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs,
            favourite: S.favourite, extras: S.extras, picks: S.picks, locked, banned: [...new Set([...S.banned, ...unofferedLegIds()])],
+           known: knownLegIds(),
            learnt: propPrices().length };   // (a new Bet365 prop price → fresh options)
 }
 const sameOptions = () => S.options && S.match && S.options.sig === JSON.stringify(buildBody())
@@ -1969,6 +1972,17 @@ function removeLeg(id) { S.slip = S.slip.filter(x => x !== id); S.locked.delete(
 // there, swapping the next best leg in; the slip lists them to undo.
 const notOn365 = () => new Set(loadPref("hawk.notOn365", []));
 const no365Key = (l, league = S.match && S.match.league) => `${league}|${l.market}`;
+// …and the other way round: every builder you check with Bet365's price (or
+// log in the Vault) was on Bet365, so its markets exist there for that league.
+// When HAWK has to guess a leg's price, it picks from those markets first.
+const onBet365 = () => new Set(loadPref("hawk.onBet365", []));
+function markOnBet365() {
+  if (!S.match || !S.slip.length) return;
+  const on = onBet365(), off = notOn365();
+  for (const id of S.slip) { const l = S.legs[id]; if (l) { on.add(no365Key(l)); off.delete(no365Key(l)); } }
+  savePref("hawk.onBet365", [...on].slice(-500)); savePref("hawk.notOn365", [...off]);
+}
+const knownLegIds = () => { const on = onBet365(); return S.match && on.size ? Object.values(S.legs).filter(l => on.has(no365Key(l))).map(l => l.id) : []; };
 function unofferedLegIds() {
   const set = notOn365();
   return S.match && set.size ? Object.values(S.legs).filter(l => set.has(no365Key(l))).map(l => l.id) : [];

@@ -1335,7 +1335,8 @@
     }
     return chosen;
   }
-  function autoBuild(legs, target, style = "Balanced", maxLegs = 10, locked = [], banned = new Set(), favourite = true, focus = "Mix", extras = false, picks = "likely") {
+  // known: legs in markets you've already found on Bet365 in this league (from builders you checked or logged).
+  function autoBuild(legs, target, style = "Balanced", maxLegs = 10, locked = [], banned = new Set(), favourite = true, focus = "Mix", extras = false, picks = "likely", known = new Set()) {
     const [lo, hi] = STYLES[style] || STYLES.Balanced;
     let [minPlayers, maxMatch] = FOCUS[focus] || FOCUS.Mix;
     const all = Object.values(legs);
@@ -1358,12 +1359,18 @@
       if (focus === "Match") want = "match";
       let best = null, bestScore = null;
       // Legs with a known price first (Bet365's own, or Unibet's): they're the
-      // ones you'll find on Bet365 at about the price HAWK expects. Guessed legs
-      // (tackles, fouls, saves…) only when none of those fits.
-      for (const guessOk of [false, true]) {
+      // ones you'll find on Bet365 at about the price HAWK expects. Then at most
+      // ONE guessed leg (tackles, fouls, saves…) — one you've found on Bet365
+      // before if possible. With a single guessed leg, the Bet365 price you type
+      // tells HAWK exactly what Bet365 pays for it. A second only if nothing else fits.
+      const guessedNow = chosen.filter((id) => !hasPrice(legs[id])).length;
+      const passes = [(l) => hasPrice(l), (l) => guessedNow < 1 && known.has(l.id), (l) => guessedNow < 1, () => true];
+      let bestPass = -1;
+      for (const allowed of passes) {
+        bestPass++;
         for (const leg of all) {
           if (chosen.includes(leg.id) || banned.has(leg.id) || groups.has(leg.group) || leg.low_data || (leg.extra && !extras)) continue;
-          if (!guessOk && !hasPrice(leg)) continue;
+          if (!hasPrice(leg) && !allowed(leg)) continue;
           if (want && leg.kind !== want) continue;
           if (leg.kind === "player") { const est = propEstimate(leg); if (est && est <= DEAD_PRICE) continue; }   // Bet365 pays ~nothing for it
           const k = playerKey(leg);
@@ -1378,6 +1385,9 @@
         }
         if (best) break;
       }
+      // A Mix build that could only get its next player leg as a 2nd guessed
+      // price: fewer player legs instead (a priced match leg next).
+      if (best && bestPass === passes.length - 1 && want === "player" && focus === "Mix" && minPlayers > nPlayers) { minPlayers = nPlayers; continue; }
       if (!best) {
         if (want === "player" && nMatch < maxMatch && focus !== "Match" && minPlayers > 0) { minPlayers = 0; continue; }
         break;
@@ -1580,7 +1590,7 @@
   function build(body) {
     const e = entryFor(body.id);
     return autoBuild(e.legs, +body.target || 3, body.style, +body.maxLegs || 10, body.locked || [], new Set(body.banned || []),
-                     body.favourite !== false, body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely");
+                     body.favourite !== false, body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely", new Set(body.known || []));
   }
   const evaluateBody = (body) => evaluate(entryFor(body.id).legs, body.legs || []);
   // "Build again": up to `count` different tickets for the same settings. The
@@ -1590,8 +1600,9 @@
   // much as possible, best first (fewest legs = least bookmaker margin).
   function buildOptions(body, count = 5) {
     const e = entryFor(body.id), target = +body.target || 3, locked = body.locked || [];
+    const known = new Set(body.known || []);
     const run = (banned) => autoBuild(e.legs, target, body.style, +body.maxLegs || 10, locked, banned, body.favourite !== false,
-                                      body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely");
+                                      body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely", known);
     const base = new Set(body.banned || []), key = (t) => t.legs.map((l) => l.id).sort().join("|");
     const first = run(base);
     if (!first.legs.length) return { options: [first] };

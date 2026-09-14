@@ -1732,10 +1732,26 @@
             return `<div class="text-xs font-bold text-white">🌍 HAWK on every match <span class="text-zinc-500 font-normal">— ${g.matches} matches, ${g.legs.toLocaleString()} legs graded</span></div>
                 <div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-1">By HAWK's chance</div>${bands}
                 <div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-2">By market</div>${markets}
+                ${radarBlock(g)}
                 ${(g.recent || []).length ? `<div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-2">Latest matches graded</div>
                 <div class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-1 text-xs divide-y divide-zinc-800/70">${g.recent.slice(0, 6).map(r =>
-                    `<div class="flex justify-between gap-2 py-1.5"><span class="text-zinc-200 truncate">${escHtml(r.home)} <b class="text-white">${escHtml(r.score)}</b> ${escHtml(r.away)}</span>
+                    `<div class="flex justify-between gap-2 py-1.5"><span class="text-zinc-200 truncate">${escHtml(r.home)} <b class="text-white">${escHtml(r.score)}</b> ${escHtml(r.away)}${radarMark(r.upset)}</span>
                      <span class="text-zinc-500 shrink-0">${r.n} legs · said ${Math.round(100 * r.said)}% · landed ${Math.round(100 * r.got)}%</span></div>`).join('')}</div>` : ''}`;
+        }
+        // The upset radar (HAWK builder, match page) graded the same way: for each
+        // risk level, how often the favourite really failed to win vs what it said.
+        function radarBlock(g) {
+            const levels = (g.upsets || []).filter(b => b.n);
+            if (!levels.length) return '';
+            return `<div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-2">⚡ Upset radar — favourite fails to win</div>
+                ${levels.map(b => calRow(`${escHtml(b.label)} risk <span class="text-zinc-500 font-normal">· underdog won ${Math.round(100 * b.dogWon / b.n)}%</span>`, b.n, b.saidFail / b.n, b.failed / b.n)).join('')}`;
+        }
+        // ⚡ on a graded match: what the radar said, and whether it came true
+        // (Low = right if the favourite won; High/Very high = right if it didn't).
+        function radarMark(u) {
+            if (!u) return '';
+            const labels = ['Low', 'Medium', 'High', 'Very high'], right = u.level >= 2 ? u.failed : u.level === 0 ? !u.failed : null;
+            return ` <span class="text-[10px] ${right === true ? 'text-emerald-400' : right === false ? 'text-red-400' : 'text-zinc-500'}" title="Upset radar before kick-off: ${labels[u.level]}">⚡${labels[u.level]} ${right === true ? '✓' : right === false ? '✗' : ''}</span>`;
         }
         // Did you get better prices than Bet365's last price before kick-off? Beating
         // that "closing price" regularly is the quickest sign of a real edge — much

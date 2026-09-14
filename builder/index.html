@@ -424,6 +424,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .sig{display:grid;grid-template-columns:22px 1fr;align-items:start;font-size:13px;padding:7px 10px;border-radius:10px;border:1px solid var(--line)}
 .sig.up{background:rgba(20,227,161,.06)}
 .sig.down{background:rgba(143,164,178,.07);color:#c3cfd6}
+.sig.info{background:rgba(255,209,102,.07);color:#e8d9a8}
+.up-record{margin-top:10px;font-size:12.5px;padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px dashed var(--line)}
+.up-verdict{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);font-size:13.5px}
+.up-verdict.hit{border-color:rgba(20,227,161,.5)}
+.up-verdict.miss{border-color:rgba(255,93,115,.45)}
 .optbar{display:flex;align-items:center;gap:6px;margin:12px 0 -4px;flex-wrap:wrap}
 .optbar .muted{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin-right:2px}
 .optbar button{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:10px;padding:5px 10px;cursor:pointer;
@@ -1111,7 +1116,7 @@ const UPSET_TONE = ["low", "med", "high", "vhigh"];
 function upsetCard(m) {
   const u = m.upset;
   if (!u || m.started) return "";
-  const ups = u.signals.filter(s => s.dir === "up"), downs = u.signals.filter(s => s.dir === "down");
+  const ups = u.signals.filter(s => s.dir === "up"), downs = u.signals.filter(s => s.dir === "down"), infos = u.signals.filter(s => s.dir === "info");
   return `<div class="section upset-card">
     <div class="up-head"><h3 style="margin:0">⚡ Upset radar</h3><span class="up-level ${UPSET_TONE[u.level]}">${esc(u.label)} upset risk</span></div>
     <div class="up-nums">
@@ -1120,11 +1125,23 @@ function upsetCard(m) {
     </div>
     ${u.open ? `<div class="note" style="margin-top:6px">There's no clear favourite here — an "upset" is close to a coin flip either way.</div>` : ""}
     <div class="up-signals">${ups.map(s => `<div class="sig up"><span>✅</span>${esc(s.text)}</div>`).join("")}${downs.map(s => `<div class="sig down"><span>✖</span>${esc(s.text)}</div>`).join("")}
-      ${u.signals.length ? "" : `<div class="note" style="margin:0">Nothing unusual: no rotation, team news, money or form pointing either way.</div>`}</div>
-    <div class="note">✅ points to an upset, ✖ points to ${esc(u.favName)}. The risk weighs the evidence the odds may not fully show — HAWK's own team ratings,
-      money moving, Polymarket, missing regulars, rotation (once lineups are out), tiredness and form — plus how live ${esc(u.dogName)} already are.
+      ${infos.map(s => `<div class="sig info"><span>⚠️</span>${esc(s.text)}</div>`).join("")}
+      ${ups.length || downs.length ? "" : `<div class="note" style="margin:0">Nothing unusual: no rotation, team news, money, chances or form pointing either way.</div>`}</div>
+    ${radarRecord(u)}
+    <div class="note">✅ points to an upset, ✖ points to ${esc(u.favName)}, ⚠️ is a caution. The risk weighs the evidence the odds may not fully show — HAWK's own team ratings,
+      money moving, Polymarket, missing regulars, rotation (once lineups are out), tiredness, who creates the chances and recent form — plus how live ${esc(u.dogName)} already are.
       It's a warning light, not a prediction that the upset happens: even "Very high" usually means under 50%.</div>
   </div>`;
+}
+// How the radar has done at this level on finished matches (graded on
+// GitHub by engine/grade.mjs): said vs happened.
+function radarRecord(u) {
+  const all = (S.graded && S.graded.upsets) || [], b = all[u.level], total = all.reduce((s, x) => s + x.n, 0);
+  if (!b || b.n < 5)
+    return `<div class="up-record">📊 Radar track record: ${total ? `${total} match${total === 1 ? "" : "es"} graded so far — ` : ""}HAWK checks every call against the final result; the record for "${esc(u.label)}" shows here after 5 matches.</div>`;
+  const said = b.saidFail / b.n, got = b.failed / b.n;
+  return `<div class="up-record">📊 When the radar said <b>${esc(b.label)}</b>, the favourite failed to win <b>${Math.round(100 * got)}%</b> of ${b.n} matches
+    (it predicted ${Math.round(100 * said)}%) · the underdog won ${Math.round((100 * b.dogWon) / b.n)}%.</div>`;
 }
 // The same risk on acca parts (Monster Acca, your acca): a favourite at real risk.
 function upsetFlag(pt) {
@@ -2129,6 +2146,20 @@ async function goToLive(league, id) {
   if (league && S.league !== league && S.allLeagues.includes(league)) await selectLeague(league);
   showInPlay(id);
 }
+// A finished match HAWK graded: what the upset radar said before kick-off,
+// against what happened. A "Low" call is right when the favourite won; a
+// High / Very high call is right when the favourite failed to win.
+function radarVerdict(id, r) {
+  const g = ((S.graded && S.graded.recent) || []).find(x => String(x.id) === String(id));
+  const u = g && g.upset;
+  if (!u || r.status !== 4) return "";
+  const labels = ["Low", "Medium", "High", "Very high"], fav = u.fav === "home" ? r.home : r.away, dog = u.fav === "home" ? r.away : r.home;
+  const outcome = u.dogWon ? `${dog} won — an upset` : u.failed ? `a draw — ${fav} failed to win` : `${fav} won — no upset`;
+  const right = u.level >= 2 ? u.failed : u.level === 0 ? !u.failed : null;
+  return `<div class="up-verdict ${right === true ? "hit" : right === false ? "miss" : ""}">
+    <span>⚡ Before kick-off the upset radar said <b>${labels[u.level]}</b> (${esc(fav)} fail to win ${Math.round(100 * u.favFail)}%, ${esc(dog)} win ${Math.round(100 * u.dogWin)}%).</span>
+    <span>Result: <b>${esc(outcome)}</b> ${right === true ? "✅ the radar called it" : right === false ? "❌ the radar missed it" : "(a Medium call is a lean, not a call)"}</span></div>`;
+}
 async function showReport(id) {
   modal(`<div class="note">Loading the match report…</div>`);
   let r;
@@ -2144,6 +2175,7 @@ async function showReport(id) {
         <div class="ko">${esc(r.status === 3 ? r.clock + " " + r.statusText : r.statusText || "")}${r.ht ? ` · HT ${r.ht[0]}–${r.ht[1]}` : ""}</div></div>
       <div class="side"><img src="${esc(r.awayCrest)}" alt="" style="width:48px;height:48px"><div class="nm" style="font-size:15px">${esc(r.away)}</div></div>
     </div>
+    ${radarVerdict(id, r)}
     ${r.events.length ? `<div class="rp-evs">${r.events.map(ev).join("")}</div>` : '<div class="note">No goals or cards.</div>'}
     ${r.stats.length ? `<h3 style="margin:16px 0 6px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Match stats</h3>
       ${r.stats.map(s => { const a = parseFloat(s.home) || 0, b = parseFloat(s.away) || 0, t = a + b || 1;

@@ -243,6 +243,23 @@
     }
     return out.join("") || null;
   }
+  // Form for the upset radar: competitive games in the last 60 days only (in
+  // August, last season's results aren't form). Same cached request as form().
+  async function recentForm(competitorId, days = 60) {
+    const d = await s365("games/results", { competitors: competitorId }, 30 * 60 * 1000);
+    if (!d) return null;
+    const since = Date.now() - days * 86400e3, out = [];
+    for (const g of (d.games || []).slice().sort((a, b) => (b.startTime || "").localeCompare(a.startTime || ""))) {
+      if (g.statusGroup !== 4 || /cancel|postpon|abandon/i.test(g.statusText || "") || /friendl/i.test(g.competitionDisplayName || "")) continue;
+      if (Date.parse(g.startTime) < since) break;
+      const hs = Math.trunc(g.homeCompetitor.score), as = Math.trunc(g.awayCompetitor.score);
+      if (!(hs >= 0 && as >= 0)) continue;
+      const [mine, theirs] = g.homeCompetitor.id === competitorId ? [hs, as] : [as, hs];
+      out.push(mine > theirs ? "W" : mine < theirs ? "L" : "D");
+      if (out.length === 6) break;
+    }
+    return out.join("");
+  }
   async function polymarket(slug, home, away) {
     const events = await getJSON(`${PM_BASE}/events?slug=${encodeURIComponent(slug)}`, 2 * 60 * 1000);
     const ev = events && events[0];
@@ -399,11 +416,12 @@
     const home = hc.name, away = ac.name, kickoff = game.startTime ? new Date(game.startTime) : null;
     const meta = ((await data("fixtures.json")) || { fixtures: {} }).fixtures[id] || null;
     const fd = (meta && meta.fd) || {};
-    const [quotes365, detailResp, table, formH, formA, pm, profH, profA, playersH, playersA] = await Promise.all([
+    const [quotes365, detailResp, table, formH, formA, pm, profH, profA, playersH, playersA, recentH, recentA] = await Promise.all([
       odds365(id), s365("game", { gameId: id }), standings(league), form(hc.id), form(ac.id),
       meta && meta.pm_slug ? polymarket(meta.pm_slug, home, away) : null,
       fd.home ? data(`profiles/${fd.home[0]}.json`) : null, fd.away ? data(`profiles/${fd.away[0]}.json`) : null,
       meta && meta.sh ? data(`players/${meta.sh[0]}.json`) : null, meta && meta.sh ? data(`players/${meta.sh[1]}.json`) : null,
+      recentForm(hc.id), recentForm(ac.id),
     ]);
     const detail = (detailResp && detailResp.game) || {};
     const fdH = fd.home && fd.home[1], fdA = fd.away && fd.away[1];
@@ -473,7 +491,7 @@
     }
     return {
       id, league, home, away, homeComp: hc, awayComp: ac, kickoff, inPlay: !!(kickoff && kickoff < new Date()),
-      quotes, cons, polymarket: pm, lineups, confirmed, detail, table, form: { home: formH, away: formA },
+      quotes, cons, polymarket: pm, lineups, confirmed, detail, table, form: { home: formH, away: formA }, recentForm: { home: recentH, away: recentA },
       referee: { name: refName, avg: refAvg, games: refGames, source: refSource, factor: refFactor },
       profiles: [profH, fdH, profA, fdA], lamModel, lamMarket, lamBlend, M: lamBlend ? scoreMatrix(...lamBlend) : null,
       // Both teams rated within the same league: only then can HAWK's own
@@ -1087,7 +1105,7 @@
   // price alone doesn't show. It predicts, it doesn't bet: every signal is a
   // reason the favourite could be weaker (or stronger) than its odds.
   const UPSET_LEVELS = ["Low", "Medium", "High", "Very high"];
-  function upsetRadar(an, M, squads) {
+  function upsetRadar(an, M, squads, exp) {
     const probs = { home: sumCells(M, (i, j) => i > j), draw: sumCells(M, (i, j) => i === j), away: sumCells(M, (i, j) => i < j) };
     const c = an.cons["1|"], mk = c && ["1", "X", "2"].every((k) => k in c.probs) ? { home: c.probs["1"], draw: c.probs.X, away: c.probs["2"] } : null;
     const ref = mk || probs, fav = ref.home >= ref.away ? "home" : "away", dog = fav === "home" ? "away" : "home";
@@ -1125,13 +1143,27 @@
     const favOut = regularsOut(fav), dogOut = regularsOut(dog);
     if (favOut.length) add("up", favOut.length >= 2 ? 1 : 0.5, `${name[fav]} are missing ${favOut.length} regular${favOut.length === 1 ? "" : "s"}: ${favOut.slice(0, 4).join(", ")}.`);
     if (dogOut.length >= 2) add("down", 0.5, `${name[dog]} are missing ${dogOut.length} regulars: ${dogOut.slice(0, 4).join(", ")}.`);
-    // 5. Form: points from the last 6 results (W 3, D 1).
-    const pts = (f) => (f ? [...f].reduce((s, r) => s + (r === "W" ? 3 : r === "D" ? 1 : 0), 0) : null);
-    const fp = pts(an.form[fav]), dp = pts(an.form[dog]);
+    // 5. Form: points per game from competitive games in the last 60 days
+    // (at least 3 each — in August last season's results aren't form).
+    const rf = an.recentForm || {}, ppg = (f) => (f && f.length >= 3 ? [...f].reduce((s, r) => s + (r === "W" ? 3 : r === "D" ? 1 : 0), 0) / f.length : null);
+    const fp = ppg(rf[fav]), dp = ppg(rf[dog]);
     if (fp != null && dp != null) {
-      if (dp >= fp + 3) add("up", 0.5, `${name[dog]} are in better form: ${an.form[dog]} (${dp} pts) vs ${an.form[fav]} (${fp} pts).`);
-      else if (fp >= dp + 5) add("down", 0.5, `${name[fav]} are in much better form: ${an.form[fav]} (${fp} pts) vs ${an.form[dog]} (${dp} pts).`);
+      if (dp >= fp + 0.5) add("up", 0.5, `${name[dog]} are in better form: ${rf[dog]} (${dp.toFixed(1)} pts a game) vs ${rf[fav]} (${fp.toFixed(1)}).`);
+      else if (fp >= dp + 0.8) add("down", 0.5, `${name[fav]} are in much better form: ${rf[fav]} (${fp.toFixed(1)} pts a game) vs ${rf[dog]} (${dp.toFixed(1)}).`);
     }
+    // 5b. Chances: does HAWK expect the underdog to create about as many shots
+    // on target? Results follow chances — a "weaker" side that matches the
+    // favourite for chances is a live upset.
+    if (exp && exp.sot && exp.sot[fav === "home" ? 0 : 1] > 0) {
+      const sf = exp.sot[fav === "home" ? 0 : 1], sd = exp.sot[dog === "home" ? 0 : 1], r = sd / sf;
+      if (r >= 0.85) add("up", 0.5, `HAWK expects ${name[dog]} to create about as many shots on target as ${name[fav]} (${sd.toFixed(1)} v ${sf.toFixed(1)}).`);
+      else if (r <= 0.5) add("down", 0.5, `HAWK expects ${name[fav]} to dominate the chances (${sf.toFixed(1)} v ${sd.toFixed(1)} shots on target).`);
+    }
+    // 5c. Early season: the prices and HAWK's ratings still lean on last
+    // season, so a favourite's price is less sure. A caution, not a weight.
+    const round = +((an.detail || {}).roundNum) || 0, played = (f) => (f ? f.length : 0);
+    if (!CUPS.has(an.league) && ((round && round <= 3) || (played(rf.home) + played(rf.away) <= 2 && !round)))
+      add("info", 0, `Early in the season${round ? ` (round ${round})` : ""}: the odds and HAWK's ratings still lean on last season — new signings and managers make any favourite's price less sure.`);
     // 6. Rotation: how many of the favourite's regulars (270+ minutes in their
     // last 5 games) are in the lineup. Big favourites lose most often with a
     // changed team — above all in cups.
@@ -1156,7 +1188,7 @@
     // (Home advantage isn't a signal: it's already in the odds.)
     // The level: mostly the evidence, plus a little for how live the underdog
     // already is (a 30% underdog adds half a point, a 10% one takes half off).
-    const net = signals.reduce((s, x) => s + (x.dir === "up" ? x.weight : -x.weight), 0);
+    const net = signals.reduce((s, x) => s + (x.dir === "up" ? x.weight : x.dir === "down" ? -x.weight : 0), 0);
     const score = net + (probs[dog] - 0.2) * 5;
     const level = score < 0.5 ? 0 : score < 1.5 ? 1 : score < 2.5 ? 2 : 3;
     return { fav, dog, favName: name[fav], dogName: name[dog], dogWin: probs[dog], favFail: 1 - probs[fav], draw: probs.draw,
@@ -1195,7 +1227,7 @@
         recent_starts: p.recent_starts }))])),
       warnings: an.warnings, value: { book: PRICE_BOOK, legs: value }, sims: sim.n, missing: an.missing || { home: [], away: [] },
       movers: an.inPlay ? [] : moverRows(an, sim.exp).slice(0, 8),
-      upset: upsetRadar(an, M, squads),
+      upset: upsetRadar(an, M, squads, sim.exp),
     };
   }
   function entryFor(id) {

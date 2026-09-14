@@ -35,6 +35,10 @@ HAWK.setLearning({});   // grade HAWK's own chances, not adjusted ones
 
 const newTotals = () => ({ matches: 0, legs: 0, byMarket: {}, byKey: {}, recent: [],
                            bands: BANDS.map(([lo, hi]) => ({ lo, hi, n: 0, p: 0, won: 0 })) });
+// Upset radar record, per level (Low … Very high): how often the favourite
+// really failed to win / the underdog won, against what the radar said.
+const newUpsets = () => ["Low", "Medium", "High", "Very high"].map((label, level) =>
+  ({ level, label, n: 0, saidFail: 0, failed: 0, saidDog: 0, dogWon: 0 }));
 const tally = (b, p, won) => { b.n++; b.p = +(b.p + p).toFixed(4); if (won) b.won++; };
 
 // Last run's state: kept by the Action's cache; if that's missing, the copy on
@@ -50,6 +54,7 @@ async function loadState() {
 
 const state = await loadState();
 const T = state.totals;
+T.upsets ||= newUpsets();
 const now = Date.now();
 let graded = 0, predicted = 0;
 
@@ -62,6 +67,18 @@ for (const [id, pr] of Object.entries(state.pending)) {
   if (!f || !f.finished) { if (now > ko + GIVE_UP_AFTER_D * 86400e3) delete state.pending[id]; continue; }
   delete state.pending[id];
   if (f.off) continue;   // postponed / abandoned
+  // The upset radar's call against the result.
+  let upset = null;
+  if (pr.upset && f.ft) {
+    const [H, A] = f.ft, fg = pr.upset.fav === "home" ? H : A, dg = pr.upset.fav === "home" ? A : H;
+    upset = { level: pr.upset.level, fav: pr.upset.fav, favFail: pr.upset.favFail, dogWin: pr.upset.dogWin, failed: fg <= dg, dogWon: dg > fg };
+    const b = T.upsets[upset.level];
+    if (b) {
+      b.n++; b.saidFail = +(b.saidFail + upset.favFail).toFixed(4); b.saidDog = +(b.saidDog + upset.dogWin).toFixed(4);
+      if (upset.failed) b.failed++;
+      if (upset.dogWon) b.dogWon++;
+    }
+  }
   let n = 0, won = 0, said = 0;
   for (const leg of pr.legs) {
     const r = HawkSettle.legResult(leg, f);
@@ -77,7 +94,7 @@ for (const [id, pr] of Object.entries(state.pending)) {
   if (!n) continue;
   T.matches++; T.legs += n; graded++;
   T.recent.unshift({ id, league: pr.league, home: pr.home, away: pr.away, kickoff: pr.kickoff, score: f.ft.join("-"),
-                     n, said: +(said / n).toFixed(3), got: +(won / n).toFixed(3) });
+                     n, said: +(said / n).toFixed(3), got: +(won / n).toFixed(3), upset });
   T.recent = T.recent.slice(0, KEEP_RECENT);
 }
 
@@ -95,6 +112,7 @@ for (const league of HAWK.LEAGUES) {
         league, home: f.home, away: f.away, kickoff: f.kickoff, at: new Date().toISOString(),
         legs: m.legs.filter((l) => !l.low_data).map((l) => ({ id: l.id, market: l.market, p: +(l.pRaw ?? l.p).toFixed(4),
                                                              ...(l.player ? { player: l.player } : {}) })),
+        upset: m.upset ? { level: m.upset.level, fav: m.upset.fav, favFail: +m.upset.favFail.toFixed(3), dogWin: +m.upset.dogWin.toFixed(3) } : null,
       };
       predicted++;
     } catch (e) { console.warn(`skipped ${f.home} v ${f.away}: ${e.message}`); }
@@ -106,7 +124,7 @@ await mkdir(path.dirname(STATE_FILE), { recursive: true });
 await writeFile(STATE_FILE, JSON.stringify(state));
 await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   updated: new Date().toISOString(), matches: T.matches, legs: T.legs, waiting: Object.keys(state.pending).length,
-  byMarket: T.byMarket, byKey: T.byKey, bands: T.bands, recent: T.recent.slice(0, 20),
+  byMarket: T.byMarket, byKey: T.byKey, bands: T.bands, recent: T.recent.slice(0, 20), upsets: T.upsets,
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
 process.exit(0);   // the engine's timers shouldn't keep the job alive

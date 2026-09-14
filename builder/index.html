@@ -387,6 +387,34 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 .hits{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+/* hit-rate chips + the leg history chart */
+.hr{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:8px;cursor:pointer;vertical-align:1px;white-space:nowrap}
+.hr.g{background:rgba(20,227,161,.14);color:var(--accent)}
+.hr.a{background:rgba(255,209,102,.14);color:var(--gold)}
+.hr.r{background:rgba(255,93,115,.14);color:var(--red)}
+.hr:hover{filter:brightness(1.25);box-shadow:inset 0 0 0 1px currentColor}
+.chart.hist{position:relative}
+.chart.hist .bar.hit{background:var(--accent)}
+.chart.hist .marks{color:var(--accent);font-weight:900}
+.thr{position:absolute;left:0;right:0;border-top:2px dashed var(--gold);pointer-events:none;opacity:.85}
+.thr span{position:absolute;right:0;top:-18px;font-size:11px;font-weight:800;color:var(--gold)}
+/* trusted-market badges */
+.tb{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:8px;letter-spacing:0;text-transform:none;vertical-align:1px;cursor:help;white-space:nowrap}
+.tb.ok{background:rgba(20,227,161,.14);color:var(--accent)}
+.tb.hi{background:rgba(255,209,102,.14);color:var(--gold)}
+.tb.lo{background:rgba(96,165,250,.14);color:var(--blue)}
+/* head to head */
+.h2h-sum{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;margin-bottom:10px}
+.h2h-sum span{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+.h2h-list{display:flex;flex-direction:column}
+.h2h-row{display:grid;grid-template-columns:78px minmax(0,1fr) auto 120px;gap:10px;align-items:center;padding:7px 6px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer;border-radius:8px}
+.h2h-row:hover{background:var(--panel2)}
+.h2h-teams{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h2h-sc{display:inline-block;min-width:44px;text-align:center;padding:1px 8px;border-radius:7px;margin:0 6px;background:#34424c}
+.h2h-sc.w{background:rgba(20,227,161,.2);color:var(--accent)}
+.h2h-sc.l{background:rgba(255,93,115,.18);color:var(--red)}
+.h2h-comp{font-size:11.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:560px){.h2h-row{grid-template-columns:62px minmax(0,1fr) auto}.h2h-comp{display:none}}
 .pl .nm,.pl .ph{cursor:pointer}
 .pl .nm:hover{color:var(--accent)}
 /* value finder */
@@ -545,6 +573,7 @@ async function api(path, body) {
     case "/api/live": return HAWK.liveMatch(q.id);
     case "/api/scores": return HAWK.scores(q.day);
     case "/api/report": return HAWK.matchReport(q.id);
+    case "/api/h2h": return HAWK.h2h(q.id);
     case "/api/ticketlive": return HAWK.ticketLive(q.id, body.legs);
     case "/api/legprices": return HAWK.legPrices(body.items);
     case "/api/monster": return body ? HAWK.startMonster(body) : HAWK.monsterStatus();
@@ -808,6 +837,7 @@ function renderMatch() {
       <div><h3>Market value check</h3>${valueCard(m.value)}</div>
     </div>
     ${moversCard(m)}
+    <div class="section" id="h2h"><h3>⚔️ Head to head</h3><div class="note">Loading the last meetings…</div></div>
     <div class="section">
       <div class="tabs"><div class="tab ${S.tab === "players" ? "on" : ""}" data-t="players">Players</div>
         <div class="tab ${S.tab === "legs" ? "on" : ""}" data-t="legs">All legs (${m.legs.length})</div></div>
@@ -817,6 +847,7 @@ function renderMatch() {
   renderTab();
   renderLive();
   renderCountdown();
+  loadH2H(m);
 }
 
 /* ---------- kick-off countdown (last hour only) ---------- */
@@ -940,6 +971,7 @@ function renderTab() {
   }
   body.onclick = (e) => {
     const st = e.target.closest("[data-star]"); if (st) return toggleStar(st.dataset.star);
+    const hi = e.target.closest("[data-hist]"); if (hi) return openLegHistory(hi.dataset.hist);
     const b = e.target.closest("[data-add]"); if (b) return addLeg(b.dataset.add);
     const pl = e.target.closest("[data-pl]"); if (pl) openPlayer(pl.dataset.pl, pl.dataset.name);
   };
@@ -1023,8 +1055,8 @@ function renderLegList() {
     <div style="text-align:right">${esc(book)}</div><div></div></div>`;
   const cats = ["All", ...Object.keys(CATEGORIES).filter(c => counts[c])];
   $("#lgcats").innerHTML = cats.map(c => `<span class="qc ${S.cat === c ? "in" : ""}" data-cat="${esc(c)}">${esc(c)} ${c === "All" ? all.length : counts[c]}</span>`).join("");
-  $("#lglist").innerHTML = Object.entries(groups).sort((a, b) => rank(a[0]) - rank(b[0])).map(([g, ls]) => `<div class="lg"><h4>${esc(g)}</h4>${head}${ls.slice(0, 40).map(l => `
-    <div class="lrow"><div>${esc(l.label)}${l.low_data ? ' <span class="badge warn">low data</span>' : ""}<div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div></div>
+  $("#lglist").innerHTML = Object.entries(groups).sort((a, b) => rank(a[0]) - rank(b[0])).map(([g, ls]) => `<div class="lg"><h4>${esc(g)} ${trustBadge(g)}</h4>${head}${ls.slice(0, 40).map(l => `
+    <div class="lrow"><div>${esc(l.label)}${l.low_data ? ' <span class="badge warn">low data</span>' : ""}${hitChip(l)}<div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div></div>
       <div style="text-align:right;font-weight:700">${pct(l.p, 1)}</div><div class="muted" style="text-align:right">${odds(l.fair)}</div>
       <div style="text-align:right;font-weight:700;color:${l.bookPrice ? (l.bookPrice > l.fair ? "var(--accent)" : "var(--text)") : "var(--muted)"}">${l.bookPrice ? odds(l.bookPrice) : "–"}${moveMark(l)}${
         l.bookPrice ? `<span class="star ${isStarred(S.match.id, l.id) ? "on" : ""}" data-star="${l.id}" title="${isStarred(S.match.id, l.id) ? "Price alert on — click to stop" : `Alert me when Bet365 pays ${odds(l.fair * VALUE_EDGE)}+`}">★</span>` : ""}</div>
@@ -1048,9 +1080,8 @@ function renderSlip() {
   const legRows = S.slip.map((id, n) => {
     const l = S.legs[id]; if (!l) return "";
     const row = r && r.legs ? r.legs.find(x => x.id === id) : null;
-    const hist = l.games ? `<span class="mk"> · hit ${l.hits}/${l.games} recent${l.basis === "starts" ? " starts" : ""}</span>` : "";
     return `<div class="leg" style="animation-delay:${n * 60}ms"><div class="ck">✓</div>
-      <div class="l1"><div><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)}${hist}</div></div>
+      <div class="l1"><div><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}${hitChip(l)}</div></div>
         <div class="rt"><div class="pp">${pct(l.p)}</div>${row && n > 0 ? `<div class="fo">${pct(row.cond)} given above</div>` : ""}
           ${priceLine(l)}</div></div>
       <div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div>
@@ -1094,7 +1125,7 @@ function renderSlip() {
     <div class="note">Fair odds = 1 ÷ chance to land, from ${m ? m.sims.toLocaleString() : "12,000"} simulated matches.
       Match legs are calibrated to the bookmakers; player legs are HAWK's own estimates (no free feed has player-prop prices).
       ${S.dataAge ? `Player &amp; team data updated ${esc(S.dataAge)}.` : ""}</div>
-    ${learningNote()}`;
+    ${learningNote()}${trustNote()}`;
 
   $("#rng").oninput = (e) => { S.target = sliderToOdds(+e.target.value); $("#tgt").textContent = S.target.toFixed(2); };
   $("#rng").onchange = () => renderSlip();
@@ -1106,6 +1137,7 @@ function renderSlip() {
   $("#mx").onchange = (e) => { S.maxLegs = +e.target.value; };
   $("#go").onclick = build;
   $("#slip").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => removeLeg(b.dataset.rm));
+  $("#slip").querySelectorAll("[data-hist]").forEach(b => b.onclick = () => openLegHistory(b.dataset.hist));
   $("#slip").querySelectorAll("[data-lock]").forEach(b => b.onclick = () => { const id = b.dataset.lock;
     S.locked.has(id) ? S.locked.delete(id) : S.locked.add(id); renderSlip(); });
   $("#jump").textContent = S.slip.length && r && r.fair ? `🎟 Slip · ${odds(r.fair)}` : "🎟 Slip";
@@ -2128,6 +2160,44 @@ function computeLearning() {
 function applyLearning() {
   S.learn = { on: loadPref("hawk.learn", true), ...computeLearning() };
   HAWK.setLearning(S.learn.on ? S.learn.shifts : {});
+  S.trust = computeTrust();
+  HAWK.setTrust(Object.fromEntries(Object.entries(S.trust).filter(([, t]) => t.kind === "hi").map(([market]) => [market, TRUST_RUNS_HIGH])));
+}
+
+/* ---------- trusted markets ---------- */
+// From HAWK's graded predictions on every match (data/graded.json): did each
+// market's chances land as often as HAWK said? It only judges a market after
+// 200+ graded legs from 15+ matches. ✅ trusted = within 3 points; ⚠️ runs
+// high = landed 5+ points less often than said (auto-builds then prefer a
+// similar leg from another market); 🔹 runs low = landed 5+ points more often.
+const TRUST_MIN_LEGS = 200, TRUST_MIN_MATCHES = 15, TRUST_RUNS_HIGH = 0.9;
+function computeTrust() {
+  const g = S.graded, out = {};
+  if (!g || (g.matches || 0) < TRUST_MIN_MATCHES) return out;
+  for (const [market, b] of Object.entries(g.byMarket || {})) {
+    if (b.n < TRUST_MIN_LEGS) continue;
+    const said = b.p / b.n, got = b.won / b.n, gap = got - said;
+    out[market] = { n: b.n, said, got, gap, kind: Math.abs(gap) <= 0.03 ? "ok" : gap <= -0.05 ? "hi" : gap >= 0.05 ? "lo" : "close" };
+  }
+  return out;
+}
+const learnsMarket = (market) => S.learn && S.learn.on && Object.keys(S.learn.shifts).some(k => k === market || k.startsWith(market + " · "));
+function trustBadge(market) {
+  const t = S.trust && S.trust[market];
+  if (!t || t.kind === "close") return "";
+  const nums = `HAWK said ${pct(t.said)} on average and ${pct(t.got)} landed, over ${t.n.toLocaleString()} graded legs.`;
+  if (t.kind === "ok") return `<span class="tb ok" title="${esc("Trusted: HAWK's chances in this market come true as often as it says. " + nums)}">✅ Trusted</span>`;
+  const pts = Math.abs(100 * t.gap).toFixed(0);
+  if (t.kind === "hi") return `<span class="tb hi" title="${esc(`HAWK's chances here have run high. ${nums} ${learnsMarket(market) ? "The chances you see are already corrected down. " : ""}Auto-builds prefer a similar leg from a trusted market.`)}">⚠️ Runs ${pts} pts high</span>`;
+  return `<span class="tb lo" title="${esc(`These legs have landed more often than HAWK said. ${nums}${learnsMarket(market) ? " The chances you see are already corrected up." : ""}`)}">🔹 Runs ${pts} pts low</span>`;
+}
+function trustNote() {
+  const T = S.trust || {}, list = (kind) => Object.entries(T).filter(([, t]) => t.kind === kind).sort((a, b) => b[1].n - a[1].n).map(([m]) => m);
+  const ok = list("ok"), hi = list("hi"), matches = (S.graded && S.graded.matches) || 0;
+  if (!ok.length && !hi.length)
+    return `<div class="learn">🎯 Trusted markets: HAWK marks each market ✅ or ⚠️ once it has graded ${TRUST_MIN_MATCHES}+ matches${matches ? ` (${matches} so far)` : ""}.</div>`;
+  return `<div class="learn">🎯 ${ok.length ? `<b>Trusted:</b> ${ok.slice(0, 5).map(esc).join(", ")}${ok.length > 5 ? ` +${ok.length - 5}` : ""}` : ""}
+    ${hi.length ? `${ok.length ? "<br>" : ""}<b>Runs high</b> (builds avoid): ${hi.slice(0, 4).map(esc).join(", ")}` : ""}</div>`;
 }
 function learningNote() {
   const L = S.learn;
@@ -2322,6 +2392,91 @@ function flashTitle(text) {
   }, 1000);
 }
 
+/* ---------- hit rates ---------- */
+// "L5 4/5 · L10 7/10": how often the player hit this exact leg in his last
+// games (his starts, when he has 3+). Green 70%+, amber 40–69%, red below.
+function hitChip(l) {
+  if (!l.recent || !(l.games >= 3)) return "";
+  const r5 = l.recent.slice(0, 5), h5 = r5.filter(v => v >= l.threshold).length;
+  const rate = l.hits / l.games, tone = rate >= 0.7 ? "g" : rate >= 0.4 ? "a" : "r";
+  const unit = l.basis === "starts" ? "starts" : "games";
+  const text = l.games > 5 ? `L5 ${h5}/${r5.length} · L${l.games} ${l.hits}/${l.games}` : `L${l.games} ${l.hits}/${l.games}`;
+  return ` <span class="hr ${tone}" data-hist="${esc(l.id)}" title="Hit in ${l.hits} of his last ${l.games} ${unit}${l.games > 5 ? ` (${h5} of the last ${r5.length})` : ""} — click to see the games">${text}</span>`;
+}
+// The games behind a hit rate: one bar per game with the leg's line drawn
+// across, and how that compares with HAWK's chance for this match.
+function openLegHistory(id) {
+  const l = S.legs[id], m = S.match;
+  if (!l || !m || !l.recent) return;
+  const p = (m.players[l.side] || []).find(x => x.name === l.player) || {};
+  const src = (l.basis === "starts" ? p.recent_starts : p.recent) || [];
+  const games = l.recent.map((v, i) => ({ v, g: src[i] || null })).reverse();   // oldest -> newest
+  const top = Math.max(l.threshold + 1, ...games.map(x => x.v));
+  const date = (ts) => ts ? new Date(ts * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
+  const r5 = l.recent.slice(0, 5), h5 = r5.filter(v => v >= l.threshold).length, rate = l.hits / l.games;
+  const avg = l.recent.reduce((s, v) => s + v, 0) / l.recent.length;
+  const what = l.label.replace(l.player + ": ", "").replace(l.player + " ", "");
+  const cols = games.map(({ v, g }) => `<div class="col" title="${esc(g ? `${date(g.ts)} · ${g.comp}\n${g.home ? "vs" : "at"} ${g.opp} ${g.score}\n${g.minutes}' played${g.sub_in ? " (off the bench)" : ""}` : "")}">
+      <div class="marks">${v >= l.threshold ? "✓" : ""}</div><div class="num">${v}</div>
+      <div class="bw"><div class="bar ${v >= l.threshold ? "hit" : ""}" style="height:${100 * v / top}%"></div></div></div>`).join("");
+  const labels = games.map(({ g }) => g ? `<div title="${esc(g.opp)}">${g.home ? "" : "@"}${esc(g.opp)}<br>${g.minutes}'</div>` : "<div></div>").join("");
+  const gap = rate - l.p;
+  const verdict = Math.abs(gap) < 0.12 ? `✅ HAWK's ${pct(l.p)} agrees with his record.`
+    : gap > 0 ? `His record (${pct(rate)}) is better than HAWK's ${pct(l.p)}. HAWK also weighs today's opponent, his expected minutes and the match odds, so it's more cautious than the raw record — check the lineup and the opponent before trusting the streak.`
+    : `HAWK's ${pct(l.p)} is higher than his record (${pct(rate)}) — usually because this match looks more open, or he's expected to play more minutes than in those games.`;
+  modal(`<div class="mhead"><div class="ph">${p.photo ? `<img src="${esc(p.photo)}" alt="" onerror="this.remove()">` : ""}</div>
+      <div><div style="font-size:20px;font-weight:800">${esc(l.player)} · ${esc(capitalise(what))}</div>
+        <div class="muted">${esc(l.side === "home" ? m.home : m.away)} · his last ${l.games} ${l.basis === "starts" ? "starts" : "games"} · oldest → newest</div></div>
+      <button class="x" data-close title="Close">✕</button></div>
+    <div class="hits" style="margin-top:6px">
+      <div class="tile"><div class="k">Last ${l.games}</div><div class="v">${l.hits}/${l.games}</div></div>
+      <div class="tile"><div class="k">Last ${r5.length}</div><div class="v">${h5}/${r5.length}</div></div>
+      <div class="tile"><div class="k">Average</div><div class="v">${avg.toFixed(1)}</div></div>
+      <div class="tile"><div class="k">HAWK today</div><div class="v" style="color:var(--accent)">${pct(l.p)}</div></div></div>
+    <div class="chart hist">${cols}<div class="thr" style="bottom:${(140 * l.threshold / top).toFixed(1)}px"><span>${l.threshold}+</span></div></div>
+    <div class="xlabels">${labels}</div>
+    <div class="note" style="margin-top:12px">${verdict}</div>
+    <div style="margin-top:12px;display:flex;justify-content:flex-end"><button class="build" style="width:auto;margin:0;padding:9px 18px" data-add="${esc(l.id)}">${S.slip.includes(l.id) ? "✓ On your slip" : "+ Add to slip"}</button></div>`);
+}
+
+/* ---------- head to head ---------- */
+// The last 5 meetings (any competition), from today's home side's view:
+// results, goals, corners and cards, with the averages on top. Loaded after
+// the match page, since it takes a few extra requests.
+async function loadH2H(m) {
+  const el = $("#h2h");
+  if (!el) return;
+  let d = S.h2h && S.h2h.id === m.id ? S.h2h.d : null;   // the tabs re-render the page: don't fetch twice
+  if (!d) {
+    try { d = await api(`/api/h2h?id=${m.id}`); } catch (err) { el.innerHTML = `<h3>⚔️ Head to head</h3><div class="note">Couldn't load the head to head (${esc(err.message)}).</div>`; return; }
+    S.h2h = { id: m.id, d };
+  }
+  if (!S.match || S.match.id !== m.id || !$("#h2h")) return;
+  const games = d.games || [];
+  if (!games.length) { el.innerHTML = `<h3>⚔️ Head to head</h3><div class="note">These two haven't met recently.</div>`; return; }
+  const us = (g) => (g.sameVenue ? [g.score[0], g.score[1]] : [g.score[1], g.score[0]]);   // [today's home, today's away]
+  const wins = games.filter(g => us(g)[0] > us(g)[1]).length, draws = games.filter(g => us(g)[0] === us(g)[1]).length, n = games.length;
+  const goals = games.map(g => g.score[0] + g.score[1]);
+  const withStat = (k) => games.filter(g => g[k]);
+  const avgOf = (k) => { const l = withStat(k); return l.length ? (l.reduce((s, g) => s + g[k][0] + g[k][1], 0) / l.length).toFixed(1) : "–"; };
+  const date = (iso) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" });
+  el.innerHTML = `<h3>⚔️ Head to head · last ${n}</h3>
+    <div class="h2h-sum"><span><b>${esc(m.home)}</b> ${wins}W</span><span>${draws}D</span><span><b>${esc(m.away)}</b> ${n - wins - draws}W</span>
+      <span>⚽ ${(goals.reduce((s, x) => s + x, 0) / n).toFixed(1)} goals/g</span><span>Over 2.5: ${goals.filter(x => x > 2.5).length}/${n}</span>
+      <span>BTTS: ${games.filter(g => g.score[0] > 0 && g.score[1] > 0).length}/${n}</span>
+      <span>🚩 ${avgOf("corners")} corners</span><span>🟨 ${avgOf("cards")} cards</span></div>
+    <div class="h2h-list">${games.map(g => {
+      const [a, b] = us(g), res = a > b ? "w" : a < b ? "l" : "d";
+      return `<div class="h2h-row" data-rep="${g.id}" title="Match report">
+        <span class="muted">${esc(date(g.date))}</span>
+        <span class="h2h-teams">${esc(g.home)} <b class="h2h-sc ${res}">${g.score[0]}–${g.score[1]}</b> ${esc(g.away)}</span>
+        <span class="muted">${g.corners ? `🚩 ${g.corners[0] + g.corners[1]}` : ""}${g.cards ? ` · 🟨 ${g.cards[0] + g.cards[1]}` : ""}</span>
+        <span class="muted h2h-comp">${esc(g.comp)}</span></div>`;
+    }).join("")}</div>
+    <div class="note">Colours are from ${esc(m.home)}'s side: green won, red lost. Old meetings say less than current form — HAWK's chances don't use them.</div>`;
+  el.querySelector(".h2h-list").onclick = (e) => { const r = e.target.closest("[data-rep]"); if (r) showReport(r.dataset.rep); };
+}
+
 /* ---------- player deep-dive ---------- */
 // From his team's point of view: "2-0" at home, or "0-2" away, is a clean sheet.
 function cleanSheet(g) { const s = /^(\d+)-(\d+)$/.exec(g.score || ""); return !!s && +(g.home ? s[2] : s[1]) === 0; }
@@ -2360,7 +2515,7 @@ function openPlayer(side, name) {
       : `<div class="note">No recent match data for this player.</div>`}
     <div style="margin-top:16px"><h3 style="margin:0 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">HAWK legs for ${esc(p.name)}</h3>
       ${legs.length ? legs.map(l => `<div class="lrow" style="grid-template-columns:1fr 64px 56px 30px">
-          <div>${esc(capitalise(l.label.replace(p.name + ": ", "").replace(p.name + " ", "")))}${l.low_data ? ' <span class="badge warn">low data</span>' : ""}
+          <div>${esc(capitalise(l.label.replace(p.name + ": ", "").replace(p.name + " ", "")))}${l.low_data ? ' <span class="badge warn">low data</span>' : ""}${hitChip(l)}
             <div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div></div>
           <div style="text-align:right;font-weight:700">${pct(l.p, 1)}</div><div class="muted" style="text-align:right">${odds(l.fair)}</div>
           <button class="add" data-add="${l.id}" title="Add to slip">${S.slip.includes(l.id) ? "✓" : "+"}</button></div>`).join("")
@@ -2374,6 +2529,7 @@ function modal(html) {
   bg.innerHTML = `<div class="modal">${html}</div>`;
   bg.onclick = (e) => {
     if (e.target === bg || e.target.closest("[data-close]")) return closeModal();
+    const h = e.target.closest("[data-hist]"); if (h) return openLegHistory(h.dataset.hist);
     const b = e.target.closest("[data-add]");
     if (b) { addLeg(b.dataset.add); b.textContent = S.slip.includes(b.dataset.add) ? "✓" : "+"; }
   };

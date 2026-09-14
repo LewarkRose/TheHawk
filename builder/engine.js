@@ -904,6 +904,12 @@
   // HAWK bets (see "learning" in index.html). Empty = no adjustment.
   let learning = {};
   function setLearning(shifts) { learning = shifts && typeof shifts === "object" ? shifts : {}; }
+  // Trusted markets: {market: factor} from HAWK's graded predictions (worked
+  // out by the page). A factor under 1 marks a market where HAWK's chances
+  // have landed less often than it said; auto-builds then prefer a similar
+  // leg from a market it has proven accurate on. It never changes a chance.
+  let trust = {};
+  function setTrust(factors) { trust = factors && typeof factors === "object" ? factors : {}; }
   // Which group a leg learns with, or null. Only HAWK's own estimates learn:
   // player props, and corners/cards/shots-on-target lines split by Over and
   // Under (shifting both the same way would be contradictory). Results and
@@ -1017,8 +1023,8 @@
         for (let s = 0; s < n; s++) c += m[s] & a[s];
         const joint = (c / n) * adjNow * (leg.adj || 1), cond = joint / pNow;
         if (cond < lo || cond > hi) continue;
-        const reaches = joint > 0 && 1 / joint >= target;
-        const score = picks === "value" ? [reaches ? 1 : 0, valueScore(leg), cond] : [reaches ? 1 : 0, reaches ? joint : cond];
+        const reaches = joint > 0 && 1 / joint >= target, t = trust[leg.market] || 1;
+        const score = picks === "value" ? [reaches ? 1 : 0, valueScore(leg) - (1 - t), cond] : [reaches ? 1 : 0, (reaches ? joint : cond) * t];
         if (!bestScore || isBetter(score, bestScore)) { best = leg.id; bestScore = score; }
       }
       if (!best) {
@@ -1092,7 +1098,8 @@
       legs: legJSON, priceBook: PRICE_BOOK,
       players: Object.fromEntries(Object.entries(squads).map(([side, sq]) => [side, sq.map((p) => ({
         name: p.name, pos: p.pos, status: p.status, photo: p.photo, start_p: p.start_p, doubtful: p.doubtful, sh90: p.sh90, sot90: p.sot90,
-        g90: p.g90, c90: p.c90, x: p.x, sv90: p.sv90, minutes: p.minutes, has_data: p.has_data, recent: p.recent }))])),
+        g90: p.g90, c90: p.c90, x: p.x, sv90: p.sv90, minutes: p.minutes, has_data: p.has_data, recent: p.recent,
+        recent_starts: p.recent_starts }))])),
       warnings: an.warnings, value: { book: PRICE_BOOK, legs: value }, sims: sim.n, missing: an.missing || { home: [], away: [] },
       movers: an.inPlay ? [] : moverRows(an, sim.exp).slice(0, 8),
     };
@@ -1109,6 +1116,29 @@
                      body.favourite !== false, body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely");
   }
   const evaluateBody = (body) => evaluate(entryFor(body.id).legs, body.legs || []);
+
+  // Head to head: the last 5 finished meetings of the two clubs (any
+  // competition), each with its corners, cards and shots on target. Past
+  // games don't change, so their stats are cached for a day.
+  async function h2h(id) {
+    const d = await s365("games/h2h", { gameId: id }, 30 * 60 * 1000);
+    const g = d && d.game;
+    if (!g || !g.homeCompetitor) throw new Error("365Scores didn't return the head to head");
+    const past = (g.h2hGames || []).filter((x) => x.statusGroup === 4 && String(x.id) !== String(id)
+      && x.homeCompetitor.score >= 0 && x.awayCompetitor.score >= 0 && !/postpon|cancel|abandon/i.test(x.statusText || "")).slice(0, 5);
+    const games = await Promise.all(past.map(async (x) => {
+      const st = await s365("game/stats", { games: x.id }, 24 * 3600 * 1000);
+      const one = (name, cid) => { const s = ((st && st.statistics) || []).find((v) => v.name === name && v.competitorId === cid); return s ? parseFloat(s.value) || 0 : null; };
+      const pair = (name) => { const a = one(name, x.homeCompetitor.id), b = one(name, x.awayCompetitor.id); return a == null && b == null ? null : [a || 0, b || 0]; };
+      const yellow = pair("Yellow Cards"), red = pair("Red Cards") || [0, 0];
+      return { id: String(x.id), date: x.startTime, comp: x.competitionDisplayName || "", home: x.homeCompetitor.name, away: x.awayCompetitor.name,
+               // true when today's home side was at home in that meeting
+               sameVenue: x.homeCompetitor.id === g.homeCompetitor.id,
+               score: [Math.trunc(x.homeCompetitor.score), Math.trunc(x.awayCompetitor.score)],
+               corners: pair("Corners"), cards: yellow ? [yellow[0] + red[0], yellow[1] + red[1]] : null, sot: pair("Shots On Target") };
+    }));
+    return { home: g.homeCompetitor.name, away: g.awayCompetitor.name, games };
+  }
 
   async function lineups(id) {
     const d = await s365("game", { gameId: id });
@@ -1738,7 +1768,7 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, learnKey, liveMatch,
+  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, h2h, learnKey, liveMatch,
                   scores, matchReport, ticketLive,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },

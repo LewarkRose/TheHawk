@@ -1107,7 +1107,8 @@ function moveTag(r, short = false) {
 function pct100(ps) {
   const total = ps.reduce((s, p) => s + p, 0) || 1, raw = ps.map(p => (100 * p) / total), out = raw.map(Math.floor);
   const order = raw.map((v, i) => [v - Math.floor(v), i]).sort((a, b) => b[0] - a[0]);
-  for (let k = 0; k < 100 - out.reduce((s, v) => s + v, 0); k++) out[order[k % order.length][1]]++;
+  const missing = 100 - out.reduce((s, v) => s + v, 0);   // counted once, before adding them back
+  for (let k = 0; k < missing; k++) out[order[k % order.length][1]]++;
   return out;
 }
 // ⚡ Upset radar (engine: upsetRadar): how likely the underdog is to win, and

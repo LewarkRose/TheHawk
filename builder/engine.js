@@ -1726,7 +1726,10 @@
   function legSummary(e, json, id) {
     const l = e.legs[id], j = json.legs.find((x) => x.id === id) || {};
     return { id, label: l.label, market: l.market, kind: l.kind, p: l.p, pRaw: l.pRaw, fair: l.fair, bookPrice: j.bookPrice || null,
-             player: l.player || null, side: l.side || null };
+             player: l.player || null, side: l.side || null,
+             // for the acca cards: face, form, Unibet's price, Bet365's wording, Early Payout
+             photo: l.photo || null, refPrice: l.refPrice || null, b365: l.b365 || null, ep: !!l.ep, pNoEp: l.pNoEp ?? null,
+             hits: l.hits ?? null, games: l.games ?? null, basis: l.basis || null };
   }
 
   // Monster Acca: one part per fixture, then the page picks the best ones.
@@ -2358,11 +2361,12 @@
     if (!game) return null;
     const hc = game.homeCompetitor, names = Object.fromEntries((game.members || []).map((m) => [m.id, m.name]));
     const nums = Object.fromEntries((game.members || []).map((m) => [m.id, m.jerseyNumber]));
+    const photos = Object.fromEntries((game.members || []).filter((m) => m.athleteId).map((m) => [m.id, athletePhoto(m)]));
     // Every player's live numbers, as 365Scores lists them (Minutes, Goals, Total Shots, Tackles Won "1/2 (50%)", …).
     const players = {};
     for (const [side, key] of [["home", "homeCompetitor"], ["away", "awayCompetitor"]])
       players[side] = (((game[key] || {}).lineups || {}).members || []).filter((m) => m.statusText === "Starting" || m.statusText === "Substitute")
-        .map((m) => ({ name: names[m.id] || "", num: nums[m.id] || null, starter: m.statusText === "Starting", pos: ((m.position || {}).name) || "",
+        .map((m) => ({ name: names[m.id] || "", num: nums[m.id] || null, photo: photos[m.id] || null, starter: m.statusText === "Starting", pos: ((m.position || {}).name) || "",
                        stats: (m.stats || []).map((s) => [s.name, String(s.value)]) }));
     return { status: game.statusGroup, statusText: game.statusText, clock: game.gameTimeDisplay, players,
              events: (game.events || []).map((e) => {

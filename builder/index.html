@@ -341,6 +341,71 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .leg .lb{font-weight:700}
 .leg .mk{font-size:12px;color:var(--muted)}
 .leg .b365{font-size:11.5px;color:var(--gold);margin-top:2px}.leg .b365 b{font-weight:800}
+/* scorecard leg: face + name + verdict, three tiles, a short why, icon buttons — raised, 3D */
+.leg.card{padding:12px;margin:0 0 10px;border-radius:14px;border:1px solid #294640;
+  background:linear-gradient(180deg,#1b2a27 0%,#151d20 100%);
+  box-shadow:0 14px 26px -14px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.06),inset 0 -1px 0 rgba(0,0,0,.35)}
+.leg.card::before{display:none}
+.leg.card{animation-fill-mode:backwards}   /* (so the rise-in animation doesn't hold the transform the tilt needs) */
+.legs:has(.leg.card){padding:4px 12px 6px}
+.leg.card .sc-head{display:flex;align-items:center;gap:10px}
+.leg.card .sc-name{flex:1;min-width:0}.leg.card .sc-head .lb{font-weight:800;line-height:1.25}
+.lface{position:relative;flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;
+  background:radial-gradient(circle at 35% 30%,#2b3d3a,#131b1d);border:2px solid var(--accent);
+  box-shadow:0 6px 12px -4px rgba(0,0,0,.7),0 0 0 3px rgba(20,227,161,.12)}
+.lface.away{border-color:var(--blue);box-shadow:0 6px 12px -4px rgba(0,0,0,.7),0 0 0 3px rgba(74,168,255,.12)}
+.lface img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:top}
+.lface.crest img{inset:6px;width:calc(100% - 12px);height:calc(100% - 12px);border-radius:0;object-fit:contain}
+.lface.ball{border-color:#3a4a55}
+.lface .ini{font-size:13px;font-weight:900;color:var(--muted)}
+.lface .no{position:absolute;right:-7px;bottom:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;display:grid;place-items:center;
+  font-size:10px;font-weight:900;background:var(--accent);color:#04241a;border:2px solid #151d20;box-shadow:0 2px 4px rgba(0,0,0,.5)}
+.lface.away .no{background:var(--blue);color:#061a2c}
+.verdict{flex:none;align-self:flex-start;font-size:11px;font-weight:800;letter-spacing:.02em;padding:3px 9px;border-radius:999px;white-space:nowrap;
+  color:var(--muted);background:linear-gradient(180deg,#26333a,#1c262c);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 3px 6px -3px rgba(0,0,0,.6)}
+.verdict.good{color:#04241a;background:linear-gradient(180deg,#3cf0b6,#12c58c);border-color:#0a9e70;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px -4px rgba(20,227,161,.6)}
+.verdict.warn{color:#2e2200;background:linear-gradient(180deg,#ffe08f,#f2b93b);border-color:#c8911f;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px -4px rgba(255,209,102,.5)}
+.verdict.bad{color:#fff;background:linear-gradient(180deg,#ff7a8c,#e0455b);border-color:#b8324a;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 4px 10px -4px rgba(255,93,115,.55)}
+/* acca / Monster Acca match cards */
+.apart3d{padding-left:12px;margin-bottom:10px}.apart3d.gone{opacity:.55}
+.pcrests{display:flex;flex:none}.pcrests .pcrest{width:30px;height:30px;object-fit:contain;filter:drop-shadow(0 4px 6px rgba(0,0,0,.6))}
+.pcrests .pcrest + .pcrest{margin-left:-8px}
+.plegs{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+.pleg{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05)}
+.pleg .lface{width:30px;height:30px;border-width:1.5px}.pleg .lface .ini{font-size:10.5px}.pleg .lface .no{min-width:15px;height:15px;font-size:9px;right:-6px}
+.pleg .pl-l{flex:1;min-width:0;font-size:13px;font-weight:700}.pleg .pl-l .b365{margin:0}.pleg > b{font-size:13px}
+.pacts{margin-top:8px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.leg.card .tile{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.01));box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 6px 12px -8px rgba(0,0,0,.8)}
+/* 3D tilt (mouse only): the card leans towards the pointer, with a light that follows it */
+.tilt3d{transform-style:preserve-3d;transition:transform .18s ease,box-shadow .18s ease;will-change:transform}
+.tilt3d::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .2s;
+  background:radial-gradient(380px circle at var(--mx,50%) var(--my,50%),rgba(160,255,220,.08),transparent 45%)}
+.tilt3d.tilting::after{opacity:1}
+.tilt3d.tilting{box-shadow:0 26px 44px -18px rgba(0,0,0,.9),0 0 0 1px rgba(20,227,161,.22),inset 0 1px 0 rgba(255,255,255,.08)}
+@media (prefers-reduced-motion:reduce){.tilt3d,.tilt3d::after{transition:none}}
+.leg .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.leg .tile{border:1px solid var(--line);border-radius:10px;padding:6px 8px;background:rgba(255,255,255,.025);min-width:0}
+.leg .tile .tk{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800;display:flex;align-items:center;gap:4px}
+.leg .tile .tv{font-size:18px;font-weight:900;line-height:1.25;white-space:nowrap}.leg .tile .tv small{font-size:10.5px;font-weight:700;color:var(--muted)}
+.leg .tile .tm{font-size:12px;color:var(--muted);margin-right:2px}
+.leg .tile .ts{font-size:10.5px;color:var(--muted);line-height:1.3;overflow:hidden;text-overflow:ellipsis}
+.leg .tile.good{border-color:rgba(20,227,161,.45);background:rgba(20,227,161,.07)}.leg .tile.good .ts{color:var(--accent)}
+.leg .tile.ok .ts{color:var(--text)}
+.leg .tile.dead{border-color:rgba(255,209,102,.5);background:rgba(255,209,102,.07)}.leg .tile.dead .ts{color:var(--gold)}
+.leg .tile.poor{border-color:rgba(255,93,115,.35)}.leg .tile.poor .ts{color:#ff8a8a}
+.leg .tile.form{cursor:pointer}.leg .tile .dn{color:var(--accent)}.leg .tile .up{color:#ff8a8a}
+.leg .tile .pp-in{width:52px;padding:1px 4px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:600 11px inherit}
+.leg .tile .linkbtn{font-size:11px;text-decoration:none}
+.leg.card .acts button{font-size:12px;padding:2px 8px}
+/* the price line and the "why" under each leg */
+.leg .lprice{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:6px;font-size:12.5px}
+.leg .lprice b{font-weight:800;color:var(--text)}
+.leg .lprice .vt{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--muted)}
+.leg .lprice .vt.good{background:rgba(20,227,161,.14);color:var(--accent)}.leg .lprice .vt.ok{color:var(--text)}
+.leg .lprice .vt.dead{background:rgba(255,209,102,.14);color:var(--gold)}
+.leg .lprice .pp-in{width:62px;padding:2px 6px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:600 12px inherit}
+.leg .lprice .mvo,.leg .lprice .agree{font-size:11px}
+.leg .why{margin-top:5px;font-size:12px;line-height:1.45;color:#b9c6cf;background:rgba(255,255,255,.035);border-left:2px solid rgba(20,227,161,.45);padding:5px 8px;border-radius:0 8px 8px 0}
 .epb{display:inline-block;font-size:9.5px;font-weight:900;font-style:italic;letter-spacing:.04em;padding:0 4px;border:1px solid currentColor;border-radius:3px;margin-right:2px}
 .leg .rt{text-align:right;white-space:nowrap}
 .leg .rt .pp{font-weight:800}
@@ -447,6 +512,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .mhead{display:flex;align-items:center;gap:14px}
 .mhead .ph{width:64px;height:64px;border-radius:50%;background:#26323b;overflow:hidden;flex-shrink:0}
 .mhead .ph img{width:64px;height:64px;object-fit:cover}
+.mhead .ph.lp-face{position:relative;overflow:visible;border:3px solid var(--accent);margin-right:12px}.mhead .ph.lp-face.away{border-color:var(--blue)}
+.mhead .ph.lp-face img{width:100%;height:100%;border-radius:50%;object-position:top}
+.mhead .ph.lp-face .no{position:absolute;right:-8px;bottom:-4px;min-width:24px;height:24px;padding:0 4px;border-radius:12px;display:grid;place-items:center;
+  font-size:12px;font-weight:900;background:var(--accent);color:#04241a;border:2px solid var(--panel)}
+.mhead .ph.lp-face.away .no{background:var(--blue);color:#061a2c}
 .mhead .x{margin-left:auto;border:1px solid var(--line);background:transparent;border-radius:10px;width:34px;height:34px;cursor:pointer;color:var(--muted)}
 .chart{display:flex;align-items:flex-end;gap:8px;height:210px;margin:18px 0 6px;padding:0 4px;border-bottom:1px solid var(--line)}
 .chart .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
@@ -509,6 +579,15 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   box-shadow:0 2px 6px rgba(0,0,0,.45)}
 .pm.home .shirt{background:var(--accent);color:#04241a}
 .pm.away .shirt{background:var(--blue);color:#061a2c}
+/* faces: the photo in a team-coloured ring, the shirt number as a badge */
+.pm .shirt{position:relative}
+.pm .shirt.face{width:36px;height:36px;background:#0d1a16;border-width:2.5px}
+.pm.home .shirt.face{border-color:var(--accent)}.pm.away .shirt.face{border-color:var(--blue)}
+.pm .shirt.face img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:top}
+.pm .shirt.face .no{position:absolute;right:-7px;bottom:-4px;min-width:17px;height:17px;padding:0 3px;border-radius:9px;display:grid;place-items:center;
+  font-size:9.5px;font-weight:900;border:1.5px solid #0d1114;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.pm.home .shirt.face .no{background:var(--accent);color:#04241a}.pm.away .shirt.face .no{background:var(--blue);color:#061a2c}
+.pm.subon .shirt.face,.pm.subon .shirt{border-color:var(--gold)}
 .pm .nm{font-size:10.5px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pm .tg{font-size:9.5px;font-weight:800;color:#fff;background:rgba(4,12,10,.62);padding:0 5px;border-radius:6px;white-space:nowrap}
 .lu-legend{font-size:11.5px;color:var(--muted);margin:8px 2px 0}
@@ -702,8 +781,7 @@ a.nav{text-decoration:none}
       <a class="nav vaultnav" href="../" title="Your bets, bankroll and track record (the Vault)">🏦 <span>Vault</span></a>
     </nav>
     <div class="topright">
-      <button class="tool install" id="installBtn" hidden title="Install HAWK as an app on this device">📲 <span>Install</span></button>
-      <button class="tool bell" id="watchBtn" hidden></button>
+      <button class="tool install" id="installBtn" hidden title="Install HAWK as an app on this device">📲 <span>Install</span></button>      <button class="tool bell" id="watchBtn" hidden></button>
       <div class="pop" id="watchPop" hidden></div>
     </div>
   </div>
@@ -728,8 +806,7 @@ function loadPref(key, fallback) { try { const v = localStorage.getItem(key); re
 function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
             target: 3.25, style: "Balanced", focus: "Mix", maxLegs: 10, favourite: true, result: null, tab: "players", q: "",
-            chk: { price: "", boost: "", stake: "5" }, extras: false, cat: "All", ep: loadPref("hawk.ep", true),
-            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
+            chk: { price: "", boost: "", stake: "5" }, extras: false, cat: "All", ep: loadPref("hawk.ep", true),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
@@ -1343,6 +1420,15 @@ function myBetPlayers(gameId) {
   } catch { /* no Vault data */ }
   return out;
 }
+// A player's spot on the pitch: his face (365Scores' photo) with the shirt
+// number as a badge — or just the number when there's no photo. (Without
+// 365Scores' grey default the image fails for players with no photo, and
+// the number shows instead of a silhouette.)
+function shirtHTML(p) {
+  const no = p.num || p.pos || "·", src = p.photo ? String(p.photo).replace(/,d_[^,/]+/, "") : null;
+  return src ? `<div class="shirt face"><img src="${esc(src)}" alt="" onerror="this.parentNode.classList.remove('face');this.remove()"><span class="no">${esc(no)}</span></div>`
+    : `<div class="shirt" ${p.num ? "" : `title="No shirt number yet"`}><span class="no">${esc(no)}</span></div>`;
+}
 function lineupCard(m, live = null) {
   if (!m.players || !(m.players.home || []).some(p => p.status === "Starting")) return "";
   const by = live ? liveEventsBy(live, m) : null, mine = live ? myBetPlayers(m.id) : null;
@@ -1371,7 +1457,7 @@ function lineupCard(m, live = null) {
       const tag = (subP ? `↑${r.off} ` : "") + liveIcons(rw) + (!subP && r && r.off ? ` ↓${r.off}` : "") + (inBet(who.name) ? " 🎟" : "");
       return `<div class="pm ${side} ${subP ? "subon" : ""} ${!subP && r && r.off ? "gone" : ""} ${rw && (rw.goals || rw.assists) ? "star" : ""} ${inBet(who.name) ? "mine" : ""}" ${at}
           data-lp="${side}" data-name="${esc(who.name)}" title="${esc(who.name)}${subP ? ` — on for ${p.name} (${r.off})` : ""}${inBet(who.name) ? " — in your bet" : ""}">
-        <div class="shirt">${who.num || who.pos || "·"}</div><div class="nm">${esc(who.short || who.name.split(" ").slice(-1)[0])}</div>
+        ${shirtHTML(who)}<div class="nm">${esc(who.short || who.name.split(" ").slice(-1)[0])}</div>
         ${tag.trim() ? `<div class="tg">${tag.trim()}</div>` : ""}</div>`;
     }
     const tag = playerTag(side, p), booked = legsFor(side, p.name).find(l => /:booked$/.test(l.id) && l.p >= 0.3);
@@ -1380,7 +1466,7 @@ function lineupCard(m, live = null) {
     return `<div class="pm ${side}" style="--hl:${hl.toFixed(1)}%;--ht:${ht.toFixed(1)}%;--vl:${vl.toFixed(1)}%;--vt:${vt.toFixed(1)}%"
         data-lp="${side}" data-name="${esc(p.name)}" title="${esc(p.name)}${p.doubtful ? " — doubtful" : ""}${!p.has_data ? " — no recent data (new or young player)" : ""}${
         fresh ? ` — hasn't played in ${side === "home" ? m.home : m.away}'s last 5 games: new signing, back from injury, or a lineup mistake` : ""}">
-      <div class="shirt" ${p.num ? "" : `title="No shirt number yet"`}>${p.num || p.pos || "·"}</div><div class="nm">${p.doubtful ? "❓" : ""}${fresh ? "🆕" : ""}${esc(p.short || p.name.split(" ").slice(-1)[0])}</div>
+      ${shirtHTML(p)}<div class="nm">${p.doubtful ? "❓" : ""}${fresh ? "🆕" : ""}${esc(p.short || p.name.split(" ").slice(-1)[0])}</div>
       ${tag || booked ? `<div class="tg">${tag}${booked ? ` 🟨` : ""}</div>` : ""}</div>`;
   };
   const bench = (side) => (m.players[side] || []).filter(p => p.status === "Substitute")
@@ -1499,6 +1585,148 @@ function renderLegList() {
 /* ---------- slip ---------- */
 // "fair 1.23 · Bet365 1.22": the bookmaker's own single price for this leg,
 // green when it beats HAWK's fair odds. Player props have no feed price.
+// A leg's Bet365 price, wherever it comes from: Bet365's own (match legs),
+// the one you typed, Unibet's turned into Bet365's, or HAWK's guess.
+function legPrice(l) {
+  if (l.bookPrice > 1) return { price: l.bookPrice, src: "bet365" };
+  if (l.kind !== "player") return null;
+  const typed = propPrices().find(x => x.match === String(S.match && S.match.id) && x.leg === l.id);
+  if (typed) return { price: typed.price, src: "typed" };
+  const est = HAWK.propEstimate(l);
+  return est ? { price: est, src: l.refPrice > 1 ? "priced" : "guess" } : { price: null, src: "guess" };
+}
+// The price line: Bet365 1.22 · fair 1.27 · 4% under fair — plus EP, the market move, and ✎ for a player leg.
+function legPriceRow(l) {
+  const pr = legPrice(l), src = pr && pr.src, dead = pr && pr.price && pr.price <= HAWK.DEAD_PRICE;
+  const ev = pr && pr.price ? pr.price * l.p - 1 : null;
+  const verdict = !pr || !pr.price ? "" : dead ? `<span class="vt dead">pays next to nothing</span>`
+    : ev >= 0.02 ? `<span class="vt good">value +${(100 * ev).toFixed(0)}%</span>` : ev >= -0.02 ? `<span class="vt ok">fair price</span>`
+    : `<span class="vt">${(100 * -ev).toFixed(0)}% under fair</span>`;
+  const srcTag = { bet365: "", typed: ` <span class="muted" title="The price you typed">✓ yours</span>`,
+                   priced: ` <span class="muted" title="From Unibet's real price (${odds(l.refPrice)}), turned into Bet365's">≈</span>`,
+                   guess: ` <span class="muted" title="HAWK's guess — no bookmaker prices this leg. It gets better from the Bet365 builder prices you type in">guess</span>` }[src] || "";
+  const edit = l.kind === "player" && S.ppEdit === l.id
+    ? ` <input class="pp-in" data-pprice="${esc(l.id)}" inputmode="decimal" placeholder="${pr && pr.price ? odds(pr.price) : "price"}">`
+    : l.kind === "player" && src !== "bet365" ? ` <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Type this leg's Bet365 price (optional)">✎</button>` : "";
+  const ep = l.ep && l.pNoEp != null ? ` <span class="epb" title="Bet365's Early Payout: paid as won once the team goes 2 goals ahead. Adds ${pct(Math.max(0, l.p - l.pNoEp), 1)} — switch it off under the build options.">EP</span>` : "";
+  return `<div class="lprice"><span>Bet365 <b>${pr && pr.price ? odds(pr.price) : "—"}</b>${srcTag}${edit}</span><span class="muted">fair ${odds(l.fair)}</span>${verdict}${ep}${openMark(l)}</div>`;
+}
+// The leg's face: the player's photo with his shirt number (initials if
+// there's no photo), the team's crest for a team leg, or a ball for a match leg.
+function legFace(l, part = null) {
+  // part: a match in the acca (its crests), when the leg isn't from the match that's open.
+  const m = part ? (S.match && String(S.match.id) === String(part.id) ? S.match : { homeCrest: part.homeCrest, awayCrest: part.awayCrest, players: {} }) : S.match;
+  if (l.kind === "player") {
+    const p = m && m.players && (m.players[l.side] || []).find(x => x.name === l.player) || {};
+    const ini = String(l.player || "?").split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+    const src = (l.photo || p.photo) ? String(l.photo || p.photo).replace(/,d_[^,/]+/, "") : null;
+    return `<div class="lface ${l.side}"><span class="ini">${esc(ini)}</span>${src ? `<img src="${esc(src)}" alt="" onerror="this.remove()">` : ""}${p.num ? `<span class="no">${esc(p.num)}</span>` : ""}</div>`;
+  }
+  const side = /(^|:)home(:|$)/.test(l.id) ? "home" : /(^|:)away(:|$)/.test(l.id) ? "away" : null;
+  if (side && m && (side === "home" ? m.homeCrest : m.awayCrest)) return `<div class="lface crest ${side}"><img src="${esc(side === "home" ? m.homeCrest : m.awayCrest)}" alt="" onerror="this.remove()"></div>`;
+  return `<div class="lface ball"><span class="ini">${/corner/i.test(l.market) ? "⛳" : /card/i.test(l.market) ? "🟨" : "⚽"}</span></div>`;
+}
+// One word on the leg: Solid pick · Good price · OK · Weak link · Swap it — from its chance, form, how it fits, and the price.
+function legVerdict(l, row, n) {
+  const pr = legPrice(l), has = pr && pr.price, ev = has ? pr.price * l.p - 1 : null;
+  const rate = l.kind === "player" && l.games >= 3 ? l.hits / l.games : null, lift = row && n > 0 ? row.cond - l.p : 0;
+  // Form only counts with enough games (6+), and against what HAWK expects: a 36% scorer
+  // who scored in 1 of 4 isn't "bad form"; a 75% leg that landed in 1 of 8 is.
+  const formGap = rate != null && l.games >= 6 ? rate - l.p : 0;
+  if (has && pr.price <= HAWK.DEAD_PRICE) return { label: "Swap it", tone: "bad", why: "Bet365 pays next to nothing for it, but it can still lose the bet" };
+  if (formGap < -0.35) return { label: "Swap it", tone: "bad", why: `Only ${l.hits} of his last ${l.games}, far below HAWK's ${pct(l.p)} — the chance leans on this one matchup` };
+  if (ev != null && ev >= 0.02) return { label: "Good price", tone: "good", why: `Bet365 pays more than HAWK thinks it's worth (+${(100 * ev).toFixed(0)}%)` };
+  if (ev != null && ev < -0.15) return { label: "Weak link", tone: "warn", why: "Bet365 pays well under what it's worth" };
+  if (formGap < -0.2 || lift < -0.08) return { label: "Weak link", tone: "warn", why: formGap < -0.2 ? `Landed in ${l.hits} of his last ${l.games} — less than HAWK's ${pct(l.p)}` : "Goes against the legs above" };
+  if (l.p >= 0.65 && (rate == null || l.games < 6 || rate >= 0.6) && lift >= -0.04) return { label: "Solid pick", tone: "good", why: "Likely, backed by form and the other legs" };
+  if (l.p < 0.4) return { label: "Price leg", tone: "", why: "The least likely leg — it's the one that makes the price" };
+  return { label: "OK", tone: "", why: "A normal leg: fair chance, normal builder price" };
+}
+// The three scorecard tiles: Chance (HAWK's, and with the legs above) ·
+// Bet365 (its price and what it's worth) · Form (the player's last games —
+// tap for them) or, for a match leg, HAWK's fair odds and the market's move.
+function legTiles(l, row, n) {
+  const pr = legPrice(l), has = pr && pr.price, ev = has ? pr.price * l.p - 1 : null, dead = has && pr.price <= HAWK.DEAD_PRICE;
+  const chance = `<div class="tile"><div class="tk">Chance</div><div class="tv">${pct(l.p)}</div>
+    <div class="ts">${row && n > 0 ? `${pct(row.cond)} with the above` : "on its own"}${l.ep && l.pNoEp != null ? ` <span class="epb" title="Includes Bet365's Early Payout: +${pct(Math.max(0, l.p - l.pNoEp), 1)}">EP</span>` : ""}</div></div>`;
+  const tone = !has ? "" : dead ? "dead" : ev >= 0.02 ? "good" : ev >= -0.02 ? "ok" : ev >= -0.12 ? "" : "poor";
+  const verdict = !has ? "no price yet" : dead ? "pays next to nothing" : ev >= 0.02 ? `value +${(100 * ev).toFixed(0)}%` : ev >= -0.02 ? "fair price" : `${(100 * -ev).toFixed(0)}% under fair`;
+  const mark = pr && pr.src === "priced" ? `<span class="tm" title="From Unibet's real price (${odds(l.refPrice)}), turned into Bet365's">≈</span>`
+    : pr && pr.src === "guess" && has ? `<span class="tm" title="HAWK's guess — no bookmaker prices this leg">~</span>` : pr && pr.src === "typed" ? `<span class="tm" title="The price you typed">✓</span>` : "";
+  const edit = l.kind === "player" && pr && pr.src !== "bet365"
+    ? (S.ppEdit === l.id ? ` <input class="pp-in" data-pprice="${esc(l.id)}" inputmode="decimal" placeholder="${has ? odds(pr.price) : "price"}">`
+                         : ` <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Type this leg's Bet365 price (optional)">✎</button>`) : "";
+  const bet = `<div class="tile ${tone}"><div class="tk">Bet365${edit}</div><div class="tv">${mark}${has ? odds(pr.price) : "—"}</div><div class="ts">${verdict}</div></div>`;
+  let third;
+  if (l.kind === "player" && l.games >= 3) {
+    const r5 = (l.recent || []).slice(0, 5), h5 = r5.filter(v => v >= l.threshold).length, rate = l.hits / l.games;
+    third = `<div class="tile form ${rate >= 0.7 ? "good" : rate >= 0.4 ? "" : "poor"}" data-hist="${esc(l.id)}" title="Tap for his last games">
+      <div class="tk">Form</div><div class="tv">${l.hits}/${l.games}<small> ${l.basis === "starts" ? "starts" : "games"}</small></div>
+      <div class="ts">${l.games > 5 ? `last 5: ${h5}/${r5.length}` : "tap for the games"}</div></div>`;
+  } else {
+    const moved = l.bookOpen > 1 && l.bookPrice > 1 && Math.abs(l.bookPrice / l.bookOpen - 1) >= 0.03;
+    const down = moved && l.bookPrice < l.bookOpen;
+    third = `<div class="tile"><div class="tk">Fair odds</div><div class="tv">${odds(l.fair)}</div>
+      <div class="ts">${moved ? `<span class="${down ? "dn" : "up"}">${down ? "▼" : "▲"} from ${odds(l.bookOpen)}</span>` : "HAWK's price"}</div></div>`;
+  }
+  return `<div class="tiles">${chance}${bet}${third}</div>`;
+}
+// The short "why" under the tiles (the full one is in its tooltip): how
+// reliable it's been, how it fits the other legs, and what Bet365 pays.
+function whyShort(l, row, n) {
+  const first = [], rest = [];
+  if (l.kind === "player" && l.games >= 3) {
+    const r = l.hits / l.games;
+    first.push(r >= 0.75 ? "very reliable lately" : r >= 0.5 ? "hits more often than not lately" : r >= 0.3 ? "hit and miss lately" : "rarely hits lately — the chance leans on this matchup");
+  } else if (l.group === "result") first.push(l.p >= 0.6 ? "clear favourite" : l.p >= 0.45 ? "slight favourite" : "not the favourite — a punt");
+  else first.push(l.p >= 0.7 ? "likely on its own" : l.p >= 0.5 ? "better than even" : "less likely than not");
+  if (row && n > 0) { const lift = row.cond - l.p; first.push(lift > 0.04 ? "fits the legs above" : lift < -0.04 ? "goes a bit against the legs above" : "doesn't depend on the other legs"); }
+  const pr = legPrice(l), has = pr && pr.price, ev = has ? pr.price * l.p - 1 : null;
+  if (has) rest.push(pr.price <= HAWK.DEAD_PRICE ? "Bet365 pays next to nothing for it — swap it" : ev >= 0.02 ? "Bet365 pays over the odds" : ev >= -0.02 ? "a fair price" : ev >= -0.12 ? "a normal builder price" : "Bet365 pays short here");
+  if (pr && pr.src === "guess") rest.push("the price is HAWK's guess");
+  if (l.ep && l.pNoEp != null) rest.push(`Early Payout adds ${pct(Math.max(0, l.p - l.pNoEp), 1)}`);
+  if (l.bookOpen > 1 && l.bookPrice > 1 && Math.abs(l.bookPrice / l.bookOpen - 1) >= 0.03) {
+    const down = l.bookPrice < l.bookOpen, agree = down ? l.fair < l.bookOpen : l.fair > l.bookOpen;
+    rest.push(`${down ? "money has come for it" : "it's drifting"}${agree ? "" : " — HAWK thinks too far"}`);
+  }
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const tip = document.createElement("div"); tip.innerHTML = whyLeg(l, row, n);
+  return `<span title="${esc(tip.textContent)}">${esc(cap(first.join("; ")))}.${rest.length ? " " + rest.map(x => esc(cap(x)) + ".").join(" ") : ""}</span>`;
+}
+// Why HAWK picked the leg, in a sentence or two, from what it knows: the form
+// behind it, how it goes with the other legs, the price, the market's move.
+const FORM_VERB = { score: "scored", soa: "scored or assisted", assist: "assisted", booked: "was booked", sot: "had {k}+ shots on target", shots: "had {k}+ shots",
+                    fouled: "won {k}+ fouls", fouls: "made {k}+ fouls", tackles: "made {k}+ tackles", saves: "made {k}+ saves", offsides: "was caught offside {k}+ times" };
+function whyLeg(l, row, n) {
+  const out = [];
+  // 1. What it rests on.
+  if (l.kind === "player" && l.games >= 3) {
+    const m = /:([a-z]+?)(\d*)$/.exec(l.id) || [], verb = (FORM_VERB[m[1]] || "hit this line").replace("{k}", m[2] || "1");
+    out.push(`${verb.charAt(0).toUpperCase() + verb.slice(1)} in ${l.hits} of his last ${l.games} ${l.basis === "starts" ? "starts" : "games"}`);
+  } else if (l.group === "result" && l.ep && l.pNoEp != null) out.push(`HAWK makes it ${pct(l.pNoEp)} to win, +${pct(Math.max(0, l.p - l.pNoEp), 1)} from Early Payout`);
+  else out.push(`HAWK makes it ${pct(l.p)}`);
+  // 2. With the legs above it.
+  if (row && n > 0) {
+    const lift = row.cond - l.p;
+    if (lift > 0.04) out.push(`goes with the legs above — ${pct(row.cond)} if they land`);
+    else if (lift < -0.04) out.push(`pulls a little against the legs above (${pct(row.cond)} if they land)`);
+  }
+  // 3. The price.
+  const pr = legPrice(l);
+  if (pr && pr.price) {
+    const ev = pr.price * l.p - 1, where = pr.src === "guess" ? "Bet365 should pay about" : "Bet365 pays";
+    out.push(pr.price <= HAWK.DEAD_PRICE ? `${where} next to nothing for it — worth swapping`
+      : ev >= 0.02 ? `${where} ${odds(pr.price)}, more than it's worth`
+      : ev >= -0.02 ? `${where} a fair ${odds(pr.price)}`
+      : `${where} ${odds(pr.price)} — ${(100 * -ev).toFixed(0)}% under fair, the usual cost of a builder leg`);
+  } else if (l.kind === "player") out.push("no bookmaker prices it, so Bet365's price is a guess");
+  // 4. The market's move since it opened.
+  if (l.bookOpen > 1 && l.bookPrice > 1 && Math.abs(l.bookPrice / l.bookOpen - 1) >= 0.03) {
+    const down = l.bookPrice < l.bookOpen, agree = down ? l.fair < l.bookOpen : l.fair > l.bookOpen;
+    out.push(`${down ? "money has come for it" : "it has drifted"} (${odds(l.bookOpen)} → ${odds(l.bookPrice)}) — ${agree ? "HAWK agrees" : "HAWK thinks the market has gone too far"}`);
+  }
+  return out.map(s => esc(s.charAt(0).toUpperCase() + s.slice(1))).join(". ") + ".";
+}
 function priceLine(l) {
   const book = (S.match && S.match.priceBook) || "Bet365";
   if (!l.bookPrice) return `<div class="bp">fair <b>${odds(l.fair)}</b></div>`;
@@ -1581,15 +1809,19 @@ function renderSlip() {
   const legRows = S.slip.map((id, n) => {
     const l = S.legs[id]; if (!l) return "";
     const row = r && r.legs ? r.legs.find(x => x.id === id) : null;
-    return `<div class="leg" style="animation-delay:${n * 60}ms"><div class="ck">✓</div>
-      <div class="l1"><div><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}${hitChip(l)}</div>${b365Line(l)}${propLine(l)}${moveLine(l)}</div>
-        <div class="rt"><div class="pp">${pct(l.p)}</div>${row && n > 0 ? `<div class="fo">${pct(row.cond)} given above</div>` : ""}
-          ${priceLine(l)}</div></div>
-      <div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div>
-      <div class="acts"><button class="${S.locked.has(id) ? "on" : ""}" data-lock="${id}">${S.locked.has(id) ? "🔒 locked" : "lock"}</button>
-        <button data-swap="${id}" title="Take this leg out and let HAWK put the best replacement in, back up to your target odds">🔄 swap</button>
-        <button data-rm="${id}" title="Just take this leg out">remove</button>
-        <button data-no365="${id}" title="Bet365 doesn't offer ${esc(l.market)} for this league — HAWK stops using it there and puts the next best leg in">🚫 not on Bet365</button></div></div>`;
+    // Scorecard: the leg's name, three tiles — Chance · Bet365 · Form — a
+    // short "why", and the buttons.
+    const vd = legVerdict(l, row, n);
+    return `<div class="leg card tilt3d" style="animation-delay:${n * 60}ms">
+      <div class="sc-head">${legFace(l)}<div class="sc-name"><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}</div></div>
+        <span class="verdict ${vd.tone}" title="${esc(vd.why)}">${vd.label}</span></div>
+      ${l.b365 ? `<div class="b365" title="Bet365's corners and cards lines are 3-way (Over / Exactly / Under): its &quot;Over 3&quot; means 4 or more">On Bet365 pick: <b>${esc(l.b365)}</b></div>` : ""}
+      ${legTiles(l, row, n)}
+      <div class="why">💬 ${whyShort(l, row, n)}</div>
+      <div class="acts"><button class="${S.locked.has(id) ? "on" : ""}" data-lock="${id}" title="${S.locked.has(id) ? "Locked: Build again keeps it — click to unlock" : "Lock: keep this leg when you build again"}">🔒${S.locked.has(id) ? " Locked" : ""}</button>
+        <button data-swap="${id}" title="Swap: take it out and let HAWK put the best replacement in, back up to your target">🔄</button>
+        <button data-rm="${id}" title="Remove this leg">✕</button>
+        <button data-no365="${id}" title="Not on Bet365? HAWK stops using ${esc(l.market)} in this league and puts the next best leg in">🚫</button></div></div>`;
   }).join("");
   const predicted = m && Object.values(m.lineups).some(lu => lu.status !== "Confirmed");
   $("#slip").innerHTML = `
@@ -2416,6 +2648,7 @@ function accaTotals(parts = S.acca) {
            legs: parts.reduce((s, pt) => s + pt.legs.length, 0) };
 }
 const makePart = (info, legs, p) => ({ id: String(info.id), league: info.league, home: info.home, away: info.away,
+                                       homeCrest: info.homeCrest || null, awayCrest: info.awayCrest || null, upset: info.upset,
                                        kickoff: info.kickoff, legs, p, fair: p > 0 ? 1 / p : null });
 function putPart(part) {   // one part per match: adding a match again replaces it
   const i = S.acca.findIndex(x => x.id === part.id);
@@ -2432,7 +2665,9 @@ function addSlipToAcca() {
   const m = S.match, r = S.result;
   if (!m || !S.slip.length || !r || !r.p) return toast("Build a ticket first.");
   const legs = S.slip.map(id => { const l = S.legs[id]; return { id, label: l.label, market: l.market, kind: l.kind, p: l.p, pRaw: l.pRaw, fair: l.fair,
-    bookPrice: l.bookPrice || null, player: l.player || null, side: l.side || null }; });
+    bookPrice: l.bookPrice || null, player: l.player || null, side: l.side || null,
+    photo: l.photo || null, refPrice: l.refPrice || null, b365: l.b365 || null, ep: !!l.ep, pNoEp: l.pNoEp ?? null,
+    hits: l.hits ?? null, games: l.games ?? null, basis: l.basis || null }; });
   accaToast(putPart(makePart(m, legs, r.p)), m.home, m.away);
   renderSlip();
 }
@@ -2483,15 +2718,57 @@ function renderAcca() {
   updateMonster();
 }
 
+// One match in the acca / Monster Acca, as a 3D card like the slip's legs:
+// both crests and the teams with a verdict badge · each leg with its face ·
+// Chance · Bet365 · Fair odds tiles · a short why · the buttons.
 function partRow(pt, actions) {
-  const started = pt.kickoff && new Date(pt.kickoff).getTime() < Date.now(), price = partPrice(pt);
-  return `<div class="apart ${started ? "gone" : ""}">
-    <div><div class="teams">${esc(pt.home)} <span class="muted" style="font-weight:500">v</span> ${esc(pt.away)}${upsetFlag(pt)}</div>
-      <div class="muted" style="font-size:12px">${esc(pt.league)} · ${esc(fmtKick(pt.kickoff))}${started ? ' · <span class="badge live">STARTED</span>' : ""}</div>
-      <div>${pt.legs.map(l => `<span class="lchip ${l.kind === "player" ? "pl" : ""}">${esc(l.label)}</span>`).join("")}</div></div>
-    <div style="text-align:right;white-space:nowrap"><div style="font-weight:800">${odds(pt.fair)} <span class="muted" style="font-weight:500;font-size:12px">fair</span></div>
-      <div class="muted" style="font-size:12px">${pct(pt.p, 1)}${price ? ` · Bet365 <b style="color:${price * pt.p >= VALUE_EDGE ? "var(--accent)" : "var(--text)"}">${odds(price)}</b>${moveMark(pt.legs[0])}` : ""}</div>
-      ${actions}</div></div>`;
+  const started = pt.kickoff && new Date(pt.kickoff).getTime() < Date.now(), price = partPrice(pt), single = pt.legs.length === 1;
+  const ev = price ? price * pt.p - 1 : null, vd = partVerdict(pt, price);
+  const crest = (src) => src ? `<img class="pcrest" src="${esc(src)}" alt="" onerror="this.remove()">` : "";
+  const legRow = (l) => `<div class="pleg">${legFace(l, pt)}<div class="pl-l"><div>${esc(l.label)}</div>${
+      l.b365 ? `<div class="b365">On Bet365 pick: <b>${esc(l.b365)}</b></div>` : `<div class="muted" style="font-size:11px">${esc(l.market || "")}</div>`}</div><b>${pct(l.p)}</b></div>`;
+  const moved = single && pt.legs[0].bookOpen > 1 && pt.legs[0].bookPrice > 1 && Math.abs(pt.legs[0].bookPrice / pt.legs[0].bookOpen - 1) >= 0.03;
+  const tone = ev == null ? "" : ev >= 0.02 ? "good" : ev >= -0.02 ? "ok" : ev < -0.12 ? "poor" : "";
+  return `<div class="leg card tilt3d apart3d ${started ? "gone" : ""}">
+    <div class="sc-head"><div class="pcrests">${crest(pt.homeCrest)}${crest(pt.awayCrest)}</div>
+      <div class="sc-name"><div class="lb">${esc(pt.home)} <span class="muted" style="font-weight:500">v</span> ${esc(pt.away)}${upsetFlag(pt)}</div>
+        <div class="mk">${esc(pt.league)} · ${esc(fmtKick(pt.kickoff))}${started ? ' · <span class="badge live">STARTED</span>' : ""}</div></div>
+      <span class="verdict ${vd.tone}" title="${esc(vd.why)}">${vd.label}</span></div>
+    <div class="plegs">${pt.legs.map(legRow).join("")}</div>
+    <div class="tiles">
+      <div class="tile"><div class="tk">Chance</div><div class="tv">${pct(pt.p, pt.p < 0.1 ? 1 : 0)}</div><div class="ts">${single ? "this leg" : `${pt.legs.length} legs together`}</div></div>
+      <div class="tile ${tone}"><div class="tk">Bet365</div><div class="tv">${price ? odds(price) : "—"}</div>
+        <div class="ts">${price ? (ev >= 0.02 ? `value +${(100 * ev).toFixed(0)}%` : ev >= -0.02 ? "fair price" : `${(100 * -ev).toFixed(0)}% under fair`) : "Bet365 prices the builder"}</div></div>
+      <div class="tile"><div class="tk">Fair odds</div><div class="tv">${odds(pt.fair)}</div>
+        <div class="ts">${moved ? `<span class="${pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "dn" : "up"}">${pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "▼" : "▲"} from ${odds(pt.legs[0].bookOpen)}</span>` : "HAWK's price"}</div></div>
+    </div>
+    <div class="why">💬 ${esc(whyPart(pt, price))}</div>
+    <div class="pacts">${actions}</div></div>`;
+}
+// One word on a match in the acca, as on the slip's legs.
+function partVerdict(pt, price) {
+  const ev = price ? price * pt.p - 1 : null, single = pt.legs.length === 1;
+  if (ev != null && ev >= 0.02) return { label: "Good price", tone: "good", why: `Bet365 pays more than HAWK thinks it's worth (+${(100 * ev).toFixed(0)}%)` };
+  if (ev != null && ev < -0.12) return { label: "Weak link", tone: "warn", why: "Bet365 pays well under what it's worth — swap it for another leg from this match" };
+  if (pt.p >= (single ? 0.7 : 0.5)) return { label: "Solid pick", tone: "good", why: single ? "Likely, at a normal price" : "A likely builder for this match" };
+  if (pt.p < (single ? 0.4 : 0.25)) return { label: "Price leg", tone: "", why: "One of the less likely parts — it's what makes the acca's price" };
+  return { label: "OK", tone: "", why: "A normal part: fair chance, normal price" };
+}
+// The short why for a match in the acca.
+function whyPart(pt, price) {
+  const l = pt.legs[0], single = pt.legs.length === 1, out = [];
+  if (single) {
+    if (l.kind === "player" && l.games >= 3) out.push(`${l.hits} of his last ${l.games} ${l.basis === "starts" ? "starts" : "games"}`);
+    else out.push(l.p >= 0.7 ? "likely on its own" : l.p >= 0.5 ? "better than even" : "less likely than not");
+    if (price) { const ev = price * pt.p - 1; out.push(ev >= 0.02 ? "Bet365 pays over the odds" : ev >= -0.02 ? "a fair price" : ev >= -0.12 ? "a normal price" : "Bet365 pays short here"); }
+    if (l.ep && l.pNoEp != null) out.push(`Early Payout adds ${pct(Math.max(0, l.p - l.pNoEp), 1)}`);
+    if (l.bookOpen > 1 && l.bookPrice > 1 && Math.abs(l.bookPrice / l.bookOpen - 1) >= 0.03) out.push(l.bookPrice < l.bookOpen ? "money has come for it" : "it's drifting");
+  } else {
+    const alone = pt.legs.reduce((a, x) => a * x.p, 1), lift = pt.p / alone;
+    out.push(`${pt.legs.length} legs from one match, ${pct(pt.p)} together`);
+    out.push(lift > 1.08 ? "they go together, so the builder is likelier than the legs look" : lift < 0.92 ? "they pull a little against each other" : "they don't depend much on each other");
+  }
+  return out.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(". ") + ".";
 }
 function accaInputs() {
   const num = (s) => parseFloat(String(s || "").replace(",", "."));
@@ -3215,7 +3492,9 @@ async function openLivePlayer(side, name) {
   const stats = pl ? [...pl.stats].sort((a, b) => ((TOP.indexOf(a[0]) + 1) || 99) - ((TOP.indexOf(b[0]) + 1) || 99)) : [];
   const legsNow = (ip.mine || []).flatMap(t => t.parts.filter(pt => pt.live).flatMap(pt => pt.live.legs)).filter(r2 => samePerson(r2.label.split(/:| to /)[0], name));
   const pre = ip.m ? (ip.m.legs || []).filter(l => l.kind === "player" && l.side === side && samePerson(l.player, name) && /:(score|sot1|shots1|booked|soa)$/.test(l.id)) : [];
-  modal(`<div class="mhead"><div><div style="font-size:20px;font-weight:800">${pl && pl.num ? `<span class="muted">#${pl.num}</span> ` : ""}${esc(name)}</div>
+  const photo = (pl && pl.photo) || ((ip.m && (ip.m.players[side] || []).find(p => samePerson(p.name, name))) || {}).photo;
+  modal(`<div class="mhead"><div class="ph lp-face ${side}">${photo ? `<img src="${esc(photo)}" alt="" onerror="this.remove()">` : ""}${pl && pl.num ? `<span class="no">${pl.num}</span>` : ""}</div>
+      <div style="flex:1"><div style="font-size:20px;font-weight:800">${esc(name)}</div>
       <div class="muted">${esc(team)}${pl && pl.pos ? ` · ${esc(pl.pos)}` : ""}${status ? ` · ${esc(status)}` : ""} · ${esc(d.clock || "")}</div></div>
       <button class="x" data-close title="Close">✕</button></div>
     ${r && (r.goals || r.assists || r.yellow || r.red) ? `<div style="font-size:18px;margin:4px 0 10px">${liveIcons(r)}</div>` : ""}
@@ -3766,6 +4045,26 @@ function goalToggleText() {
   const perm = "Notification" in window ? Notification.permission : "unsupported";
   return perm === "granted" ? "⚽ Goal alerts: on · pop-ups ✓" : perm === "denied" ? "⚽ Goal alerts: on · pop-ups blocked" : "⚽ Goal alerts: on · 🔔 allow pop-ups";
 }
+// 3D tilt for the leg cards (as in the Vault): they lean towards the mouse.
+// Mouse only — on a phone they just have the depth; off with reduced motion.
+(function tilt3d() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  let current = null;
+  const reset = (el) => { el.classList.remove("tilting"); el.style.transform = ""; };
+  document.addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "mouse") return;
+    const el = e.target.closest ? e.target.closest(".tilt3d") : null;
+    if (current && current !== el) reset(current);
+    current = el;
+    if (!el) return;
+    const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    el.classList.add("tilting");
+    el.style.transform = `perspective(800px) rotateX(${((0.5 - y) * 6).toFixed(2)}deg) rotateY(${((x - 0.5) * 6).toFixed(2)}deg) translateY(-2px)`;
+    el.style.setProperty("--mx", `${(x * 100).toFixed(1)}%`);
+    el.style.setProperty("--my", `${(y * 100).toFixed(1)}%`);
+  }, { passive: true });
+  document.addEventListener("pointerleave", () => { if (current) reset(current); current = null; });
+})();
 function beep() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();

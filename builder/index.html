@@ -8,8 +8,12 @@
 <link rel="icon" href="hawk-tab.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png?v=4" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
-<link rel="manifest" href="manifest.webmanifest?v=4">
+<link rel="manifest" href="../manifest.webmanifest?v=5">
 <meta name="theme-color" content="#0d1114">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HAWK">
 <style>
 :root{
   --bg:#0d1114; --panel:#151b1f; --panel2:#1b2328; --line:#25313a; --text:#e8eff3; --muted:#8797a3;
@@ -425,6 +429,38 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .sig.up{background:rgba(20,227,161,.06)}
 .sig.down{background:rgba(143,164,178,.07);color:#c3cfd6}
 .sig.info{background:rgba(255,209,102,.07);color:#e8d9a8}
+/* 👕 lineups: a pitch (lying down; standing up on phones) */
+.lu-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.pitch{position:relative;width:100%;aspect-ratio:16/10;border-radius:14px;overflow:hidden;
+  background:repeating-linear-gradient(90deg,#1c5a39 0 6.25%,#195133 6.25% 12.5%);box-shadow:inset 0 0 40px rgba(0,0,0,.35)}
+.pitch svg{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke:rgba(255,255,255,.35);stroke-width:.5;vector-effect:non-scaling-stroke}
+.pitch .pl-v{display:none}
+.pm{position:absolute;left:var(--hl);top:var(--ht);transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:1px;
+  cursor:pointer;width:74px;z-index:1;transition:transform .12s}
+.pm:hover{transform:translate(-50%,-50%) scale(1.08);z-index:2}
+.pm .shirt{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:11.5px;border:2px solid rgba(255,255,255,.75);
+  box-shadow:0 2px 6px rgba(0,0,0,.45)}
+.pm.home .shirt{background:var(--accent);color:#04241a}
+.pm.away .shirt{background:var(--blue);color:#061a2c}
+.pm .nm{font-size:10.5px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pm .tg{font-size:9.5px;font-weight:800;color:#fff;background:rgba(4,12,10,.62);padding:0 5px;border-radius:6px;white-space:nowrap}
+.lu-legend{font-size:11.5px;color:var(--muted);margin:8px 2px 0}
+.lu-teams{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.lu-tname{font-weight:800;display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.lu-tname .dot{width:10px;height:10px;border-radius:50%}
+.lu-tname .dot.home{background:var(--accent)}
+.lu-tname .dot.away{background:var(--blue)}
+.lu-row{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px;margin-bottom:5px}
+.lu-row>.muted{width:42px;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.lu-chip{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:2px 8px;cursor:pointer;white-space:nowrap}
+.lu-chip:hover{border-color:#3a4a55}
+.lu-chip.out{cursor:default;color:#ff9aa8;border-color:rgba(255,93,115,.3)}
+@media (max-width:560px){
+  .pitch{aspect-ratio:10/15;background:repeating-linear-gradient(0deg,#1c5a39 0 6.25%,#195133 6.25% 12.5%)}
+  .pitch .pl-h{display:none}.pitch .pl-v{display:block}
+  .pm{left:var(--vl);top:var(--vt);width:64px}
+  .lu-teams{grid-template-columns:1fr}
+}
 /* ⚡ Radar page */
 .rcard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;
   background:var(--panel2);margin-bottom:10px;cursor:pointer;transition:.15s}
@@ -511,6 +547,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 @media (max-width:1180px) and (min-width:821px){.nav span{display:none}.nav.on span{display:inline}.nav{padding:7px 11px}}
 /* small phones: icon over a small label, so all five pages fit in one row */
 @media (max-width:560px){.nav{flex-direction:column;gap:1px;font-size:10.5px;padding:5px 2px}.nav span{display:block}.tool.bell span{display:none}}
+.tool.install{color:var(--accent);border-color:rgba(20,227,161,.45)}
+@media (max-width:560px){.tool.install span{display:none}}
 /* long page names get a short one on phones (6 pages across a phone screen) */
 .nav .ns{display:none}
 @media (max-width:560px){.nav .nl{display:none}.nav .ns{display:block}.mainnav{gap:2px}.nav{font-size:10px;padding:5px 1px;min-width:0}}
@@ -581,6 +619,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <button class="nav" id="accaBtn" data-nav="acca" title="Several matches on one ticket, and the Monster Acca">🧩 <span>Acca</span></button>
     </nav>
     <div class="topright">
+      <button class="tool install" id="installBtn" hidden title="Install HAWK as an app on this device">📲 <span>Install</span></button>
       <button class="tool bell" id="watchBtn" hidden></button>
       <div class="pop" id="watchPop" hidden></div>
       <a class="vaultlink" href="../" title="Back to the HAWK Vault"><img src="../hawk-logo.svg" alt="">Vault</a>
@@ -729,7 +768,10 @@ async function init() {
 // Upcoming → the match with those legs on the slip; in play → live view;
 // finished → match report.
 async function openFromUrl() {
-  const q = new URLSearchParams(location.search), id = q.get("match");
+  const q = new URLSearchParams(location.search), id = q.get("match"), view = q.get("view");
+  // App shortcuts (long-press the HAWK icon): builder/?view=radar | scores | value | acca | scan
+  const views = { radar: showRadar, scores: showScores, value: showValue, acca: showAcca, scan: showScan };
+  if (view && views[view]) { history.replaceState(null, "", location.pathname); return views[view](); }
   if (!id) return;
   history.replaceState(null, "", location.pathname);   // so a refresh doesn't reopen it
   const league = q.get("league"), legs = (q.get("legs") || "").split(",").filter(Boolean);
@@ -918,6 +960,7 @@ function renderMatch() {
       <div class="srcs">${srcs.join("")}</div>
     </div>
     ${upsetCard(m)}
+    ${lineupCard(m)}
     ${teamNews(m)}
     <div class="section"><div class="tiles">
       <div class="tile"><div class="k">Expected goals</div><div class="v">${e.goals[0].toFixed(2)} – ${e.goals[1].toFixed(2)}</div></div>
@@ -940,6 +983,7 @@ function renderMatch() {
       <div id="tabbody"></div>
     </div>`;
   $("#match").querySelector(".tabs").onclick = (ev) => { const t = ev.target.closest(".tab"); if (t) { S.tab = t.dataset.t; renderMatch(); } };
+  if ($("#lineups")) $("#lineups").onclick = (ev) => { const p = ev.target.closest("[data-lp]"); if (p) openPlayer(p.dataset.lp, p.dataset.name); };
   renderTab();
   renderLive();
   renderCountdown();
@@ -1131,6 +1175,65 @@ function moveTag(r, short = false) {
   if (r.value >= 0.02) return `<span class="badge ok">${short ? "" : "still "}value +${(100 * r.value).toFixed(1)}%</span>`;
   if (!r.agree) return `<span class="badge warn" title="The price moved away from HAWK's fair ${odds(r.fair)}">HAWK disagrees</span>`;
   return `<span class="badge nv" title="The price moved towards HAWK's fair ${odds(r.fair)}, but ${odds(r.price)} still pays less than that — no bet. Value from ${odds(r.fair * VALUE_EDGE)}+">HAWK agrees · no value <small>(needs ${odds(r.fair * VALUE_EDGE)}+)</small></span>`;
+}
+/* ---------- 👕 lineups ---------- */
+// Both XIs on a pitch in their formation (365Scores' positions; players
+// without one are laid out by position), with one HAWK number each:
+// ⚽ chance to score, 🎯 1+ shot on target, or 🧤 2+ saves for keepers.
+// Bench and absentees underneath. Tap a player for his stats and legs.
+function pitchSpots(list) {
+  const out = [], byLine = { G: [], D: [], M: [], F: [] };
+  for (const p of list.filter(x => x.status === "Starting")) {
+    if (p.field) out.push({ p, depth: p.field.depth, side: p.field.side });
+    else (byLine[p.pos] || byLine.M).push(p);
+  }
+  const depthOf = { G: 0, D: 28, M: 58, F: 88 };
+  for (const [pos, ps] of Object.entries(byLine))
+    ps.forEach((p, i) => out.push({ p, depth: depthOf[pos], side: ps.length === 1 ? 50 : 10 + (80 * i) / (ps.length - 1) }));
+  return out;
+}
+function playerTag(side, p) {
+  const legs = legsFor(side, p.name), find = (re) => legs.find(l => re.test(l.id));
+  if (p.pos === "G") { const s = find(/:saves2$/); return s ? `🧤 ${pct(s.p)}` : ""; }
+  const sc = find(/:score$/);
+  if (sc && sc.p >= 0.15) return `⚽ ${pct(sc.p)}`;
+  const sot = find(/:sot1$/);
+  return sot ? `🎯 ${pct(sot.p)}` : "";
+}
+function lineupCard(m) {
+  if (!m.players || !(m.players.home || []).some(p => p.status === "Starting")) return "";
+  const lu = m.lineups, confirmed = lu.home.status === "Confirmed" && lu.away.status === "Confirmed";
+  const marker = (side, { p, depth, side: s }) => {
+    // Horizontal pitch: home attacks left → right, away right → left. On phones
+    // the pitch stands up: home at the bottom, away at the top.
+    // (kept a little inside the lines so names and badges on the wings aren't cut off)
+    const hl = side === "home" ? 6 + depth * 0.4 : 94 - depth * 0.4, ht = side === "home" ? 12 + s * 0.74 : 88 - s * 0.74;
+    const vt = side === "home" ? 94 - depth * 0.4 : 6 + depth * 0.4, vl = side === "home" ? 12 + s * 0.76 : 88 - s * 0.76;
+    const tag = playerTag(side, p), booked = legsFor(side, p.name).find(l => /:booked$/.test(l.id) && l.p >= 0.3);
+    return `<div class="pm ${side}" style="--hl:${hl.toFixed(1)}%;--ht:${ht.toFixed(1)}%;--vl:${vl.toFixed(1)}%;--vt:${vt.toFixed(1)}%"
+        data-lp="${side}" data-name="${esc(p.name)}" title="${esc(p.name)}${p.doubtful ? " — doubtful" : ""}${!p.has_data ? " — no recent data" : ""}">
+      <div class="shirt">${p.num || "·"}</div><div class="nm">${p.doubtful ? "❓" : ""}${esc(p.short || p.name.split(" ").slice(-1)[0])}</div>
+      ${tag || booked ? `<div class="tg">${tag}${booked ? ` 🟨` : ""}</div>` : ""}</div>`;
+  };
+  const bench = (side) => (m.players[side] || []).filter(p => p.status === "Substitute")
+    .map(p => `<span class="lu-chip" data-lp="${side}" data-name="${esc(p.name)}">${p.num ? `<b>${p.num}</b> ` : ""}${esc(p.short || p.name)}</span>`).join("") || '<span class="muted">—</span>';
+  const out = (side) => ((m.missing || {})[side] || []).map(o => `<span class="lu-chip out" title="${esc(o.reason || o.status)}${o.back ? " · back " + esc(o.back) : ""}">${o.status === "Doubtful" ? "❓" : "✚"} ${esc(o.name)}</span>`).join("");
+  const team = (side) => `<div class="lu-team"><div class="lu-tname"><span class="dot ${side}"></span>${esc(side === "home" ? m.home : m.away)}
+      <span class="muted">${esc(lu[side].formation || "")}</span></div>
+    <div class="lu-row"><span class="muted">Bench</span>${bench(side)}</div>${out(side) ? `<div class="lu-row"><span class="muted">Out</span>${out(side)}</div>` : ""}</div>`;
+  return `<div class="section" id="lineups">
+    <div class="lu-head"><h3 style="margin:0">👕 Lineups</h3>
+      <span class="badge ${confirmed ? "ok" : "warn"}">${confirmed ? "✅ Confirmed — HAWK's chances use them" : "🕐 Predicted — confirmed about an hour before kick-off"}</span></div>
+    <div class="pitch">
+      <svg class="pl-h" viewBox="0 0 160 100" preserveAspectRatio="none"><rect x="1" y="1" width="158" height="98"/><line x1="80" y1="1" x2="80" y2="99"/><circle cx="80" cy="50" r="9"/>
+        <rect x="1" y="22" width="16" height="56"/><rect x="1" y="38" width="6" height="24"/><rect x="143" y="22" width="16" height="56"/><rect x="153" y="38" width="6" height="24"/></svg>
+      <svg class="pl-v" viewBox="0 0 100 160" preserveAspectRatio="none"><rect x="1" y="1" width="98" height="158"/><line x1="1" y1="80" x2="99" y2="80"/><circle cx="50" cy="80" r="9"/>
+        <rect x="22" y="1" width="56" height="16"/><rect x="38" y="1" width="24" height="6"/><rect x="22" y="143" width="56" height="16"/><rect x="38" y="153" width="24" height="6"/></svg>
+      ${["home", "away"].map(side => pitchSpots(m.players[side] || []).map(spot => marker(side, spot)).join("")).join("")}
+    </div>
+    <div class="lu-legend">⚽ chance to score · 🎯 1+ shot on target · 🧤 2+ saves · 🟨 30%+ to be booked · ❓ doubtful — tap any player for his record and legs</div>
+    <div class="lu-teams">${team("home")}${team("away")}</div>
+  </div>`;
 }
 // Whole percentages that add up to exactly 100 (largest remainder), so three
 // rounded chances never show 101%.
@@ -2544,6 +2647,28 @@ function healthLine() {
   return `<div class="dhealth ${stuck || parts.some(p => p.includes("bad")) ? "warn" : ""}">📡 ${parts.join(" · ") || "Data"}
     <span class="muted">— updated ${esc(S.dataAge)}${stuck ? " (the 3-hourly update seems stuck — check GitHub Actions)" : ""}</span></div>`;
 }
+
+/* ---------- install as an app ---------- */
+// The service worker (../sw.js) makes HAWK installable and quick to open.
+// Chrome/Edge/Android offer the install prompt; on iPhone it's Share → Add to
+// Home Screen, so the button explains that instead. Hidden once installed.
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("../sw.js").catch(() => { /* not over https / blocked */ });
+(function setupInstall() {
+  const btn = document.getElementById("installBtn");
+  const installed = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  let prompt = null;
+  if (installed()) return;
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); prompt = e; btn.hidden = false; });
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent)) btn.hidden = false;
+  btn.onclick = async () => {
+    if (!prompt) return toast("On iPhone: tap Share ⬆️ at the bottom, then “Add to Home Screen”.");
+    prompt.prompt();
+    const choice = await prompt.userChoice;
+    prompt = null;
+    if (choice.outcome === "accepted") btn.hidden = true;
+  };
+  window.addEventListener("appinstalled", () => { btn.hidden = true; toast("🦅 HAWK is installed — open it from your home screen or apps."); });
+})();
 
 /* ---------- trusted markets ---------- */
 // From HAWK's graded predictions on every match (data/graded.json): did each

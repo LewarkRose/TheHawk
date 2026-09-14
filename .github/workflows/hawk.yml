@@ -64,6 +64,15 @@ jobs:
           sleep 2
           node engine/grade.mjs
 
+      # Safety test: loads a few matches with this run's engine and data. If
+      # anything is broken, the job stops here — the site isn't re-published,
+      # so the live version stays the last one that worked (and GitHub emails you).
+      - name: Safety test
+        run: |
+          python -m http.server 8001 --bind 127.0.0.1 &
+          sleep 2
+          HAWK_LOCAL=http://127.0.0.1:8001 node engine/smoke.mjs
+
       - name: Save grading state
         if: always()
         uses: actions/cache/save@v6

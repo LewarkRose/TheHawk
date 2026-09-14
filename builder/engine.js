@@ -576,8 +576,11 @@
       missing[side] = news;
       const listed = (name, status) => news.some((o) => o.status === status && nameSimilarity(o.name, name) >= 0.85);
       let entries = (lineup.members || []).filter((m) => m.statusText === "Starting" || m.statusText === "Substitute").map((m) => {
-        const info = members[m.id] || {};
-        return [info.name || "?", m.statusText, POSITIONS[(m.position || {}).name], info.athleteId ? athletePhoto(info) : null];
+        const info = members[m.id] || {}, y = m.yardFormation;
+        // Where he plays on the pitch (for the lineup view): depth 0 = own goal … 100 = attack, side 0 … 100.
+        const field = y && y.fieldLine != null ? { depth: y.fieldLine, side: y.fieldSide } : null;
+        return [info.name || "?", m.statusText, POSITIONS[(m.position || {}).name], info.athleteId ? athletePhoto(info) : null,
+                field, info.jerseyNumber || null, info.shortName || null];
       });
       if (!entries.some((e) => e[1] === "Starting") && sh[side].length) {
         // No lineup from 365Scores: the most-used players lately, minus the injured and suspended.
@@ -585,14 +588,14 @@
         const recent = sh[side].filter((p) => !listed(p.name, "Missing")).sort((a, b) => mins(b) - mins(a));
         entries = recent.slice(0, 18).map((p, i) => [p.name, i < 11 ? "Starting" : "Substitute", p.position, null]);
       }
-      squads[side] = entries.map(([name, status, pos, photo]) => {
+      squads[side] = entries.map(([name, status, pos, photo, field = null, num = null, short = null]) => {
         const match = Object.keys(byName).length ? bestMatch(name, Object.keys(byName), 0.6) : null;
         const matches = match ? byName[match].matches : [];
         pos = pos || (match && byName[match].position) || "M";
         const r = rates(matches, priors[pos] || DEFAULT_RATES.M, pos, teamHasExtras ? xpriors[pos] || EXTRA_DEFAULTS.M : null);
         // A doubtful player in a predicted lineup may well not start (and gets no legs).
         const doubt = !confirmed && listed(name, "Doubtful") ? DOUBTFUL_START : 1;
-        return { ...r, name, pos, status, photo, start_p: START_PROB[confirmed][status] * doubt, doubtful: doubt < 1,
+        return { ...r, name, pos, status, photo, field, num, short, start_p: START_PROB[confirmed][status] * doubt, doubtful: doubt < 1,
                  sub_p: status === "Substitute" ? SUB_APPEAR_PROB : 0, has_data: !!match, recent: matches.slice(0, 10),
                  recent_starts: matches.filter((m) => !m.sub_in).slice(0, 10) };
       });
@@ -1224,7 +1227,7 @@
       players: Object.fromEntries(Object.entries(squads).map(([side, sq]) => [side, sq.map((p) => ({
         name: p.name, pos: p.pos, status: p.status, photo: p.photo, start_p: p.start_p, doubtful: p.doubtful, sh90: p.sh90, sot90: p.sot90,
         g90: p.g90, c90: p.c90, x: p.x, sv90: p.sv90, minutes: p.minutes, has_data: p.has_data, recent: p.recent,
-        recent_starts: p.recent_starts }))])),
+        recent_starts: p.recent_starts, field: p.field, num: p.num, short: p.short }))])),
       warnings: an.warnings, value: { book: PRICE_BOOK, legs: value }, sims: sim.n, missing: an.missing || { home: [], away: [] },
       movers: an.inPlay ? [] : moverRows(an, sim.exp).slice(0, 8),
       upset: upsetRadar(an, M, squads, sim.exp),

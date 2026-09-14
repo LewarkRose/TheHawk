@@ -258,6 +258,8 @@ img{max-width:100%}
 .kfrac{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:2px 4px;font-size:12px;margin-left:4px}
 .ip-score{font-size:44px;font-weight:900;letter-spacing:.04em;text-align:center;line-height:1}
 .ip-clock{color:#ff6b6b;font-weight:800;text-align:center;margin-top:4px}
+.ip-scorers{margin-top:6px;display:flex;flex-direction:column;gap:2px;font-size:12.5px;font-weight:700;color:var(--text)}
+.ip-scorers span{color:var(--muted);font-weight:600}
 .ip-stat{display:grid;grid-template-columns:48px 1fr 48px;gap:8px;align-items:center;font-size:12.5px;margin:5px 0}
 .ip-stat .bar{display:flex;height:7px;border-radius:5px;overflow:hidden;background:#22303a}
 .ip-stat .bar i{display:block;height:100%}
@@ -3076,13 +3078,25 @@ function renderInPlay() {
   if (!d) { $("#match").innerHTML = `<div class="empty"><h2>Couldn't read this match</h2>${esc(ip.error || "")}</div>`; return; }
   const fx = S.fixtures.find(f => String(f.id) === ip.id);
   const prematch = `<button class="ghost" style="width:auto;padding:5px 10px;margin-top:8px" onclick="openMatch('${ip.id}', false, true)">Pre-match builder</button>`;
+  // Goalscorers under each team, like a scoreboard: "⚽ Martínez 12', 34' (pen)".
+  const scorers = (side) => {
+    const by = [];
+    for (const e of (d.events || []).filter(e => e.type === "goal" && e.side === side)) {
+      const own = /own/i.test(e.detail), pen = /pen/i.test(e.detail), name = e.player ? e.player.split(" ").slice(-1)[0] : "Goal";
+      const key = name + (own ? "|og" : "");
+      let row = by.find(r => r.key === key);
+      if (!row) by.push(row = { key, name, full: e.player, own, mins: [] });
+      row.mins.push(`${e.minute}${pen ? " (pen)" : ""}`);
+    }
+    return by.length ? `<div class="ip-scorers">${by.map(r => `<div title="${esc(r.full || "")}${r.own ? " — own goal" : ""}">⚽ ${esc(r.name)}${r.own ? " (og)" : ""} <span>${esc(r.mins.join(", "))}</span></div>`).join("")}</div>` : "";
+  };
   const head = `<div class="hero"><div class="vs">
-      <div class="side"><img src="${esc(d.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(d.home)}</div>${d.reds && d.reds[0] ? `<div>${"🟥".repeat(d.reds[0])}</div>` : ""}</div>
+      <div class="side"><img src="${esc(d.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(d.home)}</div>${d.reds && d.reds[0] ? `<div>${"🟥".repeat(d.reds[0])}</div>` : ""}${scorers("home")}</div>
       <div class="mid">${d.live ? `<div class="ip-score">${d.score[0]} – ${d.score[1]}</div><div class="ip-clock">🔴 ${esc(d.clock || "")} ${esc(d.statusText || "")}</div>`
         : `<div class="x">VS</div><div class="ko">${esc(d.statusText || "")}</div>`}
         <div class="ko" style="margin-top:6px">${d.checked ? `checked ${new Date(d.checked).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · every 30s` : ""}</div>
         ${prematch}</div>
-      <div class="side"><img src="${esc(d.awayCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(d.away)}</div>${d.reds && d.reds[1] ? `<div>${"🟥".repeat(d.reds[1])}</div>` : ""}</div>
+      <div class="side"><img src="${esc(d.awayCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(d.away)}</div>${d.reds && d.reds[1] ? `<div>${"🟥".repeat(d.reds[1])}</div>` : ""}${scorers("away")}</div>
     </div></div>`;
   if (!d.live) {
     $("#match").innerHTML = head + `<div class="section"><div class="note">${d.status === 4 ? "This match has finished." : "Not in play right now."}

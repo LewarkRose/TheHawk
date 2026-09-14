@@ -2065,7 +2065,8 @@
     const names = Object.fromEntries((game.members || []).map((m) => [m.id, m.name]));
     const events = (game.events || []).map((e) => {
       const nm = ((e.eventType || {}).name || "").toLowerCase();
-      const type = nm.includes("goal") ? "goal" : nm.includes("red") ? "red" : nm.includes("yellow") ? "yellow" : nm.includes("substitution") ? "sub" : null;
+      // (365Scores event type 1 = goal; "Goal Disallowed" (VAR) is type 11 — not a goal)
+      const type = evType(e);
       return type && { type, side: e.competitorId === hc.id ? "home" : "away", minute: e.gameTimeDisplay || "", player: names[e.playerId] || "",
                        other: (e.extraPlayers || []).map((p) => names[p]).filter(Boolean)[0] || "", detail: (e.eventType || {}).subTypeName || "" };
     }).filter(Boolean);
@@ -2308,8 +2309,8 @@
     if (!game) throw new Error("365Scores didn't return this match");
     const hc = game.homeCompetitor, ac = game.awayCompetitor, names = Object.fromEntries((game.members || []).map((m) => [m.id, m.name]));
     const ht = (game.stages || []).find((s) => s.id === 7);
-    const events = (game.events || []).filter((e) => e.eventType && /goal|card/i.test(e.eventType.name || "")).map((e) => ({
-      side: e.competitorId === hc.id ? "home" : "away", minute: e.gameTimeDisplay || "", type: /goal/i.test(e.eventType.name) ? "goal" : /red/i.test(e.eventType.name) ? "red" : "yellow",
+    const events = (game.events || []).filter((e) => ["goal", "disallowed", "red", "yellow"].includes(evType(e))).map((e) => ({
+      side: e.competitorId === hc.id ? "home" : "away", minute: e.gameTimeDisplay || "", type: evType(e),
       detail: e.eventType.subTypeName && !/field goal/i.test(e.eventType.subTypeName) ? e.eventType.subTypeName : "",
       player: names[e.playerId] || "", assist: (e.extraPlayers || []).map((p) => names[p]).filter(Boolean)[0] || "",
     }));
@@ -2323,6 +2324,52 @@
              statusText: game.statusText, clock: game.gameTimeDisplay, score: [Math.max(0, Math.trunc(hc.score) || 0), Math.max(0, Math.trunc(ac.score) || 0)],
              ht: ht && ht.isEnded ? [ht.homeCompetitorScore, ht.awayCompetitorScore] : null, venue: (game.venue || {}).name || "",
              competition: game.competitionDisplayName || "", events, stats };
+  }
+
+  // What a 365Scores match event is. Goals are event type 1 only: a goal ruled
+  // out by VAR comes as "Goal Disallowed" (type 11) and must not count.
+  function evType(e) {
+    const t = e && e.eventType, nm = ((t && t.name) || "").toLowerCase();
+    if (!t) return null;
+    if (t.id === 1) return "goal";
+    if (t.id === 11 || /disallow|cancel/.test(nm)) return "disallowed";
+    if (nm.includes("red")) return "red";
+    if (nm.includes("yellow")) return "yellow";
+    if (nm.includes("substitution")) return "sub";
+    return null;
+  }
+  // Team stats for one half: 365Scores' stats filter 6 = 1st half, 8 = 2nd half.
+  // {name: [home, away]} as numbers, like the match stats in liveMatch.
+  const HALF_FILTER = { 1: 6, 2: 8 };
+  async function halfStats(id, half) {
+    const st = await s365("game/stats", { games: id, filterId: HALF_FILTER[half] }, 20 * 1000);
+    const g = st && (st.games || [])[0], hcId = g && g.homeCompetitor && g.homeCompetitor.id;
+    if (!hcId) return null;
+    const out = {};
+    for (const s of st.statistics || []) {
+      const k = s.competitorId === hcId ? 0 : 1;
+      (out[s.name] ||= [null, null])[k] = parseFloat(String(s.value).replace("%", "")) || 0;
+    }
+    return out;
+  }
+  // A match's goals and cards so far (for the alerts), cached 20 seconds.
+  async function gameEvents(id) {
+    const d = await s365("game", { gameId: id }, 20 * 1000), game = d && d.game;
+    if (!game) return null;
+    const hc = game.homeCompetitor, names = Object.fromEntries((game.members || []).map((m) => [m.id, m.name]));
+    const nums = Object.fromEntries((game.members || []).map((m) => [m.id, m.jerseyNumber]));
+    // Every player's live numbers, as 365Scores lists them (Minutes, Goals, Total Shots, Tackles Won "1/2 (50%)", …).
+    const players = {};
+    for (const [side, key] of [["home", "homeCompetitor"], ["away", "awayCompetitor"]])
+      players[side] = (((game[key] || {}).lineups || {}).members || []).filter((m) => m.statusText === "Starting" || m.statusText === "Substitute")
+        .map((m) => ({ name: names[m.id] || "", num: nums[m.id] || null, starter: m.statusText === "Starting", pos: ((m.position || {}).name) || "",
+                       stats: (m.stats || []).map((s) => [s.name, String(s.value)]) }));
+    return { status: game.statusGroup, statusText: game.statusText, clock: game.gameTimeDisplay, players,
+             events: (game.events || []).map((e) => {
+               const type = evType(e);
+               return type && { type, side: e.competitorId === hc.id ? "home" : "away", player: names[e.playerId] || "", minute: e.gameTimeDisplay || "",
+                                detail: (e.eventType || {}).subTypeName || "" };
+             }).filter(Boolean) };
   }
 
   // Market movers: Bet365 selections whose price has moved 5%+ since it opened.
@@ -2367,7 +2414,7 @@
   }
 
   global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
-                  scores, matchReport, ticketLive,
+                  scores, matchReport, ticketLive, gameEvents, halfStats,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   startRadar, radarStatus: () => jobStatus(radarJob), stopRadar: () => { radarJob.stop = true; return jobStatus(radarJob); },

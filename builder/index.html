@@ -259,7 +259,15 @@ img{max-width:100%}
 .ip-score{font-size:44px;font-weight:900;letter-spacing:.04em;text-align:center;line-height:1}
 .ip-clock{color:#ff6b6b;font-weight:800;text-align:center;margin-top:4px}
 .ip-scorers{margin-top:6px;display:flex;flex-direction:column;gap:2px;font-size:12.5px;font-weight:700;color:var(--text)}
-.ip-scorers span{color:var(--muted);font-weight:600}
+.ip-tabs{display:inline-flex;gap:4px;padding:3px;text-transform:none;letter-spacing:0}.ip-tabs button{padding:4px 10px;font-size:12px}
+.ip-teams{display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;color:var(--muted);margin:0 0 4px}
+.ip-teams span:first-child{color:var(--accent)}.ip-teams span:last-child{color:#7aa2ff}
+.lp-sec{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:14px 0 6px}
+.lp-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}.lp-row small{display:block;color:var(--muted);font-size:11px}
+.lp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.lp-grid div{display:flex;justify-content:space-between;gap:8px;padding:6px 9px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);font-size:12.5px}
+.lp-grid span{color:var(--muted)}
+.ip-scorers span{color:var(--muted);font-weight:600}.ip-scorers .off{color:var(--muted);font-weight:600}
 .ip-stat{display:grid;grid-template-columns:48px 1fr 48px;gap:8px;align-items:center;font-size:12.5px;margin:5px 0}
 .ip-stat .bar{display:flex;height:7px;border-radius:5px;overflow:hidden;background:#22303a}
 .ip-stat .bar i{display:block;height:100%}
@@ -394,6 +402,13 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .g-bar{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.06)}
 .g-bar i{display:block;height:100%;background:var(--accent);animation:goalTimer 15s linear forwards}
 .goal-card.off .g-bar i{background:#ff8a8a}
+/* other alerts: green = good news, red = bad, gold = one to go / check, blue = half-time */
+.goal-card.t-bad{border-color:rgba(255,93,115,.6);background:linear-gradient(135deg,#2a1418 0%,#141b22 60%);box-shadow:0 18px 40px rgba(0,0,0,.5),0 0 26px rgba(255,93,115,.2)}
+.goal-card.t-bad .g-word{color:#ff6b7f;text-shadow:0 0 16px rgba(255,93,115,.5)}.goal-card.t-bad .g-bar i{background:#ff6b7f}
+.goal-card.t-warn{border-color:rgba(255,209,102,.6);background:linear-gradient(135deg,#2a2412 0%,#141b22 60%);box-shadow:0 18px 40px rgba(0,0,0,.5),0 0 26px rgba(255,209,102,.2)}
+.goal-card.t-warn .g-word{color:var(--gold);text-shadow:0 0 16px rgba(255,209,102,.5)}.goal-card.t-warn .g-bar i{background:var(--gold)}
+.goal-card.t-info{border-color:rgba(74,168,255,.55);background:linear-gradient(135deg,#12202e 0%,#141b22 60%)}
+.goal-card.t-info .g-word{color:var(--blue);text-shadow:none}.goal-card.t-info .g-bar i{background:var(--blue)}
 @keyframes goalIn{from{opacity:0;transform:translateX(60px) scale(.9)}to{opacity:1;transform:none}}
 @keyframes goalOut{to{opacity:0;transform:translateX(60px)}}
 @keyframes goalShine{to{transform:translateX(100%)}}
@@ -707,6 +722,7 @@ a.nav{text-decoration:none}
 <div id="goalfeed" aria-live="polite"></div>
 
 <script src="engine.js"></script>
+<script src="hawk-settle.js"></script>
 <script>
 function loadPref(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } }
 function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
@@ -2888,7 +2904,8 @@ async function showReport(id) {
   let r;
   try { r = await api(`/api/report?id=${id}`); } catch (err) { modal(`<div class="note">${esc(err.message)}</div><button class="ghost" data-close>Close</button>`); return; }
   const ev = (e) => `<div class="rp-ev ${e.side}"><span class="min">${esc(e.minute)}</span>
-      <span>${e.type === "goal" ? "⚽" : e.type === "red" ? "🟥" : "🟨"} <b>${esc(e.player || "")}</b>${e.detail ? ` <span class="muted">(${esc(e.detail)})</span>` : ""}${
+      <span>${e.type === "goal" ? "⚽" : e.type === "disallowed" ? "❌⚽" : e.type === "red" ? "🟥" : "🟨"} <b ${e.type === "disallowed" ? `style="text-decoration:line-through;opacity:.7"` : ""}>${esc(e.player || "")}</b>${
+      e.type === "disallowed" ? ` <span class="muted">(goal ruled out${/var/i.test(e.detail) ? " by VAR" : ""})</span>` : e.detail ? ` <span class="muted">(${esc(e.detail)})</span>` : ""}${
       e.assist && e.type === "goal" ? ` <span class="muted">· assist ${esc(e.assist)}</span>` : ""}</span></div>`;
   modal(`<div class="mhead" style="justify-content:space-between"><div class="muted">${esc(r.competition)}${r.venue ? " · " + esc(r.venue) : ""}</div>
       <button class="x" data-close title="Close">✕</button></div>
@@ -2931,6 +2948,7 @@ async function refreshInPlay() {
   try { ip.data = await api(`/api/live?id=${ip.id}`); ip.error = null; }
   catch (err) { ip.error = err.message; }
   if (ip.data && ip.data.live) { try { ip.mine = await myLiveTickets(ip.id); } catch (err) { console.warn("[hawk] cash-out helper:", err.message); } }
+  if (ip.data && ip.data.live && ip.statTab && ip.statTab !== "all") await loadHalfStats(ip);
   // The lineups (once): the pre-match page's players and pitch spots, which the live pitch marks up.
   if (ip.data && ip.data.live && !ip.m && !ip.mTried) {
     ip.mTried = true;
@@ -3102,7 +3120,10 @@ function renderInPlay() {
       if (!row) by.push(row = { key, name, full: e.player, own, mins: [] });
       row.mins.push(`${e.minute}${pen ? " (pen)" : ""}`);
     }
-    return by.length ? `<div class="ip-scorers">${by.map(r => `<div title="${esc(r.full || "")}${r.own ? " — own goal" : ""}">⚽ ${esc(r.name)}${r.own ? " (og)" : ""} <span>${esc(r.mins.join(", "))}</span></div>`).join("")}</div>` : "";
+    // Goals VAR ruled out: shown struck through, so the list matches the score.
+    const off = (d.events || []).filter(e => e.type === "disallowed" && e.side === side)
+      .map(e => `<div class="off" title="${esc(e.player || "")} — goal ruled out${/var/i.test(e.detail) ? " by VAR" : ""}">❌⚽ <s>${esc(e.player ? e.player.split(" ").slice(-1)[0] : "Goal")}</s> <span>${esc(e.minute)} · VAR</span></div>`);
+    return by.length || off.length ? `<div class="ip-scorers">${by.map(r => `<div title="${esc(r.full || "")}${r.own ? " — own goal" : ""}">⚽ ${esc(r.name)}${r.own ? " (og)" : ""} <span>${esc(r.mins.join(", "))}</span></div>`).join("")}${off.join("")}</div>` : "";
   };
   const head = `<div class="hero"><div class="vs">
       <div class="side"><img src="${esc(d.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(d.home)}</div>${d.reds && d.reds[0] ? `<div>${"🟥".repeat(d.reds[0])}</div>` : ""}${scorers("home")}</div>
@@ -3117,7 +3138,9 @@ function renderInPlay() {
       The live view works while a match is being played.</div></div>`;
     return;
   }
-  const st = d.stats || {};
+  // Match / 1st half / 2nd half (the halves come from 365Scores' half filters).
+  const tab = S.inplay.statTab || "all", halves = S.inplay.halves || {};
+  const st = tab === "all" ? d.stats || {} : halves[tab] || {};
   const statRow = (name, label, fmt = (x) => x) => {
     const v = st[name]; if (!v || (v[0] == null && v[1] == null)) return "";
     const a = v[0] || 0, b = v[1] || 0, tot = a + b || 1;
@@ -3145,10 +3168,14 @@ function renderInPlay() {
     <div class="section"><h3>Live win chances <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:600">— 🦅 HAWK LIVE</span></h3>
       ${liveHawk(d)}</div>
     ${S.inplay.m ? lineupCard(S.inplay.m, d) : ""}
-    <div class="section"><h3>Live stats</h3>
+    <div class="section"><h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Live stats
+        <span class="seg ip-tabs" id="ipHalf" style="margin:0 0 0 auto">${[["all", "Match"], ["h1", "1st half"], ["h2", "2nd half"]].map(([k, t]) =>
+          `<button class="${tab === k ? "on" : ""}" data-half="${k}">${t}</button>`).join("")}</span></h3>
+      <div class="ip-teams"><span>${esc(d.home)}</span><span>${esc(d.away)}</span></div>
       ${statRow("Expected Goals", "Expected goals (xG)", (x) => x.toFixed(2))}${statRow("Shots On Target", "Shots on target")}${statRow("Total Shots", "Shots")}
       ${statRow("Big Chances Created", "Big chances")}${statRow("Corners", "Corners")}${statRow("Possession", "Possession", (x) => x + "%")}
-      ${!Object.keys(st).length ? '<div class="note">No live stats yet.</div>' : ""}</div>
+      ${statRow("Fouls", "Fouls")}${statRow("Yellow Cards", "Yellow cards")}${statRow("Offsides", "Offsides")}${statRow("Goalkeeper Saves", "Saves")}
+      ${!Object.keys(st).length ? `<div class="note">${tab === "all" ? "No live stats yet." : tab === "h2" && /1st/i.test(d.statusText || "") ? "The 2nd half hasn't started yet." : "Loading…"}</div>` : ""}</div>
     <div class="section"><h3>💰 Live value at Bet365</h3>
       ${value.length ? headRow + value.map(row).join("") : `<div class="note">Nothing at Bet365 beats HAWK's live chances by 2%+ right now. That's normal — in-play prices are sharp. Checking again every 30 seconds.</div>`}
     </div>
@@ -3158,6 +3185,46 @@ function renderInPlay() {
         and nor are corners and cards (bookmakers update those live lines too unevenly to compare).
         <b>Losing a bet on this match? Don't chase it</b> — only bet what shows as value, at the stake shown.</div></div>`;
   bindCashOut();
+  $("#ipHalf").onclick = async (e) => {
+    const b = e.target.closest("[data-half]"); if (!b) return;
+    const ip = S.inplay; ip.statTab = b.dataset.half; renderInPlay();
+    if (ip.statTab !== "all") { await loadHalfStats(ip); if (S.view === "inplay" && S.inplay === ip) renderInPlay(); }
+  };
+  // Tap a player on the live pitch: his numbers so far, and your legs on him.
+  if ($("#lineups")) $("#lineups").onclick = (ev) => { const p = ev.target.closest("[data-lp]"); if (p) openLivePlayer(p.dataset.lp, p.dataset.name); };
+}
+async function loadHalfStats(ip) {
+  const half = ip.statTab === "h1" ? 1 : ip.statTab === "h2" ? 2 : null;
+  if (!half) return;
+  try { (ip.halves ||= {})[ip.statTab] = (await HAWK.halfStats(ip.id, half)) || {}; } catch { /* keep the last */ }
+}
+// A player's live numbers (365Scores), his pre-match chances and your legs on him.
+async function openLivePlayer(side, name) {
+  const ip = S.inplay, d = ip && ip.data;
+  if (!d) return;
+  modal(`<div class="note">Loading ${esc(name)}…</div>`);
+  let ev = null;
+  try { ev = await HAWK.gameEvents(ip.id); } catch { /* shown below */ }
+  const list = ev && ev.players ? ev.players[side] || [] : [];
+  const pl = list.find(p => samePerson(p.name, name));
+  const team = side === "home" ? d.home : d.away;
+  const by = ip.m ? liveEventsBy(d, ip.m) : { home: {}, away: {} }, r = liveRec(by, side, name);
+  const status = r && r.off ? `off ${r.off}${r.by ? ` (${r.by} on)` : ""}` : r && r.on ? `on ${r.on}${r.for ? ` for ${r.for}` : ""}` : pl && pl.starter ? "on the pitch" : pl ? "on the bench" : "";
+  // The stats worth a glance first, then the rest as 365Scores lists them.
+  const TOP = ["Minutes", "Goals", "Assists", "Total Shots", "Shots On Target", "Expected Goals", "Was Fouled", "Fouls Made", "Tackles Won", "Goalkeeper Saves", "Offsides", "Touches", "Key Passes"];
+  const stats = pl ? [...pl.stats].sort((a, b) => ((TOP.indexOf(a[0]) + 1) || 99) - ((TOP.indexOf(b[0]) + 1) || 99)) : [];
+  const legsNow = (ip.mine || []).flatMap(t => t.parts.filter(pt => pt.live).flatMap(pt => pt.live.legs)).filter(r2 => samePerson(r2.label.split(/:| to /)[0], name));
+  const pre = ip.m ? (ip.m.legs || []).filter(l => l.kind === "player" && l.side === side && samePerson(l.player, name) && /:(score|sot1|shots1|booked|soa)$/.test(l.id)) : [];
+  modal(`<div class="mhead"><div><div style="font-size:20px;font-weight:800">${pl && pl.num ? `<span class="muted">#${pl.num}</span> ` : ""}${esc(name)}</div>
+      <div class="muted">${esc(team)}${pl && pl.pos ? ` · ${esc(pl.pos)}` : ""}${status ? ` · ${esc(status)}` : ""} · ${esc(d.clock || "")}</div></div>
+      <button class="x" data-close title="Close">✕</button></div>
+    ${r && (r.goals || r.assists || r.yellow || r.red) ? `<div style="font-size:18px;margin:4px 0 10px">${liveIcons(r)}</div>` : ""}
+    ${legsNow.length ? `<div class="lp-sec">🎟 Your legs on him</div>${legsNow.map(x => `<div class="lp-row"><span>${esc(x.label)}<small>${esc(x.note || "")}</small></span>
+        <b>${x.state === "won" ? "✅ done" : x.state === "lost" ? "❌ lost" : x.p == null ? "—" : pct(x.p)}</b></div>`).join("")}` : ""}
+    <div class="lp-sec">Live numbers</div>
+    ${stats.length ? `<div class="lp-grid">${stats.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join("")}</div>`
+      : `<div class="note">${ev ? "No numbers for him yet (not on the pitch, or 365Scores hasn't counted any)." : "Couldn't reach 365Scores — try again in a moment."}</div>`}
+    ${pre.length ? `<div class="lp-sec">HAWK before kick-off</div><div class="lp-grid">${pre.map(l => `<div><span>${esc(l.label.replace(l.player, "").replace(/^[:\s]+/, "") || l.market)}</span><b>${pct(l.p)}</b></div>`).join("")}</div>` : ""}`);
 }
 
 /* ---------- learning from your results ---------- */
@@ -3496,9 +3563,148 @@ async function checkGoals() {
       const side = now[0] > was[0] ? "home" : now[1] > was[1] ? "away" : now[0] < was[0] ? "home-off" : now[1] < was[1] ? "away-off" : null;
       if (side) goalAlert(g, side, now).catch(e => console.warn("[hawk] goal alert:", e.message));
     }
+    await matchAlerts(games);
   } catch (e) { console.warn("[hawk] goal check:", e.message); }
   finally { goalState.busy = false; }
 }
+
+/* ---------- more alerts: red cards, your bet live, half-time, bet settled ---------- */
+// Same card as a goal (and a PC / phone notification while HAWK is in the
+// background). Each alert shows once: what's been shown is remembered, so a
+// reload doesn't repeat it — and a leg that landed while HAWK was closed
+// still gets its alert when you're back.
+const alertSeen = new Set(loadPref("hawk.alertSeen", []));
+function firstTime(key) {
+  if (alertSeen.has(key)) return false;
+  alertSeen.add(key); savePref("hawk.alertSeen", [...alertSeen].slice(-500));
+  return true;
+}
+function pendingBetsOn(gameId) {
+  try { return (JSON.parse(localStorage.getItem("hawk_bets")) || []).filter(b => b.status === "PENDING" && (b.legs || []).some(l => l.hawk && String(l.hawk.game) === String(gameId))); }
+  catch { return []; }
+}
+async function matchAlerts(games) {
+  const states = loadPref("hawk.betStates", {});
+  for (const g of games) {
+    // 🟥 Red cards
+    if (g.status === 3) {
+      let ev = null;
+      try { ev = await HAWK.gameEvents(g.id); } catch { /* next time */ }
+      for (const e of (ev && ev.events || []).filter(e => e.type === "red"))
+        if (firstTime(`red|${g.id}|${e.player}|${e.minute}`))
+          alertCard({ tone: "bad", icon: "🟥", word: "RED CARD", g, clock: e.minute,
+                      body: `${esc(e.player || "A player")} <span>· ${esc(g[e.side])}${/second|2nd/i.test(e.detail) ? " · second yellow" : ""}</span>`,
+                      bet: pendingBetsOn(g.id).length ? await betNow(g.id) : null });
+    }
+    const bets = pendingBetsOn(g.id);
+    if (!bets.length) continue;
+    // ⏸ Half-time check on your bet
+    if (g.status === 3 && /half.?time|^ht$/i.test(g.statusText || "") && firstTime(`ht|${g.id}`)) {
+      const t = await betNow(g.id);
+      if (t) alertCard({ tone: "info", icon: "⏸", word: "HALF-TIME", g, clock: "HT", body: `${t.done} of ${t.total} legs done${t.lost ? ` · ${t.lost} lost` : ""}`, bet: t });
+    }
+    // ✅ / ❌ / 🔥 Your bet, leg by leg
+    if (g.status === 3) {
+      let mine = [];
+      try { mine = await myLiveTickets(g.id); } catch { continue; }
+      for (const t of mine) {
+        const rows = t.parts.filter(pt => pt.live).flatMap(pt => pt.live.legs), was = states[t.id];
+        states[t.id] = Object.fromEntries(rows.map(r => [r.id, r.state]));
+        if (!was) continue;   // first look at this bet: just remember where it stands
+        for (const r of rows) {
+          if (was[r.id] === r.state) continue;
+          if (r.state === "won" && firstTime(`leg|${t.id}|${r.id}|won`))
+            alertCard({ tone: "good", icon: "✅", word: "LEG LANDED", g, body: esc(r.label), bet: t });
+          if (r.state === "lost" && firstTime(`leg|${t.id}|${r.id}|lost`))
+            alertCard({ tone: "bad", icon: "❌", word: "LEG LOST", g, body: `${esc(r.label)} <span>· the bet can't land now</span>`, bet: t });
+        }
+        const open = rows.filter(r => r.state !== "won"), others = t.parts.filter(pt => !pt.live && pt.other !== "won");
+        if (open.length === 1 && open[0].state !== "lost" && !others.length && t.p > 0 && firstTime(`last|${t.id}`))
+          alertCard({ tone: "warn", icon: "🔥", word: "ONE LEG TO GO", g, body: `${esc(open[0].label)} <span>· ${open[0].p != null ? pct(open[0].p) : "—"}</span>`, bet: t });
+      }
+    }
+    // 🎉 / ❌ Settled — as soon as the match ends (the Vault books it when you open it)
+    if (g.status === 4) for (const b of bets) {
+      if (alertSeen.has(`settled|${b.id}`)) continue;
+      const out = await betOutcome(b);
+      if (!out) continue;
+      firstTime(`settled|${b.id}`);
+      alertCard(out.won ? { tone: "good", icon: "🎉", word: "BET WON", g, body: `€${b.stake.toFixed(2)} @ ${odds(b.odds)} returns <b>€${b.potentialReturn.toFixed(2)}</b> <span>· the Vault books it when you open it</span>` }
+                        : out.lost ? { tone: "bad", icon: "❌", word: "BET LOST", g, body: `${esc(out.lost)} didn't land <span>· €${b.stake.toFixed(2)} stake</span>` }
+                        : { tone: "warn", icon: "⚠️", word: "CHECK YOUR BET", g, body: `${esc(out.check)} <span>· settle it in the Vault</span>` });
+    }
+  }
+  savePref("hawk.betStates", states);
+}
+// Your bet on a match right now: its chance, legs done, what it's worth.
+async function betNow(gameId) {
+  let mine = [];
+  try { mine = await myLiveTickets(gameId); } catch { return null; }
+  const t = mine[0];
+  if (!t) return null;
+  const rows = t.parts.filter(pt => pt.live).flatMap(pt => pt.live.legs);
+  return { ...t, done: rows.filter(r => r.state === "won").length, lost: rows.filter(r => r.state === "lost").length, total: rows.length };
+}
+// A finished bet the way the Vault will settle it (Early Payout, your ✓ ticks): {won} / {lost: leg} / {check: why}, or null while other matches are still to play.
+async function betOutcome(b) {
+  if (!window.HawkSettle) return null;
+  let check = null;
+  for (const l of b.legs || []) {
+    if (!l.hawk) { check = "a leg HAWK can't follow"; continue; }
+    let f = null;
+    try { f = await HawkSettle.fetchMatchFacts(l.hawk.game); } catch { return null; }
+    if (!f || !f.finished) return null;
+    if (f.off) { check = `${l.fixture}: ${f.off}`; continue; }
+    for (const h of l.hawk.legs || []) {
+      const r = h.userDone ? "won" : HawkSettle.legResult(h, f, { earlyPayout: true });
+      if (r === "lost") return { lost: h.label };
+      if (r !== "won") check = `${h.label} — ${r === "void" ? "didn't play" : "no result data"}`;
+    }
+  }
+  return check ? { check } : { won: true };
+}
+// The alert card (bottom-right, top on a phone), like the goal one.
+function alertCard({ tone = "good", icon, word, g, clock, body, bet }) {
+  const box = $("#goalfeed"), card = document.createElement("div");
+  card.className = `goal-card t-${tone}`;
+  const crest = (k) => `<img src="${esc(g[k + "Crest"])}" alt="" onerror="this.style.visibility='hidden'">`;
+  card.innerHTML = `
+    <button class="gx" title="Close">✕</button>
+    <div class="g-top"><span class="g-ball">${icon}</span><span class="g-word">${esc(word)}</span><span class="g-min">${esc(clock || g.clock || "")}</span></div>
+    <div class="g-score"><span class="g-team">${crest("home")}${esc(g.home)}</span><b>${g.score[0] ?? 0}<i>–</i>${g.score[1] ?? 0}</b><span class="g-team away">${esc(g.away)}${crest("away")}</span></div>
+    <div class="g-who">${body}</div>
+    ${bet && bet.p != null ? `<div class="g-bet">🎟 Your bet: <b>${pct(bet.p, bet.p < 0.1 ? 1 : 0)}</b> to land now${bet.ret ? ` · worth ≈ €${(bet.p * bet.ret).toFixed(2)}` : ""}</div>` : ""}
+    <div class="g-bar"><i></i></div>`;
+  card.onclick = (e) => { card.remove(); if (!e.target.closest(".gx")) (g.status === 4 ? showReport(g.id) : goToLive(g.league, g.id)); };
+  box.prepend(card);
+  while (box.children.length > 3) box.lastElementChild.remove();
+  const hideLater = () => { setTimeout(() => card.classList.add("bye"), GOAL_SHOW_MS); setTimeout(() => card.remove(), GOAL_SHOW_MS + 600); };
+  if (document.hidden) document.addEventListener("visibilitychange", function once() { if (!document.hidden) { document.removeEventListener("visibilitychange", once); hideLater(); } });
+  else hideLater();
+  if (tone !== "info") beep();
+  flashTitle(`${icon} ${word}`);
+  if (document.hidden || !document.hasFocus()) {
+    const tmp = document.createElement("div"); tmp.innerHTML = body;
+    systemNotify(`${icon} ${word} · ${g.home} ${g.score[0] ?? 0}–${g.score[1] ?? 0} ${g.away}`,
+                 [tmp.textContent, bet && bet.p != null ? `🎟 Your bet: ${pct(bet.p)} to land now` : ""].filter(Boolean).join("\n"),
+                 { tag: `${word}-${g.id}`, url: `?view=live&id=${g.id}&league=${encodeURIComponent(g.league)}` });
+  }
+}
+// The Vault settled one of your bets in another tab: say so (once).
+window.addEventListener("storage", (e) => {
+  if (e.key !== "hawk_bets" || !e.newValue) return;
+  let before = [], after = [];
+  try { before = JSON.parse(e.oldValue || "[]"); after = JSON.parse(e.newValue); } catch { return; }
+  for (const b of after) {
+    const old = before.find(x => x.id === b.id);
+    if (!old || old.status !== "PENDING" || (b.status !== "WON" && b.status !== "LOST") || !firstTime(`settled|${b.id}`)) continue;
+    const l = (b.legs || []).find(x => x.hawk) || {}, h = l.hawk || {};
+    const g = { id: h.game, league: h.league, home: h.home || l.fixture || "", away: h.away || "", homeCrest: "", awayCrest: "", status: 4,
+                score: (h.score || "").split("-").map(Number).concat([null, null]).slice(0, 2), clock: "FT" };
+    alertCard(b.status === "WON" ? { tone: "good", icon: "🎉", word: "BET WON", g, body: `Returns <b>€${(+b.potentialReturn).toFixed(2)}</b> <span>· booked in your Vault</span>` }
+                                 : { tone: "bad", icon: "❌", word: "BET LOST", g, body: `€${(+b.stake).toFixed(2)} stake <span>· booked in your Vault</span>` });
+  }
+});
 async function goalAlert(g, side, score) {
   const off = side.endsWith("-off"), who = side.startsWith("home") ? "home" : "away", team = g[who];
   // Who scored (the latest goal for that side) and what it did to your bet.
@@ -3511,7 +3717,7 @@ async function goalAlert(g, side, score) {
   const crest = (k) => `<img src="${esc(g[k + "Crest"])}" alt="" onerror="this.style.visibility='hidden'">`;
   card.innerHTML = `
     <button class="gx" title="Close">✕</button>
-    <div class="g-top"><span class="g-ball">${off ? "🚫" : "⚽"}</span><span class="g-word">${off ? "GOAL OFF" : "GOAL!"}</span><span class="g-min">${esc(g.clock || "")}</span></div>
+    <div class="g-top"><span class="g-ball">${off ? "❌⚽" : "⚽"}</span><span class="g-word">${off ? "GOAL OFF" : "GOAL!"}</span><span class="g-min">${esc(g.clock || "")}</span></div>
     <div class="g-score">
       <span class="g-team ${who === "home" && !off ? "hit" : ""}">${crest("home")}${esc(g.home)}</span>
       <b>${score[0]}<i>–</i>${score[1]}</b>
@@ -3529,7 +3735,7 @@ async function goalAlert(g, side, score) {
   if (!off) { beep(); flashTitle("⚽ GOAL!"); }
   // A PC / phone notification when HAWK isn't the window you're looking at.
   if (document.hidden || !document.hasFocus()) {
-    const title = off ? `🚫 Goal off · ${g.home} ${score[0]}–${score[1]} ${g.away}` : `⚽ GOAL! ${g.home} ${score[0]}–${score[1]} ${g.away}`;
+    const title = off ? `❌⚽ Goal off · ${g.home} ${score[0]}–${score[1]} ${g.away}` : `⚽ GOAL! ${g.home} ${score[0]}–${score[1]} ${g.away}`;
     const body = [off ? `${team}'s goal was taken off` : scorer && scorer.player ? `${scorer.player} ${scorer.minute}${scorer.assist ? ` (assist ${scorer.assist})` : ""}` : `${team} score · ${g.clock || ""}`,
                   bet ? `🎟 Your bet: ${pct(bet.p, bet.p < 0.1 ? 1 : 0)} to land now · worth ≈ €${(bet.p * bet.ret).toFixed(2)}` : ""].filter(Boolean).join("\n");
     systemNotify(title, body, { icon: g[who + "Crest"], tag: `goal-${g.id}`, url: `?view=live&id=${g.id}&league=${encodeURIComponent(g.league)}` });

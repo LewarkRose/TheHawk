@@ -34,7 +34,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/
 button,input,select{font:inherit;color:inherit}
 img{max-width:100%}
 /* header: row 1 = logo · pages · alerts + Vault, row 2 = leagues */
-:root{--head:112px}
+:root{--head:66px}
 .top{position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line);
   background:linear-gradient(180deg,rgba(18,26,30,.97),rgba(13,17,20,.95));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .topbar{display:flex;align-items:center;gap:18px;padding:10px 22px 8px}
@@ -70,18 +70,33 @@ img{max-width:100%}
 .pill:hover{border-color:#3a4a55}
 .pill.on{background:var(--accent);color:#04241a;border-color:var(--accent);font-weight:800}
 .pill.on img{filter:brightness(0) opacity(.75)}
-/* league bar: group switcher (fixed) + that group's leagues (scrolls) */
-.leaguebar{display:flex;align-items:center;gap:10px;padding:0 22px 10px}
-.leaguebar .leagues{padding:0;flex:1;min-width:0}
-.lgroups{display:flex;gap:2px;padding:3px;background:var(--panel);border:1px solid var(--line);border-radius:12px;flex-shrink:0}
-.lg{border:0;background:transparent;color:var(--muted);padding:5px 10px;border-radius:9px;cursor:pointer;font-weight:700;font-size:12.5px;
-  white-space:nowrap;display:flex;align-items:center;gap:5px;transition:.15s}
-.lg:hover{color:var(--text);background:var(--panel2)}
-.lg.on{color:var(--text);background:var(--panel2);box-shadow:inset 0 0 0 1px rgba(20,227,161,.55)}
-.pill .n{font-style:normal;font-size:10.5px;font-weight:800;min-width:18px;padding:1px 6px;border-radius:8px;background:var(--panel2);color:var(--muted);text-align:center}
-.pill.on .n{background:rgba(4,36,26,.18);color:#04241a}
-.pill.none{opacity:.45}
-.pill.none.on{opacity:1}
+/* left panel: league tree (groups open/close, ★ favourites) above the fixtures */
+.ltree{display:flex;flex-direction:column;gap:2px;padding-bottom:10px;margin-bottom:8px;border-bottom:1px solid var(--line)}
+.lt-grp{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:10px;cursor:pointer;font-weight:800;font-size:12px;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--muted);user-select:none;transition:.12s}
+.lt-grp:hover{background:var(--panel2);color:var(--text)}
+.lt-grp .ic{font-size:14px;letter-spacing:0}
+.lt-grp .chev{margin-left:auto;font-size:10px;transition:transform .15s}
+.lt-grp.open .chev{transform:rotate(90deg)}
+.lt-grp.has{color:var(--text)}
+.lt-grp .tot{font-size:10.5px;font-weight:800;color:var(--muted);letter-spacing:0}
+.lt-lg{display:flex;align-items:center;gap:9px;padding:6px 8px 6px 14px;border-radius:10px;cursor:pointer;font-weight:600;font-size:13px;
+  border:1px solid transparent;transition:.12s}
+.lt-lg:hover{background:var(--panel2)}
+.lt-lg img{width:18px;height:18px;object-fit:contain;flex-shrink:0}
+.lt-lg .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lt-lg .n{font-size:11px;font-weight:800;min-width:20px;padding:1px 6px;border-radius:8px;background:var(--panel2);color:var(--muted);text-align:center}
+.lt-lg.none{color:var(--muted)}
+.lt-lg.none .n{opacity:.6}
+.lt-lg.on{background:rgba(20,227,161,.1);border-color:rgba(20,227,161,.5);color:var(--text)}
+.lt-lg.on .n{background:var(--accent);color:#04241a}
+.lt-star{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;opacity:0;transition:.12s}
+.lt-lg:hover .lt-star,.lt-star.on{opacity:1}
+.lt-star.on{color:var(--gold)}
+.lt-hint{font-size:12px;color:var(--muted);padding:2px 8px 6px 14px}
+.fxhead{display:flex;align-items:center;gap:8px;padding:4px 8px 8px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.fxhead img{width:16px;height:16px}
+@media (hover:none){.lt-star{opacity:1}}
 /* league picker in Best builders / Value / Acca: one row per group */
 .lpick{display:flex;flex-direction:column;gap:6px;margin:12px 0}
 .lprow{display:grid;grid-template-columns:128px minmax(0,1fr);gap:8px;align-items:start}
@@ -410,11 +425,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   .tool{padding:6px 10px;font-size:12px}
   .vaultlink{padding:5px 10px}
   .leagues{padding:0 12px 10px}
-  .leaguebar{flex-direction:column;align-items:stretch;gap:8px;padding:0 12px 10px}
-  .lg{flex:1;justify-content:center;flex-direction:column;gap:1px;font-size:10.5px;padding:5px 2px}
   .lpgroup{min-width:0}
   .grid{padding:10px;gap:10px}
-  .fixtures{position:static;max-height:38vh}
+  .fixtures{position:static;max-height:60vh}
   .hero{padding:16px 12px}
   .section{padding:12px 14px}
   .side img{width:46px;height:46px}
@@ -471,10 +484,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <a class="vaultlink" href="../" title="Back to the HAWK Vault"><img src="../hawk-logo.svg" alt="">Vault</a>
     </div>
   </div>
-  <div class="leaguebar"><nav class="lgroups" id="lgroups"></nav><nav class="leagues" id="leagues"></nav></div>
 </header>
 <main class="grid">
-  <aside class="panel fixtures" id="fixtures"><div class="empty">Loading leagues…</div></aside>
+  <aside class="panel fixtures"><nav class="ltree" id="ltree"></nav><div id="fixtures"><div class="empty">Loading leagues…</div></div></aside>
   <section class="panel" id="match">
     <div class="empty"><img class="bigmark" src="hawk-logo.svg" alt=""><h2>Pick a fixture</h2>
       HAWK simulates the match thousands of times — goals, shots, shots on target, corners and cards, player by player —
@@ -575,11 +587,9 @@ async function init() {
   renderAccaBtn();
   setInterval(trackPrices, ALERT_MS);
   setTimeout(trackPrices, 5000);
-  $("#lgroups").innerHTML = HAWK.LEAGUE_GROUPS.map(g => `<button class="lg" data-g="${g.key}" title="${esc(g.leagues.join(" · "))}">${g.icon}<span>${esc(g.name)}</span></button>`).join("");
-  $("#lgroups").onclick = (e) => { const b = e.target.closest("[data-g]"); if (b) openGroup(b.dataset.g, true); };
+  $("#ltree").onclick = onTreeClick;
   $("#navBuilder").onclick = showBuilder;
   watchView();
-  $("#leagues").onclick = (e) => { const b = e.target.closest(".pill"); if (b) selectLeague(b.dataset.l); };
   $("#scanBtn").onclick = showScan;
   $("#watchBtn").onclick = () => { const p = $("#watchPop"); p.hidden = !p.hidden; };
   S.watch = loadWatch();
@@ -617,59 +627,104 @@ async function openFromUrl() {
     toast(`Your Vault ticket is back on the slip (${keep.length} leg${keep.length === 1 ? "" : "s"}).`);
   }
 }
-const groupOf = (key) => HAWK.LEAGUE_GROUPS.find(g => g.key === key || g.leagues.includes(key)) || HAWK.LEAGUE_GROUPS[0];
+/* League tree in the left panel: ★ Favourites, then the six groups; each
+   group opens/closes (remembered) and shows every league with its number of
+   games this week (dimmed when none). */
+S.favs = new Set(loadPref("hawk.favLeagues", []));
+S.openGroups = new Set(loadPref("hawk.openGroups", ["fav"]));
+S.counts = {};           // league -> {n: games in the next 7 days, next: kick-off of the next one}
+S.counting = new Set();  // leagues whose count is being fetched
+const WEEK_MS = 7 * 86400000;
+function leagueGroups() {
+  return [{ key: "fav", name: "Favourites", icon: "⭐", leagues: HAWK.LEAGUES.filter(l => S.favs.has(l)) }, ...HAWK.LEAGUE_GROUPS];
+}
+const groupOf = (key) => (key === "fav" ? leagueGroups()[0] : HAWK.LEAGUE_GROUPS.find(g => g.key === key || g.leagues.includes(key))) || HAWK.LEAGUE_GROUPS[0];
 const leagueLogo = (l) => HAWK.COMPETITIONS[l]
   ? `<img src="https://imagecache.365scores.com/image/upload/f_png,w_36,h_36,c_limit,q_auto:eco,dpr_2,d_Countries:round:15.png/v1/Competitions/${HAWK.COMPETITIONS[l]}" alt="" onerror="this.remove()">` : "";
-const WEEK_MS = 7 * 86400000;
-S.counts = {};   // league -> {n: games in the next 7 days, next: kick-off of the next one}
-// Shows a group's leagues in the bar, then fills in how many games each has
-// this week (dimmed when none). pickFirst: also open the first league with games.
-async function openGroup(key, pickFirst = false) {
-  const g = groupOf(key);
-  S.group = g.key;
-  document.querySelectorAll(".lg").forEach(b => b.classList.toggle("on", b.dataset.g === g.key));
-  const pillsFor = () => g.leagues.map(l => {
-    const c = S.counts[l], none = c && !c.n;
-    const tip = !c ? l : c.n ? `${l}: ${c.n} game${c.n === 1 ? "" : "s"} in the next 7 days`
-      : `${l}: no games this week${c.next ? " — next " + fmtKick(c.next) : ""}`;
-    return `<button class="pill ${l === S.league ? "on" : ""} ${none ? "none" : ""}" data-l="${esc(l)}" title="${esc(tip)}">${leagueLogo(l)}${esc(l)}${c ? `<i class="n">${c.n}</i>` : ""}</button>`;
+function renderTree() {
+  $("#ltree").innerHTML = leagueGroups().map(g => {
+    const open = S.openGroups.has(g.key), known = g.leagues.filter(l => S.counts[l]);
+    const tot = known.reduce((s, l) => s + S.counts[l].n, 0);
+    const head = `<div class="lt-grp ${open ? "open" : ""} ${g.leagues.includes(S.league) ? "has" : ""}" data-g="${g.key}" title="${open ? "Close" : "Open"} ${esc(g.name)}">
+      <span class="ic">${g.icon}</span>${esc(g.name)}${tot ? `<span class="tot">· ${tot}</span>` : ""}<span class="chev">▶</span></div>`;
+    if (!open) return head;
+    if (!g.leagues.length) return head + `<div class="lt-hint">Tap ☆ next to any league to pin it here.</div>`;
+    return head + g.leagues.map(leagueRow).join("");
   }).join("");
-  $("#leagues").innerHTML = pillsFor();
-  $("#leagues").scrollLeft = 0;
+}
+function leagueRow(l) {
+  const c = S.counts[l], fav = S.favs.has(l);
+  const tip = !c ? l : c.n ? `${c.n} game${c.n === 1 ? "" : "s"} in the next 7 days` : `No games this week${c.next ? " — next " + fmtKick(c.next) : ""}`;
+  return `<div class="lt-lg ${l === S.league ? "on" : ""} ${c && !c.n ? "none" : ""}" data-l="${esc(l)}" title="${esc(tip)}">${leagueLogo(l)}<span class="nm">${esc(l)}</span>${
+    c ? `<span class="n">${c.n}</span>` : ""}<button class="lt-star ${fav ? "on" : ""}" data-star="${esc(l)}" title="${fav ? "Remove from" : "Add to"} favourites">${fav ? "★" : "☆"}</button></div>`;
+}
+function onTreeClick(e) {
+  const star = e.target.closest("[data-star]");
+  if (star) {
+    const l = star.dataset.star;
+    S.favs.has(l) ? S.favs.delete(l) : (S.favs.add(l), S.openGroups.add("fav"));
+    savePref("hawk.favLeagues", [...S.favs]); savePref("hawk.openGroups", [...S.openGroups]);
+    toast(S.favs.has(l) ? `⭐ ${l} added to your favourites.` : `${l} removed from your favourites.`);
+    return renderTree();
+  }
+  const g = e.target.closest("[data-g]");
+  if (g) {
+    const k = g.dataset.g;
+    S.openGroups.has(k) ? S.openGroups.delete(k) : S.openGroups.add(k);
+    savePref("hawk.openGroups", [...S.openGroups]);
+    renderTree(); loadCounts();
+    return;
+  }
+  const row = e.target.closest("[data-l]");
+  if (row) selectLeague(row.dataset.l, true);
+}
+// Games this week for every league in the open groups (365Scores, cached 5 min).
+async function loadCounts() {
+  const want = [...new Set(leagueGroups().filter(g => S.openGroups.has(g.key)).flatMap(g => g.leagues))]
+    .filter(l => !S.counts[l] && !S.counting.has(l));
+  if (!want.length) return;
+  want.forEach(l => S.counting.add(l));
   const now = Date.now();
-  await Promise.all(g.leagues.filter(l => !S.counts[l]).map(async (l) => {
+  await Promise.all(want.map(async (l) => {
     try {
       const list = await HAWK.fixtures(l);
-      const upcoming = list.filter(f => new Date(f.kickoff).getTime() - now < WEEK_MS);
-      S.counts[l] = { n: upcoming.length, next: (list.find(f => !f.started) || {}).kickoff || null };
-    } catch { /* leave it unknown */ }
+      S.counts[l] = { n: list.filter(f => new Date(f.kickoff).getTime() - now < WEEK_MS).length, next: (list.find(f => !f.started) || {}).kickoff || null };
+    } catch { /* leave it unknown */ } finally { S.counting.delete(l); }
   }));
-  if (S.group !== g.key) return;
-  $("#leagues").innerHTML = pillsFor();
-  if (pickFirst && !g.leagues.includes(S.league)) await selectLeague(g.leagues.find(l => S.counts[l] && S.counts[l].n) || g.leagues[0]);
+  renderTree();
+  const h = document.querySelector("#fixtures .fxhead");
+  if (h) h.outerHTML = fxHead();
 }
-async function selectLeague(league) {
+async function selectLeague(league, fromTree = false) {
   S.league = league;
   savePref("hawk.league", league);
-  if (S.group !== groupOf(league).key) openGroup(league);
-  document.querySelectorAll(".pill[data-l]").forEach(p => p.classList.toggle("on", p.dataset.l === league));
+  // Keep its group open (unless you picked it from your open favourites).
+  const g = groupOf(league).key;
+  if (!(fromTree && S.favs.has(league) && S.openGroups.has("fav")) && !S.openGroups.has(g)) { S.openGroups.add(g); savePref("hawk.openGroups", [...S.openGroups]); }
+  renderTree(); loadCounts();
   $("#fixtures").innerHTML = `<div class="skel"><div class="ln"></div><div class="ln"></div><div class="ln"></div></div>`;
   try {
     const { fixtures } = await api("/api/fixtures?league=" + encodeURIComponent(league));
     if (S.league !== league) return;
     S.fixtures = fixtures;
     renderFixtures();
+    if (fromTree) $("#fixtures").scrollIntoView({ block: "nearest", behavior: "smooth" });
   } catch (err) { $("#fixtures").innerHTML = `<div class="empty">Couldn't load fixtures.<br>${esc(err.message)}</div>`; }
+}
+function fxHead() {
+  const c = S.counts[S.league];
+  return `<div class="fxhead">${leagueLogo(S.league)}${esc(S.league)}${c && c.n ? ` · ${c.n} this week` : ""}</div>`;
 }
 function renderFixtures() {
   const openId = S.view === "match" && S.match ? String(S.match.id) : null;
-  $("#fixtures").innerHTML = S.fixtures.length ? S.fixtures.map(f => `
+  const c = S.counts[S.league];
+  $("#fixtures").innerHTML = fxHead() + (S.fixtures.length ? S.fixtures.map(f => `
     <div class="fx ${String(f.id) === openId ? "on" : ""}" data-id="${f.id}">
       <div class="team"><img src="${esc(f.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(f.home)}${isWatched(f.id) ? '<span class="bellmark" title="Lineup alert on">🔔</span>' : ""}</div>
       <div class="team"><img src="${esc(f.awayCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(f.away)}</div>
       <div class="when">${f.started ? '<span class="badge live" title="In play — opens the live view">🔴 LIVE</span>'
         : soon(f.kickoff) ? `<span class="badge soon" title="Kicks off ${esc(fmtKick(f.kickoff))}">in ${kickIn(f.kickoff)}</span>` : esc(fmtKick(f.kickoff)).replace(" · ", "<br>")}</div>
-    </div>`).join("") : `<div class="empty">No upcoming fixtures.</div>`;
+    </div>`).join("") : `<div class="empty">No upcoming fixtures${c && c.next ? ` — the next ${esc(S.league)} game is ${esc(fmtKick(c.next))}` : ""}.</div>`);
   $("#fixtures").onclick = (e) => { const f = e.target.closest(".fx"); if (f) openMatch(f.dataset.id); };
 }
 
@@ -1219,7 +1274,7 @@ function showScan() {
 // League picker for the scans: one row per group; the group button selects
 // all of it (or none, if it's all on). The choice is remembered.
 function leaguePicker(id, set) {
-  return `<div class="lpick" id="${id}">${HAWK.LEAGUE_GROUPS.map(g => {
+  return `<div class="lpick" id="${id}">${leagueGroups().filter(g => g.leagues.length).map(g => {
     const on = g.leagues.filter(l => set.has(l)).length;
     return `<div class="lprow"><button class="lpgroup ${on === g.leagues.length ? "on" : on ? "part" : ""}" data-pg="${g.key}"
       title="${on === g.leagues.length ? "Untick" : "Tick"} all of ${esc(g.name)}">${g.icon} ${esc(g.name)}</button><div class="lppills">${g.leagues.map(l =>
@@ -1802,7 +1857,7 @@ function renderScores() {
 // Filter chips: All + each league group, with how many games it has that day.
 function scoreChips() {
   const sc = S.scores;
-  return [["All", "All"], ...HAWK.LEAGUE_GROUPS.map(g => [g.key, `${g.icon} ${g.name}`])].map(([k, t]) => {
+  return [["All", "All"], ...leagueGroups().filter(g => g.leagues.length).map(g => [g.key, `${g.icon} ${g.name}`])].map(([k, t]) => {
     const n = sc.data ? sc.data.filter(g => k === "All" || groupOf(k).leagues.includes(g.league)).length : null;
     return `<span class="qc ${k === sc.league ? "in" : ""} ${n === 0 ? "zero" : ""}" data-lg="${esc(k)}">${esc(t)}${n != null ? ` <b>${n}</b>` : ""}</span>`;
   }).join("");

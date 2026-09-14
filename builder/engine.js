@@ -22,8 +22,8 @@
   // id. Keep in step with COMPETITIONS in engine/sources.py (which builds the
   // data files for the same list).
   const LEAGUE_GROUPS = [
-    { key: "top5", name: "Top 5", icon: "🏆", ids: { "Premier League": 7, "La Liga": 11, "Serie A": 17, "Bundesliga": 25, "Ligue 1": 35 } },
-    { key: "europe", name: "Europe", icon: "⭐", ids: { "Champions League": 572, "Europa League": 573, "Conference League": 7685 } },
+    { key: "top5", name: "Top 5", icon: "👑", ids: { "Premier League": 7, "La Liga": 11, "Serie A": 17, "Bundesliga": 25, "Ligue 1": 35 } },
+    { key: "europe", name: "Europe", icon: "🏆", ids: { "Champions League": 572, "Europa League": 573, "Conference League": 7685 } },
     { key: "more", name: "More Europe", icon: "🌍", ids: { "Eredivisie": 57, "Liga Portugal": 73, "Scottish Premiership": 61, "Belgian Pro League": 98,
         "Süper Lig": 78, "Greek Super League": 84, "Austrian Bundesliga": 111, "Swiss Super League": 95, "Danish Superliga": 119 } },
     { key: "second", name: "Second tier", icon: "🥈", ids: { "Championship": 1, "League One": 2, "2. Bundesliga": 26, "Serie B": 18, "LaLiga 2": 12, "Ligue 2": 36 } },

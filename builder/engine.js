@@ -510,6 +510,15 @@
     return file.players.map((p) => ({ name: p.name, position: p.position,
       matches: p.m.map((row) => Object.fromEntries(f.map((k, i) => [k, k === "home" || k === "sub_in" ? !!row[i] : row[i]]))) }));
   }
+  // The team's last n games (their kick-off times) from all its players' logs,
+  // and a player's minutes in them. "Who plays lately" must be measured in the
+  // team's recent games: a player's own last 5 can be from last season (he's
+  // since left, or has been injured for months).
+  function teamGames(rows, n = 5) {
+    const ts = [...new Set(rows.flatMap((p) => p.matches.map((m) => m.ts)).filter(Boolean))].sort((a, b) => b - a);
+    return new Set(ts.slice(0, n));
+  }
+  const minutesIn = (matches, games) => (matches || []).reduce((s, m) => s + (games.has(m.ts) ? m.minutes : 0), 0);
   const totalsOf = (ms) => [
     ms.reduce((s, m) => s + m.minutes, 0), ms.reduce((s, m) => s + m.shots, 0), ms.reduce((s, m) => s + m.sot, 0),
     ms.reduce((s, m) => s + XG_WEIGHT * m.xg + (1 - XG_WEIGHT) * m.goals, 0), ms.reduce((s, m) => s + m.yellow + m.red, 0)];
@@ -560,8 +569,9 @@
     const members = Object.fromEntries((an.detail.members || []).map((m) => [m.id, m]));
     const sh = { home: playerRows(an.players[0]), away: playerRows(an.players[1]) };
     const priors = positionPriors([...sh.home, ...sh.away]), xpriors = extraPriors([...sh.home, ...sh.away]);
-    const squads = {}, missing = {};
+    const squads = {}, missing = {}, lineupGuess = {};
     an.missing = missing;
+    an.lineupGuess = lineupGuess;   // side -> true when HAWK guessed the XI (365Scores had none)
     for (const [side, key] of [["home", "homeCompetitor"], ["away", "awayCompetitor"]]) {
       const lineup = (an.detail[key] || {}).lineups || {};
       const confirmed = lineup.status === "Confirmed";
@@ -583,10 +593,15 @@
                 field, info.jerseyNumber || null, info.shortName || null];
       });
       if (!entries.some((e) => e[1] === "Starting") && sh[side].length) {
-        // No lineup from 365Scores: the most-used players lately, minus the injured and suspended.
-        const mins = (p) => p.matches.slice(0, 5).reduce((s, m) => s + m.minutes, 0);
-        const recent = sh[side].filter((p) => !listed(p.name, "Missing")).sort((a, b) => mins(b) - mins(a));
-        entries = recent.slice(0, 18).map((p, i) => [p.name, i < 11 ? "Starting" : "Substitute", p.position, null]);
+        // No lineup from 365Scores: the most-used players in the team's last 5
+        // games, minus the injured and suspended — and a keeper in goal.
+        const games = teamGames(sh[side]), mins = (p) => minutesIn(p.matches, games);
+        const recent = sh[side].filter((p) => !listed(p.name, "Missing") && mins(p) > 0).sort((a, b) => mins(b) - mins(a));
+        const keeper = recent.find((p) => p.position === "G");
+        const xi = [keeper, ...recent.filter((p) => p.position !== "G")].filter(Boolean).slice(0, 11);
+        const bench = recent.filter((p) => !xi.includes(p)).slice(0, 7);
+        entries = [...xi.map((p) => [p.name, "Starting", p.position, null]), ...bench.map((p) => [p.name, "Substitute", p.position, null])];
+        lineupGuess[side] = true;
       }
       squads[side] = entries.map(([name, status, pos, photo, field = null, num = null, short = null]) => {
         const match = Object.keys(byName).length ? bestMatch(name, Object.keys(byName), 0.6) : null;
@@ -1136,11 +1151,13 @@
       else if (gap <= -0.03) add("down", 0.5, `Polymarket gives ${name[dog]} only ${P(an.polymarket[dog])}.`);
     }
     // 4. Team news: absent players who've been regulars (270+ minutes in the last 5 games).
+    // (Regular = 270+ minutes in the TEAM's last 5 games: someone out since May is already in the odds.)
+    const rowsOf = (side) => playerRows(an.players[side === "home" ? 0 : 1]);
     const regularsOut = (side) => {
-      const rows = playerRows(an.players[side === "home" ? 0 : 1]), names = rows.map((p) => p.name);
+      const rows = rowsOf(side), names = rows.map((p) => p.name), games = teamGames(rows);
       return ((an.missing || {})[side] || []).filter((m) => m.status === "Missing").map((m) => {
         const hit = names.length ? bestMatch(m.name, names, 0.6) : null, p = hit && rows.find((r) => r.name === hit);
-        return p && p.matches.slice(0, 5).reduce((s, x) => s + x.minutes, 0) >= 270 ? m.name : null;
+        return p && minutesIn(p.matches, games) >= 270 ? m.name : null;
       }).filter(Boolean);
     };
     const favOut = regularsOut(fav), dogOut = regularsOut(dog);
@@ -1167,10 +1184,10 @@
     const round = +((an.detail || {}).roundNum) || 0, played = (f) => (f ? f.length : 0);
     if (!CUPS.has(an.league) && ((round && round <= 3) || (played(rf.home) + played(rf.away) <= 2 && !round)))
       add("info", 0, `Early in the season${round ? ` (round ${round})` : ""}: the odds and HAWK's ratings still lean on last season — new signings and managers make any favourite's price less sure.`);
-    // 6. Rotation: how many of the favourite's regulars (270+ minutes in their
-    // last 5 games) are in the lineup. Big favourites lose most often with a
+    // 6. Rotation: how many of the favourite's regulars (270+ minutes in the
+    // team's last 5 games) are in the lineup. Big favourites lose most often with a
     // changed team — above all in cups.
-    const regulars = (p) => (p.recent || []).slice(0, 5).reduce((s, x) => s + x.minutes, 0) >= 270;
+    const favGames = teamGames(rowsOf(fav)), regulars = (p) => minutesIn(p.recent, favGames) >= 270;
     const favXI = ((squads || {})[fav] || []).filter((p) => p.status === "Starting");
     const known = an.lineups[fav] && an.lineups[fav].status === "Confirmed";
     if (known && favXI.length >= 11 && favXI.some((p) => p.has_data)) {
@@ -1219,7 +1236,9 @@
     const tableRow = (c) => { const r = an.table[c.id]; return r ? { position: r.position, points: r.points } : null; };
     return {
       id: an.id, league: an.league, home: an.home, away: an.away, homeCrest: crest(an.homeComp), awayCrest: crest(an.awayComp),
-      kickoff: an.kickoff ? an.kickoff.toISOString() : null, started: an.inPlay, lineups: an.lineups, referee: an.referee,
+      kickoff: an.kickoff ? an.kickoff.toISOString() : null, started: an.inPlay, referee: an.referee,
+      // guess: 365Scores had no lineup yet, so HAWK picked the XI from the team's last 5 games
+      lineups: Object.fromEntries(Object.entries(an.lineups).map(([s, v]) => [s, { ...v, guess: !!(an.lineupGuess || {})[s] }])),
       probs: { home: sumCells(M, (i, j) => i > j), draw: sumCells(M, (i, j) => i === j), away: sumCells(M, (i, j) => i < j),
                market, polymarket: an.polymarket, model },
       expected: sim.exp, grid, table: { home: tableRow(an.homeComp), away: tableRow(an.awayComp) }, form: an.form,

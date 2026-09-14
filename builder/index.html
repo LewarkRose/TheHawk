@@ -1201,7 +1201,7 @@ function playerTag(side, p) {
 }
 function lineupCard(m) {
   if (!m.players || !(m.players.home || []).some(p => p.status === "Starting")) return "";
-  const lu = m.lineups, confirmed = lu.home.status === "Confirmed" && lu.away.status === "Confirmed";
+  const lu = m.lineups, confirmed = lu.home.status === "Confirmed" && lu.away.status === "Confirmed", guess = lu.home.guess || lu.away.guess;
   const marker = (side, { p, depth, side: s }) => {
     // Horizontal pitch: home attacks left → right, away right → left. On phones
     // the pitch stands up: home at the bottom, away at the top.
@@ -1222,7 +1222,8 @@ function lineupCard(m) {
     <div class="lu-row"><span class="muted">Bench</span>${bench(side)}</div>${out(side) ? `<div class="lu-row"><span class="muted">Out</span>${out(side)}</div>` : ""}</div>`;
   return `<div class="section" id="lineups">
     <div class="lu-head"><h3 style="margin:0">👕 Lineups</h3>
-      <span class="badge ${confirmed ? "ok" : "warn"}">${confirmed ? "✅ Confirmed — HAWK's chances use them" : "🕐 Predicted — confirmed about an hour before kick-off"}</span></div>
+      <span class="badge ${confirmed ? "ok" : "warn"}">${confirmed ? "✅ Confirmed — HAWK's chances use them"
+        : guess ? "🤔 HAWK's guess — no lineup out yet (from the team's last 5 games)" : "🕐 Predicted — confirmed about an hour before kick-off"}</span></div>
     <div class="pitch">
       <svg class="pl-h" viewBox="0 0 160 100" preserveAspectRatio="none"><rect x="1" y="1" width="158" height="98"/><line x1="80" y1="1" x2="80" y2="99"/><circle cx="80" cy="50" r="9"/>
         <rect x="1" y="22" width="16" height="56"/><rect x="1" y="38" width="6" height="24"/><rect x="143" y="22" width="16" height="56"/><rect x="153" y="38" width="6" height="24"/></svg>

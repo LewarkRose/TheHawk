@@ -124,7 +124,7 @@ await mkdir(path.dirname(STATE_FILE), { recursive: true });
 await writeFile(STATE_FILE, JSON.stringify(state));
 await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   updated: new Date().toISOString(), matches: T.matches, legs: T.legs, waiting: Object.keys(state.pending).length,
-  byMarket: T.byMarket, byKey: T.byKey, bands: T.bands, recent: T.recent.slice(0, 20), upsets: T.upsets,
+  byMarket: T.byMarket, byKey: T.byKey, bands: T.bands, recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets,
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
 process.exit(0);   // the engine's timers shouldn't keep the job alive

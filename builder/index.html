@@ -425,6 +425,26 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .sig.up{background:rgba(20,227,161,.06)}
 .sig.down{background:rgba(143,164,178,.07);color:#c3cfd6}
 .sig.info{background:rgba(255,209,102,.07);color:#e8d9a8}
+/* ⚡ Radar page */
+.rcard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;
+  background:var(--panel2);margin-bottom:10px;cursor:pointer;transition:.15s}
+.rcard:hover{border-color:#3a4a55;transform:translateY(-1px)}
+.rcard .teams{display:flex;align-items:center;gap:7px;font-weight:800;flex-wrap:wrap}
+.rcard .teams img{width:20px;height:20px}
+.rsig{margin-top:6px;font-size:12.5px;display:flex;flex-direction:column;gap:3px}
+.rright{text-align:right;display:flex;flex-direction:column;align-items:flex-end}
+.rcal{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:9px 12px;margin-bottom:8px;font-size:13px}
+.rcal-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.rbar{position:relative;height:7px;background:#24313a;border-radius:4px;margin-top:7px}
+.rbar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#b8975a,var(--gold));border-radius:4px}
+.rbar b{position:absolute;top:-3px;width:2px;height:13px;background:#fff;border-radius:1px}
+.rcall{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line);
+  font-size:13px;cursor:pointer;border-radius:8px}
+.rcall:hover{background:var(--panel2)}
+.rcall-m{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rcall .ok{color:var(--accent)}
+.rcall .bad{color:var(--red)}
+@media (max-width:560px){.rcard{grid-template-columns:1fr}.rright{align-items:flex-start;text-align:left}.rcall{grid-template-columns:minmax(0,1fr) auto}}
 .up-record{margin-top:10px;font-size:12.5px;padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px dashed var(--line)}
 .up-verdict{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);font-size:13.5px}
 .up-verdict.hit{border-color:rgba(20,227,161,.5)}
@@ -491,6 +511,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 @media (max-width:1180px) and (min-width:821px){.nav span{display:none}.nav.on span{display:inline}.nav{padding:7px 11px}}
 /* small phones: icon over a small label, so all five pages fit in one row */
 @media (max-width:560px){.nav{flex-direction:column;gap:1px;font-size:10.5px;padding:5px 2px}.nav span{display:block}.tool.bell span{display:none}}
+/* long page names get a short one on phones (6 pages across a phone screen) */
+.nav .ns{display:none}
+@media (max-width:560px){.nav .nl{display:none}.nav .ns{display:block}.mainnav{gap:2px}.nav{font-size:10px;padding:5px 1px;min-width:0}}
 /* phones */
 @media (max-width:820px){
   .top{position:static}
@@ -552,7 +575,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     <nav class="mainnav" id="mainnav">
       <button class="nav" id="navBuilder" data-nav="builder" title="Build a bet on a match">⚡ <span>Builder</span></button>
       <button class="nav" id="scoresBtn" data-nav="scores" title="Live scores and results">⚽ <span>Scores</span></button>
-      <button class="nav" id="scanBtn" data-nav="scan" title="HAWK's builder for every fixture">🏆 <span>Best builders</span></button>
+      <button class="nav" id="radarBtn" data-nav="radar" title="Upset radar: the favourites most at risk, and how the radar has done">📡 <span>Radar</span></button>
+      <button class="nav" id="scanBtn" data-nav="scan" title="HAWK's builder for every fixture">🏆 <span class="nl">Best builders</span><span class="ns">Best</span></button>
       <button class="nav" id="valueBtn" data-nav="value" title="Every bookmaker price that beats HAWK's fair odds">💰 <span>Value</span></button>
       <button class="nav" id="accaBtn" data-nav="acca" title="Several matches on one ticket, and the Monster Acca">🧩 <span>Acca</span></button>
     </nav>
@@ -588,6 +612,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },
             view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "legs", data: null, timer: null },
+            radar: { leagues: null, hours: "today", min: 1, data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null,
                      tab: "value", minMove: 0.1 },
             watch: [] };
@@ -641,6 +666,8 @@ async function api(path, body) {
     case "/api/evaluate": return HAWK.evaluate(body);
     case "/api/scan": return body ? HAWK.startScan(body) : HAWK.scanStatus();
     case "/api/scan/stop": return HAWK.stopScan();
+    case "/api/radar": return body ? HAWK.startRadar(body) : HAWK.radarStatus();
+    case "/api/radar/stop": return HAWK.stopRadar();
     case "/api/value": return body ? HAWK.startValue(body) : HAWK.valueStatus();
     case "/api/value/stop": return HAWK.stopValue();
   }
@@ -663,15 +690,18 @@ async function init() {
   S.scan.leagues = pick("hawk.scanLeagues");
   S.value.leagues = pick("hawk.valueLeagues");
   S.monster.leagues = pick("hawk.monsterLeagues");
+  S.radar.leagues = pick("hawk.radarLeagues");
   applyLearning();
   // HAWK's graded predictions on every match (built on GitHub by engine/grade.mjs).
   fetch(new URL("../data/graded.json", location.href)).then(r => (r.ok ? r.json() : null)).then(g => {
     if (!g) return;
     S.graded = g; applyLearning(); renderSlip();
+    if (S.view === "radar") renderRadarRecord();
   }).catch(() => { /* not built yet */ });
   $("#valueBtn").onclick = showValue;
   $("#accaBtn").onclick = showAcca;
   $("#scoresBtn").onclick = showScores;
+  $("#radarBtn").onclick = showRadar;
   renderAccaBtn();
   setInterval(trackPrices, ALERT_MS);
   setTimeout(trackPrices, 5000);
@@ -1620,6 +1650,115 @@ async function openFromScan(id) {
   await evaluateSlip();
 }
 
+/* ---------- ⚡ Radar page ---------- */
+// Upset watch (the upset radar for every fixture in a window, riskiest first),
+// the radar's track record by level, and its latest calls against the results.
+function showRadar() {
+  S.view = "radar";
+  document.querySelectorAll(".fx").forEach(f => f.classList.remove("on"));
+  renderRadar();
+  pollRadar();
+}
+function renderRadar() {
+  const rd = S.radar;
+  $("#match").innerHTML = `
+    <div class="section" style="border-top:0">
+      <h3>⚡ Upset watch</h3>
+      <div class="note" style="margin-top:0">HAWK runs the upset radar on every match in the window and ranks them — the favourites most at risk first.
+        Each one shows the main reasons; open it for the full radar and the builder.</div>
+      ${leaguePicker("rdLeagues", rd.leagues)}
+      <div class="opts" style="justify-content:flex-start;gap:16px;flex-wrap:wrap">
+        <label>Kick-off <select id="rdHrs">${KICKOFF_WINDOWS.filter(([h]) => h !== 72).map(([h, t]) => `<option value="${h}" ${h === rd.hours ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+        <button class="build" id="rdGo" style="width:auto;margin:0 0 0 auto;padding:10px 20px"></button>
+      </div>
+      <div id="rdProg"></div>
+      <div class="qchips" id="rdFilter" style="margin-top:10px"></div>
+    </div>
+    <div class="section" id="rdRes"></div>
+    <div class="section"><h3>📊 Radar track record</h3><div id="rdRecord"></div></div>
+    <div class="section"><h3>🏁 Latest calls vs results</h3><div id="rdCalls"></div></div>`;
+  bindLeaguePicker("rdLeagues", rd.leagues, "hawk.radarLeagues");
+  $("#rdHrs").onchange = (e) => { rd.hours = windowValue(e.target.value); };
+  $("#rdGo").onclick = toggleRadar;
+  $("#rdFilter").onclick = (e) => { const c = e.target.closest("[data-rf]"); if (c) { rd.min = +c.dataset.rf; updateRadar(); } };
+  $("#rdRes").onclick = (e) => { const c = e.target.closest("[data-ropen]"); if (c) openFromRadar(c.dataset.ropen); };
+  $("#rdCalls").onclick = (e) => { const c = e.target.closest("[data-rrep]"); if (c) showReport(c.dataset.rrep); };
+  updateRadar();
+  renderRadarRecord();
+}
+function updateRadar() {
+  if (S.view !== "radar" || !$("#rdRes")) return;
+  const rd = S.radar, d = rd.data || { running: false, total: 0, done: 0, errors: 0, results: [] };
+  $("#rdGo").textContent = d.running ? "■ STOP" : d.results.length ? "⚡ SCAN AGAIN" : "⚡ SCAN FOR UPSETS";
+  $("#rdProg").innerHTML = d.running || d.total ? `<div class="prog"><span style="width:${d.total ? 100 * d.done / d.total : 3}%"></span></div>
+    <div class="note">${d.running ? `Checking… ${d.done} of ${d.total || "?"} matches` : `Checked ${d.done} match${d.done === 1 ? "" : "es"}`}${d.errors ? ` · ${d.errors} skipped (no odds or data yet)` : ""}</div>` : "";
+  const count = (min) => d.results.filter(r => r.upset.level >= min).length;
+  $("#rdFilter").innerHTML = d.results.length ? [[2, "🔥 High +"], [1, "Medium +"], [0, "All"]].map(([min, t]) =>
+    `<span class="qc ${rd.min === min ? "in" : ""}" data-rf="${min}">${t} <b>${count(min)}</b></span>`).join("") : "";
+  const res = d.results.filter(r => r.upset.level >= rd.min)
+    .sort((a, b) => b.upset.level - a.upset.level || b.upset.net - a.upset.net || b.upset.dogWin - a.upset.dogWin);
+  $("#rdRes").innerHTML = res.length ? res.map(radarRow).join("") : `<div class="note">${d.running ? "Matches appear here as they're checked…"
+    : d.results.length ? "No match at this level — every favourite looks solid. Try a lower filter or a longer window."
+    : d.total === 0 && d.params ? "No matches kick off in that window — try a longer one." : "Pick leagues and a window, then hit Scan for upsets."}</div>`;
+}
+function radarRow(r) {
+  const u = r.upset, ups = u.signals.filter(s => s.dir === "up").slice(0, 2), info = u.signals.find(s => s.dir === "info");
+  return `<div class="rcard" data-ropen="${esc(r.id)}">
+    <div style="min-width:0"><div class="teams"><img src="${esc(r.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(r.home)}
+        <span class="muted" style="font-weight:500">v</span><img src="${esc(r.awayCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(r.away)}</div>
+      <div class="muted" style="font-size:12px;margin-top:2px">${esc(r.league)} · ${esc(fmtKick(r.kickoff))} ·
+        <span class="badge ${r.confirmed ? "ok" : "warn"}">${r.confirmed ? "Lineups confirmed" : "Lineups predicted"}</span></div>
+      <div class="rsig">${ups.map(s => `<div>✅ ${esc(s.text)}</div>`).join("")}${info ? `<div class="muted">⚠️ ${esc(info.text)}</div>` : ""}${!ups.length && !info ? `<div class="muted">No warning signs — the risk is just how live ${esc(u.dogName)} are.</div>` : ""}</div></div>
+    <div class="rright"><span class="up-level ${UPSET_TONE[u.level]}">${esc(u.label)}</span>
+      <div class="muted" style="font-size:12px;margin-top:6px">${esc(u.dogName)} <b style="color:var(--text)">${pct(u.dogWin)}</b> to win<br>${esc(u.favName)} fail to win <b style="color:var(--text)">${pct(u.favFail)}</b></div>
+      <button class="ghost" style="width:auto;padding:6px 12px;margin-top:6px">Open ›</button></div></div>`;
+}
+function renderRadarRecord() {
+  const g = S.graded || {}, levels = g.upsets || [], total = levels.reduce((s, b) => s + b.n, 0);
+  $("#rdRecord").innerHTML = total ? levels.filter(b => b.n).map(b => {
+    const said = b.saidFail / b.n, got = b.failed / b.n, close = Math.abs(got - said) <= 0.05;
+    return `<div class="rcal"><div class="rcal-top"><span><b>${esc(b.label)} risk</b> <span class="muted">(${b.n} match${b.n === 1 ? "" : "es"})</span></span>
+        <span>favourite failed to win: said <b>${Math.round(100 * said)}%</b> · happened <b style="color:${close ? "var(--accent)" : "var(--gold)"}">${Math.round(100 * got)}%</b></span></div>
+      <div class="rbar"><i style="width:${(100 * got).toFixed(1)}%"></i><b style="left:${(100 * said).toFixed(1)}%" title="What the radar said"></b></div>
+      <div class="muted" style="font-size:11.5px;margin-top:4px">underdog won ${Math.round((100 * b.dogWon) / b.n)}% · ${b.n < 30 ? "small sample — it swings a lot until 30+" : "solid sample"}</div></div>`;
+  }).join("") + `<div class="note">Gold bar = how often the favourite really failed to win · white mark = what the radar said. When they line up, the radar can be trusted at that level.</div>`
+    : `<div class="note">HAWK saves the radar's call for every match before kick-off and marks it after the final whistle — the record builds here as matches finish${g.waiting ? ` (${g.waiting} match${g.waiting === 1 ? "" : "es"} waiting)` : ""}.</div>`;
+  const calls = (g.recent || []).filter(r => r.upset);
+  const labels = ["Low", "Medium", "High", "Very high"];
+  $("#rdCalls").innerHTML = calls.length ? calls.map(r => {
+    const u = r.upset, right = u.level >= 2 ? u.failed : u.level === 0 ? !u.failed : null;
+    const outcome = u.dogWon ? "upset" : u.failed ? "draw" : "favourite won";
+    return `<div class="rcall" data-rrep="${esc(r.id)}" title="Match report">
+      <span class="rcall-m">${esc(r.home)} <b>${esc(r.score)}</b> ${esc(r.away)}</span>
+      <span class="up-level ${UPSET_TONE[u.level]}" style="font-size:10.5px;padding:2px 8px">${labels[u.level]}</span>
+      <span class="muted" style="font-size:12px">${outcome}</span>
+      <span class="${right === true ? "ok" : right === false ? "bad" : "muted"}" style="font-weight:800">${right === true ? "✅ called it" : right === false ? "❌ missed" : "— lean"}</span></div>`;
+  }).join("") : `<div class="note">No graded calls yet — the first ones land a couple of hours after tonight's matches finish.</div>`;
+}
+async function toggleRadar() {
+  try {
+    if (S.radar.data && S.radar.data.running) S.radar.data = await api("/api/radar/stop", {});
+    else {
+      if (!S.radar.leagues.size) return toast("Pick at least one league.");
+      S.radar.data = await api("/api/radar", { leagues: [...S.radar.leagues], hours: hoursFor(S.radar.hours) });
+    }
+  } catch (err) { toast(err.message); }
+  updateRadar();
+  pollRadar();
+}
+async function pollRadar() {
+  clearTimeout(S.radar.timer);
+  try { S.radar.data = await api("/api/radar"); } catch { /* keep the last status */ }
+  updateRadar();
+  if (S.radar.data && S.radar.data.running) S.radar.timer = setTimeout(pollRadar, 1500);
+}
+async function openFromRadar(id) {
+  const r = ((S.radar.data || {}).results || []).find(x => String(x.id) === String(id)); if (!r) return;
+  await goToMatch(r.league, r.id);
+  const card = document.querySelector(".upset-card");
+  if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 /* ---------- value finder ---------- */
 function showValue() {
   S.view = "value";
@@ -2023,7 +2162,7 @@ function monsterClick(e) {
 /* ---------- page navigation ---------- */
 // The page buttons in the header light up for the page on screen. S.view is
 // set all over the place, so it's watched rather than every caller updating it.
-const NAV_OF = { match: "builder", inplay: "builder", scores: "scores", scan: "scan", value: "value", acca: "acca" };
+const NAV_OF = { match: "builder", inplay: "builder", scores: "scores", radar: "radar", scan: "scan", value: "value", acca: "acca" };
 function watchView() {
   let view = S.view;
   const paint = () => document.querySelectorAll(".mainnav .nav").forEach(b => b.classList.toggle("on", b.dataset.nav === NAV_OF[view]));

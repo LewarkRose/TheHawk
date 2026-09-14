@@ -1352,6 +1352,18 @@
     });
     return jobStatus(scan);
   }
+  // Upset watch: the upset radar for every fixture in the window (the Radar page).
+  const radarJob = newJob();
+  function startRadar(body) {
+    if (radarJob.running) return jobStatus(radarJob);
+    Object.assign(radarJob, newJob(), { running: true, params: windowParams(body) });
+    runFixtureJob(radarJob, (league, f, json) => {
+      if (json.started || !json.upset) return;
+      radarJob.results.push({ ...fixtureInfo(league, f, json), upset: json.upset,
+                              probs: { home: json.probs.home, draw: json.probs.draw, away: json.probs.away } });
+    });
+    return jobStatus(radarJob);
+  }
   // What an acca needs to remember about one leg once the match isn't loaded.
   function legSummary(e, json, id) {
     const l = e.legs[id], j = json.legs.find((x) => x.id === id) || {};
@@ -1929,6 +1941,7 @@
                   scores, matchReport, ticketLive,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
+                  startRadar, radarStatus: () => jobStatus(radarJob), stopRadar: () => { radarJob.stop = true; return jobStatus(radarJob); },
                   startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },
                   meta: () => data("meta.json"),
                   _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas,

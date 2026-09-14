@@ -366,6 +366,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .verdict.good{color:#04241a;background:linear-gradient(180deg,#3cf0b6,#12c58c);border-color:#0a9e70;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px -4px rgba(20,227,161,.6)}
 .verdict.warn{color:#2e2200;background:linear-gradient(180deg,#ffe08f,#f2b93b);border-color:#c8911f;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px -4px rgba(255,209,102,.5)}
 .verdict.bad{color:#fff;background:linear-gradient(180deg,#ff7a8c,#e0455b);border-color:#b8324a;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 4px 10px -4px rgba(255,93,115,.55)}
+/* the reasoning: one line per point, icon + text */
+.why.wlist{display:flex;flex-direction:column;gap:4px;padding:7px 9px}
+.why.wlist .wl{display:grid;grid-template-columns:18px 1fr;gap:4px;align-items:start;line-height:1.4}
 /* acca / Monster Acca match cards */
 .apart3d{padding-left:12px;margin-bottom:10px}.apart3d.gone{opacity:.55}
 .pcrests{display:flex;flex:none}.pcrests .pcrest{width:30px;height:30px;object-fit:contain;filter:drop-shadow(0 4px 6px rgba(0,0,0,.6))}
@@ -1637,8 +1640,9 @@ function legVerdict(l, row, n) {
   if (formGap < -0.35) return { label: "Swap it", tone: "bad", why: `Only ${l.hits} of his last ${l.games}, far below HAWK's ${pct(l.p)} — the chance leans on this one matchup` };
   if (ev != null && ev >= 0.02) return { label: "Good price", tone: "good", why: `Bet365 pays more than HAWK thinks it's worth (+${(100 * ev).toFixed(0)}%)` };
   if (ev != null && ev < -0.15) return { label: "Weak link", tone: "warn", why: "Bet365 pays well under what it's worth" };
-  if (formGap < -0.2 || lift < -0.08) return { label: "Weak link", tone: "warn", why: formGap < -0.2 ? `Landed in ${l.hits} of his last ${l.games} — less than HAWK's ${pct(l.p)}` : "Goes against the legs above" };
-  if (l.p >= 0.65 && (rate == null || l.games < 6 || rate >= 0.6) && lift >= -0.04) return { label: "Solid pick", tone: "good", why: "Likely, backed by form and the other legs" };
+  if (formGap < -0.2 || lift < -0.08) return { label: "Weak link", tone: "warn", why: formGap < -0.2 ? `HAWK gives ${pct(l.p)} but it landed in only ${l.hits} of his last ${l.games} — if this matchup doesn't play out as HAWK expects, it's the leg most likely to fail` : "It works against the legs above, so it lowers the whole builder's chance more than its own % suggests" };
+  if (l.p >= 0.65 && (rate == null || l.games < 6 || rate >= 0.6) && lift >= -0.04)
+    return { label: "Solid pick", tone: "good", why: `HAWK gives it ${pct(l.p)}${rate != null && l.games >= 6 ? `, his recent games back it up (${l.hits} of ${l.games})` : ""}${lift > 0.04 ? ", and it goes with the other legs" : ""}` };
   if (l.p < 0.4) return { label: "Price leg", tone: "", why: "The least likely leg — it's the one that makes the price" };
   return { label: "OK", tone: "", why: "A normal leg: fair chance, normal builder price" };
 }
@@ -1673,30 +1677,58 @@ function legTiles(l, row, n) {
 }
 // The short "why" under the tiles (the full one is in its tooltip): how
 // reliable it's been, how it fits the other legs, and what Bet365 pays.
+// The reasoning under the tiles: plain lines with the real numbers —
+// 📊 what it rests on (his games, or HAWK against Bet365's price), 🔗 what the
+// other legs do to it, 💶 Bet365's price against what it's worth, 📉 a move.
 function whyShort(l, row, n) {
-  const first = [], rest = [];
+  const lines = [];
+  // 📊 Form, or what the chance rests on.
   if (l.kind === "player" && l.games >= 3) {
-    const r = l.hits / l.games;
-    first.push(r >= 0.75 ? "very reliable lately" : r >= 0.5 ? "hits more often than not lately" : r >= 0.3 ? "hit and miss lately" : "rarely hits lately — the chance leans on this matchup");
-  } else if (l.group === "result") first.push(l.p >= 0.6 ? "clear favourite" : l.p >= 0.45 ? "slight favourite" : "not the favourite — a punt");
-  else first.push(l.p >= 0.7 ? "likely on its own" : l.p >= 0.5 ? "better than even" : "less likely than not");
-  if (row && n > 0) { const lift = row.cond - l.p; first.push(lift > 0.04 ? "fits the legs above" : lift < -0.04 ? "goes a bit against the legs above" : "doesn't depend on the other legs"); }
+    const r = l.hits / l.games, unit = l.basis === "starts" ? "starts" : "games";
+    lines.push(["📊", `${formVerb(l.id, true)} in ${l.hits} of his last ${l.games} ${unit} (${pct(r)}). HAWK gives him ${pct(l.p)} here${
+      l.games < 6 ? " — only a few games to go on, so it leans on players like him"
+      : r - l.p > 0.15 ? " — a bit below his form: HAWK allows for the opponent and for hot streaks cooling off"
+      : l.p - r > 0.15 ? " — above his recent games: his longer record and this opponent point higher"
+      : ", in line with his form"}.`]);
+  } else if (l.group === "result" && l.ep && l.pNoEp != null) {
+    lines.push(["📊", `HAWK makes it ${pct(l.pNoEp)} to win, plus ${pct(Math.max(0, l.p - l.pNoEp), 1)} from Early Payout (paid if they go 2 goals up) = ${pct(l.p)}.`]);
+  } else if (l.bookPrice > 1) {
+    const implied = 1 / l.bookPrice;
+    lines.push(["📊", `HAWK makes it ${pct(l.p)}; Bet365's price means about ${pct(implied)}${Math.abs(l.p - implied) < 0.04 ? " — they agree" : l.p > implied ? " — HAWK rates it higher" : " — HAWK rates it lower"}.`]);
+  } else lines.push(["📊", `HAWK makes it ${pct(l.p)} on its own, from both teams' numbers.`]);
+  // 🔗 With the other legs.
+  if (row && n > 0) {
+    const lift = row.cond - l.p;
+    lines.push(["🔗", `If the legs above land, this one is ${pct(row.cond)} (${pct(l.p)} on its own) — ${lift > 0.04 ? "they help each other, so it suits this builder" : lift < -0.04 ? "they work a little against each other" : "the other legs hardly change it"}.`]);
+  } else lines.push(["🔗", "The first leg — the others are picked to go with it."]);
+  // 💶 The price.
   const pr = legPrice(l), has = pr && pr.price, ev = has ? pr.price * l.p - 1 : null;
-  if (has) rest.push(pr.price <= HAWK.DEAD_PRICE ? "Bet365 pays next to nothing for it — swap it" : ev >= 0.02 ? "Bet365 pays over the odds" : ev >= -0.02 ? "a fair price" : ev >= -0.12 ? "a normal builder price" : "Bet365 pays short here");
-  if (pr && pr.src === "guess") rest.push("the price is HAWK's guess");
-  if (l.ep && l.pNoEp != null) rest.push(`Early Payout adds ${pct(Math.max(0, l.p - l.pNoEp), 1)}`);
+  if (has) {
+    const key = HAWK.propKey(l), learnt = key && S.propBook && S.propBook.n[key];
+    const src = pr.src === "priced" ? " (from Unibet's real price)" : pr.src === "typed" ? " (the price you typed)"
+      : pr.src === "guess" ? (learnt ? " (estimated from the Bet365 prices you've given HAWK)" : " (a rough guess — no bookmaker prices this leg)") : "";
+    lines.push(["💶", pr.price <= HAWK.DEAD_PRICE ? `Bet365 pays about ${odds(pr.price)}${src} — next to nothing, yet it can still lose the bet. Swap it.`
+      : `Bet365 ${odds(pr.price)}${src} vs HAWK's fair ${odds(l.fair)} — ${ev >= 0.02 ? `${(100 * ev).toFixed(0)}% more than it's worth. Value.` : ev >= -0.02 ? "about what it's worth." : ev >= -0.12 ? `${(100 * -ev).toFixed(0)}% less than it's worth, normal for a builder leg.` : `${(100 * -ev).toFixed(0)}% less than it's worth — a poor price, think about swapping.`}`]);
+  } else if (l.kind === "player") lines.push(["💶", `No bookmaker HAWK can read prices this leg, so it can't say if Bet365's price is good. HAWK's fair price: ${odds(l.fair)} — Bet365 needs to pay about that or more.`]);
+  else lines.push(["💶", `HAWK couldn't find Bet365's price for this exact line${l.b365 ? ` — look for "${l.b365}"` : ""}. HAWK's fair price: ${odds(l.fair)} — Bet365 needs to pay about that or more.`]);
+  // 📉 Money moving (only when it has).
   if (l.bookOpen > 1 && l.bookPrice > 1 && Math.abs(l.bookPrice / l.bookOpen - 1) >= 0.03) {
     const down = l.bookPrice < l.bookOpen, agree = down ? l.fair < l.bookOpen : l.fair > l.bookOpen;
-    rest.push(`${down ? "money has come for it" : "it's drifting"}${agree ? "" : " — HAWK thinks too far"}`);
+    lines.push(["📉", `Bet365 moved it ${odds(l.bookOpen)} → ${odds(l.bookPrice)}: ${down ? "money has come for it" : "money has gone against it"}. ${agree ? "HAWK agrees with the move." : "HAWK thinks it has gone too far."}`]);
   }
-  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-  const tip = document.createElement("div"); tip.innerHTML = whyLeg(l, row, n);
-  return `<span title="${esc(tip.textContent)}">${esc(cap(first.join("; ")))}.${rest.length ? " " + rest.map(x => esc(cap(x)) + ".").join(" ") : ""}</span>`;
+  return lines.map(([icon, text]) => `<div class="wl"><span>${icon}</span><span>${esc(text)}</span></div>`).join("");
 }
 // Why HAWK picked the leg, in a sentence or two, from what it knows: the form
 // behind it, how it goes with the other legs, the price, the market's move.
 const FORM_VERB = { score: "scored", soa: "scored or assisted", assist: "assisted", booked: "was booked", sot: "had {k}+ shots on target", shots: "had {k}+ shots",
                     fouled: "won {k}+ fouls", fouls: "made {k}+ fouls", tackles: "made {k}+ tackles", saves: "made {k}+ saves", offsides: "was caught offside {k}+ times" };
+// "Had a shot on target" for a 1+ line, "had 2+ shots" for bigger ones.
+const FORM_ONE = { sot: "had a shot on target", shots: "had a shot", fouled: "won a foul", fouls: "committed a foul", tackles: "made a tackle", saves: "made a save", offsides: "was caught offside" };
+function formVerb(id, capital = false) {
+  const m = /:([a-z]+?)(\d*)$/.exec(id || "") || [], k = +m[2] || 1;
+  const v = k === 1 && FORM_ONE[m[1]] ? FORM_ONE[m[1]] : (FORM_VERB[m[1]] || "hit this line").replace("{k}", String(k));
+  return capital ? v.charAt(0).toUpperCase() + v.slice(1) : v;
+}
 function whyLeg(l, row, n) {
   const out = [];
   // 1. What it rests on.
@@ -1817,7 +1849,7 @@ function renderSlip() {
         <span class="verdict ${vd.tone}" title="${esc(vd.why)}">${vd.label}</span></div>
       ${l.b365 ? `<div class="b365" title="Bet365's corners and cards lines are 3-way (Over / Exactly / Under): its &quot;Over 3&quot; means 4 or more">On Bet365 pick: <b>${esc(l.b365)}</b></div>` : ""}
       ${legTiles(l, row, n)}
-      <div class="why">💬 ${whyShort(l, row, n)}</div>
+      <div class="why wlist">${whyShort(l, row, n)}</div>
       <div class="acts"><button class="${S.locked.has(id) ? "on" : ""}" data-lock="${id}" title="${S.locked.has(id) ? "Locked: Build again keeps it — click to unlock" : "Lock: keep this leg when you build again"}">🔒${S.locked.has(id) ? " Locked" : ""}</button>
         <button data-swap="${id}" title="Swap: take it out and let HAWK put the best replacement in, back up to your target">🔄</button>
         <button data-rm="${id}" title="Remove this leg">✕</button>
@@ -2742,7 +2774,7 @@ function partRow(pt, actions) {
       <div class="tile"><div class="tk">Fair odds</div><div class="tv">${odds(pt.fair)}</div>
         <div class="ts">${moved ? `<span class="${pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "dn" : "up"}">${pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "▼" : "▲"} from ${odds(pt.legs[0].bookOpen)}</span>` : "HAWK's price"}</div></div>
     </div>
-    <div class="why">💬 ${esc(whyPart(pt, price))}</div>
+    <div class="why wlist">${whyPart(pt, price).map(([icon, text]) => `<div class="wl"><span>${icon}</span><span>${esc(text)}</span></div>`).join("")}</div>
     <div class="pacts">${actions}</div></div>`;
 }
 // One word on a match in the acca, as on the slip's legs.
@@ -2756,19 +2788,24 @@ function partVerdict(pt, price) {
 }
 // The short why for a match in the acca.
 function whyPart(pt, price) {
-  const l = pt.legs[0], single = pt.legs.length === 1, out = [];
+  const l = pt.legs[0], single = pt.legs.length === 1, lines = [];
   if (single) {
-    if (l.kind === "player" && l.games >= 3) out.push(`${l.hits} of his last ${l.games} ${l.basis === "starts" ? "starts" : "games"}`);
-    else out.push(l.p >= 0.7 ? "likely on its own" : l.p >= 0.5 ? "better than even" : "less likely than not");
-    if (price) { const ev = price * pt.p - 1; out.push(ev >= 0.02 ? "Bet365 pays over the odds" : ev >= -0.02 ? "a fair price" : ev >= -0.12 ? "a normal price" : "Bet365 pays short here"); }
-    if (l.ep && l.pNoEp != null) out.push(`Early Payout adds ${pct(Math.max(0, l.p - l.pNoEp), 1)}`);
-    if (l.bookOpen > 1 && l.bookPrice > 1 && Math.abs(l.bookPrice / l.bookOpen - 1) >= 0.03) out.push(l.bookPrice < l.bookOpen ? "money has come for it" : "it's drifting");
+    if (l.kind === "player" && l.games >= 3) {
+      lines.push(["📊", `${formVerb(l.id, true)} in ${l.hits} of his last ${l.games} ${l.basis === "starts" ? "starts" : "games"}; HAWK gives him ${pct(l.p)} here.`]);
+    } else if (l.ep && l.pNoEp != null) lines.push(["📊", `HAWK makes it ${pct(l.pNoEp)} to win, plus ${pct(Math.max(0, l.p - l.pNoEp), 1)} from Early Payout = ${pct(l.p)}.`]);
+    else if (price) lines.push(["📊", `HAWK makes it ${pct(l.p)}; Bet365's price means about ${pct(1 / price)}${Math.abs(l.p - 1 / price) < 0.04 ? " — they agree" : l.p > 1 / price ? " — HAWK rates it higher" : " — HAWK rates it lower"}.`]);
+    else lines.push(["📊", `HAWK makes it ${pct(l.p)}.`]);
+    if (price) { const ev = price * pt.p - 1;
+      lines.push(["💶", `Bet365 ${odds(price)} vs HAWK's fair ${odds(pt.fair)} — ${ev >= 0.02 ? `${(100 * ev).toFixed(0)}% more than it's worth. Value.` : ev >= -0.02 ? "about what it's worth." : ev >= -0.12 ? `${(100 * -ev).toFixed(0)}% less than it's worth, a normal acca leg.` : `${(100 * -ev).toFixed(0)}% less than it's worth — try 🔄 another leg from this match.`}`]); }
+    if (l.bookOpen > 1 && l.bookPrice > 1 && Math.abs(l.bookPrice / l.bookOpen - 1) >= 0.03)
+      lines.push(["📉", `Bet365 moved it ${odds(l.bookOpen)} → ${odds(l.bookPrice)}: ${l.bookPrice < l.bookOpen ? "money has come for it" : "money has gone against it"}.`]);
   } else {
     const alone = pt.legs.reduce((a, x) => a * x.p, 1), lift = pt.p / alone;
-    out.push(`${pt.legs.length} legs from one match, ${pct(pt.p)} together`);
-    out.push(lift > 1.08 ? "they go together, so the builder is likelier than the legs look" : lift < 0.92 ? "they pull a little against each other" : "they don't depend much on each other");
+    lines.push(["📊", `${pt.legs.length} legs from one match: HAWK gives them ${pct(pt.p)} to all land (fair ${odds(pt.fair)}).`]);
+    lines.push(["🔗", `Multiplied separately they'd be ${pct(alone)} — ${lift > 1.08 ? "they help each other, so together they're likelier than they look" : lift < 0.92 ? "they work a little against each other" : "they hardly affect each other"}.`]);
+    lines.push(["💶", "Bet365 prices a builder itself — type the acca price it shows and HAWK checks it."]);
   }
-  return out.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(". ") + ".";
+  return lines;
 }
 function accaInputs() {
   const num = (s) => parseFloat(String(s || "").replace(",", "."));

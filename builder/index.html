@@ -112,6 +112,19 @@ img{max-width:100%}
 .grid{display:grid;grid-template-columns:290px minmax(0,1fr) 400px;gap:16px;padding:16px 22px;align-items:start}
 @media (max-width:1250px){.grid{grid-template-columns:260px minmax(0,1fr)}.slipcol{grid-column:1/-1}}
 @media (max-width:820px){.grid{grid-template-columns:1fr}}
+/* Phones (one column): the league list only on the builder, folded into one bar once a match is open */
+.fx-toggle{display:none}
+@media (max-width:820px){
+  body:not([data-view="match"]) .fixtures{display:none}
+  /* the slip and its settings belong to the builder page */
+  body:not([data-view="match"]) .slipcol,body:not([data-view="match"]) .jump{display:none!important}
+  .fixtures{position:static;max-height:none}
+  .fx-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:11px 12px;border-radius:12px;border:1px solid #294640;cursor:pointer;
+    background:linear-gradient(180deg,#1b2a27,#151d20);color:var(--text);font:600 14px inherit;text-align:left;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+  .fx-toggle span{color:var(--muted);font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fx-toggle i{font-style:normal;color:var(--accent);transition:transform .2s}
+  .fixtures:not(.folded) .fx-toggle{margin-bottom:10px}.fixtures:not(.folded) .fx-toggle i{transform:rotate(180deg)}
+  .fixtures.folded{padding:6px}.fixtures.folded .ltree,.fixtures.folded #fixtures{display:none}
+}
 .panel{background:var(--panel);background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .fixtures{padding:10px;max-height:calc(100vh - var(--head) - 24px);overflow:auto;position:sticky;top:calc(var(--head) + 10px)}
 .fx{display:grid;grid-template-columns:1fr auto;gap:4px 8px;padding:10px 12px;border-radius:12px;cursor:pointer;
@@ -128,6 +141,12 @@ img{max-width:100%}
 .muted{color:var(--muted)}
 .empty{padding:60px 30px;text-align:center;color:var(--muted)}
 .empty h2{color:var(--text);margin:10px 0 6px;font-size:22px}
+.ip-bell{position:absolute;top:12px;right:12px;z-index:2;display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;cursor:pointer;
+  font:700 12px inherit;color:var(--muted);background:linear-gradient(180deg,#25333a,#1a2328);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 4px 10px -4px rgba(0,0,0,.6)}
+.ip-bell.on{color:#2e2200;background:linear-gradient(180deg,#ffe08f,#f2b93b);border-color:#c8911f;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 12px -4px rgba(255,209,102,.6)}
+.ip-bell:hover{filter:brightness(1.1)}
+@media (max-width:560px){.ip-bell{top:8px;right:8px;padding:5px 9px}.ip-bell span{display:none}}
+.hero{position:relative}
 .hero{padding:22px 24px;border-radius:16px 16px 0 0;
   background:radial-gradient(1200px 200px at 50% -60px,rgba(20,227,161,.18),transparent),linear-gradient(180deg,#18242a,#151b1f)}
 .vs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px}
@@ -366,6 +385,33 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .verdict.good{color:#04241a;background:linear-gradient(180deg,#3cf0b6,#12c58c);border-color:#0a9e70;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px -4px rgba(20,227,161,.6)}
 .verdict.warn{color:#2e2200;background:linear-gradient(180deg,#ffe08f,#f2b93b);border-color:#c8911f;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px -4px rgba(255,209,102,.5)}
 .verdict.bad{color:#fff;background:linear-gradient(180deg,#ff7a8c,#e0455b);border-color:#b8324a;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 4px 10px -4px rgba(255,93,115,.55)}
+/* flip cards: on a bigger screen the front and back simply stack; on a phone
+   the card turns over when you tap it (numbers on the front, the why on the back) */
+.fcard .fb-h,.fcard .fhint{display:none}
+@media (max-width:560px){
+  .fcard{perspective:900px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  /* the front sets the card's size; the back fits into it (and scrolls if a reason runs long) */
+  .fcard .fin{position:relative;transition:transform .55s cubic-bezier(.3,1.3,.5,1);transform-style:preserve-3d}
+  .fcard .fa,.fcard .fb{backface-visibility:hidden;-webkit-backface-visibility:hidden;min-width:0}
+  .fcard .fb{position:absolute;inset:0;transform:rotateY(180deg);display:flex;flex-direction:column;gap:5px;overflow-y:auto;scrollbar-width:none}
+  .fcard .fb::-webkit-scrollbar{display:none}
+  .fcard.flipped .fin{transform:rotateY(180deg)}
+  /* turned over: the back sets the size, so every reason shows in full */
+  .fcard.flipped .fa{position:absolute;inset:0;overflow:hidden}
+  .fcard.flipped .fb{position:relative;inset:auto;overflow:visible}
+  .fcard .fb-h{display:flex;align-items:center;gap:7px}.fcard .fb-h .lb{flex:1;min-width:0;font-size:12.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fcard .fb-h .lface{width:26px;height:26px;border-width:1.5px}.fcard .fb-h .lface .no{display:none}.fcard .fb-h .lface .ini{font-size:10px}.fcard .fb-h .pcrest{width:22px;height:22px}
+  .fcard .fb .why{margin-top:0;flex:1;font-size:11px;line-height:1.35;padding:5px 7px;gap:3px}
+  .fcard .fhint{display:inline-block;margin-left:auto;align-self:center;font-size:10.5px;font-weight:700;color:var(--accent);opacity:.85;order:9}
+  .fcard .fhint .h2,.fcard.flipped .fhint .h1{display:none}.fcard.flipped .fhint .h2{display:inline}
+  .leg.card .acts{display:flex;align-items:center}
+  .fcard.flipped{box-shadow:0 14px 26px -14px rgba(0,0,0,.85),0 0 0 1px rgba(20,227,161,.3)}
+  /* tighter on a phone */
+  .leg.card{padding:10px}.leg .tiles{gap:5px}.leg .tile{padding:5px 6px}.leg .tile .tv{font-size:16px}
+  .leg.card .sc-head .lb{font-size:13.5px}.lface{width:36px;height:36px}.verdict{font-size:10px;padding:2px 7px}
+  .why.wlist{font-size:11.5px}
+  .leg.card .acts{margin-top:6px}
+}
 /* the reasoning: one line per point, icon + text */
 .why.wlist{display:flex;flex-direction:column;gap:4px;padding:7px 9px}
 .why.wlist .wl{display:grid;grid-template-columns:18px 1fr;gap:4px;align-items:start;line-height:1.4}
@@ -790,7 +836,8 @@ a.nav{text-decoration:none}
   </div>
 </header>
 <main class="grid">
-  <aside class="panel fixtures"><nav class="ltree" id="ltree"></nav><div id="fixtures"><div class="empty">Loading leagues…</div></div></aside>
+  <aside class="panel fixtures" id="fxPanel"><button class="fx-toggle" id="fxToggle" type="button">⚽ <b id="fxLeague">Leagues</b> <span>· change league or match</span> <i>▾</i></button>
+    <nav class="ltree" id="ltree"></nav><div id="fixtures"><div class="empty">Loading leagues…</div></div></aside>
   <section class="panel" id="match">
     <div class="empty"><img class="bigmark" src="hawk-logo.svg" alt=""><h2>Pick a fixture</h2>
       HAWK simulates the match thousands of times — goals, shots, shots on target, corners and cards, player by player —
@@ -805,11 +852,18 @@ a.nav{text-decoration:none}
 <script src="engine.js"></script>
 <script src="hawk-settle.js"></script>
 <script>
+// Phones: which page is showing goes on <body data-view>, so the league list
+// can hide where it isn't used; on the builder it folds into one bar once a match is open.
+function foldFixtures(fold) {
+  const p = document.getElementById("fxPanel"); if (!p) return;
+  p.classList.toggle("folded", !!fold);
+  const lg = document.getElementById("fxLeague"); if (lg) lg.textContent = S.league || "Leagues";
+}
 function loadPref(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } }
 function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
             target: 3.25, style: "Balanced", focus: "Mix", maxLegs: 10, favourite: true, result: null, tab: "players", q: "",
-            chk: { price: "", boost: "", stake: "5" }, extras: false, cat: "All", ep: loadPref("hawk.ep", true),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
+            chk: { price: "", boost: "", stake: "5" }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
@@ -910,6 +964,8 @@ async function init() {
   setTimeout(trackPrices, 5000);
   $("#ltree").onclick = onTreeClick;
   $("#navBuilder").onclick = showBuilder;
+  // The folding league bar (phones).
+  $("#fxToggle").onclick = () => { const p = $("#fxPanel"); foldFixtures(!p.classList.contains("folded")); if (!p.classList.contains("folded")) p.scrollIntoView({ behavior: "smooth", block: "start" }); };
   watchView();
   $("#scanBtn").onclick = showScan;
   $("#watchBtn").onclick = () => { const p = $("#watchPop"); p.hidden = !p.hidden; };
@@ -1028,6 +1084,7 @@ async function loadCounts() {
 async function selectLeague(league, fromTree = false) {
   S.league = league;
   savePref("hawk.league", league);
+  const fl = document.getElementById("fxLeague"); if (fl) fl.textContent = league;
   // Keep its group open (unless you picked it from your open favourites).
   const g = groupOf(league).key;
   if (!(fromTree && S.favs.has(league) && S.openGroups.has("fav")) && !S.openGroups.has(g)) { S.openGroups.add(g); savePref("hawk.openGroups", [...S.openGroups]); }
@@ -1078,6 +1135,7 @@ async function openMatch(id, refresh = false, prematch = false) {
   try {
     const m = await api(`/api/match?league=${encodeURIComponent(S.league)}&id=${id}${refresh ? "&refresh=1" : ""}`);
     S.match = m; S.legs = Object.fromEntries(m.legs.map(l => [l.id, l]));
+    foldFixtures(true);   // phones: the league list folds away once a match is open
     if (!refresh) { S.slip = []; S.locked = new Set(); S.banned = new Set(); S.result = null; S.cat = "All"; }
     S.slip = S.slip.filter(id => S.legs[id]);
     S.live.checked = new Date();
@@ -1614,6 +1672,19 @@ function legPriceRow(l) {
   const ep = l.ep && l.pNoEp != null ? ` <span class="epb" title="Bet365's Early Payout: paid as won once the team goes 2 goals ahead. Adds ${pct(Math.max(0, l.p - l.pNoEp), 1)} — switch it off under the build options.">EP</span>` : "";
   return `<div class="lprice"><span>Bet365 <b>${pr && pr.price ? odds(pr.price) : "—"}</b>${srcTag}${edit}</span><span class="muted">fair ${odds(l.fair)}</span>${verdict}${ep}${openMark(l)}</div>`;
 }
+// Flip cards (phones): tapping a card turns it over — numbers on the front,
+// the reasoning on the back. Buttons, the price box and the Form tile still
+// work as normal. Which cards are turned is remembered through redraws.
+const PHONE = () => window.matchMedia("(max-width: 560px)").matches;
+const FLIP_HINT = `<span class="fhint"><span class="h1">↻ Tap for why</span><span class="h2">↻ Tap to flip back</span></span>`;
+function bindFlips(root, flipped) {
+  if (!root) return;
+  root.querySelectorAll(".fcard").forEach(c => c.onclick = (e) => {
+    if (!PHONE() || e.target.closest("button, input, a, select, [data-hist], [data-ppedit], .acts, .pacts")) return;
+    const on = c.classList.toggle("flipped"), id = c.dataset.fid;
+    if (id) on ? flipped.add(id) : flipped.delete(id);
+  });
+}
 // The leg's face: the player's photo with his shirt number (initials if
 // there's no photo), the team's crest for a team leg, or a ball for a match leg.
 function legFace(l, part = null) {
@@ -1844,13 +1915,19 @@ function renderSlip() {
     // Scorecard: the leg's name, three tiles — Chance · Bet365 · Form — a
     // short "why", and the buttons.
     const vd = legVerdict(l, row, n);
-    return `<div class="leg card tilt3d" style="animation-delay:${n * 60}ms">
-      <div class="sc-head">${legFace(l)}<div class="sc-name"><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}</div></div>
-        <span class="verdict ${vd.tone}" title="${esc(vd.why)}">${vd.label}</span></div>
-      ${l.b365 ? `<div class="b365" title="Bet365's corners and cards lines are 3-way (Over / Exactly / Under): its &quot;Over 3&quot; means 4 or more">On Bet365 pick: <b>${esc(l.b365)}</b></div>` : ""}
-      ${legTiles(l, row, n)}
-      <div class="why wlist">${whyShort(l, row, n)}</div>
-      <div class="acts"><button class="${S.locked.has(id) ? "on" : ""}" data-lock="${id}" title="${S.locked.has(id) ? "Locked: Build again keeps it — click to unlock" : "Lock: keep this leg when you build again"}">🔒${S.locked.has(id) ? " Locked" : ""}</button>
+    // On a phone the card flips (tap it): the front has the numbers, the back
+    // the reasoning. On a bigger screen both show, one under the other.
+    return `<div class="leg card tilt3d fcard ${S.flipped.has(id) ? "flipped" : ""}" data-fid="${id}" style="animation-delay:${n * 60}ms"><div class="fin">
+      <div class="fa">
+        <div class="sc-head">${legFace(l)}<div class="sc-name"><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}</div></div>
+          <span class="verdict ${vd.tone}" title="${esc(vd.why)}">${vd.label}</span></div>
+        ${l.b365 ? `<div class="b365" title="Bet365's corners and cards lines are 3-way (Over / Exactly / Under): its &quot;Over 3&quot; means 4 or more">On Bet365 pick: <b>${esc(l.b365)}</b></div>` : ""}
+        ${legTiles(l, row, n)}
+      </div>
+      <div class="fb"><div class="fb-h">${legFace(l)}<div class="lb">${esc(l.label)}</div><span class="verdict ${vd.tone}">${vd.label}</span></div>
+        <div class="why wlist">${whyShort(l, row, n)}</div></div>
+      </div>
+      <div class="acts">${FLIP_HINT}<button class="${S.locked.has(id) ? "on" : ""}" data-lock="${id}" title="${S.locked.has(id) ? "Locked: Build again keeps it — click to unlock" : "Lock: keep this leg when you build again"}">🔒${S.locked.has(id) ? " Locked" : ""}</button>
         <button data-swap="${id}" title="Swap: take it out and let HAWK put the best replacement in, back up to your target">🔄</button>
         <button data-rm="${id}" title="Remove this leg">✕</button>
         <button data-no365="${id}" title="Not on Bet365? HAWK stops using ${esc(l.market)} in this league and puts the next best leg in">🚫</button></div></div>`;
@@ -1919,6 +1996,7 @@ function renderSlip() {
   $("#slip").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => removeLeg(b.dataset.rm));
   $("#slip").querySelectorAll("[data-swap]").forEach(b => b.onclick = () => swapLeg(b.dataset.swap));
   $("#slip").querySelectorAll("[data-no365]").forEach(b => b.onclick = () => notOnBet365(b.dataset.no365));
+  bindFlips($("#slip"), S.flipped);
   $("#slip").querySelectorAll("[data-on365]").forEach(b => b.onclick = () => {
     const set = notOn365(); set.delete(b.dataset.on365); savePref("hawk.notOn365", [...set]);
     toast("HAWK can use it again"); renderSlip();
@@ -2761,7 +2839,8 @@ function partRow(pt, actions) {
       l.b365 ? `<div class="b365">On Bet365 pick: <b>${esc(l.b365)}</b></div>` : `<div class="muted" style="font-size:11px">${esc(l.market || "")}</div>`}</div><b>${pct(l.p)}</b></div>`;
   const moved = single && pt.legs[0].bookOpen > 1 && pt.legs[0].bookPrice > 1 && Math.abs(pt.legs[0].bookPrice / pt.legs[0].bookOpen - 1) >= 0.03;
   const tone = ev == null ? "" : ev >= 0.02 ? "good" : ev >= -0.02 ? "ok" : ev < -0.12 ? "poor" : "";
-  return `<div class="leg card tilt3d apart3d ${started ? "gone" : ""}">
+  const fid = `p:${pt.id}`;
+  return `<div class="leg card tilt3d apart3d fcard ${started ? "gone" : ""} ${S.flipped.has(fid) ? "flipped" : ""}" data-fid="${esc(fid)}"><div class="fin"><div class="fa">
     <div class="sc-head"><div class="pcrests">${crest(pt.homeCrest)}${crest(pt.awayCrest)}</div>
       <div class="sc-name"><div class="lb">${esc(pt.home)} <span class="muted" style="font-weight:500">v</span> ${esc(pt.away)}${upsetFlag(pt)}</div>
         <div class="mk">${esc(pt.league)} · ${esc(fmtKick(pt.kickoff))}${started ? ' · <span class="badge live">STARTED</span>' : ""}</div></div>
@@ -2774,8 +2853,10 @@ function partRow(pt, actions) {
       <div class="tile"><div class="tk">Fair odds</div><div class="tv">${odds(pt.fair)}</div>
         <div class="ts">${moved ? `<span class="${pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "dn" : "up"}">${pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "▼" : "▲"} from ${odds(pt.legs[0].bookOpen)}</span>` : "HAWK's price"}</div></div>
     </div>
-    <div class="why wlist">${whyPart(pt, price).map(([icon, text]) => `<div class="wl"><span>${icon}</span><span>${esc(text)}</span></div>`).join("")}</div>
-    <div class="pacts">${actions}</div></div>`;
+    </div>
+    <div class="fb"><div class="fb-h"><div class="pcrests">${crest(pt.homeCrest)}${crest(pt.awayCrest)}</div><div class="lb">${esc(pt.home)} v ${esc(pt.away)}</div><span class="verdict ${vd.tone}">${vd.label}</span></div>
+      <div class="why wlist">${whyPart(pt, price).map(([icon, text]) => `<div class="wl"><span>${icon}</span><span>${esc(text)}</span></div>`).join("")}</div></div></div>
+    <div class="pacts">${FLIP_HINT}${actions}</div></div>`;
 }
 // One word on a match in the acca, as on the slip's legs.
 function partVerdict(pt, price) {
@@ -2842,6 +2923,7 @@ function renderAccaBody() {
   for (const [id, key] of [["aPrice", "price"], ["aBoost", "boost"], ["aStake", "stake"]])
     $("#" + id).oninput = (e) => { c[key] = e.target.value; accaVerdict(); };
   $("#aCopy").onclick = copyAcca; $("#aVault").onclick = sendAccaToVault;
+  bindFlips(el, S.flipped);
   $("#aClear").onclick = () => { if (confirm("Clear your acca?")) { S.acca = []; S.accaChk.price = ""; saveAcca(); renderAccaBody(); } };
   el.onclick = (e) => {
     const rm = e.target.closest("[data-arm]");
@@ -2979,6 +3061,7 @@ function updateMonster(force = false) {
   const box = $("#monRes");
   if (!force && box.dataset.html === html) return;   // nothing changed: keep the buttons you're about to tap
   box.innerHTML = html; box.dataset.html = html;
+  bindFlips(box, S.flipped);
   $("#monUse").onclick = () => { if (S.acca.length && !confirm("Replace your current acca with this one?")) return;
     S.acca = []; picked.forEach(r => putPart(makePart(r, r.legs, r.p))); S.accaChk.price = ""; renderAccaBody(); updateMonster(); toast(`🧩 Your acca: ${t.legs} legs.`); };
   $("#monAdd").onclick = () => { picked.forEach(r => putPart(makePart(r, r.legs, r.p))); renderAccaBody(); toast(`🧩 Added — your acca has ${accaLegCount()} legs.`); };
@@ -3025,7 +3108,12 @@ function monsterClick(e) {
 const NAV_OF = { match: "builder", inplay: "builder", scores: "scores", radar: "radar", scan: "scan", value: "value", acca: "acca" };
 function watchView() {
   let view = S.view;
-  const paint = () => document.querySelectorAll(".mainnav .nav").forEach(b => b.classList.toggle("on", b.dataset.nav === NAV_OF[view]));
+  const paint = () => {
+    document.querySelectorAll(".mainnav .nav").forEach(b => b.classList.toggle("on", b.dataset.nav === NAV_OF[view]));
+    // For the phone layout: the league list shows on the builder only, folded once a match is open.
+    document.body.dataset.view = view;
+    if (view === "match") foldFixtures(!!S.match);
+  };
   Object.defineProperty(S, "view", { get: () => view, set: (v) => { view = v; paint(); }, configurable: true });
   paint();
 }
@@ -3067,15 +3155,17 @@ function showScores() {
   S.scores.timer = setInterval(() => {
     if (S.view !== "scores") { clearInterval(S.scores.timer); return; }
     // Every 15 s while a game is live or about to start, otherwise every 30 s.
+    // (Also after midnight: a day that still has games live keeps updating —
+    // it used to freeze at 00:00, when "today" became yesterday.)
     const busy = (S.scores.data || []).some(g => g.status === 3 || due(g));
-    if (!document.hidden && S.scores.day === localDay(new Date()) && (busy || ++tick % 2 === 0)) loadScores();
+    if (!document.hidden && (S.scores.day === localDay(new Date()) || busy) && (busy || ++tick % 2 === 0)) loadScores();
   }, SCORES_MS / 2);
 }
 // Past kick-off time but 365Scores hasn't started the game yet (kick-offs run a few minutes late).
 function due(g) { return g.status === 2 && !!g.kickoff && minsToKick(g.kickoff) <= 0 && minsToKick(g.kickoff) > -30; }
 // Back on the app (phone unlocked, tab switched back): refresh straight away.
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && S.view === "scores" && S.scores.day === localDay(new Date())) loadScores();
+  if (!document.hidden && S.view === "scores" && (S.scores.day === localDay(new Date()) || (S.scores.data || []).some(g => g.status === 3 || due(g)))) loadScores();
 });
 async function loadScores() {
   const sc = S.scores, day = sc.day;
@@ -3152,7 +3242,8 @@ function renderScoreList() {
         const sc0 = g.score[0] == null ? "" : g.score[0], sc1 = g.score[1] == null ? "" : g.score[1];
         const bet = mine[g.id] ? `<span title="You have a HAWK bet on this match (${esc(mine[g.id].toLowerCase())})">🎟</span>` : "";
         // Upcoming: a bell for a lineup alert, or "XI ✓" once both lineups are out.
-        const alert = g.status !== 2 ? "" : g.lineupsConfirmed ? `<span class="sc-xi" title="Lineups confirmed">XI ✓</span>`
+        const alert = g.status === 3 ? (() => { const f = followState(g.id); return `<button class="sc-bell ${f.on ? "on" : ""}" data-follow="${g.id}" title="${f.bet ? "You have a bet on it — alerts on" : f.on ? "Goal alerts on — tap to stop" : "Goal and red-card alerts for this match"}">${f.on ? "🔔" : "🔕"}</button>`; })()
+          : g.status !== 2 ? "" : g.lineupsConfirmed ? `<span class="sc-xi" title="Lineups confirmed">XI ✓</span>`
           : `<button class="sc-bell ${isWatched(g.id) ? "on" : ""}" data-bell="${g.id}" title="${isWatched(g.id) ? "Lineup alert on — click to stop" : "Alert me when the lineups are confirmed"}">🔔</button>`;
         return `<div class="sc-row ${g.status === 3 ? "is-live" : ""}" data-sid="${g.id}" title="${g.status === 3 ? "Open the live view" : g.status === 4 ? "Match report" : "Open in the builder"}">
           <div class="sc-state">${state}</div>
@@ -3439,7 +3530,9 @@ function renderInPlay() {
       .map(e => `<div class="off" title="${esc(e.player || "")} — goal ruled out${/var/i.test(e.detail) ? " by VAR" : ""}">❌⚽ <s>${esc(e.player ? e.player.split(" ").slice(-1)[0] : "Goal")}</s> <span>${esc(e.minute)} · VAR</span></div>`);
     return by.length || off.length ? `<div class="ip-scorers">${by.map(r => `<div title="${esc(r.full || "")}${r.own ? " — own goal" : ""}">⚽ ${esc(r.name)}${r.own ? " (og)" : ""} <span>${esc(r.mins.join(", "))}</span></div>`).join("")}${off.join("")}</div>` : "";
   };
-  const head = `<div class="hero"><div class="vs">
+  const fol = followState(ip.id);
+  const bell = `<button class="ip-bell ${fol.on ? "on" : ""}" data-follow="${esc(ip.id)}" title="${fol.bet ? "You have a bet on this match, so its goal and red-card alerts are on" : fol.on ? "Goal and red-card alerts on for this match — tap to stop" : "Get goal and red-card alerts for this match, even when you leave this page"}">${fol.on ? "🔔" : "🔕"}<span>${fol.on ? "Alerts on" : "Alerts off"}</span></button>`;
+  const head = `<div class="hero">${d.live ? bell : ""}<div class="vs">
       <div class="side"><img src="${esc(d.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(d.home)}</div>${d.reds && d.reds[0] ? `<div>${"🟥".repeat(d.reds[0])}</div>` : ""}${scorers("home")}</div>
       <div class="mid">${d.live ? `<div class="ip-score">${d.score[0]} – ${d.score[1]}</div><div class="ip-clock">🔴 ${esc(d.clock || "")} ${esc(d.statusText || "")}</div>`
         : `<div class="x">VS</div><div class="ko">${esc(d.statusText || "")}</div>`}
@@ -3848,6 +3941,27 @@ async function lineupsIn(w, source) {
 // scores feed as the Scores page; a goal taken off (VAR) shows too.
 const GOALS_MS = 30 * 1000, GOAL_SHOW_MS = 15000;
 const goalState = { last: {}, busy: false, on: loadPref("hawk.goalAlerts", true) };
+// 🔔 on a live match (live view, Scores): goal and red-card alerts for it,
+// even after you leave its page. A match you have a bet on is always followed.
+function followState(id) {
+  const f = loadPref("hawk.goalFollow", {})[String(id)], mine = pendingBetsOn(id).length > 0;
+  return { on: mine || (!!f && Date.now() - Date.parse(f) < 3 * 3600e3), bet: mine };
+}
+async function toggleFollow(id) {
+  const st = followState(id);
+  if (st.bet) return toast("🔔 You have a bet on this match — its alerts stay on.");
+  const follow = loadPref("hawk.goalFollow", {});
+  if (st.on) { delete follow[String(id)]; toast("🔕 Alerts off for this match"); }
+  else {
+    follow[String(id)] = new Date().toISOString();
+    if (goalState && !goalState.on) { goalState.on = true; savePref("hawk.goalAlerts", true); }
+    if ("Notification" in window && Notification.permission === "default") { try { await Notification.requestPermission(); } catch { /* ignored */ } }
+    toast("🔔 Alerts on: goals and red cards for this match" + ("Notification" in window && Notification.permission === "granted" ? ", on your screen too" : ""));
+  }
+  savePref("hawk.goalFollow", follow);
+  if (S.view === "inplay") renderInPlay(); else if (S.view === "scores") renderScoreList();
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-follow]"); if (b) { e.stopPropagation(); toggleFollow(b.dataset.follow); } }, true);
 function followedGames() {
   const ids = new Set();
   try {
@@ -3871,7 +3985,10 @@ async function checkGoals() {
   if (!follow.size) return;
   goalState.busy = true;
   try {
-    const games = (await HAWK.scores(localDay(new Date()))).filter(g => follow.has(g.id) && (g.status === 3 || g.status === 4));
+    // Today's games — and, in the small hours, yesterday's too (a match that kicked off before midnight).
+    let list = await HAWK.scores(localDay(new Date()));
+    if (new Date().getHours() < 5) { const y = new Date(); y.setDate(y.getDate() - 1); list = list.concat(await HAWK.scores(localDay(y))); }
+    const seen = new Set(), games = list.filter(g => follow.has(g.id) && (g.status === 3 || g.status === 4) && !seen.has(g.id) && seen.add(g.id));
     for (const g of games) {
       const now = [g.score[0] || 0, g.score[1] || 0], was = goalState.last[g.id];
       goalState.last[g.id] = now;

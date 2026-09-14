@@ -273,6 +273,11 @@ img{max-width:100%}
 .agree{font-size:9.5px;font-weight:800;margin-left:5px;padding:1px 5px;border-radius:5px;white-space:nowrap;letter-spacing:.02em}
 .agree.yes{background:rgba(20,227,161,.14);color:var(--accent)}
 .agree.no{background:rgba(255,209,102,.14);color:var(--gold)}
+.agree.nv,.badge.nv{background:rgba(143,164,178,.14);color:#b3c1ca}
+.badge.nv small{font-weight:600;opacity:.8}
+/* the move since Bet365 opened, on its own line under a leg (never over the price column) */
+.mvline{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:3px 0 4px}
+.mvline .mvo,.mvline .agree{margin-left:0}
 .seg2{grid-template-columns:repeat(2,1fr)}
 .mvo.dn,.mv-prices .dn{color:var(--accent)}
 .mvo.up,.mv-prices .up{color:#ff8a8a}
@@ -1050,9 +1055,12 @@ const CATEGORIES = {
 const MARKET_ORDER = Object.values(CATEGORIES).flat();
 const categoryOf = (market) => Object.keys(CATEGORIES).find(c => CATEGORIES[c].includes(market)) || "Result";
 
-// ▲/▼ when Bet365 has moved this leg's price since the match was opened.
+// ▲/▼ when Bet365 has moved this leg's price since the match was opened (fits
+// next to a price). The move since Bet365 opened, with HAWK's take, is longer:
+// it goes on its own line under the leg (moveLine).
 const moveMark = (l) => (l.prevPrice && l.bookPrice && l.prevPrice !== l.bookPrice
-  ? `<span class="mv ${l.bookPrice > l.prevPrice ? "up" : "down"}" title="Bet365 was ${odds(l.prevPrice)}">${l.bookPrice > l.prevPrice ? "▲" : "▼"}</span>` : "") + openMark(l);
+  ? `<span class="mv ${l.bookPrice > l.prevPrice ? "up" : "down"}" title="Bet365 was ${odds(l.prevPrice)}">${l.bookPrice > l.prevPrice ? "▲" : "▼"}</span>` : "");
+const moveLine = (l) => { const m = openMark(l); return m ? `<div class="mvline">${m}</div>` : ""; };
 // "▼ from 2.55": how far Bet365's price has moved since it opened (3%+).
 // Shortening = money has come for it; drifting = money has gone against it.
 function openMark(l) {
@@ -1060,21 +1068,28 @@ function openMark(l) {
   const move = l.bookPrice / l.bookOpen - 1;
   if (Math.abs(move) < 0.03) return "";
   // HAWK agrees when the move went towards its fair price.
-  const agree = move < 0 ? l.fair < l.bookOpen : l.fair > l.bookOpen;
+  const agree = move < 0 ? l.fair < l.bookOpen : l.fair > l.bookOpen, noValue = agree && l.bookPrice < l.fair * VALUE_EDGE;
   return `<span class="mvo ${move < 0 ? "dn" : "up"}" title="Bet365 opened at ${odds(l.bookOpen)} — ${move < 0 ? "shortened: money has come for it" : "drifted: money has gone against it"}">${move < 0 ? "▼" : "▲"} from ${odds(l.bookOpen)}</span>`
-    + `<span class="agree ${agree ? "yes" : "no"}" title="${agree ? "The market moved towards HAWK's fair price" : "The market moved away from HAWK's fair price"}">${agree ? "HAWK agrees" : "HAWK disagrees"}</span>`;
+    + `<span class="agree ${agree ? (noValue ? "nv" : "yes") : "no"}" title="${agree ? `The market moved towards HAWK's fair price (${odds(l.fair)})` + (noValue ? ` — but ${odds(l.bookPrice)} still pays less than that, so it's no bet: value from ${odds(l.fair * VALUE_EDGE)}+` : "") : "The market moved away from HAWK's fair price"}">${
+      agree ? (noValue ? `HAWK agrees · no value (needs ${odds(l.fair * VALUE_EDGE)}+)` : "HAWK agrees") : "HAWK disagrees"}</span>`;
+}
+// A mover's verdict: value if Bet365 still over-pays after the move; otherwise
+// whether the move went HAWK's way — and, if it did, that it's still no bet.
+function moveTag(r, short = false) {
+  if (r.value >= 0.02) return `<span class="badge ok">${short ? "" : "still "}value +${(100 * r.value).toFixed(1)}%</span>`;
+  if (!r.agree) return `<span class="badge warn" title="The price moved away from HAWK's fair ${odds(r.fair)}">HAWK disagrees</span>`;
+  return `<span class="badge nv" title="The price moved towards HAWK's fair ${odds(r.fair)}, but ${odds(r.price)} still pays less than that — no bet. Value from ${odds(r.fair * VALUE_EDGE)}+">HAWK agrees · no value <small>(needs ${odds(r.fair * VALUE_EDGE)}+)</small></span>`;
 }
 // Match page: the biggest Bet365 moves since opening, and HAWK's take on each.
 function moversCard(m) {
   const rows = m.movers || [];
   if (!rows.length) return "";
   return `<div class="section"><h3>📈 Market movers</h3>${rows.slice(0, 6).map(r => moverRow(r)).join("")}
-    <div class="note">Bet365's opening price → now. ▼ shortened = money has come for it. <b>HAWK agrees</b> = the move went towards HAWK's fair price.
-      Getting on before a price shortens is how you beat the closing price.</div></div>`;
+    <div class="note">Bet365's opening price → now. ▼ shortened = money has come for it. <b>HAWK agrees</b> = the move went towards HAWK's fair price —
+      a good sign for HAWK, but only a green <b>value</b> badge is worth betting. Getting on before a price shortens is how you beat the closing price.</div></div>`;
 }
 function moverRow(r, extra = "") {
-  const tag = r.value >= 0.02 ? `<span class="badge ok">still value +${(100 * r.value).toFixed(1)}%</span>`
-    : r.agree ? `<span class="badge ok" style="opacity:.8">HAWK agrees</span>` : `<span class="badge warn">HAWK disagrees</span>`;
+  const tag = moveTag(r);
   return `<div class="mover">${extra}<div><b>${esc(r.label)}</b></div>
     <div class="mv-prices">${odds(r.open)} → <b>${odds(r.price)}</b> <span class="${r.move < 0 ? "dn" : "up"}">${r.move < 0 ? "▼" : "▲"} ${Math.abs(100 * r.move).toFixed(0)}%</span></div>
     <div class="muted" style="font-size:12px">HAWK fair ${odds(r.fair)}</div><div>${tag}</div></div>`;
@@ -1095,7 +1110,7 @@ function renderLegList() {
   const cats = ["All", ...Object.keys(CATEGORIES).filter(c => counts[c])];
   $("#lgcats").innerHTML = cats.map(c => `<span class="qc ${S.cat === c ? "in" : ""}" data-cat="${esc(c)}">${esc(c)} ${c === "All" ? all.length : counts[c]}</span>`).join("");
   $("#lglist").innerHTML = Object.entries(groups).sort((a, b) => rank(a[0]) - rank(b[0])).map(([g, ls]) => `<div class="lg"><h4>${esc(g)} ${trustBadge(g)}</h4>${head}${ls.slice(0, 40).map(l => `
-    <div class="lrow"><div>${esc(l.label)}${l.low_data ? ' <span class="badge warn">low data</span>' : ""}${hitChip(l)}<div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div></div>
+    <div class="lrow"><div>${esc(l.label)}${l.low_data ? ' <span class="badge warn">low data</span>' : ""}${hitChip(l)}${moveLine(l)}<div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div></div>
       <div style="text-align:right;font-weight:700">${pct(l.p, 1)}</div><div class="muted" style="text-align:right">${odds(l.fair)}</div>
       <div style="text-align:right;font-weight:700;color:${l.bookPrice ? (l.bookPrice > l.fair ? "var(--accent)" : "var(--text)") : "var(--muted)"}">${l.bookPrice ? odds(l.bookPrice) : "–"}${moveMark(l)}${
         l.bookPrice ? `<span class="star ${isStarred(S.match.id, l.id) ? "on" : ""}" data-star="${l.id}" title="${isStarred(S.match.id, l.id) ? "Price alert on — click to stop" : `Alert me when Bet365 pays ${odds(l.fair * VALUE_EDGE)}+`}">★</span>` : ""}</div>
@@ -1120,7 +1135,7 @@ function renderSlip() {
     const l = S.legs[id]; if (!l) return "";
     const row = r && r.legs ? r.legs.find(x => x.id === id) : null;
     return `<div class="leg" style="animation-delay:${n * 60}ms"><div class="ck">✓</div>
-      <div class="l1"><div><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}${hitChip(l)}</div></div>
+      <div class="l1"><div><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}${hitChip(l)}</div>${moveLine(l)}</div>
         <div class="rt"><div class="pp">${pct(l.p)}</div>${row && n > 0 ? `<div class="fo">${pct(row.cond)} given above</div>` : ""}
           ${priceLine(l)}</div></div>
       <div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div>
@@ -1608,9 +1623,9 @@ function renderMovers(d) {
       <div><b>${esc(r.label)}</b><div class="muted" style="font-size:11.5px">HAWK fair ${odds(r.fair)}</div></div>
       <div class="mv-prices">${odds(r.open)} → <b>${odds(r.price)}</b></div>
       <div class="mv-prices"><span class="${r.move < 0 ? "dn" : "up"}" style="font-weight:900">${r.move < 0 ? "▼" : "▲"} ${Math.abs(100 * r.move).toFixed(0)}%</span></div>
-      <div>${r.value >= 0.02 ? `<span class="badge ok">value +${(100 * r.value).toFixed(1)}%</span>` : r.agree ? '<span class="badge ok" style="opacity:.8">HAWK agrees</span>' : '<span class="badge warn">HAWK disagrees</span>'}</div></div>`).join("")
-    + `<div class="note">Bet365's opening price → now. ▼ = the price has shortened (money has come for it), ▲ = drifted. <b>HAWK agrees</b> = the move went towards HAWK's fair price;
-       <b>value</b> = even after the move, Bet365 still pays more than HAWK's fair odds.</div>`
+      <div>${moveTag(r, true)}</div></div>`).join("")
+    + `<div class="note">Bet365's opening price → now. ▼ = the price has shortened (money has come for it), ▲ = drifted. <b>HAWK agrees</b> = the move went towards HAWK's fair price —
+       the market came round to HAWK's view, but the value has usually gone; <b>value</b> = even after the move, Bet365 still pays more than HAWK's fair odds, so it's worth a bet.</div>`
     : `<div class="note">${d.running ? "Moves appear here as each match is checked…" : d.total ? "No Bet365 price has moved that much in this window." : "Pick leagues and a window, then hit Find value — it checks prices and moves together."}</div>`);
   $("#vMinMove").onchange = (e) => { v.minMove = +e.target.value; renderMovers(d); };
   $("#valRes").onclick = (e) => { const r = e.target.closest("[data-mopen]"); if (r) { const m = S.value.moversShown[+r.dataset.mopen]; if (m) goToMatch(m.league, m.id); } };

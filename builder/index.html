@@ -143,6 +143,14 @@ img{max-width:100%}
 .bar3{display:flex;height:34px;border-radius:10px;overflow:hidden;font-weight:800;font-size:13px}
 .bar3 div{display:flex;align-items:center;justify-content:center;min-width:34px;transition:flex .6s}
 .bar3 .h{background:var(--accent);color:#04241a}.bar3 .d{background:#34424c}.bar3 .a{background:var(--blue);color:#061a2c}
+.bar3.sm{height:22px;font-size:11.5px;border-radius:7px;flex:1}.bar3.sm div{min-width:28px}
+.ng-box{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+.ng-head{font-weight:800;margin-bottom:8px}
+.ng-row{display:flex;align-items:center;gap:10px;margin-bottom:5px}.ng-src{width:62px;font-size:12px;font-weight:700;color:var(--muted)}
+.ng-box .bar3-legend{margin-left:72px}
+.ng-stats{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;margin-top:6px;color:var(--muted)}.ng-stats b{color:var(--text)}
+.ng-scorers{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;margin-top:8px}
+.ng-p{padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--panel)}.ng-p b{color:var(--accent)}
 .srcs{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--muted)}
 .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .tile{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
@@ -1500,12 +1508,16 @@ function applyPropBook() {
     if (Math.abs(d) <= 4) (book[x.key] ||= []).push({ x: lg(x.p), d });   // (a typo like 14.0 for 1.40 is left out)
   }
   // …and from the builder prices you type in the price box (no typing per leg).
+  const ratios = {};
   for (const x of loadPref("hawk.b365prices", [])) {
     const f = propShiftFromBuilder(x);
-    if (f) for (const d of f.props) (book[d.k] ||= []).push({ x: lg(d.p), d: f.s, w: 1 / f.props.length });
+    if (f && f.props) for (const d of f.props) (book[d.k] ||= []).push({ x: lg(d.p), d: f.s, w: 1 / f.props.length });
+    if (f && f.refProps) for (const d of f.refProps) (ratios[d.k] ||= []).push(f.ratio);
   }
-  S.propBook = { book, n: Object.fromEntries(Object.entries(book).map(([k, pts]) => [k, pts.length])) };
-  HAWK.setPropBook(book);
+  // Bet365 ÷ Unibet per kind of leg: your builders' average, pulled towards the measured 1.2% until there are a few.
+  const refRatio = Object.fromEntries(Object.entries(ratios).map(([k, rs]) => [k, (rs.reduce((a, r) => a + r, 0) + HAWK.REF_TO_B365 * 2) / (rs.length + 2)]));
+  S.propBook = { book, refRatio, n: Object.fromEntries(Object.entries(book).map(([k, pts]) => [k, pts.length])), nRef: Object.fromEntries(Object.entries(ratios).map(([k, rs]) => [k, rs.length])) };
+  HAWK.setPropBook(book, refRatio);
 }
 function recordPropPrice(legId, price) {
   const l = S.legs[legId], key = l && HAWK.propKey(l);
@@ -1532,7 +1544,8 @@ function propLine(l) {
   const ref = !typed && l.refPrice > 1;
   return `<div class="pp-line ${dead ? "dead" : ""}"><span>${ref ? `${esc(l.refBook || "Unibet")}` : "Bet365"}</span>${box ? `<input data-pprice="${esc(l.id)}" inputmode="decimal" placeholder="${est ? odds(est) : "price"}" value="${typed ? odds(typed.price) : ""}">` : ""}${
     typed ? ` <span class="muted">✓ you typed it</span>`
-    : ref ? ` <b class="est" title="${esc(l.refBook || "Unibet")}'s real price for this leg right now (from its public odds feed) — Bet365's can differ a little">${odds(l.refPrice)}</b>${box ? "" : ` <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Give Bet365's price for it (optional)">✎</button>`}`
+    : ref ? ` ${odds(l.refPrice)} → <span>Bet365</span> <b class="est" title="${esc(l.refBook || "Unibet")}'s real price right now (its public odds feed), turned into Bet365's: Bet365 pays ${
+        ((Math.exp((S.propBook.refRatio || {})[key] ?? HAWK.REF_TO_B365) - 1) * 100).toFixed(1)}% more than Unibet on ${(S.propBook.nRef || {})[key] ? `your ${S.propBook.nRef[key]} builder${S.propBook.nRef[key] > 1 ? "s" : ""} with these legs` : "average (measured on 307 prices, 25 matches)"}">≈ ${odds(est)}</b>${box ? "" : ` <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Give Bet365's price for it (optional)">✎</button>`}`
     : ` <b class="est" title="HAWK's estimate, from ${n} Bet365 price${n === 1 ? "" : "s"} for ${esc(propKeyLabel(key))} legs (your builder prices included)">≈ ${odds(est)}</b>${box ? "" : ` <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Give this leg's real Bet365 price (optional)">✎</button>`}`}${
     dead ? ` <b>· adds next to nothing at Bet365 — 🔄 swap it</b>` : est && l.p ? ` <span class="muted">· ${est * l.p >= 1 ? "value" : `${(100 * (1 - est * l.p)).toFixed(0)}% under fair`}</span>` : ""}</div>`;
 }
@@ -1658,7 +1671,7 @@ function recordB365Price() {
   const list = loadPref("hawk.b365prices", []).filter(x => x.key !== key);
   // Each leg too: with Bet365's own prices for the match legs, the builder
   // price tells HAWK roughly what Bet365 paid for the player legs (applyPropBook).
-  const detail = S.slip.map(id => { const l = S.legs[id]; return { k: HAWK.propKey(l), p: +l.p.toFixed(4), b: l.bookPrice || null }; });
+  const detail = S.slip.map(id => { const l = S.legs[id]; return { k: HAWK.propKey(l), p: +l.p.toFixed(4), b: l.bookPrice || null, u: l.refPrice || null }; });
   list.push({ key, fair: +r.fair.toFixed(3), joint: +r.p.toFixed(5), price, legs: S.slip.length, detail, t: Date.now() });
   savePref("hawk.b365prices", list.slice(-B365_KEEP));
   applyPropBook();
@@ -1670,11 +1683,20 @@ function recordB365Price() {
 // Bet365 price, or the answer is silly (a boosted or mistyped price).
 function propShiftFromBuilder(x) {
   if (!x.detail || !(x.joint > 0) || !(x.price > 1)) return null;
-  const props = x.detail.filter(d => d.k), match = x.detail.filter(d => !d.k);
-  if (!props.length || match.some(d => !(d.b > 1))) return null;
+  const all = x.detail.filter(d => d.k), match = x.detail.filter(d => !d.k);
+  if (!all.length || match.some(d => !(d.b > 1))) return null;
   const lg = (p) => Math.log(p / (1 - p));
   const together = x.detail.reduce((a, d) => a * d.p, 1) / x.joint;   // < 1 when the legs go together
-  const target = Math.log(x.price) - match.reduce((a, d) => a + Math.log(d.b), 0) - Math.log(together);   // what the props pay, in logs
+  let target = Math.log(x.price) - match.reduce((a, d) => a + Math.log(d.b), 0) - Math.log(together);   // what the props pay, in logs
+  // Props Unibet prices: all of them → how Bet365's price compares with Unibet's
+  // (the same ratio for each). Some of them → count those at Unibet's price (+ the
+  // usual 1.2%) and work out the rest as below.
+  const withRef = all.filter(d => d.u > 1), props = all.filter(d => !(d.u > 1));
+  if (!props.length) {
+    const r = (target - withRef.reduce((a, d) => a + Math.log(d.u), 0)) / withRef.length;
+    return Math.abs(r) <= 0.5 ? { ratio: r, refProps: withRef } : null;
+  }
+  target -= withRef.reduce((a, d) => a + Math.log(d.u) + HAWK.REF_TO_B365, 0);
   const pays = (s) => props.reduce((a, d) => a - Math.log(Math.min(0.995, 1 / (1 + Math.exp(-(lg(d.p) + s))))), 0);
   if (target <= pays(4) || target >= pays(-2)) return null;
   let lo = -2, hi = 4;   // pays() falls as the shift grows: find where it hits the target
@@ -2996,7 +3018,39 @@ function liveHawk(d) {
   return `<div class="bar3"><div class="h" style="flex:${p.home}">${hp[0]}%</div><div class="d" style="flex:${p.draw}">${hp[1]}%</div><div class="a" style="flex:${p.away}">${hp[2]}%</div></div>
     <div class="bar3-legend"><span>${esc(d.home)}</span><span>Draw</span><span>${esc(d.away)}</span></div>
     ${srcs.length ? `<div class="srcs">${srcs.join("")}</div>` : ""}
-    <div class="note" style="margin-top:6px">${esc(how)} About ${Math.round(d.remaining || 0)} minutes left incl. stoppage time.</div>`;
+    <div class="note" style="margin-top:6px">${esc(how)} About ${Math.round(d.remaining || 0)} minutes left incl. stoppage time.</div>
+    ${nextGoalBox(d)}`;
+}
+// ⚽ Next goal: HAWK's chances (from the goals still expected) beside Unibet's
+// live "Next Goal" prices, and who's likeliest to score it.
+function nextGoalBox(d) {
+  const n = d.next;
+  if (!n) return "";
+  const hawk = pct100([n.home, 1 - n.any, n.away]), bk = d.nextBook && d.nextBook.team ? pct100([d.nextBook.team.home, d.nextBook.team.none, d.nextBook.team.away]) : null;
+  const seg = (v) => `<div class="h" style="flex:${v[0]}">${v[0]}%</div><div class="d" style="flex:${v[1]}">${v[1]}%</div><div class="a" style="flex:${v[2]}">${v[2]}%</div>`;
+  // Likeliest scorers: Unibet's "Next Goal Scorer" prices, or else HAWK's own (each player's share of his team's goals).
+  let scorers = (d.nextBook && d.nextBook.scorers || []).map(s => ({ name: s.player, p: s.p, src: d.nextBook.book }));
+  if (!scorers.length && S.inplay && S.inplay.m) {
+    const m = S.inplay.m, by = liveEventsBy(d, m), list = [];
+    for (const side of ["home", "away"]) {
+      const legs = (m.legs || []).filter(l => l.kind === "player" && l.side === side && /:score$/.test(l.id));
+      const rate = (l) => -Math.log(1 - Math.min(0.95, l.p));
+      const on = legs.filter(l => { const r = liveRec(by, side, l.player); return !(r && r.off); });
+      const tot = on.reduce((a, l) => a + rate(l), 0);
+      for (const l of on) list.push({ name: l.player, p: tot ? (rate(l) / tot) * n[side] : 0, src: "HAWK" });
+    }
+    scorers = list.sort((a, b) => b.p - a.p).slice(0, 5);
+  }
+  return `<div class="ng-box">
+    <div class="ng-head">⚽ Next goal ${n.by ? `<span class="muted">· due by about ${n.by}'</span>` : `<span class="muted">· more likely no more goals</span>`}</div>
+    <div class="ng-row"><span class="ng-src">🦅 HAWK</span><div class="bar3 sm">${seg(hawk)}</div></div>
+    ${bk ? `<div class="ng-row"><span class="ng-src">${esc(d.nextBook.book)}</span><div class="bar3 sm">${seg(bk)}</div></div>` : ""}
+    <div class="bar3-legend"><span>${esc(d.home)}</span><span>No more goals</span><span>${esc(d.away)}</span></div>
+    <div class="ng-stats"><span>Another goal <b>${pct(n.any)}</b></span><span>2+ more <b>${pct(n.twoPlus)}</b></span>${
+      bk ? `<span title="Unibet's live Next Goal prices, margin taken out">${esc(d.nextBook.book)}: another goal <b>${100 - bk[1]}%</b></span>` : ""}</div>
+    ${scorers.length ? `<div class="ng-scorers"><span class="muted">Likeliest to score it${scorers[0].src === "HAWK" ? " (HAWK)" : ` (${esc(scorers[0].src)})`}:</span> ${
+      scorers.map(s => `<span class="ng-p">${esc(s.name)} <b>${pct(s.p, s.p < 0.1 ? 1 : 0)}</b></span>`).join("")}</div>` : ""}
+  </div>`;
 }
 function renderInPlay() {
   const ip = S.inplay, d = ip.data;

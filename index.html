@@ -235,15 +235,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-visible">
                             <select id="league-selector" onchange="onLeagueChange()" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#d9b571]">
                                 <option value="">-- Select League / Category --</option>
-                                <option value="Premier League">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
-                                <option value="La Liga">🇪🇸 La Liga</option>
-                                <option value="Serie A">🇮🇹 Serie A</option>
-                                <option value="Bundesliga">🇩🇪 Bundesliga</option>
-                                <option value="Ligue 1">🇫🇷 Ligue 1</option>
-                                <option value="UEFA Champions League">🇪🇺 UEFA Champions League</option>
-                    <option value="UEFA Europa League">🇪🇺 UEFA Europa League</option>
-                    <option value="UEFA Conference League">🇪🇺 UEFA Conference League</option>
-                                <option value="Other Matches">⭐ Other competition (type the match)</option>
+                                <!-- filled from LEAGUE_GROUPS -->
                             </select>
                             <select id="league-match-dropdown" onchange="onLeagueMatchSelect()" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#d9b571]" disabled>
                                 <option value="">-- Choose Match --</option>
@@ -634,8 +626,22 @@
             "Other Matches": []
         };
 
-        const FEED_LEAGUES = ["Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "UEFA Champions League",
-                              "UEFA Europa League", "UEFA Conference League", "Other Matches"];
+        // Every competition with a live fixture feed (365Scores ids), grouped as in
+        // the HAWK builder (builder/engine.js LEAGUE_GROUPS; the Vault uses the full
+        // UEFA names).
+        const LEAGUE_GROUPS = [
+            ['🏆 Top 5', { 'Premier League': 7, 'La Liga': 11, 'Serie A': 17, 'Bundesliga': 25, 'Ligue 1': 35 }],
+            ['⭐ Europe', { 'UEFA Champions League': 572, 'UEFA Europa League': 573, 'UEFA Conference League': 7685 }],
+            ['🌍 More Europe', { 'Eredivisie': 57, 'Liga Portugal': 73, 'Scottish Premiership': 61, 'Belgian Pro League': 98, 'Süper Lig': 78,
+                                'Greek Super League': 84, 'Austrian Bundesliga': 111, 'Swiss Super League': 95, 'Danish Superliga': 119 }],
+            ['🥈 Second tier', { 'Championship': 1, 'League One': 2, '2. Bundesliga': 26, 'Serie B': 18, 'LaLiga 2': 12, 'Ligue 2': 36 }],
+            ['🏅 Cups', { 'FA Cup': 8, 'EFL Cup': 9, 'Copa del Rey': 13, 'Coppa Italia': 20, 'DFB-Pokal': 28, 'Coupe de France': 37 }],
+            ['🌎 World', { 'MLS': 104, 'Brasileirão': 113, 'Argentina Primera': 72, 'Liga MX': 141, 'Saudi Pro League': 649, 'Copa Libertadores': 102 }],
+        ];
+        const FEED_LEAGUES = [...LEAGUE_GROUPS.flatMap(([, ids]) => Object.keys(ids)), "Other Matches"];
+        document.getElementById('league-selector').insertAdjacentHTML('beforeend',
+            LEAGUE_GROUPS.map(([label, ids]) => `<optgroup label="${label}">${Object.keys(ids).map(l => `<option value="${l}">${l}</option>`).join('')}</optgroup>`).join('')
+            + '<option value="Other Matches">⭐ Other competition (type the match)</option>');
         // The builder calls the cups by their short names; the Vault uses the full ones.
         const LEAGUE_ALIASES = { 'Champions League': 'UEFA Champions League', 'Europa League': 'UEFA Europa League',
                                  'Conference League': 'UEFA Conference League' };
@@ -694,8 +700,8 @@
         // --- LIVE FIXTURE FEED: 365Scores, the same source the HAWK builder uses ---
         const S365 = 'https://webws.365scores.com/web';
         const S365_PARAMS = { appTypeId: 5, langId: 1, timezoneName: 'Europe/London', userCountryId: -1 };
-        const S365_COMPETITIONS = { 'Premier League': 7, 'La Liga': 11, 'Serie A': 17, 'Bundesliga': 25, 'Ligue 1': 35, 'UEFA Champions League': 572,
-                                    'UEFA Europa League': 573, 'UEFA Conference League': 7685 };
+        const S365_COMPETITIONS = Object.assign({}, ...LEAGUE_GROUPS.map(([, ids]) => ids));
+        const CUP_LEAGUES = new Set(Object.keys(LEAGUE_GROUPS.find(([label]) => label.includes('Cups'))[1]));
         async function s365(path, params) {
             for (let attempt = 0; attempt < 3; attempt++) {
                 try {
@@ -713,7 +719,8 @@
             if (!comp || (liveFixtures[league] && !force)) return liveFixtures[league] || [];
             const d = await s365('games/fixtures', { competitions: comp });
             if (!d) return liveFixtures[league] || [];
-            liveFixtures[league] = (d.games || []).filter(g => g.statusGroup !== 4)
+            // (cups: the early qualifying rounds between amateur clubs are left out)
+            liveFixtures[league] = (d.games || []).filter(g => g.statusGroup !== 4 && !(CUP_LEAGUES.has(league) && /qualif|prelim/i.test(g.stageName || '')))
                 .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
                 .map(g => {
                     const ko = new Date(g.startTime);
@@ -1957,11 +1964,10 @@
 
             const legsContainer = document.getElementById('edit-ticket-legs');
             legsContainer.innerHTML = '';
-            const leagueOptions = ['Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'UEFA Champions League', 'UEFA Europa League',
-                                   'UEFA Conference League', 'Other Matches', 'Custom / Manual', 'Unknown / Custom'];
-
             const ticketLeagueSelect = document.getElementById('edit-ticket-league');
             const currentTicketLeague = getBetLeague(bet); // resolves to a shared league, or 'Multi-League Acca' if legs differ
+            const leagueOptions = [...new Set([...FEED_LEAGUES, 'Custom / Manual', 'Unknown / Custom',
+                                               ...(currentTicketLeague === 'Multi-League Acca' ? [] : [currentTicketLeague])])];
             const leagueSelectOptions = currentTicketLeague === 'Multi-League Acca'
                 ? [...leagueOptions, 'Multi-League Acca (keep per-leg)']
                 : leagueOptions;

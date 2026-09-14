@@ -16,6 +16,7 @@ Run locally:  python build_data.py ../data
 """
 import datetime as dt
 import json
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -35,11 +36,11 @@ ROUNDED = {"xg", "xa"}
 def find_team(name, codes, today):
     """(code, football-data name) for a 365Scores team, searching the given
     league codes' current-season team lists."""
-    cur_season, _ = sources.fd_season_codes(today)
     best = None
     for code in codes:
-        teams = sources.fd_teams(code, cur_season)
-        match = sources.best_match(name, teams, threshold=0.75 if len(codes) > 1 else 0.7)
+        teams = sources.fd_teams(code, today)
+        # One league: the team must be in it, so a clear best guess will do.
+        match = sources.best_match(name, teams, threshold=0.75) if len(codes) > 1 else sources.closed_match(name, teams)
         if match:
             score = sources.name_similarity(name, match)
             if best is None or score > best[0]:
@@ -79,14 +80,18 @@ def main(out_dir):
         if games is None:
             problems.append(f"365Scores fixtures unavailable for {league}")
             continue
-        codes = ([sources.FD_LEAGUE_CODES[league]] if league in sources.FD_LEAGUE_CODES
-                 else list(sources.FD_LEAGUE_CODES.values()) + list(sources.FD_EXTRA_CODES))
+        codes = sources.fd_codes(league)
         for g in games:
             kickoff = sources.parse_kickoff(g.get("startTime"))
             if not kickoff or not now - dt.timedelta(hours=3) < kickoff <= horizon:
                 continue
             home, away = g["homeCompetitor"]["name"], g["awayCompetitor"]["name"]
-            fd_home, fd_away = find_team(home, codes, today), find_team(away, codes, today)
+            cup = sources.COMPETITIONS[league].get("cup")
+            if cup and re.search(r"qualif|prelim", g.get("stageName") or "", re.I):
+                continue   # early rounds between amateur clubs: no data, no bet builders
+            fd_home, fd_away = (find_team(home, codes, today), find_team(away, codes, today)) if codes else (None, None)
+            if cup and not (fd_home or fd_away):
+                continue   # two clubs from outside the leagues HAWK rates
             ids = sources.sh_team_ids(home, away, league)
             referee = sources.sh_referee(home, away)
             pm = sources.pm_match(league, home, away, kickoff)
@@ -105,10 +110,8 @@ def main(out_dir):
     print(f"{len(fixtures)} fixtures, {len(codes_needed)} leagues to rate, {len(sh_teams)} squads to fetch")
 
     # 2. Team ratings per league.
-    cur_season, prev_season = sources.fd_season_codes(today)
     for code in sorted(codes_needed):
-        profile = model.build_profile(sources.fd_matches(code, cur_season) or [],
-                                      sources.fd_matches(code, prev_season) or [], today)
+        profile = model.build_profile(*sources.fd_seasons(code, today), today)
         if profile:
             write(out_dir / "profiles" / f"{code}.json", profile_json(profile))
         else:

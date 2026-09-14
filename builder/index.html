@@ -70,6 +70,30 @@ img{max-width:100%}
 .pill:hover{border-color:#3a4a55}
 .pill.on{background:var(--accent);color:#04241a;border-color:var(--accent);font-weight:800}
 .pill.on img{filter:brightness(0) opacity(.75)}
+/* league bar: group switcher (fixed) + that group's leagues (scrolls) */
+.leaguebar{display:flex;align-items:center;gap:10px;padding:0 22px 10px}
+.leaguebar .leagues{padding:0;flex:1;min-width:0}
+.lgroups{display:flex;gap:2px;padding:3px;background:var(--panel);border:1px solid var(--line);border-radius:12px;flex-shrink:0}
+.lg{border:0;background:transparent;color:var(--muted);padding:5px 10px;border-radius:9px;cursor:pointer;font-weight:700;font-size:12.5px;
+  white-space:nowrap;display:flex;align-items:center;gap:5px;transition:.15s}
+.lg:hover{color:var(--text);background:var(--panel2)}
+.lg.on{color:var(--text);background:var(--panel2);box-shadow:inset 0 0 0 1px rgba(20,227,161,.55)}
+.pill .n{font-style:normal;font-size:10.5px;font-weight:800;min-width:18px;padding:1px 6px;border-radius:8px;background:var(--panel2);color:var(--muted);text-align:center}
+.pill.on .n{background:rgba(4,36,26,.18);color:#04241a}
+.pill.none{opacity:.45}
+.pill.none.on{opacity:1}
+/* league picker in Best builders / Value / Acca: one row per group */
+.lpick{display:flex;flex-direction:column;gap:6px;margin:12px 0}
+.lprow{display:grid;grid-template-columns:128px minmax(0,1fr);gap:8px;align-items:start}
+.lppills{display:flex;flex-wrap:wrap;gap:6px}
+@media (max-width:560px){.lprow{grid-template-columns:1fr}}
+.lpgroup{border:1px dashed var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:5px 11px;cursor:pointer;
+  font-weight:800;font-size:12px;white-space:nowrap;text-align:left}
+.lpgroup:hover{color:var(--text);border-color:#3a4a55}
+.lpgroup.on{color:var(--accent);border:1px solid rgba(20,227,161,.55)}
+.lpgroup.part{color:var(--text);border-style:solid}
+.pill.sm{padding:4px 10px;font-size:12px}
+.lpsum{font-size:12px;color:var(--muted)}
 .grid{display:grid;grid-template-columns:290px minmax(0,1fr) 400px;gap:16px;padding:16px 22px;align-items:start}
 @media (max-width:1250px){.grid{grid-template-columns:260px minmax(0,1fr)}.slipcol{grid-column:1/-1}}
 @media (max-width:820px){.grid{grid-template-columns:1fr}}
@@ -134,6 +158,8 @@ img{max-width:100%}
 .qc{font-size:11.5px;padding:3px 8px;border-radius:999px;background:#22303a;border:1px solid #2e3e49;cursor:pointer;transition:.12s}
 .qc:hover{border-color:var(--accent);color:var(--accent)}
 .qc.in{background:rgba(20,227,161,.16);border-color:var(--accent);color:var(--accent)}
+.qc b{font-weight:800;opacity:.7;margin-left:2px}
+.qc.zero{opacity:.45}
 .search{width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);margin-bottom:10px}
 .lg{margin-bottom:14px}
 .lg h4{margin:0 0 6px;font-size:12px;color:var(--muted)}
@@ -159,7 +185,8 @@ img{max-width:100%}
 .live-odds .dot.on{background:var(--accent);box-shadow:0 0 0 0 rgba(20,227,161,.6);animation:livepulse 2s infinite}
 @keyframes livepulse{70%{box-shadow:0 0 0 6px rgba(20,227,161,0)}100%{box-shadow:0 0 0 0 rgba(20,227,161,0)}}
 .linkbtn{background:none;border:0;padding:0 2px;color:var(--accent);cursor:pointer;font:inherit;text-decoration:underline}
-.sc-league{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+.sc-league{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;display:flex;align-items:center;gap:7px}
+.sc-league img{width:16px;height:16px;object-fit:contain}
 .sc-league:first-child{margin-top:0}
 .sc-row{display:grid;grid-template-columns:58px 1fr 64px 1fr 64px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;
   border:1px solid transparent;transition:.12s}
@@ -383,6 +410,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   .tool{padding:6px 10px;font-size:12px}
   .vaultlink{padding:5px 10px}
   .leagues{padding:0 12px 10px}
+  .leaguebar{flex-direction:column;align-items:stretch;gap:8px;padding:0 12px 10px}
+  .lg{flex:1;justify-content:center;flex-direction:column;gap:1px;font-size:10.5px;padding:5px 2px}
+  .lpgroup{min-width:0}
   .grid{padding:10px;gap:10px}
   .fixtures{position:static;max-height:38vh}
   .hero{padding:16px 12px}
@@ -441,7 +471,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <a class="vaultlink" href="../" title="Back to the HAWK Vault"><img src="../hawk-logo.svg" alt="">Vault</a>
     </div>
   </div>
-  <nav class="leagues" id="leagues"></nav>
+  <div class="leaguebar"><nav class="lgroups" id="lgroups"></nav><nav class="leagues" id="leagues"></nav></div>
 </header>
 <main class="grid">
   <aside class="panel fixtures" id="fixtures"><div class="empty">Loading leagues…</div></aside>
@@ -527,9 +557,12 @@ function fmtKick(iso) {
 async function init() {
   const { leagues } = await api("/api/leagues");
   S.allLeagues = leagues;
-  S.scan.leagues = new Set(leagues);
-  S.value.leagues = new Set(leagues);
-  S.monster.leagues = new Set(leagues);
+  // The scans start with the Top 5 + European cups (each extra league adds
+  // matches to check); your own picks are remembered.
+  const pick = (key) => new Set(loadPref(key, [...groupOf("top5").leagues, ...groupOf("europe").leagues]).filter(l => leagues.includes(l)));
+  S.scan.leagues = pick("hawk.scanLeagues");
+  S.value.leagues = pick("hawk.valueLeagues");
+  S.monster.leagues = pick("hawk.monsterLeagues");
   applyLearning();
   // HAWK's graded predictions on every match (built on GitHub by engine/grade.mjs).
   fetch(new URL("../data/graded.json", location.href)).then(r => (r.ok ? r.json() : null)).then(g => {
@@ -542,9 +575,8 @@ async function init() {
   renderAccaBtn();
   setInterval(trackPrices, ALERT_MS);
   setTimeout(trackPrices, 5000);
-  const logo = (l) => HAWK.COMPETITIONS && HAWK.COMPETITIONS[l]
-    ? `<img src="https://imagecache.365scores.com/image/upload/f_png,w_36,h_36,c_limit,q_auto:eco,dpr_2,d_Countries:round:15.png/v1/Competitions/${HAWK.COMPETITIONS[l]}" alt="" onerror="this.remove()">` : "";
-  $("#leagues").innerHTML = leagues.map(l => `<button class="pill" data-l="${esc(l)}">${logo(l)}${esc(l)}</button>`).join("");
+  $("#lgroups").innerHTML = HAWK.LEAGUE_GROUPS.map(g => `<button class="lg" data-g="${g.key}" title="${esc(g.leagues.join(" · "))}">${g.icon}<span>${esc(g.name)}</span></button>`).join("");
+  $("#lgroups").onclick = (e) => { const b = e.target.closest("[data-g]"); if (b) openGroup(b.dataset.g, true); };
   $("#navBuilder").onclick = showBuilder;
   watchView();
   $("#leagues").onclick = (e) => { const b = e.target.closest(".pill"); if (b) selectLeague(b.dataset.l); };
@@ -559,7 +591,8 @@ async function init() {
     renderSlip();
   });
   renderSlip();
-  await selectLeague(leagues[0]);
+  const last = loadPref("hawk.league", leagues[0]);
+  await selectLeague(leagues.includes(last) ? last : leagues[0]);
   checkLineups();
   setInterval(checkLineups, 120000);
   openFromUrl();
@@ -584,12 +617,46 @@ async function openFromUrl() {
     toast(`Your Vault ticket is back on the slip (${keep.length} leg${keep.length === 1 ? "" : "s"}).`);
   }
 }
+const groupOf = (key) => HAWK.LEAGUE_GROUPS.find(g => g.key === key || g.leagues.includes(key)) || HAWK.LEAGUE_GROUPS[0];
+const leagueLogo = (l) => HAWK.COMPETITIONS[l]
+  ? `<img src="https://imagecache.365scores.com/image/upload/f_png,w_36,h_36,c_limit,q_auto:eco,dpr_2,d_Countries:round:15.png/v1/Competitions/${HAWK.COMPETITIONS[l]}" alt="" onerror="this.remove()">` : "";
+const WEEK_MS = 7 * 86400000;
+S.counts = {};   // league -> {n: games in the next 7 days, next: kick-off of the next one}
+// Shows a group's leagues in the bar, then fills in how many games each has
+// this week (dimmed when none). pickFirst: also open the first league with games.
+async function openGroup(key, pickFirst = false) {
+  const g = groupOf(key);
+  S.group = g.key;
+  document.querySelectorAll(".lg").forEach(b => b.classList.toggle("on", b.dataset.g === g.key));
+  const pillsFor = () => g.leagues.map(l => {
+    const c = S.counts[l], none = c && !c.n;
+    const tip = !c ? l : c.n ? `${l}: ${c.n} game${c.n === 1 ? "" : "s"} in the next 7 days`
+      : `${l}: no games this week${c.next ? " — next " + fmtKick(c.next) : ""}`;
+    return `<button class="pill ${l === S.league ? "on" : ""} ${none ? "none" : ""}" data-l="${esc(l)}" title="${esc(tip)}">${leagueLogo(l)}${esc(l)}${c ? `<i class="n">${c.n}</i>` : ""}</button>`;
+  }).join("");
+  $("#leagues").innerHTML = pillsFor();
+  $("#leagues").scrollLeft = 0;
+  const now = Date.now();
+  await Promise.all(g.leagues.filter(l => !S.counts[l]).map(async (l) => {
+    try {
+      const list = await HAWK.fixtures(l);
+      const upcoming = list.filter(f => new Date(f.kickoff).getTime() - now < WEEK_MS);
+      S.counts[l] = { n: upcoming.length, next: (list.find(f => !f.started) || {}).kickoff || null };
+    } catch { /* leave it unknown */ }
+  }));
+  if (S.group !== g.key) return;
+  $("#leagues").innerHTML = pillsFor();
+  if (pickFirst && !g.leagues.includes(S.league)) await selectLeague(g.leagues.find(l => S.counts[l] && S.counts[l].n) || g.leagues[0]);
+}
 async function selectLeague(league) {
   S.league = league;
+  savePref("hawk.league", league);
+  if (S.group !== groupOf(league).key) openGroup(league);
   document.querySelectorAll(".pill[data-l]").forEach(p => p.classList.toggle("on", p.dataset.l === league));
   $("#fixtures").innerHTML = `<div class="skel"><div class="ln"></div><div class="ln"></div><div class="ln"></div></div>`;
   try {
     const { fixtures } = await api("/api/fixtures?league=" + encodeURIComponent(league));
+    if (S.league !== league) return;
     S.fixtures = fixtures;
     renderFixtures();
   } catch (err) { $("#fixtures").innerHTML = `<div class="empty">Couldn't load fixtures.<br>${esc(err.message)}</div>`; }
@@ -1149,6 +1216,27 @@ function showScan() {
   renderScan();
   pollScan();
 }
+// League picker for the scans: one row per group; the group button selects
+// all of it (or none, if it's all on). The choice is remembered.
+function leaguePicker(id, set) {
+  return `<div class="lpick" id="${id}">${HAWK.LEAGUE_GROUPS.map(g => {
+    const on = g.leagues.filter(l => set.has(l)).length;
+    return `<div class="lprow"><button class="lpgroup ${on === g.leagues.length ? "on" : on ? "part" : ""}" data-pg="${g.key}"
+      title="${on === g.leagues.length ? "Untick" : "Tick"} all of ${esc(g.name)}">${g.icon} ${esc(g.name)}</button><div class="lppills">${g.leagues.map(l =>
+      `<button class="pill sm ${set.has(l) ? "on" : ""}" data-pl="${esc(l)}">${esc(l)}</button>`).join("")}</div></div>`;
+  }).join("")}<div class="lpsum">${set.size} of ${S.allLeagues.length} competitions — more leagues means more matches to check, so the scan takes longer.</div></div>`;
+}
+function bindLeaguePicker(id, set, prefKey) {
+  $("#" + id).onclick = (e) => {
+    const g = e.target.closest("[data-pg]"), p = e.target.closest("[data-pl]");
+    if (g) { const grp = groupOf(g.dataset.pg), all = grp.leagues.every(l => set.has(l)); grp.leagues.forEach(l => (all ? set.delete(l) : set.add(l))); }
+    else if (p) { const l = p.dataset.pl; set.has(l) ? set.delete(l) : set.add(l); }
+    else return;
+    savePref(prefKey, [...set]);
+    $("#" + id).outerHTML = leaguePicker(id, set);
+    bindLeaguePicker(id, set, prefKey);
+  };
+}
 function renderScan() {
   const sc = S.scan;
   $("#match").innerHTML = `
@@ -1158,8 +1246,7 @@ function renderScan() {
         target <b style="color:var(--gold)">${S.target.toFixed(2)}</b> · ${esc(STYLES[S.style].label)} · ${esc(FOCUS_LABELS[S.focus])} · max ${S.maxLegs} legs.
         At the same target every ticket has the same chance to land, so the best are the ones needing the <b>fewest legs</b>
         (each leg adds bookmaker margin). Green lines are match legs where Bet365's price beats HAWK's fair odds.</div>
-      <div class="leagues" id="scanLeagues" style="flex-wrap:wrap;margin:12px 0">${S.allLeagues.map(l =>
-        `<button class="pill ${sc.leagues.has(l) ? "on" : ""}" data-sl="${esc(l)}">${esc(l)}</button>`).join("")}</div>
+      ${leaguePicker("scanLeagues", sc.leagues)}
       <div class="opts" style="justify-content:flex-start;gap:16px;flex-wrap:wrap">
         <label>Kick-off within <select id="hrs">${[[24, "24 hours"], [48, "48 hours"], [168, "7 days"]].map(([h, t]) =>
           `<option value="${h}" ${h === sc.hours ? "selected" : ""}>${t}</option>`).join("")}</select></label>
@@ -1170,11 +1257,7 @@ function renderScan() {
       <div id="scanProg"></div>
     </div>
     <div class="section" id="scanRes"></div>`;
-  $("#scanLeagues").onclick = (e) => {
-    const b = e.target.closest("[data-sl]"); if (!b) return;
-    const l = b.dataset.sl; sc.leagues.has(l) ? sc.leagues.delete(l) : sc.leagues.add(l);
-    b.classList.toggle("on", sc.leagues.has(l));
-  };
+  bindLeaguePicker("scanLeagues", sc.leagues, "hawk.scanLeagues");
   $("#hrs").onchange = (e) => { sc.hours = +e.target.value; };
   $("#srt").onchange = (e) => { sc.sort = e.target.value; updateScan(); };
   $("#scanGo").onclick = toggleScan;
@@ -1261,8 +1344,7 @@ function renderValue() {
         every goals line, both teams to score, clean sheets, first to score, correct score, half-time markets, corners, cards, shots on
         target, offsides, penalties, red cards — at all 6 bookmakers, and lists every price that beats HAWK's fair odds. <b>Edge</b> = how much
         more the price pays than it should: +5% means that over many bets you'd expect about €5 profit per €100 staked. These are <b>single bets</b>.</div>
-      <div class="leagues" id="valLeagues" style="flex-wrap:wrap;margin:12px 0">${S.allLeagues.map(l =>
-        `<button class="pill ${v.leagues.has(l) ? "on" : ""}" data-vl="${esc(l)}">${esc(l)}</button>`).join("")}</div>
+      ${leaguePicker("valLeagues", v.leagues)}
       <div class="opts" style="justify-content:flex-start;gap:14px;flex-wrap:wrap">
         <label>Kick-off within ${sel("vHrs", [[24, "24 hours"], [48, "48 hours"], [168, "7 days"]], v.hours)}</label>
         <button class="build" id="valGo" style="width:auto;margin:0 0 0 auto;padding:10px 20px"></button>
@@ -1277,11 +1359,7 @@ function renderValue() {
       <div id="valProg"></div>
     </div>
     <div class="section" id="valRes"></div>`;
-  $("#valLeagues").onclick = (e) => {
-    const b = e.target.closest("[data-vl]"); if (!b) return;
-    const l = b.dataset.vl; v.leagues.has(l) ? v.leagues.delete(l) : v.leagues.add(l);
-    b.classList.toggle("on", v.leagues.has(l));
-  };
+  bindLeaguePicker("valLeagues", v.leagues, "hawk.valueLeagues");
   $("#vHrs").onchange = (e) => { v.hours = +e.target.value; };
   $("#vMinP").onchange = (e) => { v.minP = +e.target.value; updateValue(); };
   $("#vMinE").onchange = (e) => { v.minEdge = +e.target.value; updateValue(); };
@@ -1446,8 +1524,7 @@ function renderAcca() {
       <div class="note" style="margin-top:0">HAWK checks every fixture in the window and takes the best leg — or a small builder — from each match.
         With <b>1 leg per match</b> it only uses legs Bet365 prices, picking the ones where Bet365 pays closest to (or more than) HAWK's fair odds,
         so you see the acca's real Bet365 price and whether it's worth it.</div>
-      <div class="leagues" id="monLeagues" style="flex-wrap:wrap;margin:12px 0">${S.allLeagues.map(l =>
-        `<button class="pill ${mo.leagues.has(l) ? "on" : ""}" data-ml="${esc(l)}">${esc(l)}</button>`).join("")}</div>
+      ${leaguePicker("monLeagues", mo.leagues)}
       <div class="opts" style="justify-content:flex-start;gap:14px;flex-wrap:wrap">
         <label>Legs ${sel("mLegs", [6, 8, 10, 12, 15, 20].map(n => [n, n]), mo.legs)}</label>
         <label>Per match ${sel("mPer", [[1, "1 leg (Bet365 priced)"], [2, "2-leg builder"], [3, "3-leg builder"]], mo.perMatch)}</label>
@@ -1458,11 +1535,7 @@ function renderAcca() {
       <div id="monProg"></div>
     </div>
     <div class="section" id="monRes"></div>`;
-  $("#monLeagues").onclick = (e) => {
-    const b = e.target.closest("[data-ml]"); if (!b) return;
-    const l = b.dataset.ml; mo.leagues.has(l) ? mo.leagues.delete(l) : mo.leagues.add(l);
-    b.classList.toggle("on", mo.leagues.has(l));
-  };
+  bindLeaguePicker("monLeagues", mo.leagues, "hawk.monsterLeagues");
   $("#mLegs").onchange = (e) => { mo.legs = +e.target.value; updateMonster(); };
   $("#mPer").onchange = (e) => { mo.perMatch = +e.target.value; updateMonster(); };
   $("#mHrs").onchange = (e) => { mo.hours = +e.target.value; updateMonster(); };
@@ -1714,7 +1787,7 @@ function renderScores() {
     <div class="section" style="border-top:0">
       <h3>⚽ Scores</h3>
       <div class="leagues" id="scDays" style="flex-wrap:wrap;margin:0 0 10px">${days.map(([d, t]) => `<button class="pill ${d === sc.day ? "on" : ""}" data-day="${d}">${esc(t)}</button>`).join("")}</div>
-      <div class="qchips" id="scLeagues">${["All", ...S.allLeagues].map(l => `<span class="qc ${l === sc.league ? "in" : ""}" data-lg="${esc(l)}">${esc(l)}</span>`).join("")}</div>
+      <div class="qchips" id="scLeagues">${scoreChips()}</div>
     </div>
     <div class="section" id="scList"><div class="note">Loading scores…</div></div>`;
   $("#scDays").onclick = (e) => { const b = e.target.closest("[data-day]"); if (!b) return; sc.day = b.dataset.day; sc.data = null; renderScores(); loadScores(); };
@@ -1726,20 +1799,30 @@ function renderScores() {
   };
   if (sc.data) renderScoreList();
 }
+// Filter chips: All + each league group, with how many games it has that day.
+function scoreChips() {
+  const sc = S.scores;
+  return [["All", "All"], ...HAWK.LEAGUE_GROUPS.map(g => [g.key, `${g.icon} ${g.name}`])].map(([k, t]) => {
+    const n = sc.data ? sc.data.filter(g => k === "All" || groupOf(k).leagues.includes(g.league)).length : null;
+    return `<span class="qc ${k === sc.league ? "in" : ""} ${n === 0 ? "zero" : ""}" data-lg="${esc(k)}">${esc(t)}${n != null ? ` <b>${n}</b>` : ""}</span>`;
+  }).join("");
+}
 function renderScoreList() {
   const el = $("#scList"), sc = S.scores;
   if (!el) return;
+  if ($("#scLeagues")) $("#scLeagues").innerHTML = scoreChips();
   if (!sc.data) { el.innerHTML = `<div class="note">${sc.error ? esc(sc.error) : "Loading scores…"}</div>`; return; }
   const mine = myBetGames();
-  const games = sc.data.filter(g => sc.league === "All" || g.league === sc.league);
-  if (!games.length) { el.innerHTML = `<div class="note">No games ${sc.league === "All" ? "" : "in " + esc(sc.league) + " "}on this day.</div>`; return; }
+  const grp = sc.league === "All" ? null : groupOf(sc.league);
+  const games = sc.data.filter(g => !grp || grp.leagues.includes(g.league));
+  if (!games.length) { el.innerHTML = `<div class="note">No games ${grp ? "in " + esc(grp.name) + " " : ""}on this day.</div>`; return; }
   const groups = {};
   for (const g of games) (groups[g.league] ||= []).push(g);
   const order = (l) => { const i = S.allLeagues.indexOf(l); return i < 0 ? 99 : i; };
   const live = games.filter(g => g.status === 3).length;
   el.innerHTML = (live ? `<div class="note" style="margin:0 0 10px"><span class="dot-live"></span>${live} live — updating every 30 seconds</div>` : "") +
     Object.entries(groups).sort((a, b) => order(a[0]) - order(b[0])).map(([lg, list]) => `
-      <div class="sc-league">${esc(lg)}</div>
+      <div class="sc-league">${leagueLogo(lg)}${esc(lg)}</div>
       ${list.map(g => {
         const state = g.status === 3 ? `<span class="sc-live">${esc(g.clock || "LIVE")}</span>`
           : g.status === 4 ? `<span class="muted">${/postpon|cancel|abandon/i.test(g.statusText) ? esc(g.statusText) : "FT"}</span>`

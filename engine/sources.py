@@ -32,8 +32,63 @@ HEADERS = {
 }
 TIMEOUT = 12
 
-LEAGUES = ("Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "Champions League",
-           "Europa League", "Conference League")
+# Every competition HAWK covers, in the order (and groups) the website shows
+# them. Keep in step with LEAGUE_GROUPS in builder/engine.js.
+#   s365  365Scores competition id (fixtures, odds, lineups, scores)
+#   fd    football-data.co.uk league code for team ratings; a tuple for cups
+#         means "look the teams up in these leagues"; None = market prices only
+#   sh    StatsHub (= Sofascore) tournament id (team ids -> player stats)
+#   sh_teams  extra competitions whose team lists identify a cup's teams
+#   pm    Polymarket series id (match-result crowd prices), if it has one
+#   cup   domestic cup: ties between two clubs from outside the fd leagues
+#         (early qualifying rounds) are skipped — no data, no bet builders
+# All ids confirmed live on 2026-09-14.
+_EUROPE_FD = ("E0", "SP1", "I1", "D1", "F1", "N1", "P1", "SC0", "B1", "T1", "G1", "AUT", "SWZ", "DNK", "NOR", "SWE", "POL")
+_TOP_TIERS = ("Premier League", "Championship", "League One", "League Two")
+COMPETITIONS = {
+    # Top 5
+    "Premier League": dict(s365=7, fd="E0", sh=17, pm="10188"),
+    "La Liga": dict(s365=11, fd="SP1", sh=8, pm="10193"),
+    "Serie A": dict(s365=17, fd="I1", sh=23, pm="10203"),
+    "Bundesliga": dict(s365=25, fd="D1", sh=35, pm="10194"),
+    "Ligue 1": dict(s365=35, fd="F1", sh=34, pm="10195"),
+    # European cups
+    "Champions League": dict(s365=572, fd=_EUROPE_FD, sh=7, pm="10204"),
+    "Europa League": dict(s365=573, fd=_EUROPE_FD, sh=679, sh_teams=("Champions League",), pm="10209"),
+    "Conference League": dict(s365=7685, fd=_EUROPE_FD, sh=17015, sh_teams=("Europa League", "Champions League"), pm="10437"),
+    # More Europe
+    "Eredivisie": dict(s365=57, fd="N1", sh=37, pm="10286"),
+    "Liga Portugal": dict(s365=73, fd="P1", sh=238, pm="10330"),
+    "Scottish Premiership": dict(s365=61, fd="SC0", sh=36, pm="10674"),
+    "Belgian Pro League": dict(s365=98, fd="B1", sh=38, pm="12351"),
+    "Süper Lig": dict(s365=78, fd="T1", sh=52, pm="10292"),
+    "Greek Super League": dict(s365=84, fd="G1", sh=185, pm="12356"),
+    "Austrian Bundesliga": dict(s365=111, fd="AUT", sh=45, pm="11636"),
+    "Swiss Super League": dict(s365=95, fd="SWZ", sh=215, pm="12319"),
+    "Danish Superliga": dict(s365=119, fd="DNK", sh=39, pm="10363"),
+    # Second tier
+    "Championship": dict(s365=1, fd="E1", sh=18, pm="10355"),
+    "League One": dict(s365=2, fd="E2", sh=24, pm="11435"),
+    "2. Bundesliga": dict(s365=26, fd="D2", sh=44, pm="10670"),
+    "Serie B": dict(s365=18, fd="I2", sh=53, pm="10676"),
+    "LaLiga 2": dict(s365=12, fd="SP2", sh=54, pm="10672"),
+    "Ligue 2": dict(s365=36, fd="F2", sh=182, pm="10675"),
+    # Domestic cups
+    "FA Cup": dict(cup=True, s365=8, fd=("E0", "E1", "E2", "E3", "EC"), sh=19, sh_teams=_TOP_TIERS, pm="10307"),
+    "EFL Cup": dict(cup=True, s365=9, fd=("E0", "E1", "E2", "E3"), sh=21, sh_teams=_TOP_TIERS, pm="10230"),
+    "Copa del Rey": dict(cup=True, s365=13, fd=("SP1", "SP2"), sh=329, sh_teams=("La Liga", "LaLiga 2"), pm="10316"),
+    "Coppa Italia": dict(cup=True, s365=20, fd=("I1", "I2"), sh=328, sh_teams=("Serie A", "Serie B"), pm="10287"),
+    "DFB-Pokal": dict(cup=True, s365=28, fd=("D1", "D2"), sh=217, sh_teams=("Bundesliga", "2. Bundesliga"), pm="10317"),
+    "Coupe de France": dict(cup=True, s365=37, fd=("F1", "F2"), sh=335, sh_teams=("Ligue 1", "Ligue 2"), pm="10315"),
+    # Rest of the world
+    "MLS": dict(s365=104, fd="USA", sh=242, pm="10189"),
+    "Brasileirão": dict(s365=113, fd="BRA", sh=325, pm="10359"),
+    "Argentina Primera": dict(s365=72, fd="ARG", sh=155, pm="10285"),
+    "Liga MX": dict(s365=141, fd="MEX", sh=11621, pm="10290"),
+    "Saudi Pro League": dict(s365=649, fd=None, sh=955, pm="10361"),
+    "Copa Libertadores": dict(s365=102, fd=("BRA", "ARG"), sh=384, sh_teams=("Brasileirão", "Argentina Primera"), pm="10289"),
+}
+LEAGUES = tuple(COMPETITIONS)
 
 # ---------------------------------------------------------------------------
 # Small helpers: HTTP, caching, team-name matching
@@ -131,7 +186,15 @@ def _get_json(url, params=None, timeout=TIMEOUT):
 # here so "Brighton & Hove Albion" reduces to "brighton" like every other
 # source's short name.
 _STOPWORDS = {"fc", "afc", "cf", "sc", "ac", "as", "ss", "ssc", "club", "cd", "ud", "rc", "sd", "sv",
-              "vfb", "vfl", "tsg", "the", "de", "calcio", "and", "hove", "albion", "1"}
+              "vfb", "vfl", "tsg", "the", "de", "calcio", "and", "hove", "albion", "1", "ca", "fk", "sk"}
+# Words that don't identify a club on their own ("FC United" is not "Leeds United").
+_GENERIC = {"united", "city", "town", "athletic", "county", "rovers", "wanderers", "sporting", "real", "racing",
+            "dynamo", "olympic", "inter", "union", "sports", "borough"}
+# Letters Unicode doesn't decompose to ASCII ("Brøndby" would lose its ø).
+_LETTERS = str.maketrans({"ø": "o", "Ø": "O", "æ": "ae", "Æ": "AE", "ß": "ss", "ł": "l", "Ł": "L", "đ": "d", "Đ": "D",
+                          "ı": "i", "ð": "d", "þ": "th"})
+# English vs local city names, per word.
+_WORDS = {"vienna": "wien", "copenhagen": "kobenhavn", "salonica": "thessaloniki", "athinon": "athens", "utd": "united"}
 
 # Short forms used by football-data.co.uk / Polymarket -> the long form.
 _ALIASES = {
@@ -148,14 +211,21 @@ _ALIASES = {
     "bayern munchen": "bayern munich", "bayern": "bayern munich",
     "paris sg": "paris saint germain", "psg": "paris saint germain",
     "inter milan": "inter", "internazionale": "inter",
+    # the leagues added on 2026-09-14 (365Scores / football-data / StatsHub spellings)
+    "sp lisbon": "sporting", "sporting cp": "sporting", "sporting lisbon": "sporting", "guimaraes": "vitoria",
+    "stvv": "sint truiden", "st truiden": "sint truiden", "sint truidense vv": "sint truiden",
+    "basaksehir": "buyuksehyr", "istanbul basaksehir": "buyuksehyr", "volos nfc": "nps volos", "volos": "nps volos",
+    "gimnasia la plata": "gimnasia y esgrima", "chivas": "guadalajara", "atlas guadalajara": "atlas",
+    "aarhus": "agf", "agf aarhus": "agf", "scr altach": "rheindorf altach", "altach": "rheindorf altach",
+    "olympiacos": "olympiakos", "olympiacos piraeus": "olympiakos",
 }
 
 
 def _norm(name):
-    s = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode().lower()
+    s = unicodedata.normalize("NFKD", str(name or "").translate(_LETTERS)).encode("ascii", "ignore").decode().lower()
     s = s.replace("&", " and ").replace("'", "").replace(".", "")
     s = re.sub(r"[^a-z0-9 ]+", " ", s)
-    s = " ".join(t for t in s.split() if t not in _STOPWORDS)
+    s = " ".join(_WORDS.get(t, t) for t in s.split() if t not in _STOPWORDS)
     return _ALIASES.get(s, s)
 
 
@@ -169,6 +239,8 @@ def name_similarity(a, b):
         return 0.0
     if na == nb:
         return 1.0
+    if na in _GENERIC or nb in _GENERIC:
+        return 0.0
     if re.search(rf"\b{re.escape(na)}\b", nb) or re.search(rf"\b{re.escape(nb)}\b", na):
         return 0.9
     ta = [t for t in na.split() if len(t) >= 3]
@@ -192,6 +264,19 @@ def best_match(name, candidates, threshold=0.7):
     return scored[0][1]
 
 
+def closed_match(name, candidates):
+    """best_match for a list the team is known to be in (one league's clubs):
+    also accepts a weaker match that clearly beats every other club, e.g.
+    "Rapid Vienna" -> "SK Rapid Wien" or "Hertha Berlin" -> "Hertha BSC"."""
+    hit = best_match(name, candidates)
+    if hit:
+        return hit
+    scored = sorted(((name_similarity(name, c), c) for c in candidates), reverse=True)
+    if scored and scored[0][0] >= 0.5 and (len(scored) == 1 or scored[0][0] - scored[1][0] >= 0.15):
+        return scored[0][1]
+    return None
+
+
 def parse_kickoff(start_time):
     try:
         return dt.datetime.fromisoformat(start_time)
@@ -204,11 +289,7 @@ def parse_kickoff(start_time):
 # ---------------------------------------------------------------------------
 S365_BASE = "https://webws.365scores.com/web"
 S365_PARAMS = {"appTypeId": 5, "langId": 1, "timezoneName": "Europe/London", "userCountryId": -1}
-S365_COMPETITIONS = {
-    "Premier League": 7, "La Liga": 11, "Serie A": 17,
-    "Bundesliga": 25, "Ligue 1": 35, "Champions League": 572,
-    "Europa League": 573, "Conference League": 7685,
-}
+S365_COMPETITIONS = {name: c["s365"] for name, c in COMPETITIONS.items()}
 # Odds are geo-gated by userCountryId (-1 returns none). Each of these
 # countries exposes a different bookmaker set, confirmed live:
 #   21 -> Bet365, NoviBet, Superbet, SportingBet   31 -> BWIN   37 -> STS
@@ -329,11 +410,18 @@ def dedupe_quotes(quotes):
 # the site publishes for exactly this kind of use; updated ~twice a week.
 # ---------------------------------------------------------------------------
 FD_BASE = "https://www.football-data.co.uk"
-FD_LEAGUE_CODES = {"Premier League": "E0", "La Liga": "SP1", "Serie A": "I1", "Bundesliga": "D1", "Ligue 1": "F1"}
-# Extra top divisions, only searched for teams in the European cups. Cup
-# teams from leagues football-data doesn't cover are priced from the
-# bookmakers alone.
-FD_EXTRA_CODES = ("P1", "N1", "B1", "SC0", "T1", "G1")
+# Leagues in football-data's "extra leagues" files: one CSV per country with
+# every season, goals and odds only (no shots, corners or cards), so their
+# ratings cover goals and the rest comes from the bookmakers.
+FD_NEW_CODES = {"USA", "BRA", "ARG", "MEX", "AUT", "SWZ", "DNK", "NOR", "SWE", "POL"}
+
+
+def fd_codes(league):
+    """football-data codes to search for a competition's teams (cups: every
+    league its teams come from). Teams outside them are priced from the
+    bookmakers alone."""
+    fd = COMPETITIONS[league]["fd"]
+    return [] if not fd else [fd] if isinstance(fd, str) else list(fd)
 # Column prefixes in fixtures.csv. B365 is skipped: 365Scores already has
 # Bet365 live, and the CSV is only a snapshot.
 FD_BOOKS = {"BFD": "Betfred", "BV": "BetVictor", "BW": "Betway", "PP": "Paddy Power",
@@ -388,8 +476,39 @@ def fd_matches(code, season):
     return _cached(("fd", code, season), 6 * 3600, load)
 
 
-def fd_teams(code, season):
-    matches = fd_matches(code, season) or []
+def _parse_fd_new_csv(content, code):
+    text = content.decode("utf-8-sig", errors="replace")
+    out = []
+    for row in csv.DictReader(io.StringIO(text)):
+        home, away, date = (row.get("Home") or "").strip(), (row.get("Away") or "").strip(), _parse_date(row.get("Date"))
+        if not home or not away or not date:
+            continue
+        m = {"div": code, "season": (row.get("Season") or "").strip(), "date": date, "home": home, "away": away,
+             "referee": "", "hg": _num(row, "HG"), "ag": _num(row, "AG")}
+        for key in ("hxg", "axg", "hs", "as", "hst", "ast", "hc", "ac", "hy", "ay", "hr", "ar"):
+            m[key] = None
+        out.append(m)
+    return out
+
+
+def fd_seasons(code, today):
+    """(this season's matches, last season's) for one football-data league."""
+    if code not in FD_NEW_CODES:
+        cur, prev = fd_season_codes(today)
+        return fd_matches(code, cur) or [], fd_matches(code, prev) or []
+    def load():
+        r = _get(f"{FD_BASE}/new/{code}.csv", timeout=30)
+        return None if r is None else _parse_fd_new_csv(r.content, code)
+    by_season = {}
+    for m in _cached(("fd", code, "all"), 6 * 3600, load) or []:
+        by_season.setdefault(m["season"], []).append(m)
+    # Newest season first ("2026", "2026/2027": whichever has the latest match).
+    order = sorted(by_season, key=lambda s: max(m["date"] for m in by_season[s]), reverse=True)
+    return (by_season[order[0]] if order else []), (by_season[order[1]] if len(order) > 1 else [])
+
+
+def fd_teams(code, today):
+    matches = fd_seasons(code, today)[0]
     return sorted({m["home"] for m in matches} | {m["away"] for m in matches})
 
 
@@ -428,9 +547,7 @@ def fd_upcoming_quotes(code, home_fd, away_fd, kickoff_date):
 # public gamma API.
 # ---------------------------------------------------------------------------
 PM_BASE = "https://gamma-api.polymarket.com"
-PM_SERIES = {"Premier League": "10188", "La Liga": "10193", "Serie A": "10203",
-             "Bundesliga": "10194", "Ligue 1": "10195", "Champions League": "10204",
-             "Europa League": "10209", "Conference League": "10437"}
+PM_SERIES = {name: c["pm"] for name, c in COMPETITIONS.items() if c.get("pm")}
 _PM_MAIN_EVENT = re.compile(r"^[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-(\d{4}-\d{2}-\d{2})$")
 
 
@@ -521,8 +638,8 @@ def sh_referee(home, away):
 
 
 # StatsHub's competition ids (the same numbering Sofascore uses).
-SH_TOURNAMENTS = {"Premier League": 17, "La Liga": 8, "Serie A": 23, "Bundesliga": 35, "Ligue 1": 34,
-                  "Champions League": 7, "Europa League": 679, "Conference League": 17015}
+SH_TOURNAMENTS = {**{name: c["sh"] for name, c in COMPETITIONS.items()},
+                  "League Two": 25}   # not on the site, but its clubs play in the English cups
 
 
 def sh_league_teams(league):
@@ -548,18 +665,42 @@ def sh_team_ids(home, away, league=None):
     for near-exact names. Cached 6 hours."""
     def load():
         teams = {}
-        for lg in ([league] if league in SH_TOURNAMENTS else []) + (["Champions League"] if league else []):
+        extra = list(COMPETITIONS[league].get("sh_teams", ())) if league in COMPETITIONS else []
+        for lg in ([league] if league in SH_TOURNAMENTS else []) + extra:
             teams.update(sh_league_teams(lg) or {})
-        if teams:
-            h, a = best_match(home, teams, threshold=0.7), best_match(away, teams, threshold=0.7)
-            if h and a:
-                return teams[h], teams[a]
+        # Each team from the competition's own list; if it isn't there (no
+        # table yet, a cup, a newly promoted club), from StatsHub's team search.
+        ids = []
+        for name in (home, away):
+            hit = (closed_match(name, teams) if not extra else best_match(name, teams)) if teams else None
+            ids.append(teams[hit] if hit else sh_search_team(name) if not teams or extra else None)
+        if all(ids) and ids[0] != ids[1]:
+            return tuple(ids)
         data = _get_json(f"{SH_BASE}/api/search", {"q": home})
         for f in (data or {}).get("fixtures") or []:
             if name_similarity(home, f.get("homeTeamName")) >= 0.75 and name_similarity(away, f.get("awayTeamName")) >= 0.75:
                 return f.get("homeTeamId"), f.get("awayTeamId")
         return None
     return _cached(("sh", "ids", home, away, league), 6 * 3600, load)
+
+
+# StatsHub's search mixes in other sports and teams without saying so.
+_NOT_MENS_FOOTBALL = re.compile(r"h[aå]nd(bold|ball|boll)|basket|volley|hockey|futsal|women|femin|frauen|\bw\b|\bu\d\d\b|reserves|\bii\b|\bb\b",
+                                re.I)
+
+
+def sh_search_team(name):
+    """StatsHub id for one club from its team search, or None unless one
+    result clearly is that club. Cached 12 hours."""
+    def load():
+        for q in dict.fromkeys((name, _norm(name))):   # e.g. "Chivas", then its alias "guadalajara"
+            found = {t["name"]: t["id"] for t in ((_get_json(f"{SH_BASE}/api/search", {"q": q}) or {}).get("teams") or [])
+                     if t.get("name") and t.get("id") and not _NOT_MENS_FOOTBALL.search(t["name"])}
+            hit = best_match(name, found, threshold=0.75) if found else None
+            if hit:
+                return found[hit]
+        return None
+    return _cached(("sh", "search", name), 12 * 3600, load)
 
 
 def sh_players(team_id, limit=20):

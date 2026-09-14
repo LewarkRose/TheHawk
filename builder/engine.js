@@ -18,11 +18,23 @@
   // ---------------------------------------------------------------------------
   // Config
   // ---------------------------------------------------------------------------
-  const LEAGUES = ["Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "Champions League", "Europa League", "Conference League"];
+  // Every competition, grouped the way the site shows them, with its 365Scores
+  // id. Keep in step with COMPETITIONS in engine/sources.py (which builds the
+  // data files for the same list).
+  const LEAGUE_GROUPS = [
+    { key: "top5", name: "Top 5", icon: "🏆", ids: { "Premier League": 7, "La Liga": 11, "Serie A": 17, "Bundesliga": 25, "Ligue 1": 35 } },
+    { key: "europe", name: "Europe", icon: "⭐", ids: { "Champions League": 572, "Europa League": 573, "Conference League": 7685 } },
+    { key: "more", name: "More Europe", icon: "🌍", ids: { "Eredivisie": 57, "Liga Portugal": 73, "Scottish Premiership": 61, "Belgian Pro League": 98,
+        "Süper Lig": 78, "Greek Super League": 84, "Austrian Bundesliga": 111, "Swiss Super League": 95, "Danish Superliga": 119 } },
+    { key: "second", name: "Second tier", icon: "🥈", ids: { "Championship": 1, "League One": 2, "2. Bundesliga": 26, "Serie B": 18, "LaLiga 2": 12, "Ligue 2": 36 } },
+    { key: "cups", name: "Cups", icon: "🏅", ids: { "FA Cup": 8, "EFL Cup": 9, "Copa del Rey": 13, "Coppa Italia": 20, "DFB-Pokal": 28, "Coupe de France": 37 } },
+    { key: "world", name: "World", icon: "🌎", ids: { "MLS": 104, "Brasileirão": 113, "Argentina Primera": 72, "Liga MX": 141, "Saudi Pro League": 649,
+        "Copa Libertadores": 102 } },
+  ].map((g) => ({ ...g, leagues: Object.keys(g.ids) }));
+  const COMPETITIONS = Object.assign({}, ...LEAGUE_GROUPS.map((g) => g.ids));
+  const LEAGUES = Object.keys(COMPETITIONS);
   const S365 = "https://webws.365scores.com/web";
   const S365_PARAMS = { appTypeId: 5, langId: 1, timezoneName: "Europe/London", userCountryId: -1 };
-  const COMPETITIONS = { "Premier League": 7, "La Liga": 11, "Serie A": 17, "Bundesliga": 25, "Ligue 1": 35, "Champions League": 572,
-                         "Europa League": 573, "Conference League": 7685 };
   const ODDS_COUNTRIES = [21, 31, 37]; // each exposes a different bookmaker set
   const PM_BASE = "https://gamma-api.polymarket.com";
   const DATA_URL = new URL("../data/", document.baseURI).href;
@@ -164,11 +176,18 @@
   const athletePhoto = (m) => `https://imagecache.365scores.com/image/upload/f_png,w_64,h_64,c_limit,q_auto:eco,dpr_2,d_Athletes:default.png/v${m.imageVersion || 1}/Athletes/${m.athleteId}`;
 
   const rawFixtures = new Map(); // game id -> {league, game}
+  const CUPS = new Set(LEAGUE_GROUPS.find((g) => g.key === "cups").leagues);
+  const DATA_DAYS = 8;   // build_data.py's DAYS_AHEAD
   async function fixtures(league) {
     const d = await s365("games/fixtures", { competitions: COMPETITIONS[league] }, 5 * 60 * 1000);
     if (!d) throw new Error("365Scores didn't return fixtures — try again in a moment");
     const now = Date.now();
-    return (d.games || []).filter((g) => g.statusGroup !== 4)
+    // Domestic cups: only ties HAWK's data files kept (at least one league
+    // club — early qualifying rounds between amateur clubs have no data or
+    // bet builders), plus ties too far ahead to be in the files yet.
+    const kept = CUPS.has(league) ? ((await data("fixtures.json")) || {}).fixtures : null;
+    const keep = (g) => !kept || kept[String(g.id)] || !g.startTime || Date.parse(g.startTime) - now > DATA_DAYS * 86400e3;
+    return (d.games || []).filter((g) => g.statusGroup !== 4 && keep(g))
       .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""))
       .map((g) => {
         rawFixtures.set(String(g.id), { league, game: g });
@@ -1642,7 +1661,8 @@
     const res = await s365("games/allscores", { competitions: Object.values(COMPETITIONS).join(","), startDate: date, endDate: date }, 20 * 1000);
     if (!res) throw new Error("365Scores didn't return scores — try again in a moment");
     const score = (c, g) => (g.statusGroup === 2 || !(c.score >= 0) ? null : Math.trunc(c.score));
-    return (res.games || []).map((g) => ({
+    const qualifier = (g) => CUPS.has(LEAGUE_OF[g.competitionId]) && /qualif|prelim/i.test(g.stageName || "");
+    return (res.games || []).filter((g) => !qualifier(g)).map((g) => ({
       id: String(g.id), league: LEAGUE_OF[g.competitionId] || g.competitionDisplayName || "", home: g.homeCompetitor.name, away: g.awayCompetitor.name,
       homeCrest: crest(g.homeCompetitor), awayCrest: crest(g.awayCompetitor), kickoff: g.startTime, status: g.statusGroup,
       statusText: g.shortStatusText || g.statusText || "", clock: g.gameTimeDisplay || "", score: [score(g.homeCompetitor, g), score(g.awayCompetitor, g)],
@@ -1718,7 +1738,7 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, COMPETITIONS, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, learnKey, liveMatch,
+  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, learnKey, liveMatch,
                   scores, matchReport, ticketLive,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },

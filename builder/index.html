@@ -320,6 +320,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .leg .l1{display:flex;justify-content:space-between;gap:8px}
 .leg .lb{font-weight:700}
 .leg .mk{font-size:12px;color:var(--muted)}
+.leg .b365{font-size:11.5px;color:var(--gold);margin-top:2px}.leg .b365 b{font-weight:800}
 .leg .rt{text-align:right;white-space:nowrap}
 .leg .rt .pp{font-weight:800}
 .leg .rt .fo{font-size:12px;color:var(--muted)}
@@ -1367,13 +1368,18 @@ function priceLine(l) {
   return `<div class="bp ${val ? "val" : ""}" title="${val ? book + "'s price beats HAWK's fair odds" : book + " pays less than HAWK's fair odds"}">fair ${odds(l.fair)} · ${esc(book)} <b>${odds(l.bookPrice)}</b>${moveMark(l)}</div>`;
 }
 
+// Corners and cards: Bet365's builder words the same leg with a whole number
+// ("Over 3" = 4+), so show exactly what to pick there.
+function b365Line(l) {
+  return l.b365 ? `<div class="b365" title="Bet365's corners and cards lines are 3-way (Over / Exactly / Under): its &quot;Over 3&quot; means 4 or more">On Bet365 pick: <b>${esc(l.b365)}</b></div>` : "";
+}
 function renderSlip() {
   const r = S.result, m = S.match;
   const legRows = S.slip.map((id, n) => {
     const l = S.legs[id]; if (!l) return "";
     const row = r && r.legs ? r.legs.find(x => x.id === id) : null;
     return `<div class="leg" style="animation-delay:${n * 60}ms"><div class="ck">✓</div>
-      <div class="l1"><div><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}${hitChip(l)}</div>${moveLine(l)}</div>
+      <div class="l1"><div><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}${hitChip(l)}</div>${b365Line(l)}${moveLine(l)}</div>
         <div class="rt"><div class="pp">${pct(l.p)}</div>${row && n > 0 ? `<div class="fo">${pct(row.cond)} given above</div>` : ""}
           ${priceLine(l)}</div></div>
       <div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div>
@@ -1620,7 +1626,8 @@ function openChecklist() {
       <div class="muted">${esc(m.home)} v ${esc(m.away)} · open the match on Bet365 → <b>Bet Builder</b> tab, then tick each leg as you add it.</div></div>
       <button class="x" data-close title="Close">✕</button></div>
     <div class="chk-list">${groups.map(([name, g]) => `<div class="chk-grp">${esc(name)}</div>${g.map(l => `
-      <label class="chk-row"><input type="checkbox"><span>${esc(l.player ? capitalise(l.label.replace(l.player + ": ", "").replace(l.player + " ", "")) : l.label)}</span>
+      <label class="chk-row"><input type="checkbox"><span>${l.b365 ? `<b>${esc(l.b365)}</b> <span class="muted">= ${esc(l.label.replace(/^.*?(Over|Under)/, "$1"))}</span>`
+        : esc(l.player ? capitalise(l.label.replace(l.player + ": ", "").replace(l.player + " ", "")) : l.label)}</span>
         <span class="muted">${esc(l.market)}</span></label>`).join("")}`).join("")}</div>
     <div class="chk-price">${fair ? `HAWK's fair odds <b>${odds(fair)}</b> — it's worth it if Bet365 pays <b style="color:var(--accent)">${odds(worth)}+</b>.
       Type Bet365's price into the slip's price box and HAWK checks it (and suggests a stake).` : ""}</div>
@@ -2553,6 +2560,7 @@ async function showInPlay(id) {
   document.querySelectorAll(".fx").forEach(f => f.classList.toggle("on", f.dataset.id === String(id)));
   $("#match").innerHTML = `<div class="skel"><div class="loading-msg">Reading the live match…</div>${'<div class="ln"></div>'.repeat(6)}</div>`;
   clearInterval(S.inplay.timer);
+  loadPredictions();   // "before kick-off" in the live win chances
   await refreshInPlay();
   S.inplay.timer = setInterval(refreshInPlay, INPLAY_MS);
   if (narrow()) $("#match").scrollIntoView({ behavior: "smooth" });
@@ -2634,6 +2642,35 @@ function bindCashOut() {
     if (el && fresh) el.innerHTML = fresh.innerHTML;
   });
 }
+// HAWK's live win chances, with where they come from in plain words: the
+// bookmakers' live prices, HAWK's own read (pre-match strength, score, time
+// left, red cards, live xG) and what HAWK said before kick-off.
+function liveHawk(d) {
+  const p = d.probs || {}, hp = pct100([p.home, p.draw, p.away]);
+  const three = (x) => pct100([x.home, x.draw, x.away]).map(v => v + "%").join(" · ");
+  const pre = S.preds && S.preds.m[String(d.id)];
+  const srcs = [];
+  if (d.market) srcs.push(`<span>Bookmakers live (${d.market.books}): ${three(d.market)}</span>`);
+  if (d.own) srcs.push(`<span title="HAWK's pre-match strength of both teams for the minutes left, adjusted for the score, red cards and who's creating chances (live xG)">🦅 HAWK's own read: <b>${three(d.own)}</b></span>`);
+  if (pre && pre.probs) srcs.push(`<span>🦅 Before kick-off: ${three(pre.probs)}</span>`);
+  // The plain-words line, told with the likeliest result.
+  const fi = hp.indexOf(Math.max(...hp)), who = [`${d.home} to win`, "A draw", `${d.away} to win`][fi];
+  const at = (x) => x ? pct100([x.home, x.draw, x.away])[fi] : null, bk = at(d.market);
+  const t = d.tilt || [1, 1], word = (x) => x > 1.02 ? "more" : x < 0.98 ? "less" : null;
+  const created = [[d.home, word(t[0])], [d.away, word(t[1])]].filter(([, w]) => w);
+  const xgLine = !(d.minute >= 15) ? "Too early to judge who's creating more — HAWK starts adjusting for live xG after 15 minutes"
+    : !created.length ? "Both teams are creating about what HAWK expected (live xG)"
+    : created.length === 2 && created[0][1] === created[1][1] ? `Both teams are creating ${created[0][1]} than HAWK expected (live xG)`
+    : created.map(([n, w]) => `${n} ${w === "more" ? "are creating more" : "are creating less"} than expected`).join(" and ") + " (live xG)";
+  const how = d.basis !== "live prices" ? `No live bookmaker prices right now, so this is HAWK's own read: its pre-match strength of both teams for the ${Math.round(d.remaining || 0)} minutes left, the score and red cards.`
+    : bk == null ? `From the bookmakers' live prices, adjusted a little for live xG.`
+    : bk === hp[fi] ? `${who}: bookmakers ${bk}%, HAWK ${hp[fi]}% too. ${xgLine}${created.length && d.minute >= 15 ? ", but that moves it by less than 1%" : ""}.`
+    : `${who}: bookmakers ${bk}% → HAWK ${hp[fi]}%. ${xgLine}, so HAWK ${hp[fi] > bk ? "rates it a bit higher" : "rates it a bit lower"} than the bookmakers.`;
+  return `<div class="bar3"><div class="h" style="flex:${p.home}">${hp[0]}%</div><div class="d" style="flex:${p.draw}">${hp[1]}%</div><div class="a" style="flex:${p.away}">${hp[2]}%</div></div>
+    <div class="bar3-legend"><span>${esc(d.home)}</span><span>Draw</span><span>${esc(d.away)}</span></div>
+    ${srcs.length ? `<div class="srcs">${srcs.join("")}</div>` : ""}
+    <div class="note" style="margin-top:6px">${esc(how)} About ${Math.round(d.remaining || 0)} minutes left incl. stoppage time.</div>`;
+}
 function renderInPlay() {
   const ip = S.inplay, d = ip.data;
   if (!d) { $("#match").innerHTML = `<div class="empty"><h2>Couldn't read this match</h2>${esc(ip.error || "")}</div>`; return; }
@@ -2677,11 +2714,8 @@ function renderInPlay() {
   };
   const headRow = `<div class="ip-row head"><div>Bet</div><div>Bet365</div><div class="hide-sm">Fair</div><div class="hide-sm">Chance</div><div>Edge</div><div>Stake</div></div>`;
   $("#match").innerHTML = head + cashOutSection() + `
-    <div class="section"><h3>Live win chances</h3>
-      <div class="bar3"><div class="h" style="flex:${p.home}">${pct(p.home)}</div><div class="d" style="flex:${p.draw}">${pct(p.draw)}</div><div class="a" style="flex:${p.away}">${pct(p.away)}</div></div>
-      <div class="note">From ${d.basis === "live prices" ? `the live prices of ${d.books || "several"} bookmakers` : "HAWK's pre-match ratings (no live prices yet)"}${
-        d.tilt && (d.tilt[0] !== 1 || d.tilt[1] !== 1) ? `, tilted by live xG (${esc(d.home)} ×${d.tilt[0].toFixed(2)}, ${esc(d.away)} ×${d.tilt[1].toFixed(2)})` : ""}.
-        About ${Math.round(d.remaining || 0)} minutes left incl. stoppage time.</div></div>
+    <div class="section"><h3>Live win chances <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:600">— 🦅 HAWK LIVE</span></h3>
+      ${liveHawk(d)}</div>
     <div class="section"><h3>Live stats</h3>
       ${statRow("Expected Goals", "Expected goals (xG)", (x) => x.toFixed(2))}${statRow("Shots On Target", "Shots on target")}${statRow("Total Shots", "Shots")}
       ${statRow("Big Chances Created", "Big chances")}${statRow("Corners", "Corners")}${statRow("Possession", "Possession", (x) => x + "%")}

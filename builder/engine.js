@@ -940,6 +940,10 @@
     return over ? `(${n + 2}+; ${n + 1} = half win)` : `(${fewer(n)}; ${n + 1} = half stake back)`;
   }
   const withCount = (text, option, line) => `${text} ${plainCount(option, line)}`.trim();
+  // Bet365's bet builder prices corners and cards 3-way on whole numbers
+  // (Over / Exactly / Under): its "Over 3" is 4+ and its "Under 12" is 11 or
+  // fewer. So HAWK's Over 3.5 is Bet365's "Over 3", HAWK's Under 11.5 its "Under 12".
+  const b365Whole = (option, line, what, team = "") => ({ b365: `${team ? team + ": " : ""}${option} ${option === "Over" ? Math.floor(line) : Math.ceil(line)} ${what}` });
 
   function mask(n, test) { const m = new Uint8Array(n); for (let s = 0; s < n; s++) m[s] = test(s) ? 1 : 0; return m; }
   const mean = (m) => { let c = 0; for (let s = 0; s < m.length; s++) c += m[s]; return c / m.length; };
@@ -968,13 +972,13 @@
       add(`cs:${side}`, `${name} Clean Sheet`, "Clean Sheet", `team_goals:${side === "home" ? "away" : "home"}`, mask(n, (s) => other[s] === 0));
     }
     for (const line of [7.5, 8.5, 9.5, 10.5, 11.5]) {
-      add(`corners:o${line}`, withCount(`Over ${line} Corners`, "Over", line), "Corners", "corners", mask(n, (s) => sim.corners[s] > line));
-      add(`corners:u${line}`, withCount(`Under ${line} Corners`, "Under", line), "Corners", "corners", mask(n, (s) => sim.corners[s] < line));
+      add(`corners:o${line}`, withCount(`Over ${line} Corners`, "Over", line), "Corners", "corners", mask(n, (s) => sim.corners[s] > line), b365Whole("Over", line, "Corners"));
+      add(`corners:u${line}`, withCount(`Under ${line} Corners`, "Under", line), "Corners", "corners", mask(n, (s) => sim.corners[s] < line), b365Whole("Under", line, "Corners"));
     }
     const tc = (s) => sim.teamCards.home[s] + sim.teamCards.away[s];
     for (const line of [2.5, 3.5, 4.5, 5.5]) {
-      add(`cards:o${line}`, withCount(`Over ${line} Cards`, "Over", line), "Total Cards", "cards", mask(n, (s) => tc(s) > line));
-      add(`cards:u${line}`, withCount(`Under ${line} Cards`, "Under", line), "Total Cards", "cards", mask(n, (s) => tc(s) < line));
+      add(`cards:o${line}`, withCount(`Over ${line} Cards`, "Over", line), "Total Cards", "cards", mask(n, (s) => tc(s) > line), b365Whole("Over", line, "Cards"));
+      add(`cards:u${line}`, withCount(`Under ${line} Cards`, "Under", line), "Total Cards", "cards", mask(n, (s) => tc(s) < line), b365Whole("Under", line, "Cards"));
     }
 
     // Result extras
@@ -1013,13 +1017,13 @@
     for (const [side, name] of [["home", home], ["away", away]]) {
       const c = sim.cornersTeam[side], k = sim.teamCards[side];
       for (const line of [2.5, 3.5, 4.5, 5.5, 6.5, 7.5]) {
-        add(`tcorners:${side}:o${line}`, withCount(`${name} Over ${line} Corners`, "Over", line), "Team Corners", `team_corners:${side}`, mask(n, (s) => c[s] > line));
-        add(`tcorners:${side}:u${line}`, withCount(`${name} Under ${line} Corners`, "Under", line), "Team Corners", `team_corners:${side}`, mask(n, (s) => c[s] < line));
+        add(`tcorners:${side}:o${line}`, withCount(`${name} Over ${line} Corners`, "Over", line), "Team Corners", `team_corners:${side}`, mask(n, (s) => c[s] > line), b365Whole("Over", line, "Corners", name));
+        add(`tcorners:${side}:u${line}`, withCount(`${name} Under ${line} Corners`, "Under", line), "Team Corners", `team_corners:${side}`, mask(n, (s) => c[s] < line), b365Whole("Under", line, "Corners", name));
       }
       for (const line of [0.5, 1.5, 2.5, 3.5])
-        add(`tcards:${side}:o${line}`, withCount(`${name} Over ${line} Cards`, "Over", line), "Team Cards", `team_cards:${side}`, mask(n, (s) => k[s] > line));
+        add(`tcards:${side}:o${line}`, withCount(`${name} Over ${line} Cards`, "Over", line), "Team Cards", `team_cards:${side}`, mask(n, (s) => k[s] > line), b365Whole("Over", line, "Cards", name));
       for (const line of [1.5, 2.5])
-        add(`tcards:${side}:u${line}`, withCount(`${name} Under ${line} Cards`, "Under", line), "Team Cards", `team_cards:${side}`, mask(n, (s) => k[s] < line));
+        add(`tcards:${side}:u${line}`, withCount(`${name} Under ${line} Cards`, "Under", line), "Team Cards", `team_cards:${side}`, mask(n, (s) => k[s] < line), b365Whole("Under", line, "Cards", name));
     }
     add("mostcorners:home", `${home} Most Corners`, "Most Corners", "most_corners", mask(n, (s) => sim.cornersTeam.home[s] > sim.cornersTeam.away[s]));
     add("mostcorners:away", `${away} Most Corners`, "Most Corners", "most_corners", mask(n, (s) => sim.cornersTeam.away[s] > sim.cornersTeam.home[s]));
@@ -1809,7 +1813,11 @@
     const stats = {};
     for (const s of (st && st.statistics) || []) {
       const k = s.competitorId === hc.id ? 0 : s.competitorId === ac.id ? 1 : -1;
-      if (k >= 0) (stats[s.name] ||= [null, null])[k] = parseFloat(String(s.value).replace("%", "")) || 0;
+      if (k < 0) continue;
+      (stats[s.name] ||= [null, null])[k] = parseFloat(String(s.value).replace("%", "")) || 0;
+      // "6/7 (86%)": also keep the 7 (e.g. tackles made, won or not)
+      const of = /^\s*\d+\s*\/\s*(\d+)/.exec(String(s.value));
+      if (of) (stats[`${s.name}|of`] ||= [null, null])[k] = +of[1];
     }
     const rem = remainingMinutes(game.gameTime, game.statusText), elapsed = Math.min(95, Math.max(0, Number(game.gameTime) || 0));
     const cons = liveConsensus(quotes), c1 = cons["1|"];
@@ -1817,17 +1825,16 @@
     const totals = Object.entries(cons).filter(([k, c]) => k.startsWith("3|") && halfLine(k.slice(2)) != null && "Over" in c.probs)
       .map(([k, c]) => [parseFloat(k.slice(2)), c.probs.Over]);
     const pre = await preMatchLambdas(file && file.fixtures && file.fixtures[id]);
+    // HAWK's own read: pre-match strength for the time left, nudged for the score and red cards.
+    const diff = sh - sa;
+    const ownRates = pre ? pre.map((l, k) => {
+      const mine = k === 0 ? diff : -diff, chase = mine < 0 ? Math.min(1.25, 1 + 0.1 * -mine) : mine > 0 ? 0.92 : 1;
+      return (l * rem) / 95 * chase * Math.pow(0.75, reds[k]) * Math.pow(1.2, reds[1 - k]);
+    }) : null;
     let rates, basis;
     if (p1x2 || totals.length) { rates = fitRemaining(sh, sa, p1x2, totals); basis = "live prices"; }
-    else if (pre) {
-      // No live prices: pre-match strength for the time left, nudged for the score and red cards.
-      const diff = sh - sa;
-      rates = pre.map((l, k) => {
-        const mine = k === 0 ? diff : -diff, chase = mine < 0 ? Math.min(1.25, 1 + 0.1 * -mine) : mine > 0 ? 0.92 : 1;
-        return (l * rem) / 95 * chase * Math.pow(0.75, reds[k]) * Math.pow(1.2, reds[1 - k]);
-      });
-      basis = "pre-match ratings";
-    } else return { ...base, live: true, score: [sh, sa], reds, stats, noModel: true, rows: [] };
+    else if (ownRates) { rates = ownRates; basis = "pre-match ratings"; }
+    else return { ...base, live: true, score: [sh, sa], reds, stats, noModel: true, rows: [] };
     // HAWK's tilt: teams creating more (or less) than expected so far keep doing so, a bit.
     const xg = stats["Expected Goals"];
     const tilt = [0, 1].map((k) => {
@@ -1858,7 +1865,10 @@
       }
     }
     const res = (o) => (rows.find((r) => r.type === 1 && r.label === marketLabel(1, "", "", o, hc.name, ac.name)) || {}).p;
+    const three = (Mx) => ({ home: sumCells(Mx, (i, j) => i > j), draw: sumCells(Mx, (i, j) => i === j), away: sumCells(Mx, (i, j) => i < j) });
     return { ...base, live: true, score: [sh, sa], reds, stats, basis, remaining: rem, books: c1 ? c1.books : 0, tilt,
+             market: p1x2 ? { home: p1x2[0], draw: p1x2[1], away: p1x2[2], books: c1.books } : null,
+             own: ownRates ? three(finalMatrix(sh, sa, Math.max(ownRates[0] * tilt[0], 1e-9), Math.max(ownRates[1] * tilt[1], 1e-9))) : null,
              probs: { home: res("1") ?? sumCells(M, (i, j) => i > j), draw: res("X") ?? sumCells(M, (i, j) => i === j), away: res("2") ?? sumCells(M, (i, j) => i < j) },
              rows, checked: new Date().toISOString() };
   }
@@ -1916,6 +1926,7 @@
         const started = m.statusText === "Starting", mins = count("Minutes");
         const on = !sentOff.has(m.id) && !subsOut.has(m.id) && (started ? !(mins > 0 && mins < elapsed - 5 && !subsIn.has(m.id)) : subsIn.has(m.id));
         return { name: names[m.id] || "", pos: POSITIONS[(m.position || {}).name] || "M", on, played: started || subsIn.has(m.id) || mins > 0, booked: booked.has(m.id),
+                 mins, tkShown: s["Tackles Won"] != null,
                  v: { shots: count("Total Shots"), sot: count("Shots On Target"), score: count("Goals"), assist: count("Assists"), fouls: count("Fouls Made"),
                       fouled: count("Was Fouled"), tackles: count("Tackles Won", true), offsides: count("Offsides"), saves: count("Goalkeeper Saves") } };
       });
@@ -1929,6 +1940,12 @@
       const r = rates(mt, DEFAULT_RATES[pos] || DEFAULT_RATES.M, pos, EXTRA_DEFAULTS[pos] || EXTRA_DEFAULTS.M);
       const x = r.x || EXTRA_DEFAULTS[pos] || EXTRA_DEFAULTS.M;
       return { shots: r.sh90, sot: r.sot90, score: r.g90, cards: r.c90, assist: x.assists, fouls: x.fouls, fouled: x.fouled, tackles: x.tackles, offsides: x.offsides };
+    };
+    // Team tackles (won or not) that no player is named for.
+    const unnamedTackles = (side) => {
+      const team = (stats["Tackles Won|of"] || [])[side === "home" ? 0 : 1];
+      if (!(team > 0)) return 0;
+      return Math.max(0, team - (livePlayers[side] || []).reduce((a, p) => a + (p.v.tackles || 0), 0));
     };
     // Goal legs as conditions on the final score (i = home, j = away).
     const goalTest = (legId) => {
@@ -1998,8 +2015,27 @@
             const x = stat === "soa" ? pl.v.score + pl.v.assist : pl.v[key] || 0;
             const per90 = stat === "soa" ? r.score + r.assist : r[key] || 0;
             Object.assign(row, lineChance(x, (per90 * left) / 90, "o", need - 0.5));
+            const u = stat === "tackles" && !pl.tkShown ? unnamedTackles(side) : 0;
+            if (u > 0 && row.state === "live") {
+              // 365Scores only names a player's tackles once he's won one; the
+              // team total also has the ones that lost the ball, and Bet365
+              // counts those. Some of them may be his: share them out by how
+              // often each unnamed player usually tackles and how long he's played.
+              const pool = (livePlayers[side] || []).filter((p) => p.played && !p.tkShown);
+              const wt = (p) => usual(side, p.name, p.pos).tackles * Math.max(p.mins, 1);
+              const share = Math.min(1, wt(pl) / Math.max(pool.reduce((a, p) => a + wt(p), 0), 1e-9));
+              const lam = (per90 * left) / 90;
+              let p = 0, c = 1;
+              for (let k = 0; k <= u; k++) {
+                if (k) c = (c * (u - k + 1)) / k;
+                p += c * share ** k * (1 - share) ** (u - k) * poisAtLeast(lam, need - k);
+              }
+              row.p = Math.min(1, p);
+              row.unnamed = u;
+            }
           }
           row.note = `${pl.on ? "on the pitch" : "off"} · ${stat === "booked" ? (pl.booked ? "booked" : "not booked") : `${stat === "soa" ? pl.v.score + pl.v.assist : pl.v[stat] || 0} so far`}`;
+          if (row.unnamed) row.note += ` · ${side === "home" ? hc.name : ac.name} have ${row.unnamed} more tackle${row.unnamed > 1 ? "s" : ""} 365Scores doesn't name (lost the ball) — Bet365 counts those, so he may already have one`;
         }
       } else row.note = "HAWK can't follow this one live";
       out.push(row);

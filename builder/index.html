@@ -940,6 +940,14 @@ function renderMatch() {
   if (p.model) srcs.push(`<span title="HAWK's own team ratings (goals and xG), before it blends in the market">🦅 HAWK ratings only: <b>${three(p.model)}</b></span>`);
   if (p.market) srcs.push(`<span>Bookmakers (${p.market.sources}): ${three(p.market)}</span>`);
   if (p.polymarket) srcs.push(`<span>Polymarket: ${three(p.polymarket)}</span>`);
+  // How HAWK's number was made from the two (it blends expected goals, so the % land close to — not exactly on — the weights).
+  const mix = p.mix || {}, mw = mix.market == null ? null : Math.round(mix.market * 100);
+  const how = mix.ignored && p.market
+      ? `HAWK is going with the bookmakers here. Its own ratings${p.model ? ` (${three(p.model)})` : ""} are too far from ${p.market.sources} bookmakers, and when that happens the market is usually the one that's right — often a big favourite HAWK's ratings underrate.`
+    : mw == null ? ""
+    : mw >= 100 ? "HAWK's number is the bookmakers' — it has no ratings for these two teams."
+    : mw <= 0 ? "HAWK's number is its own ratings — no bookmaker prices yet."
+    : `HAWK's number is ${mw}% bookmakers + ${100 - mw}% its own ratings${p.model ? "" : " (these two are rated in different leagues, so the ratings aren't shown on their own)"}.`;
   $("#match").innerHTML = `
     <div class="hero">
       <div class="vs">
@@ -963,6 +971,7 @@ function renderMatch() {
         <div class="h" style="flex:${p.home}">${hp[0]}%</div><div class="d" style="flex:${p.draw}">${hp[1]}%</div><div class="a" style="flex:${p.away}">${hp[2]}%</div></div>
       <div class="bar3-legend"><span>${esc(m.home)}</span><span>Draw</span><span>${esc(m.away)}</span></div>
       <div class="srcs">${srcs.join("")}</div>
+      ${how ? `<div class="note" style="margin-top:6px">${esc(how)}</div>` : ""}
     </div>
     ${upsetCard(m)}
     ${lineupCard(m)}
@@ -2369,11 +2378,20 @@ function showScores() {
   loadScores();
   loadPredictions();
   clearInterval(S.scores.timer);
+  let tick = 0;
   S.scores.timer = setInterval(() => {
     if (S.view !== "scores") { clearInterval(S.scores.timer); return; }
-    if (!document.hidden && S.scores.day === localDay(new Date())) loadScores();
-  }, SCORES_MS);
+    // Every 15 s while a game is live or about to start, otherwise every 30 s.
+    const busy = (S.scores.data || []).some(g => g.status === 3 || due(g));
+    if (!document.hidden && S.scores.day === localDay(new Date()) && (busy || ++tick % 2 === 0)) loadScores();
+  }, SCORES_MS / 2);
 }
+// Past kick-off time but 365Scores hasn't started the game yet (kick-offs run a few minutes late).
+function due(g) { return g.status === 2 && !!g.kickoff && minsToKick(g.kickoff) <= 0 && minsToKick(g.kickoff) > -30; }
+// Back on the app (phone unlocked, tab switched back): refresh straight away.
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && S.view === "scores" && S.scores.day === localDay(new Date())) loadScores();
+});
 async function loadScores() {
   const sc = S.scores, day = sc.day;
   try { const data = await api(`/api/scores?day=${day}`); if (sc.day === day) { sc.data = data; sc.error = null; } }
@@ -2420,13 +2438,14 @@ function renderScoreList() {
   for (const g of games) (groups[g.league] ||= []).push(g);
   const order = (l) => { const i = S.allLeagues.indexOf(l); return i < 0 ? 99 : i; };
   const live = games.filter(g => g.status === 3).length;
-  el.innerHTML = (live ? `<div class="note" style="margin:0 0 10px"><span class="dot-live"></span>${live} live — updating every 30 seconds</div>` : "") +
+  el.innerHTML = (live ? `<div class="note" style="margin:0 0 10px"><span class="dot-live"></span>${live} live — updating every 15 seconds</div>` : "") +
     Object.entries(groups).sort((a, b) => order(a[0]) - order(b[0])).map(([lg, list]) => `
       <div class="sc-league">${leagueLogo(lg)}${esc(lg)}</div>
       ${list.map(g => {
         const state = g.status === 3 ? `<span class="sc-live">${esc(g.clock || "LIVE")}</span>`
           : g.status === 4 ? `<span class="muted">${/postpon|cancel|abandon/i.test(g.statusText) ? esc(g.statusText) : "FT"}</span>`
-          : g.status === 2 ? (soon(g.kickoff) ? `<span class="sc-soon">in ${kickIn(g.kickoff)}</span>`
+          : g.status === 2 ? (due(g) ? `<span class="sc-soon" title="Past kick-off time — the score shows as soon as 365Scores has the game started">Kick-off</span>`
+            : soon(g.kickoff) ? `<span class="sc-soon">in ${kickIn(g.kickoff)}</span>`
             : `<span class="muted">${new Date(g.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>`) : `<span class="muted">${esc(g.statusText)}</span>`;
         const sc0 = g.score[0] == null ? "" : g.score[0], sc1 = g.score[1] == null ? "" : g.score[1];
         const bet = mine[g.id] ? `<span title="You have a HAWK bet on this match (${esc(mine[g.id].toLowerCase())})">🎟</span>` : "";

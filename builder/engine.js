@@ -556,7 +556,7 @@
     const totals = Object.entries(cons).filter(([k, c]) => k.startsWith("3|") && halfLine(k.slice(2)) != null && "Over" in c.probs)
       .map(([k, c]) => [parseFloat(k.slice(2)), c.probs.Over]);
     const lamMarket = p1x2 || totals.length ? fitGoalLambdas(p1x2, totals) : null;
-    let lamBlend = null, ignored = false;
+    let lamBlend = null, ignored = false, marketW = null;
     if (lamModel || lamMarket) {
       let weight = MARKET_WEIGHT;
       if (lamModel && p1x2) {
@@ -567,6 +567,7 @@
         ignored = trust.some((t) => t[1]);
       }
       lamBlend = [0, 1].map((k) => blend(lamModel ? lamModel[k] : null, lamMarket ? lamMarket[k] : null, weight));
+      marketW = !lamMarket ? 0 : !lamModel ? 1 : weight;   // how much of HAWK's number is the bookmakers'
     }
     if (ignored) warnings.push("HAWK's goal model disagrees strongly with the bookmakers on this match (usually a big favourite it underrates) — trusting the market instead.");
 
@@ -585,7 +586,7 @@
       id, league, home, away, homeComp: hc, awayComp: ac, kickoff, inPlay: !!(kickoff && kickoff < new Date()),
       quotes, cons, polymarket: pm, lineups, confirmed, espn, lineupCheck, detail, table, form: { home: formH, away: formA }, recentForm: { home: recentH, away: recentA },
       referee: { name: refName, avg: refAvg, games: refGames, source: refSource, factor: refFactor },
-      profiles: [profH, fdH, profA, fdA], lamModel, lamMarket, lamBlend, M: lamBlend ? scoreMatrix(...lamBlend) : null,
+      profiles: [profH, fdH, profA, fdA], lamModel, lamMarket, lamBlend, M: lamBlend ? scoreMatrix(...lamBlend) : null, marketW, ignored,
       // Both teams rated within the same league: only then can HAWK's own
       // ratings be compared head to head (a League One side isn't "45%" v Brentford).
       sameLeague: !!(fd.home && fd.away && fd.home[0] === fd.away[0]),
@@ -1372,7 +1373,7 @@
       lineups: Object.fromEntries(Object.entries(an.lineups).map(([s, v]) => [s, { ...v, guess: !!(an.lineupGuess || {})[s],
                                                                                    check: (an.lineupCheck || {})[s] || null }])),
       probs: { home: sumCells(M, (i, j) => i > j), draw: sumCells(M, (i, j) => i === j), away: sumCells(M, (i, j) => i < j),
-               market, polymarket: an.polymarket, model },
+               market, polymarket: an.polymarket, model, mix: { market: an.marketW, ignored: !!an.ignored } },
       expected: sim.exp, grid, table: { home: tableRow(an.homeComp), away: tableRow(an.awayComp) }, form: an.form,
       legs: legJSON, priceBook: PRICE_BOOK,
       players: Object.fromEntries(Object.entries(squads).map(([side, sq]) => [side, sq.map((p) => ({
@@ -2022,7 +2023,7 @@
   const LEAGUE_OF = Object.fromEntries(Object.entries(COMPETITIONS).map(([name, cid]) => [cid, name]));
   async function scores(day) {   // day = "YYYY-MM-DD" (your local date)
     const [y, m, d] = String(day).split("-"), date = `${d}/${m}/${y}`;
-    const res = await s365("games/allscores", { competitions: Object.values(COMPETITIONS).join(","), startDate: date, endDate: date }, 20 * 1000);
+    const res = await s365("games/allscores", { competitions: Object.values(COMPETITIONS).join(","), startDate: date, endDate: date }, 10 * 1000);
     if (!res) throw new Error("365Scores didn't return scores — try again in a moment");
     const score = (c, g) => (g.statusGroup === 2 || !(c.score >= 0) ? null : Math.trunc(c.score));
     const qualifier = (g) => CUPS.has(LEAGUE_OF[g.competitionId]) && /qualif|prelim/i.test(g.stageName || "");

@@ -59,10 +59,6 @@ img{max-width:100%}
   display:inline-grid;place-items:center;background:var(--gold);color:#241a00}
 .nav.on .count{background:#04241a;color:var(--accent)}
 .topright{display:flex;align-items:center;gap:8px;position:relative;flex-shrink:0}
-.vaultlink{color:#d9b571;text-decoration:none;font-weight:700;font-size:13px;padding:7px 14px;border:1px solid #6b5530;border-radius:999px;white-space:nowrap}
-.vaultlink:hover{background:rgba(217,181,113,.1)}
-.vaultlink{display:flex;align-items:center;gap:7px}
-.vaultlink img{width:20px;height:20px}
 .empty .bigmark{width:72px;height:72px;filter:drop-shadow(0 0 18px rgba(20,227,161,.35))}
 .ghost.vault{color:#d9b571;border-color:#6b5530}
 .ghost.vault:hover{background:rgba(217,181,113,.08)}
@@ -548,6 +544,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* small phones: icon over a small label, so all five pages fit in one row */
 @media (max-width:560px){.nav{flex-direction:column;gap:1px;font-size:10.5px;padding:5px 2px}.nav span{display:block}.tool.bell span{display:none}}
 .tool.install{color:var(--accent);border-color:rgba(20,227,161,.45)}
+/* the Vault is the site's last page: a link in the menu, in its own gold */
+a.nav{text-decoration:none}
+.nav.vaultnav{color:#d9b571}
+.nav.vaultnav:hover{color:#f3dca6;background:rgba(217,181,113,.1)}
 @media (max-width:560px){.tool.install span{display:none}}
 /* long page names get a short one on phones (6 pages across a phone screen) */
 .nav .ns{display:none}
@@ -562,7 +562,6 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   .mainnav{order:3;width:100%;margin:0;overflow-x:auto;scrollbar-width:none}
   .nav{flex:1;justify-content:center;padding:7px 8px}
   .tool{padding:6px 10px;font-size:12px}
-  .vaultlink{padding:5px 10px}
   .leagues{padding:0 12px 10px}
   .lpgroup{min-width:0}
   .grid{padding:10px;gap:10px}
@@ -617,12 +616,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <button class="nav" id="scanBtn" data-nav="scan" title="HAWK's builder for every fixture">🏆 <span class="nl">Best builders</span><span class="ns">Best</span></button>
       <button class="nav" id="valueBtn" data-nav="value" title="Every bookmaker price that beats HAWK's fair odds">💰 <span>Value</span></button>
       <button class="nav" id="accaBtn" data-nav="acca" title="Several matches on one ticket, and the Monster Acca">🧩 <span>Acca</span></button>
+      <a class="nav vaultnav" href="../" title="Your bets, bankroll and track record (the Vault)">🏦 <span>Vault</span></a>
     </nav>
     <div class="topright">
       <button class="tool install" id="installBtn" hidden title="Install HAWK as an app on this device">📲 <span>Install</span></button>
       <button class="tool bell" id="watchBtn" hidden></button>
       <div class="pop" id="watchPop" hidden></div>
-      <a class="vaultlink" href="../" title="Back to the HAWK Vault"><img src="../hawk-logo.svg" alt="">Vault</a>
     </div>
   </div>
 </header>

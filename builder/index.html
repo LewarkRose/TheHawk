@@ -1108,7 +1108,8 @@ function renderSlip() {
           ${priceLine(l)}</div></div>
       <div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div>
       <div class="acts"><button class="${S.locked.has(id) ? "on" : ""}" data-lock="${id}">${S.locked.has(id) ? "🔒 locked" : "lock"}</button>
-        <button data-rm="${id}">remove</button></div></div>`;
+        <button data-swap="${id}" title="Take this leg out and let HAWK put the best replacement in, back up to your target odds">🔄 swap</button>
+        <button data-rm="${id}" title="Just take this leg out">remove</button></div></div>`;
   }).join("");
   const predicted = m && Object.values(m.lineups).some(lu => lu.status !== "Confirmed");
   $("#slip").innerHTML = `
@@ -1163,6 +1164,7 @@ function renderSlip() {
   $("#mx").onchange = (e) => { S.maxLegs = +e.target.value; };
   $("#go").onclick = build;
   $("#slip").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => removeLeg(b.dataset.rm));
+  $("#slip").querySelectorAll("[data-swap]").forEach(b => b.onclick = () => swapLeg(b.dataset.swap));
   $("#slip").querySelectorAll("[data-hist]").forEach(b => b.onclick = () => openLegHistory(b.dataset.hist));
   $("#slip").querySelectorAll("[data-lock]").forEach(b => b.onclick = () => { const id = b.dataset.lock;
     S.locked.has(id) ? S.locked.delete(id) : S.locked.add(id); renderSlip(); });
@@ -1353,7 +1355,7 @@ function openChecklist() {
     <div class="chk-price">${fair ? `HAWK's fair odds <b>${odds(fair)}</b> — it's worth it if Bet365 pays <b style="color:var(--accent)">${odds(worth)}+</b>.
       Type Bet365's price into the slip's price box and HAWK checks it (and suggests a stake).` : ""}</div>
     <div class="note">Bet365 names some legs a little differently (e.g. "Anytime Goalscorer", "Player Shots on Target 1+"). If a leg isn't offered,
-      remove it here and rebuild — HAWK finds the next best.</div>`);
+      tap <b>🔄 swap</b> on it in the slip — HAWK puts the next best leg in.</div>`);
   const bg = document.querySelector(".modal-bg");
   bg.querySelectorAll(".chk-row input").forEach(cb => cb.onchange = () => {
     cb.closest(".chk-row").classList.toggle("done", cb.checked);
@@ -1377,6 +1379,22 @@ function addLeg(id) {
   evaluateSlip();
 }
 function removeLeg(id) { S.slip = S.slip.filter(x => x !== id); S.locked.delete(id); S.banned.add(id); evaluateSlip(); }
+// Swap: take a leg out, keep every other leg as it is, and let HAWK add the
+// best replacement(s) to get back up to the target odds (same style, focus
+// and picks as a normal build). The swapped-out leg stays banned.
+async function swapLeg(id) {
+  if (!S.match) return;
+  const out = S.legs[id], keep = S.slip.filter(x => x !== id);
+  S.locked.delete(id); S.banned.add(id);
+  try {
+    const r = await api("/api/build", { ...buildBody(), locked: keep });
+    const added = r.legs.map(l => l.id).filter(x => !keep.includes(x));
+    S.result = r; S.slip = r.legs.map(l => l.id);
+    toast(added.length ? `🔄 ${out.label} → ${added.map(a => S.legs[a].label).join(" + ")}`
+      : r.fair >= S.target * 0.97 ? `Removed ${out.label} — the rest still reaches your odds.` : `Removed ${out.label} — nothing else fits, try another style or more legs.`);
+  } catch (err) { toast(err.message); S.slip = keep; return evaluateSlip(); }
+  renderSlip(); refreshTab();
+}
 function copySlip() {
   const m = S.match, r = S.result;
   const text = [`BET BUILDER — ${m.home} v ${m.away}`, ...S.slip.map(id => `✓ ${S.legs[id].label}  (${S.legs[id].market})`),

@@ -1007,7 +1007,7 @@
     let chosen = locked.filter((i) => legs[i]);
     if (favourite && !chosen.some((i) => legs[i].group === "result")) {
       const side = ["home", "away"].sort((a, b) => ((legs[`res:${b}`] || {}).p || 0) - ((legs[`res:${a}`] || {}).p || 0))[0];
-      for (const [id, floor] of [[`res:${side}`, 0.5], [`dc:${side}`, 0.6]]) if (legs[id] && legs[id].p >= floor) { chosen.unshift(id); break; }
+      for (const [id, floor] of [[`res:${side}`, 0.5], [`dc:${side}`, 0.6]]) if (legs[id] && !banned.has(id) && legs[id].p >= floor) { chosen.unshift(id); break; }
     }
     const keep = new Set(chosen);
     let m = maskOf(legs, chosen, n);

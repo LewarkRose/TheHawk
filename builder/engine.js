@@ -476,6 +476,9 @@
       quotes, cons, polymarket: pm, lineups, confirmed, detail, table, form: { home: formH, away: formA },
       referee: { name: refName, avg: refAvg, games: refGames, source: refSource, factor: refFactor },
       profiles: [profH, fdH, profA, fdA], lamModel, lamMarket, lamBlend, M: lamBlend ? scoreMatrix(...lamBlend) : null,
+      // Both teams rated within the same league: only then can HAWK's own
+      // ratings be compared head to head (a League One side isn't "45%" v Brentford).
+      sameLeague: !!(fd.home && fd.away && fd.home[0] === fd.away[0]),
       statModel, statMarket, statBlend, players: [playersH, playersA], warnings,
     };
   }
@@ -998,27 +1001,6 @@
     }
     return chosen;
   }
-  // The best upset in a match: a result-type leg against the favourite (the
-  // underdog to win, the draw, underdog double chance or +handicap) that
-  // Bet365 prices at or above HAWK's fair odds — so it's value, not just a
-  // long shot. minRatio = Bet365 price × HAWK's chance (1 = exactly fair).
-  // How likely an upset must be, per style: safe = underdog double chance or
-  // +handicap territory, mixed = the draw / a live underdog, bold = long shots.
-  const UPSET_MIN_P = { Banker: 0.45, Balanced: 0.3, Punchy: 0.18 }, UPSET_BUILDER_RATIO = 0.95;
-  function upsetLeg(legs, banned = new Set(), minRatio = 1, style = "Balanced") {
-    const fav = ((legs["res:home"] || {}).p || 0) >= ((legs["res:away"] || {}).p || 0) ? "home" : "away";
-    const dog = fav === "home" ? "away" : "home", minP = UPSET_MIN_P[style] || 0.3;
-    let best = null;
-    for (const id of [`res:${dog}`, "res:draw", `dc:${dog}`, `ah:${dog}:+1.5`, `ah:${dog}:+2.5`]) {
-      const l = legs[id];
-      if (!l || banned.has(id) || !(l.bookPrice > 1) || l.p < minP || l.p > 0.8) continue;
-      const ratio = l.bookPrice * l.p;
-      if (ratio >= minRatio && (!best || ratio > best.ratio + 1e-9 || (Math.abs(ratio - best.ratio) <= 1e-9 && l.p > best.leg.p))) best = { leg: l, ratio };
-    }
-    return best;
-  }
-  // favourite: true = start with the favourite to win (or double chance),
-  // "upset" = start with the best-value upset, false = no result leg forced.
   function autoBuild(legs, target, style = "Balanced", maxLegs = 10, locked = [], banned = new Set(), favourite = true, focus = "Mix", extras = false, picks = "likely") {
     const [lo, hi] = STYLES[style] || STYLES.Balanced;
     let [minPlayers, maxMatch] = FOCUS[focus] || FOCUS.Mix;
@@ -1026,12 +1008,7 @@
     if (!all.length) return evaluate(legs, []);
     const n = all[0].arr.length;
     let chosen = locked.filter((i) => legs[i]);
-    let upset = null;
-    if (favourite === "upset") {
-      // In a builder an upset priced like the favourite (within Bet365's usual
-      // margin) is a fair swap; the best-priced one is taken.
-      if (!chosen.some((i) => legs[i].group === "result")) { const u = upsetLeg(legs, banned, UPSET_BUILDER_RATIO, style); if (u) { upset = u.leg.id; chosen.unshift(upset); } }
-    } else if (favourite && !chosen.some((i) => legs[i].group === "result")) {
+    if (favourite && !chosen.some((i) => legs[i].group === "result")) {
       const side = ["home", "away"].sort((a, b) => ((legs[`res:${b}`] || {}).p || 0) - ((legs[`res:${a}`] || {}).p || 0))[0];
       for (const [id, floor] of [[`res:${side}`, 0.5], [`dc:${side}`, 0.6]]) if (legs[id] && !banned.has(id) && legs[id].p >= floor) { chosen.unshift(id); break; }
     }
@@ -1067,9 +1044,8 @@
       chosen = pruneImplied(legs, chosen, keep, n);
       m = maskOf(legs, chosen, n);
     }
-    return { ...evaluate(legs, chosen), upset };
+    return evaluate(legs, chosen);
   }
-  const favouriteOf = (body) => (body.favourite === "upset" ? "upset" : body.favourite !== false);
 
   // ---------------------------------------------------------------------------
   // Public API — same shapes as the local server's /api endpoints
@@ -1106,12 +1082,96 @@
     if (!quotes.some((q) => q.book === PRICE_BOOK)) return null;
     return { prices: bookPrices({ quotes }, e.legs), book: PRICE_BOOK, checked: new Date().toISOString() };
   }
+  // Upset radar: how likely the underdog is to win (HAWK's chance, blended
+  // with the market), and the evidence for and against an upset that the
+  // price alone doesn't show. It predicts, it doesn't bet: every signal is a
+  // reason the favourite could be weaker (or stronger) than its odds.
+  const UPSET_LEVELS = ["Low", "Medium", "High", "Very high"];
+  function upsetRadar(an, M, squads) {
+    const probs = { home: sumCells(M, (i, j) => i > j), draw: sumCells(M, (i, j) => i === j), away: sumCells(M, (i, j) => i < j) };
+    const c = an.cons["1|"], mk = c && ["1", "X", "2"].every((k) => k in c.probs) ? { home: c.probs["1"], draw: c.probs.X, away: c.probs["2"] } : null;
+    const ref = mk || probs, fav = ref.home >= ref.away ? "home" : "away", dog = fav === "home" ? "away" : "home";
+    const name = { home: an.home, away: an.away }, P = (p) => `${Math.round(100 * p)}%`, signals = [];
+    const add = (dir, weight, text) => signals.push({ dir, weight, text });
+    // 1. HAWK's own team ratings (goals and xG), before the market blend —
+    // only when both teams are rated within the same league.
+    if (an.lamModel && an.sameLeague && mk) {
+      const Mm = scoreMatrix(...an.lamModel), model = { home: sumCells(Mm, (i, j) => i > j), away: sumCells(Mm, (i, j) => i < j) };
+      const gap = model[dog] - mk[dog];
+      if (gap >= 0.05) add("up", 1, `HAWK's team ratings (goals & xG) give ${name[dog]} ${P(model[dog])} to win — the bookmakers ${P(mk[dog])}.`);
+      else if (gap <= -0.05) add("down", 1, `HAWK's team ratings rate ${name[dog]} lower than the bookmakers (${P(model[dog])} vs ${P(mk[dog])}).`);
+    }
+    // 2. Money: Bet365's price for the underdog since it opened.
+    const q = an.quotes.find((x) => x.book === PRICE_BOOK && x.type === 1), opt = dog === "home" ? "1" : "2";
+    if (q && q.opens && q.opens[opt] > 1 && q.prices[opt] > 1) {
+      const move = q.prices[opt] / q.opens[opt] - 1, w = Math.abs(move) >= 0.08 ? 1 : 0.5;   // small moves are often noise
+      if (move <= -0.05) add("up", w, `Money is coming for ${name[dog]}: Bet365 ${q.opens[opt].toFixed(2)} → ${q.prices[opt].toFixed(2)}.`);
+      else if (move >= 0.05) add("down", w, `Money is going against ${name[dog]}: Bet365 ${q.opens[opt].toFixed(2)} → ${q.prices[opt].toFixed(2)}.`);
+    }
+    // 3. Polymarket's real-money crowd vs the bookmakers.
+    if (an.polymarket && mk) {
+      const gap = an.polymarket[dog] - mk[dog];
+      if (gap >= 0.03) add("up", 0.5, `Polymarket's crowd gives ${name[dog]} ${P(an.polymarket[dog])} — more than the bookmakers' ${P(mk[dog])}.`);
+      else if (gap <= -0.03) add("down", 0.5, `Polymarket gives ${name[dog]} only ${P(an.polymarket[dog])}.`);
+    }
+    // 4. Team news: absent players who've been regulars (270+ minutes in the last 5 games).
+    const regularsOut = (side) => {
+      const rows = playerRows(an.players[side === "home" ? 0 : 1]), names = rows.map((p) => p.name);
+      return ((an.missing || {})[side] || []).filter((m) => m.status === "Missing").map((m) => {
+        const hit = names.length ? bestMatch(m.name, names, 0.6) : null, p = hit && rows.find((r) => r.name === hit);
+        return p && p.matches.slice(0, 5).reduce((s, x) => s + x.minutes, 0) >= 270 ? m.name : null;
+      }).filter(Boolean);
+    };
+    const favOut = regularsOut(fav), dogOut = regularsOut(dog);
+    if (favOut.length) add("up", favOut.length >= 2 ? 1 : 0.5, `${name[fav]} are missing ${favOut.length} regular${favOut.length === 1 ? "" : "s"}: ${favOut.slice(0, 4).join(", ")}.`);
+    if (dogOut.length >= 2) add("down", 0.5, `${name[dog]} are missing ${dogOut.length} regulars: ${dogOut.slice(0, 4).join(", ")}.`);
+    // 5. Form: points from the last 6 results (W 3, D 1).
+    const pts = (f) => (f ? [...f].reduce((s, r) => s + (r === "W" ? 3 : r === "D" ? 1 : 0), 0) : null);
+    const fp = pts(an.form[fav]), dp = pts(an.form[dog]);
+    if (fp != null && dp != null) {
+      if (dp >= fp + 3) add("up", 0.5, `${name[dog]} are in better form: ${an.form[dog]} (${dp} pts) vs ${an.form[fav]} (${fp} pts).`);
+      else if (fp >= dp + 5) add("down", 0.5, `${name[fav]} are in much better form: ${an.form[fav]} (${fp} pts) vs ${an.form[dog]} (${dp} pts).`);
+    }
+    // 6. Rotation: how many of the favourite's regulars (270+ minutes in their
+    // last 5 games) are in the lineup. Big favourites lose most often with a
+    // changed team — above all in cups.
+    const regulars = (p) => (p.recent || []).slice(0, 5).reduce((s, x) => s + x.minutes, 0) >= 270;
+    const favXI = ((squads || {})[fav] || []).filter((p) => p.status === "Starting");
+    const known = an.lineups[fav] && an.lineups[fav].status === "Confirmed";
+    if (known && favXI.length >= 11 && favXI.some((p) => p.has_data)) {
+      const kept = favXI.filter(regulars).length;
+      if (kept <= 5) add("up", 1.5, `${name[fav]} have rotated heavily: only ${kept} of their regular starters are in the XI.`);
+      else if (kept <= 7) add("up", 1, `${name[fav]} have rotated: ${kept} of their regular starters are in the XI.`);
+      else add("down", 0.5, `${name[fav]} are close to full strength (${kept} regulars in the XI).`);
+    } else if (CUPS.has(an.league) || /cup|pokal|coppa|copa|coupe/i.test(an.league)) {
+      add("up", 0.5, `It's a cup tie — favourites often rotate. Check ${name[fav]}'s lineup when it's out.`);
+    }
+    // 7. Tiredness: days since each side's last game (from their players' match logs).
+    const lastGame = (side) => Math.max(0, ...playerRows(an.players[side === "home" ? 0 : 1]).flatMap((p) => p.matches.slice(0, 1).map((x) => x.ts || 0)));
+    const kick = an.kickoff ? an.kickoff.getTime() / 1000 : Date.now() / 1000;
+    const rest = (side) => { const t = lastGame(side); return t ? (kick - t) / 86400 : null; };
+    const favRest = rest(fav), dogRest = rest(dog);
+    if (favRest != null && favRest <= 3.5 && (dogRest == null || dogRest >= favRest + 2))
+      add("up", 0.5, `${name[fav]} played ${Math.max(1, Math.round(favRest))} day${Math.round(favRest) === 1 ? "" : "s"} ago${dogRest != null ? `; ${name[dog]} have had ${Math.round(dogRest)} days' rest` : ""}.`);
+    // (Home advantage isn't a signal: it's already in the odds.)
+    // The level: mostly the evidence, plus a little for how live the underdog
+    // already is (a 30% underdog adds half a point, a 10% one takes half off).
+    const net = signals.reduce((s, x) => s + (x.dir === "up" ? x.weight : -x.weight), 0);
+    const score = net + (probs[dog] - 0.2) * 5;
+    const level = score < 0.5 ? 0 : score < 1.5 ? 1 : score < 2.5 ? 2 : 3;
+    return { fav, dog, favName: name[fav], dogName: name[dog], dogWin: probs[dog], favFail: 1 - probs[fav], draw: probs.draw,
+             marketDog: mk ? mk[dog] : null, open: ref[fav] < 0.42, level, label: UPSET_LEVELS[level], net, signals };
+  }
+
   function matchJSON(an, sim, squads, legs) {
     const M = an.M;
     const grid = [0, 1, 2, 3, 4].map((i) => [0, 1, 2, 3, 4].map((j) => sumCells(M, (a, b) => (i < 4 ? a === i : a >= 4) && (j < 4 ? b === j : b >= 4))));
     const c1x2 = an.cons["1|"];
     const market = c1x2 && ["1", "X", "2"].every((k) => k in c1x2.probs)
       ? { home: c1x2.probs["1"], draw: c1x2.probs.X, away: c1x2.probs["2"], sources: c1x2.books } : null;
+    // HAWK's own ratings (goals & xG), before blending with the market.
+    const Mm = an.lamModel && an.sameLeague ? scoreMatrix(...an.lamModel) : null;
+    const model = Mm ? { home: sumCells(Mm, (i, j) => i > j), draw: sumCells(Mm, (i, j) => i === j), away: sumCells(Mm, (i, j) => i < j) } : null;
     const prices = bookPrices(an, legs), opens = bookPrices(an, legs, PRICE_BOOK, "opens");
     // Keep Bet365's prices on the legs themselves too: "Value first" builds use them.
     for (const [id, leg] of Object.entries(legs)) {
@@ -1126,7 +1186,7 @@
       id: an.id, league: an.league, home: an.home, away: an.away, homeCrest: crest(an.homeComp), awayCrest: crest(an.awayComp),
       kickoff: an.kickoff ? an.kickoff.toISOString() : null, started: an.inPlay, lineups: an.lineups, referee: an.referee,
       probs: { home: sumCells(M, (i, j) => i > j), draw: sumCells(M, (i, j) => i === j), away: sumCells(M, (i, j) => i < j),
-               market, polymarket: an.polymarket },
+               market, polymarket: an.polymarket, model },
       expected: sim.exp, grid, table: { home: tableRow(an.homeComp), away: tableRow(an.awayComp) }, form: an.form,
       legs: legJSON, priceBook: PRICE_BOOK,
       players: Object.fromEntries(Object.entries(squads).map(([side, sq]) => [side, sq.map((p) => ({
@@ -1135,6 +1195,7 @@
         recent_starts: p.recent_starts }))])),
       warnings: an.warnings, value: { book: PRICE_BOOK, legs: value }, sims: sim.n, missing: an.missing || { home: [], away: [] },
       movers: an.inPlay ? [] : moverRows(an, sim.exp).slice(0, 8),
+      upset: upsetRadar(an, M, squads),
     };
   }
   function entryFor(id) {
@@ -1146,7 +1207,7 @@
   function build(body) {
     const e = entryFor(body.id);
     return autoBuild(e.legs, +body.target || 3, body.style, +body.maxLegs || 10, body.locked || [], new Set(body.banned || []),
-                     favouriteOf(body), body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely");
+                     body.favourite !== false, body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely");
   }
   const evaluateBody = (body) => evaluate(entryFor(body.id).legs, body.legs || []);
   // "Build again": up to `count` different tickets for the same settings. The
@@ -1156,14 +1217,13 @@
   // much as possible, best first (fewest legs = least bookmaker margin).
   function buildOptions(body, count = 5) {
     const e = entryFor(body.id), target = +body.target || 3, locked = body.locked || [];
-    const run = (banned) => autoBuild(e.legs, target, body.style, +body.maxLegs || 10, locked, banned, favouriteOf(body),
+    const run = (banned) => autoBuild(e.legs, target, body.style, +body.maxLegs || 10, locked, banned, body.favourite !== false,
                                       body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely");
     const base = new Set(body.banned || []), key = (t) => t.legs.map((l) => l.id).sort().join("|");
     const first = run(base);
     if (!first.legs.length) return { options: [first] };
     const reaches = (t) => t.legs.length && t.fair >= target * 0.97;
-    // Legs the variants may leave out: not your locked ones, the result leg or the upset it starts from.
-    const free = (t) => t.legs.map((l) => l.id).filter((id) => !locked.includes(id) && e.legs[id].group !== "result" && id !== t.upset);
+    const free = (t) => t.legs.map((l) => l.id).filter((id) => !locked.includes(id) && e.legs[id].group !== "result");
     const found = new Map([[key(first), first]]);
     const tryBan = (ids) => { const t = run(new Set([...base, ...ids])); if (reaches(t) && !found.has(key(t))) found.set(key(t), t); return t; };
     for (const id of free(first)) tryBan([id]);
@@ -1282,7 +1342,6 @@
     runFixtureJob(monster, (league, f, json, e) => {
       if (json.started) return;
       const info = fixtureInfo(league, f, json);
-      let normal = null;
       if (params.perMatch === 1) {
         let best = null;
         for (const leg of json.legs) {
@@ -1291,23 +1350,13 @@
           const ratio = leg.bookPrice * leg.p; // above 1 = Bet365 pays more than fair
           if (!best || ratio > best.ratio + 1e-9 || (Math.abs(ratio - best.ratio) <= 1e-9 && leg.p > best.leg.p)) best = { leg, ratio };
         }
-        if (best) normal = { legs: [legSummary(e, json, best.leg.id)], p: best.leg.p, fair: best.leg.fair, bookPrice: best.leg.bookPrice, ratio: best.ratio };
+        if (best) monster.results.push({ ...info, legs: [legSummary(e, json, best.leg.id)], p: best.leg.p, fair: best.leg.fair,
+                                         bookPrice: best.leg.bookPrice, ratio: best.ratio, upset: json.upset });
       } else {
         const t = autoBuild(e.legs, 1e6, params.style, params.perMatch, [], new Set(), true, params.focus, params.extras);
-        if (t.legs.length) normal = { legs: t.legs.map((r) => legSummary(e, json, r.id)), p: t.p, fair: t.fair, bookPrice: null, ratio: null };
+        if (t.legs.length) monster.results.push({ ...info, legs: t.legs.map((r) => legSummary(e, json, r.id)), p: t.p, fair: t.fair,
+                                                  bookPrice: null, ratio: null, upset: json.upset });
       }
-      // This match's best-value upset too (the page decides how many to use),
-      // on its own or with safe legs around it for a builder.
-      let upset = null;
-      const u = upsetLeg(e.legs, new Set(), 0.97, params.style);
-      if (u && u.leg.bookPrice >= MIN_ACCA_PRICE) {
-        if (params.perMatch === 1) upset = { legs: [legSummary(e, json, u.leg.id)], p: u.leg.p, fair: u.leg.fair, bookPrice: u.leg.bookPrice, ratio: u.ratio };
-        else {
-          const t = autoBuild(e.legs, 1e6, params.style, params.perMatch, [u.leg.id], new Set(), false, params.focus, params.extras);
-          if (t.legs.length) upset = { legs: t.legs.map((r) => legSummary(e, json, r.id)), p: t.p, fair: t.fair, bookPrice: null, ratio: u.ratio };
-        }
-      }
-      if (normal || upset) monster.results.push({ ...info, ...(normal || { legs: [], p: 0, fair: null, bookPrice: null, ratio: null }), upset });
     });
     return jobStatus(monster);
   }

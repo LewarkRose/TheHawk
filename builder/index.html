@@ -406,6 +406,24 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* trusted-market badges */
 /* build options (Build again) */
 .badge.upset{background:rgba(255,145,77,.16);color:#ff9d5c}
+.bar3-legend{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:4px;padding:0 4px}
+.srcs b{color:var(--text)}
+/* upset radar */
+.up-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.up-level{font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px}
+.up-level.low{background:rgba(20,227,161,.12);color:var(--accent)}
+.up-level.med{background:rgba(255,209,102,.14);color:var(--gold)}
+.up-level.high{background:rgba(255,145,77,.18);color:#ff9d5c}
+.up-level.vhigh{background:rgba(255,93,115,.2);color:var(--red)}
+.up-nums{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.up-nums>div{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:9px 12px}
+.up-nums .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.up-nums .v{font-size:22px;font-weight:900}
+.up-nums .muted{font-size:11.5px}
+.up-signals{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.sig{display:grid;grid-template-columns:22px 1fr;align-items:start;font-size:13px;padding:7px 10px;border-radius:10px;border:1px solid var(--line)}
+.sig.up{background:rgba(20,227,161,.06)}
+.sig.down{background:rgba(143,164,178,.07);color:#c3cfd6}
 .optbar{display:flex;align-items:center;gap:6px;margin:12px 0 -4px;flex-wrap:wrap}
 .optbar .muted{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin-right:2px}
 .optbar button{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:10px;padding:5px 10px;cursor:pointer;
@@ -557,14 +575,13 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 function loadPref(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } }
 function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
-            target: 3.25, style: "Balanced", focus: "Mix", maxLegs: 10, start: loadPref("hawk.start", "fav"), result: null, tab: "players", q: "",
+            target: 3.25, style: "Balanced", focus: "Mix", maxLegs: 10, favourite: true, result: null, tab: "players", q: "",
             chk: { price: "", boost: "", stake: "5" }, extras: false, cat: "All",
             live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
-            monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set(),
-                       upsets: loadPref("hawk.upsets", "some") },
+            monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },
             view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "legs", data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null,
                      tab: "value", minMove: 0.1 },
@@ -575,13 +592,6 @@ const STYLES = {
   Banker: { label: "Safe legs", hint: "Lots of very likely legs (72–95% each) — takes more legs to reach your odds." },
   Balanced: { label: "Mixed", hint: "Legs between 55% and 90% — a bit of both." },
   Punchy: { label: "Bold legs", hint: "Fewer, bolder legs (35–78% each), like to score or 2+ on target. Fewer legs usually means a smaller bookmaker margin." },
-};
-// Monster Acca: how many parts may go against the favourite. An upset is only
-// used when Bet365 pays at least minRatio × HAWK's fair odds for it.
-const UPSETS = {
-  off: { label: "🛡️ Favourites", share: 0, minRatio: Infinity, hint: "Every part goes with the favourite or the safest leg — the most likely acca." },
-  some: { label: "⚖️ Some upsets", share: 0.25, minRatio: 1, hint: "Up to a quarter of the legs go against the favourite — only where Bet365 pays more than HAWK's fair odds. How big an upset follows your style: Safe = underdog double chance or +handicap, Mixed = the draw or a live underdog, Bold = long shots." },
-  lots: { label: "💥 Upset hunter", share: 0.5, minRatio: 0.97, hint: "Up to half the legs are upsets priced at or near HAWK's fair odds — bigger odds, a lower chance to land. Your style sets how big the upsets are." },
 };
 // Kick-off windows for the scans; "today" = until midnight, your time.
 const KICKOFF_WINDOWS = [["today", "Today"], [24, "within 24 hours"], [48, "within 48 hours"], [72, "within 3 days"], [168, "within 7 days"]];
@@ -841,9 +851,13 @@ function renderMatch() {
   const tbl = (side) => m.table[side] ? `${ord(m.table[side].position)} · ${Math.round(m.table[side].points)} pts` : "";
   const maxCell = Math.max(...m.grid.flat());
   const cell = (v) => `<div class="c" style="background:rgba(20,227,161,${(0.08 + 0.75 * v / maxCell).toFixed(3)})">${(100 * v).toFixed(1)}%</div>`;
+  // Rounded as a set so the three always add up to 100%.
+  const three = (x) => pct100([x.home, x.draw, x.away]).map(v => v + "%").join(" · ");
+  const hp = pct100([p.home, p.draw, p.away]);
   const srcs = [];
-  if (p.market) srcs.push(`Bookmakers (${p.market.sources}): ${pct(p.market.home)} · ${pct(p.market.draw)} · ${pct(p.market.away)}`);
-  if (p.polymarket) srcs.push(`Polymarket: ${pct(p.polymarket.home)} · ${pct(p.polymarket.draw)} · ${pct(p.polymarket.away)}`);
+  if (p.model) srcs.push(`<span title="HAWK's own team ratings (goals and xG), before it blends in the market">🦅 HAWK ratings only: <b>${three(p.model)}</b></span>`);
+  if (p.market) srcs.push(`<span>Bookmakers (${p.market.sources}): ${three(p.market)}</span>`);
+  if (p.polymarket) srcs.push(`<span>Polymarket: ${three(p.polymarket)}</span>`);
   $("#match").innerHTML = `
     <div class="hero">
       <div class="vs">
@@ -862,10 +876,13 @@ function renderMatch() {
       </div>
     </div>
     <div class="section">
-      <h3>Win probability</h3>
-      <div class="bar3"><div class="h" style="flex:${p.home}">${pct(p.home)}</div><div class="d" style="flex:${p.draw}">${pct(p.draw)}</div><div class="a" style="flex:${p.away}">${pct(p.away)}</div></div>
-      <div class="srcs">${srcs.map(esc).map(s => `<span>${s}</span>`).join("")}</div>
+      <h3>Win probability <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:600">— 🦅 HAWK</span></h3>
+      <div class="bar3" title="HAWK's chances: its own ratings blended with the market (the bookmakers get most of the weight)">
+        <div class="h" style="flex:${p.home}">${hp[0]}%</div><div class="d" style="flex:${p.draw}">${hp[1]}%</div><div class="a" style="flex:${p.away}">${hp[2]}%</div></div>
+      <div class="bar3-legend"><span>${esc(m.home)}</span><span>Draw</span><span>${esc(m.away)}</span></div>
+      <div class="srcs">${srcs.join("")}</div>
     </div>
+    ${upsetCard(m)}
     ${teamNews(m)}
     <div class="section"><div class="tiles">
       <div class="tile"><div class="k">Expected goals</div><div class="v">${e.goals[0].toFixed(2)} – ${e.goals[1].toFixed(2)}</div></div>
@@ -1080,6 +1097,42 @@ function moveTag(r, short = false) {
   if (!r.agree) return `<span class="badge warn" title="The price moved away from HAWK's fair ${odds(r.fair)}">HAWK disagrees</span>`;
   return `<span class="badge nv" title="The price moved towards HAWK's fair ${odds(r.fair)}, but ${odds(r.price)} still pays less than that — no bet. Value from ${odds(r.fair * VALUE_EDGE)}+">HAWK agrees · no value <small>(needs ${odds(r.fair * VALUE_EDGE)}+)</small></span>`;
 }
+// Whole percentages that add up to exactly 100 (largest remainder), so three
+// rounded chances never show 101%.
+function pct100(ps) {
+  const total = ps.reduce((s, p) => s + p, 0) || 1, raw = ps.map(p => (100 * p) / total), out = raw.map(Math.floor);
+  const order = raw.map((v, i) => [v - Math.floor(v), i]).sort((a, b) => b[0] - a[0]);
+  for (let k = 0; k < 100 - out.reduce((s, v) => s + v, 0); k++) out[order[k % order.length][1]]++;
+  return out;
+}
+// ⚡ Upset radar (engine: upsetRadar): how likely the underdog is to win, and
+// the evidence for and against an upset that the odds alone don't show.
+const UPSET_TONE = ["low", "med", "high", "vhigh"];
+function upsetCard(m) {
+  const u = m.upset;
+  if (!u || m.started) return "";
+  const ups = u.signals.filter(s => s.dir === "up"), downs = u.signals.filter(s => s.dir === "down");
+  return `<div class="section upset-card">
+    <div class="up-head"><h3 style="margin:0">⚡ Upset radar</h3><span class="up-level ${UPSET_TONE[u.level]}">${esc(u.label)} upset risk</span></div>
+    <div class="up-nums">
+      <div><div class="k">${esc(u.dogName)} to win</div><div class="v">${pct(u.dogWin)}</div>${u.marketDog != null ? `<div class="muted">bookmakers ${pct(u.marketDog)}</div>` : ""}</div>
+      <div><div class="k">${esc(u.favName)} fail to win</div><div class="v">${pct(u.favFail)}</div><div class="muted">draw ${pct(u.draw)} + ${esc(u.dogName)} win</div></div>
+    </div>
+    ${u.open ? `<div class="note" style="margin-top:6px">There's no clear favourite here — an "upset" is close to a coin flip either way.</div>` : ""}
+    <div class="up-signals">${ups.map(s => `<div class="sig up"><span>✅</span>${esc(s.text)}</div>`).join("")}${downs.map(s => `<div class="sig down"><span>✖</span>${esc(s.text)}</div>`).join("")}
+      ${u.signals.length ? "" : `<div class="note" style="margin:0">Nothing unusual: no rotation, team news, money or form pointing either way.</div>`}</div>
+    <div class="note">✅ points to an upset, ✖ points to ${esc(u.favName)}. The risk weighs the evidence the odds may not fully show — HAWK's own team ratings,
+      money moving, Polymarket, missing regulars, rotation (once lineups are out), tiredness and form — plus how live ${esc(u.dogName)} already are.
+      It's a warning light, not a prediction that the upset happens: even "Very high" usually means under 50%.</div>
+  </div>`;
+}
+// The same risk on acca parts (Monster Acca, your acca): a favourite at real risk.
+function upsetFlag(pt) {
+  const u = pt.upset;
+  if (!u || u.level < 2) return "";
+  const backsFav = (pt.legs || []).some(l => /^(res|dc):/.test(l.id) && l.id.endsWith(u.fav));
+  return ` <span class="badge upset" title="${esc(`${u.label} upset risk: ${u.dogName} ${pct(u.dogWin)} to win. ` + u.signals.filter(s => s.dir === "up").map(s => s.text).join(" "))}">⚡ ${esc(u.label.toLowerCase())} upset risk${backsFav ? " — you're backing the favourite" : ""}</span>`;
+}
 // Match page: the biggest Bet365 moves since opening, and HAWK's take on each.
 function moversCard(m) {
   const rows = m.movers || [];
@@ -1154,9 +1207,7 @@ function renderSlip() {
     <div class="seg seg2" id="picks" style="margin-top:0" title="How HAWK chooses between legs">${[["likely", "🎯 Most likely"], ["value", "💰 Value first"]].map(([k, lab]) => `<button class="${S.picks === k ? "on" : ""}" data-p="${k}">${lab}</button>`).join("")}</div>
     <div class="hint">${S.picks === "value" ? "Prefers legs where Bet365's own price beats HAWK's fair odds, and moves HAWK agrees with — usually a better builder price."
       : "Picks the legs most likely to land together at your target odds."}</div>
-    <div class="opts"><label title="The result leg the builder starts from. An upset is only used when Bet365 pays more than HAWK's fair odds for it.">Start with
-      <select id="fav">${[["fav", "the favourite to win"], ["upset", "💥 an upset (if it's value)"], ["none", "no result leg"]].map(([k, t]) =>
-        `<option value="${k}" ${S.start === k ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+    <div class="opts"><label><input type="checkbox" id="fav" ${S.favourite ? "checked" : ""}> Start with the favourite to win</label>
       <label>Max legs <select id="mx">${[3,4,5,6,7,8,9,10,12].map(n => `<option ${n === S.maxLegs ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>
     <div class="opts" style="margin-top:6px"><label title="These are counted from each player's own record, with no allowance for the opponent or referee, so HAWK is less sure of them. You can always add them yourself.">
       <input type="checkbox" id="xtra" ${S.extras ? "checked" : ""}> Auto-build can use fouls, tackles &amp; offsides</label></div>
@@ -1193,7 +1244,7 @@ function renderSlip() {
   $("#seg").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.style = b.dataset.s; renderSlip(); } };
   $("#focus").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.focus = b.dataset.f; renderSlip(); } };
   $("#picks").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.picks = b.dataset.p; savePref("hawk.picks", S.picks); renderSlip(); } };
-  $("#fav").onchange = (e) => { S.start = e.target.value; savePref("hawk.start", S.start); renderSlip(); };
+  $("#fav").onchange = (e) => { S.favourite = e.target.checked; };
   $("#xtra").onchange = (e) => { S.extras = e.target.checked; };
   $("#mx").onchange = (e) => { S.maxLegs = +e.target.value; };
   $("#go").onclick = build;
@@ -1331,7 +1382,7 @@ function bindStakeAdvice(root, useStake) {
 function buildBody() {
   const locked = S.slip.filter(id => S.locked.has(id));
   return { id: String(S.match.id), target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs,
-           favourite: S.start === "upset" ? "upset" : S.start !== "none", extras: S.extras, picks: S.picks, locked, banned: [...S.banned] };
+           favourite: S.favourite, extras: S.extras, picks: S.picks, locked, banned: [...S.banned] };
 }
 const sameOptions = () => S.options && S.match && S.options.sig === JSON.stringify(buildBody())
   && S.slip.join("|") === S.options.list[S.options.at].legs.map(l => l.id).join("|");
@@ -1356,9 +1407,6 @@ async function build() {
     // Keep the build's settings signature valid: the new slip's locks are the same ones.
     if (!S.slip.length) toast("No legs fit this style — try another style or target.");
     else if (S.result.fair < S.target * 0.97) toast(`Best found: ${odds(S.result.fair)} — raise max legs or change style to go higher.`);
-    else if (S.start === "upset" && !S.result.upset) toast("No upset here is priced fairly enough for this style — built without a result leg. Try Bold legs for bigger upsets.");
-    else if (S.start === "upset") { const u = S.legs[S.result.upset], ratio = u.bookPrice * u.p;
-      toast(`💥 Upset: ${u.label} @ ${odds(u.bookPrice)} — ${ratio >= 1 ? "value: Bet365 pays more than HAWK's fair odds" : "priced about fair"}.${options.length > 1 ? " Build again for more options." : ""}`); }
     else if (options.length > 1) toast(`${options.length} options found — press Build again for the next.`);
   } catch (err) { toast(err.message); }
   renderSlip(); refreshTab();
@@ -1759,20 +1807,14 @@ function renderAcca() {
         <label>Per match ${sel("mPer", [[1, "1 leg (Bet365 priced)"], [2, "2-leg builder"], [3, "3-leg builder"]], mo.perMatch)}</label>
         <label>Kick-off ${sel("mHrs", KICKOFF_WINDOWS, mo.hours)}</label>
       </div>
-      <div class="seg" id="mStyle" style="max-width:420px">${Object.entries(STYLES).map(([s, st]) => `<button class="${mo.style === s ? "on" : ""}" data-s="${s}">${st.label}</button>`).join("")}</div>
-      <div class="seg seg2" id="mUpsets" style="max-width:520px;margin-top:0" title="How many parts can go against the favourite">${Object.entries(UPSETS).map(([k, u]) =>
-        `<button class="${mo.upsets === k ? "on" : ""}" data-u="${k}">${u.label}</button>`).join("")}</div>
-      <div class="hint">${UPSETS[mo.upsets].hint}</div>
-      <div class="opts" style="justify-content:flex-start"><button class="build" id="monGo" style="width:auto;margin:0;padding:10px 20px"></button></div>
+      <div class="seg" id="mStyle" style="max-width:420px">${Object.entries(STYLES).map(([s, st]) => `<button class="${mo.style === s ? "on" : ""}" data-s="${s}">${st.label}</button>`).join("")}</div>      <div class="opts" style="justify-content:flex-start"><button class="build" id="monGo" style="width:auto;margin:0;padding:10px 20px"></button></div>
       <div id="monProg"></div>
     </div>
     <div class="section" id="monRes"></div>`;
   bindLeaguePicker("monLeagues", mo.leagues, "hawk.monsterLeagues");
   $("#mLegs").onchange = (e) => { mo.legs = +e.target.value; updateMonster(); };
   $("#mPer").onchange = (e) => { mo.perMatch = +e.target.value; updateMonster(); };
-  $("#mHrs").onchange = (e) => { mo.hours = windowValue(e.target.value); updateMonster(); };
-  $("#mUpsets").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; mo.upsets = b.dataset.u; savePref("hawk.upsets", mo.upsets); renderAcca(); };
-  $("#mStyle").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; mo.style = b.dataset.s;
+  $("#mHrs").onchange = (e) => { mo.hours = windowValue(e.target.value); updateMonster(); };  $("#mStyle").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; mo.style = b.dataset.s;
     $("#mStyle").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); updateMonster(); };
   $("#monGo").onclick = toggleMonster;
   $("#monRes").onclick = monsterClick;
@@ -1783,8 +1825,7 @@ function renderAcca() {
 function partRow(pt, actions) {
   const started = pt.kickoff && new Date(pt.kickoff).getTime() < Date.now(), price = partPrice(pt);
   return `<div class="apart ${started ? "gone" : ""}">
-    <div><div class="teams">${esc(pt.home)} <span class="muted" style="font-weight:500">v</span> ${esc(pt.away)}${pt.isUpset
-      ? ` <span class="badge upset" title="Against the favourite — Bet365 pays ${pt.ratio >= 1 ? "more than" : "about"} HAWK's fair odds">💥 upset</span>` : ""}</div>
+    <div><div class="teams">${esc(pt.home)} <span class="muted" style="font-weight:500">v</span> ${esc(pt.away)}${upsetFlag(pt)}</div>
       <div class="muted" style="font-size:12px">${esc(pt.league)} · ${esc(fmtKick(pt.kickoff))}${started ? ' · <span class="badge live">STARTED</span>' : ""}</div>
       <div>${pt.legs.map(l => `<span class="lchip ${l.kind === "player" ? "pl" : ""}">${esc(l.label)}</span>`).join("")}</div></div>
     <div style="text-align:right;white-space:nowrap"><div style="font-weight:800">${odds(pt.fair)} <span class="muted" style="font-weight:500;font-size:12px">fair</span></div>
@@ -1911,23 +1952,14 @@ async function pollMonster() {
   if (S.monster.data && S.monster.data.running) S.monster.timer = setTimeout(pollMonster, 1500);
 }
 // The best parts, one per match, until the ticket has the legs you asked for.
-// Upsets: first up to a quarter (Some) or half (Upset hunter) of the legs
-// from the matches with the best-value upsets, then the rest as usual.
 function monsterPick() {
   const d = S.monster.data, mo = S.monster;
   if (!d) return { picked: [], bench: [] };
-  const now = Date.now(), single = d.params.perMatch === 1, U = UPSETS[mo.upsets];
-  const live = d.results.filter(r => !mo.skip.has(String(r.id)) && (!r.kickoff || new Date(r.kickoff).getTime() > now));
-  const picked = [], used = new Set();
-  let n = 0;
-  const quota = Math.round(mo.legs * U.share);
-  for (const r of live.filter(r => r.upset && r.upset.ratio >= U.minRatio).sort((a, b) => b.upset.ratio - a.upset.ratio || b.upset.p - a.upset.p)) {
-    if (n + r.upset.legs.length > Math.max(quota, 1) || !quota) break;
-    picked.push({ ...r, ...r.upset, isUpset: true }); used.add(String(r.id)); n += r.upset.legs.length;
-  }
-  const pool = live.filter(r => r.legs.length && !used.has(String(r.id)))
+  const now = Date.now(), single = d.params.perMatch === 1;
+  const pool = d.results.filter(r => !mo.skip.has(String(r.id)) && (!r.kickoff || new Date(r.kickoff).getTime() > now))
     .sort(single ? (a, b) => b.ratio - a.ratio || b.p - a.p : (a, b) => b.p - a.p);
-  const bench = [];
+  const picked = [], bench = [];
+  let n = 0;
   for (const r of pool) { if (n < mo.legs) { picked.push(r); n += r.legs.length; } else bench.push(r); }
   picked.sort((a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""));
   return { picked, bench };

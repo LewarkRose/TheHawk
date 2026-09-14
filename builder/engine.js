@@ -843,6 +843,9 @@
     const goals = { home: new Int16Array(n), away: new Int16Array(n) };
     const half1 = { home: new Int16Array(n), away: new Int16Array(n) }; // first-half goals
     const first = new Int8Array(n); // 1 = home scored first, 2 = away, 0 = no goal
+    // Bet365's Early Payout: was the team ever 2 goals ahead?
+    const twoUp = { home: new Uint8Array(n), away: new Uint8Array(n) };
+    const order = mulberry32(11);   // its own stream, so the rest of the simulation is unchanged
     for (let s = 0; s < n; s++) {
       const u = rng() * acc;
       let lo = 0, hi = cum.length - 1;
@@ -853,7 +856,21 @@
       // given the score every order of the goals is equally likely.
       for (let e = 0; e < h; e++) if (rng() < HALF_SHARE) half1.home[s]++;
       for (let e = 0; e < a; e++) if (rng() < HALF_SHARE) half1.away[s]++;
-      first[s] = h + a ? (rng() * (h + a) < h ? 1 : 2) : 0;
+      rng();   // (kept so the random stream — and every other number — stays the same)
+      // The goals in order: the first half's, then the second half's, each
+      // half in a random order. Gives the first scorer and the biggest leads.
+      let d = 0, fs = 0;
+      for (const [rh0, ra0] of [[half1.home[s], half1.away[s]], [h - half1.home[s], a - half1.away[s]]]) {
+        let rh = rh0, ra = ra0;
+        while (rh + ra > 0) {
+          const home = order() * (rh + ra) < rh;
+          if (home) { rh--; d++; } else { ra--; d--; }
+          if (!fs) fs = home ? 1 : 2;
+          if (d >= 2) twoUp.home[s] = 1;
+          if (d <= -2) twoUp.away[s] = 1;
+        }
+      }
+      first[s] = fs;
     }
     const cornersTeam = { home: new Int16Array(n), away: new Int16Array(n) }, corners = new Int16Array(n);
     for (let s = 0; s < n; s++) {
@@ -919,7 +936,7 @@
         player[`${side}:${i}`] = a;
       }
     });
-    return { n, exp, goals, half1, first, corners, cornersTeam, teamSot, player, teamCards, squads };
+    return { n, exp, goals, half1, first, twoUp, corners, cornersTeam, teamSot, player, teamCards, squads };
   }
 
   // ---------------------------------------------------------------------------
@@ -954,9 +971,17 @@
       const p = mean(arr);
       if (p >= MIN_LEG_P && p <= MAX_LEG_P) legs[id] = { id, label, market, group, arr, p, fair: 1 / p, kind: "match", ...extra };
     };
-    add("res:home", `Result: ${home}`, "Full Time Result", "result", mask(n, (s) => hg[s] > ag[s]));
+    // With Early Payout, a Result leg also wins when that team goes 2 goals up
+    // and doesn't hold on — Bet365 has already paid it.
+    const resLeg = (side, name, g, o) => {
+      const win = mask(n, (s) => g[s] > o[s]);
+      if (!earlyPayout) return add(`res:${side}`, `Result: ${name}`, "Full Time Result", "result", win);
+      const up = sim.twoUp[side];
+      add(`res:${side}`, `Result: ${name}`, "Full Time Result", "result", mask(n, (s) => win[s] || up[s]), { ep: true, pNoEp: mean(win) });
+    };
+    resLeg("home", home, hg, ag);
     add("res:draw", "Result: Draw", "Full Time Result", "result", mask(n, (s) => hg[s] === ag[s]));
-    add("res:away", `Result: ${away}`, "Full Time Result", "result", mask(n, (s) => ag[s] > hg[s]));
+    resLeg("away", away, ag, hg);
     add("dc:home", `${home} or Draw`, "Double Chance", "result", mask(n, (s) => hg[s] >= ag[s]));
     add("dc:away", `${away} or Draw`, "Double Chance", "result", mask(n, (s) => ag[s] >= hg[s]));
     for (const line of [1.5, 2.5, 3.5, 4.5]) {
@@ -1091,6 +1116,10 @@
   // leg from a market it has proven accurate on. It never changes a chance.
   let trust = {};
   function setTrust(factors) { trust = factors && typeof factors === "object" ? factors : {}; }
+  // Bet365's Early Payout on Result legs (paid once the team is 2 goals up).
+  // Off by default (GitHub grades HAWK's plain chances); the builder turns it on.
+  let earlyPayout = false;
+  function setEarlyPayout(on) { if (!!on !== earlyPayout) { earlyPayout = !!on; matches.clear(); } }
   // Which group a leg learns with, or null. Only HAWK's own estimates learn:
   // player props, and corners/cards/shots-on-target lines split by Over and
   // Under (shifting both the same way would be contradictory). Results and
@@ -1866,7 +1895,16 @@
     }
     const res = (o) => (rows.find((r) => r.type === 1 && r.label === marketLabel(1, "", "", o, hc.name, ac.name)) || {}).p;
     const three = (Mx) => ({ home: sumCells(Mx, (i, j) => i > j), draw: sumCells(Mx, (i, j) => i === j), away: sumCells(Mx, (i, j) => i < j) });
-    return { ...base, live: true, score: [sh, sa], reds, stats, basis, remaining: rem, books: c1 ? c1.books : 0, tilt,
+    // Goals, cards and subs by player, for the live lineup pitch. A sub's
+    // player is the one coming on; the one going off is in extraPlayers.
+    const names = Object.fromEntries((game.members || []).map((m) => [m.id, m.name]));
+    const events = (game.events || []).map((e) => {
+      const nm = ((e.eventType || {}).name || "").toLowerCase();
+      const type = nm.includes("goal") ? "goal" : nm.includes("red") ? "red" : nm.includes("yellow") ? "yellow" : nm.includes("substitution") ? "sub" : null;
+      return type && { type, side: e.competitorId === hc.id ? "home" : "away", minute: e.gameTimeDisplay || "", player: names[e.playerId] || "",
+                       other: (e.extraPlayers || []).map((p) => names[p]).filter(Boolean)[0] || "", detail: (e.eventType || {}).subTypeName || "" };
+    }).filter(Boolean);
+    return { ...base, live: true, score: [sh, sa], reds, stats, basis, remaining: rem, books: c1 ? c1.books : 0, tilt, events,
              market: p1x2 ? { home: p1x2[0], draw: p1x2[1], away: p1x2[2], books: c1.books } : null,
              own: ownRates ? three(finalMatrix(sh, sa, Math.max(ownRates[0] * tilt[0], 1e-9), Math.max(ownRates[1] * tilt[1], 1e-9))) : null,
              probs: { home: res("1") ?? sumCells(M, (i, j) => i > j), draw: res("X") ?? sumCells(M, (i, j) => i === j), away: res("2") ?? sumCells(M, (i, j) => i < j) },
@@ -1974,7 +2012,10 @@
     for (const h of legs) {
       const id2 = h.id || "", row = { id: id2, label: h.label, state: "live", p: null, note: "" };
       let m, t;
-      if ((m = /^res:(home|away)$/.exec(id2)) && twoUp[m[1]]) {
+      if (h.userDone) {
+        // You ticked it: Bet365 shows it done (e.g. a tackle 365Scores doesn't name).
+        row.state = "won"; row.p = 1; row.userDone = true; row.note = "you marked it done — Bet365 shows it";
+      } else if ((m = /^res:(home|away)$/.exec(id2)) && twoUp[m[1]]) {
         row.state = "won"; row.p = 1; row.ep = true;
         row.note = `score ${sh}-${sa} · Early Payout: ${m[1] === "home" ? hc.name : ac.name} went 2 goals ahead, so Bet365 pays this leg as won (if your slip shows EP)`;
       } else if ((t = goalTest(id2))) {
@@ -2150,7 +2191,7 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, h2h, learnKey, liveMatch,
+  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, h2h, learnKey, liveMatch,
                   scores, matchReport, ticketLive,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },

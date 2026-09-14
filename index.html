@@ -419,6 +419,12 @@
                 <div id="pl-chart" class="w-full"></div>
             </div>
 
+            <div class="bg-zinc-900/60 p-4 rounded-2xl border border-[#d9b571]/30 space-y-2">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">💹</span> Am I beating Bet365?</h3>
+                <p class="text-[10px] text-zinc-500">After each match HAWK compares the Bet365 price you got on each leg with Bet365's last price before kick-off (the "closing price"). If you keep getting better prices than the close, you're betting before the market moves your way — the surest early sign of a real edge, long before wins and losses even out.</p>
+                <div id="beat-bet365-container" class="pt-1"></div>
+            </div>
+
             <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
                 <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🎯</span> HAWK Track Record</h3>
                 <p class="text-[10px] text-zinc-500">Bets sent from the HAWK builder settle themselves after the match. This checks whether HAWK's chances come true — its 70% legs should land about 70% of the time. HAWK also grades its own predictions on every match. 🧠 Once a market has 30+ graded legs, the builder corrects that market's chances by what actually happened.</p>
@@ -1664,6 +1670,7 @@
 
             renderLeagueBreakdown();
             renderProfitChart();
+            renderBeatBet365();
             renderTrackRecord();
         }
 
@@ -1738,8 +1745,7 @@
                 <div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-2">By market</div>
                 ${markets.map(([m, l]) => row(escHtml(m), l)).join('')}
                 ${tickets.length ? `<div class="text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 mt-2">Tickets: HAWK expected
-                    <b>${expWins.toFixed(1)}</b> of your ${tickets.length} settled HAWK tickets to win — <b class="${wins >= expWins ? 'text-emerald-400' : 'text-red-400'}">${wins}</b> did.</div>` : ''}
-                ${closingSummary()}`;
+                    <b>${expWins.toFixed(1)}</b> of your ${tickets.length} settled HAWK tickets to win — <b class="${wins >= expWins ? 'text-emerald-400' : 'text-red-400'}">${wins}</b> did.</div>` : ''}`;
             el.innerHTML = gradedBlock() + `<div class="text-xs font-bold text-white pt-4">🎟 Your HAWK bets</div>` + yours;
         }
         // One "HAWK said X% · landed Y%" row; the white mark on the bar is what HAWK said.
@@ -1790,14 +1796,63 @@
         // Did you get better prices than Bet365's last price before kick-off? Beating
         // that "closing price" regularly is the quickest sign of a real edge — much
         // faster than waiting for wins and losses to even out.
-        function closingSummary() {
-            const legs = bets.flatMap(b => (b.legs || []).flatMap(l => (l.hawk && l.hawk.legs) || [])).filter(h => h.bookPrice > 1 && h.close > 1);
-            if (!legs.length) return `<div class="text-[11px] text-zinc-500 pt-2">📉 Closing price check: after each match HAWK compares the Bet365 price you got with its last price before kick-off. It fills in as your HAWK bets settle.</div>`;
-            const beat = legs.filter(h => h.bookPrice > h.close).length;
-            const avg = legs.reduce((s, h) => s + (h.bookPrice / h.close - 1), 0) / legs.length;
-            return `<div class="text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 mt-2">📉 Closing price: you beat Bet365's closing price on
-                <b>${beat} of ${legs.length}</b> legs, by <b class="${avg >= 0 ? 'text-emerald-400' : 'text-red-400'}">${avg >= 0 ? '+' : ''}${(100 * avg).toFixed(1)}%</b> on average.
-                <span class="text-zinc-500">Consistently positive = HAWK is finding prices before the market moves to them.</span></div>`;
+        function renderBeatBet365() {
+            const el = document.getElementById('beat-bet365-container');
+            if (!el) return;
+            // Oldest first, so "lately" means your most recent legs.
+            const all = bets.slice().reverse().flatMap(b => (b.legs || []).flatMap(l => (l.hawk && l.hawk.legs || []).map(h => ({ ...h, fixture: l.fixture }))));
+            const legs = all.filter(h => h.bookPrice > 1 && h.close > 1);
+            const waiting = bets.filter(b => b.status === 'PENDING').flatMap(b => (b.legs || []).flatMap(l => (l.hawk && l.hawk.legs) || [])).filter(h => h.bookPrice > 1 && !(h.close > 1)).length;
+            const clv = (h) => h.bookPrice / h.close - 1;
+            const pctTxt = (x) => `${x >= 0 ? '+' : ''}${(100 * x).toFixed(1)}%`;
+            const tone = (x) => x > 0.005 ? 'text-emerald-400' : x < -0.005 ? 'text-red-400' : 'text-zinc-300';
+            if (!legs.length) {
+                el.innerHTML = `<div class="text-xs text-zinc-500 py-2">Nothing to compare yet${waiting ? ` — <b class="text-zinc-300">${waiting}</b> leg${waiting > 1 ? 's are' : ' is'} waiting for kick-off and the final whistle` : ''}.
+                    Send bets from the HAWK builder with 🦅 Send to Vault; only legs Bet365 prices on their own count (result, goals, corners, cards… — player props have no single price to compare).</div>`;
+                return;
+            }
+            const avg = legs.reduce((s, h) => s + clv(h), 0) / legs.length;
+            const beat = legs.filter(h => h.bookPrice > h.close).length, same = legs.filter(h => h.bookPrice === h.close).length;
+            const recent = legs.slice(-20), recentAvg = recent.reduce((s, h) => s + clv(h), 0) / recent.length;
+            const n = legs.length;
+            const verdict = n < 20 ? `Too early to judge — ${n} leg${n > 1 ? 's' : ''} so far. Give it 50+ before reading much into it.`
+                : n < 50 ? (avg > 0.01 ? 'An early good sign — keep going, it firms up at 50+ legs.' : avg < -0.01 ? 'Early days, but the market is moving against your prices so far.' : 'Early days — about level with the market so far.')
+                : avg > 0.02 ? 'Yes — you’re regularly getting better prices than Bet365’s close. That’s what a real edge looks like.'
+                : avg > 0 ? 'Slightly — a small edge on price. Worth keeping an eye on.'
+                : 'Not yet — Bet365’s closing prices are usually better than the ones you get. Bet earlier, or be pickier (Value first).';
+            // Running average, leg by leg: is it heading up or down?
+            let run = 0;
+            const series = legs.map((h, i) => (run += clv(h)) / (i + 1));
+            const W = 600, H = 70, P = 6, lo = Math.min(0, ...series), hi = Math.max(0, ...series), span = hi - lo || 1;
+            const x = (i) => P + (series.length > 1 ? (i * (W - 2 * P)) / (series.length - 1) : (W - 2 * P) / 2);
+            const y = (v) => P + ((hi - v) * (H - 2 * P)) / span;
+            const color = avg >= 0 ? '#34d399' : '#f87171';
+            const byMarket = {};
+            legs.forEach(h => (byMarket[h.market || 'Other'] ||= []).push(h));
+            const markets = Object.entries(byMarket).sort((a, b) => b[1].length - a[1].length).slice(0, 5);
+            const last = legs.slice(-4).reverse();
+            el.innerHTML = `
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2"><div class="text-[10px] text-zinc-500 uppercase tracking-wider">Average</div>
+                        <div class="text-xl font-extrabold ${tone(avg)}">${pctTxt(avg)}</div><div class="text-[10px] text-zinc-500">vs the closing price</div></div>
+                    <div class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2"><div class="text-[10px] text-zinc-500 uppercase tracking-wider">Beat the close</div>
+                        <div class="text-xl font-extrabold text-zinc-100">${beat}<span class="text-sm text-zinc-500"> / ${n}</span></div><div class="text-[10px] text-zinc-500">${same ? `${same} level · ` : ''}${Math.round(100 * beat / n)}% of legs</div></div>
+                    <div class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2"><div class="text-[10px] text-zinc-500 uppercase tracking-wider">Last ${recent.length}</div>
+                        <div class="text-xl font-extrabold ${tone(recentAvg)}">${pctTxt(recentAvg)}</div><div class="text-[10px] text-zinc-500">${recentAvg > avg + 0.005 ? 'getting better' : recentAvg < avg - 0.005 ? 'getting worse' : 'steady'}</div></div>
+                </div>
+                <div class="text-xs text-zinc-200 mt-2">${verdict}</div>
+                ${series.length > 1 ? `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="w-full h-14 block mt-2">
+                    <line x1="${P}" x2="${W - P}" y1="${y(0)}" y2="${y(0)}" stroke="#3f3f46" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+                    <polyline points="${series.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+                    <div class="text-[10px] text-zinc-500">Running average, leg by leg — above the dashed line = beating Bet365.</div>` : ''}
+                <div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-2">By market</div>
+                ${markets.map(([mk, l]) => { const a = l.reduce((s, h) => s + clv(h), 0) / l.length;
+                    return `<div class="flex justify-between text-xs bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5"><span class="text-zinc-200">${escHtml(mk)} <span class="text-zinc-500">(${l.length})</span></span>
+                        <span>beat ${l.filter(h => h.bookPrice > h.close).length}/${l.length} · <b class="${tone(a)}">${pctTxt(a)}</b></span></div>`; }).join('')}
+                <div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-2">Latest</div>
+                ${last.map(h => `<div class="flex justify-between gap-2 text-[11px] text-zinc-400"><span class="truncate">${escHtml(h.label)} <span class="text-zinc-600">· ${escHtml(h.fixture || '')}</span></span>
+                    <span class="whitespace-nowrap">you ${Number(h.bookPrice).toFixed(2)} → close ${Number(h.close).toFixed(2)} <b class="${tone(clv(h))}">${pctTxt(clv(h))}</b></span></div>`).join('')}
+                ${waiting ? `<div class="text-[10px] text-zinc-500 pt-2">${waiting} more leg${waiting > 1 ? 's' : ''} waiting for the final whistle.</div>` : ''}`;
         }
 
         // --- AUTO-SETTLE: bets sent from the HAWK builder settle themselves ---
@@ -1844,7 +1899,8 @@
                         if (!f) { allDone = false; allWon = false; continue; }
                         if (f.off) { issues.push(`${l.fixture}: ${f.off}`); allWon = false; continue; }
                         l.hawk.score = `${f.ft[0]}-${f.ft[1]}`;
-                        for (const h of l.hawk.legs) h.result = legResult(h, f, { earlyPayout: true });
+                        // A leg you ticked as done during the match (Bet365 showed it) counts as won.
+                        for (const h of l.hawk.legs) h.result = h.userDone ? 'won' : legResult(h, f, { earlyPayout: true });
                         const rs = l.hawk.legs.map(h => h.result);
                         if (rs.includes('lost')) anyLost = true;
                         else if (!rs.every(r => r === 'won')) {

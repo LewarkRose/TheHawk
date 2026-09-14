@@ -937,17 +937,24 @@ function renderMatch() {
   const three = (x) => pct100([x.home, x.draw, x.away]).map(v => v + "%").join(" · ");
   const hp = pct100([p.home, p.draw, p.away]);
   const srcs = [];
-  if (p.model) srcs.push(`<span title="HAWK's own team ratings (goals and xG), before it blends in the market">🦅 HAWK ratings only: <b>${three(p.model)}</b></span>`);
+  if (p.model) srcs.push(`<span title="HAWK's own team ratings (goals and xG), before it blends in the market">🦅 HAWK's own stats: <b>${three(p.model)}</b></span>`);
   if (p.market) srcs.push(`<span>Bookmakers (${p.market.sources}): ${three(p.market)}</span>`);
   if (p.polymarket) srcs.push(`<span>Polymarket: ${three(p.polymarket)}</span>`);
-  // How HAWK's number was made from the two (it blends expected goals, so the % land close to — not exactly on — the weights).
+  // How HAWK's number was made, told with the favourite's numbers: mostly the
+  // bookmakers, nudged a little towards HAWK's own stats.
   const mix = p.mix || {}, mw = mix.market == null ? null : Math.round(mix.market * 100);
-  const how = mix.ignored && p.market
-      ? `HAWK is going with the bookmakers here. Its own ratings${p.model ? ` (${three(p.model)})` : ""} are too far from ${p.market.sources} bookmakers, and when that happens the market is usually the one that's right — often a big favourite HAWK's ratings underrate.`
-    : mw == null ? ""
-    : mw >= 100 ? "HAWK's number is the bookmakers' — it has no ratings for these two teams."
-    : mw <= 0 ? "HAWK's number is its own ratings — no bookmaker prices yet."
-    : `HAWK's number is ${mw}% bookmakers + ${100 - mw}% its own ratings${p.model ? "" : " (these two are rated in different leagues, so the ratings aren't shown on their own)"}.`;
+  const fi = hp.indexOf(Math.max(...hp)), who = [`${m.home} to win`, "A draw", `${m.away} to win`][fi];
+  const at = (x) => x ? pct100([x.home, x.draw, x.away])[fi] : null, bk = at(p.market), own = at(p.model);
+  const how = mw == null ? ""
+    : mix.ignored && bk != null
+      ? `${who}: bookmakers ${bk}%, HAWK's own stats ${own != null ? own + "%" : "far off"}. That's too far apart — when that happens the bookmakers are usually right, so HAWK goes with them: ${hp[fi]}%.`
+    : mw >= 100 ? `HAWK has no stats to compare these two teams, so it uses the bookmakers' chances.`
+    : mw <= 0 ? `No bookmaker prices yet, so this is HAWK's own stats only.`
+    : bk != null && own != null && hp[fi] === bk
+      ? `${who}: bookmakers ${bk}%, HAWK's own stats ${own}%. HAWK listens mostly to the bookmakers (they know injuries, team news and where the money is); its own stats nudge that by less than 1% here, so it stays ${hp[fi]}%.`
+    : bk != null && own != null
+      ? `${who}: bookmakers ${bk}%, HAWK's own stats ${own}% → HAWK ${hp[fi]}%. HAWK listens mostly to the bookmakers (they know injuries, team news and where the money is) and nudges a little towards its own stats.`
+    : `Mostly the bookmakers' chances, nudged a little towards HAWK's own stats.`;
   $("#match").innerHTML = `
     <div class="hero">
       <div class="vs">

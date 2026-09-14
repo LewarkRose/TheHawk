@@ -382,6 +382,16 @@
 
         <!-- VIEW 2: BANKROLL & HISTORY -->
         <div id="view-history" class="hidden space-y-6">
+            <div class="bg-zinc-900/60 p-4 rounded-2xl border border-[#d9b571]/40 space-y-3" id="weekly-card">
+                <div class="flex flex-wrap justify-between items-center gap-2">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🗓️</span> Weekly HAWK report <span id="weekly-new" class="hidden text-[10px] font-bold bg-[#d9b571] text-black px-2 py-0.5 rounded-full">NEW</span></h3>
+                    <div class="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs gap-1">
+                        <button type="button" data-week="last" class="week-tab px-3 py-1 rounded-lg">Last week</button>
+                        <button type="button" data-week="this" class="week-tab px-3 py-1 rounded-lg">This week so far</button>
+                    </div>
+                </div>
+                <div id="weekly-container"></div>
+            </div>
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80">
                     <span class="text-[10px] text-zinc-400 uppercase tracking-wider flex items-center gap-1"><span class="icon-gold">💰</span> Total Profit / Loss</span>
@@ -1672,6 +1682,90 @@
             renderProfitChart();
             renderBeatBet365();
             renderTrackRecord();
+            renderWeekly();
+        }
+
+        // --- WEEKLY HAWK REPORT: last week (Monday to Sunday) or this week so far ---
+        // Your bets (profit, best and worst), whether you beat Bet365's closing
+        // prices, which markets are working for you and which are costing you,
+        // HAWK's own predictions on every match — and a plain-words takeaway.
+        let weekTab = 'last';
+        function weekRange(which) {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+            if (which === 'this') return [monday.getTime(), Date.now() + 1, monday, new Date()];
+            const prev = new Date(monday); prev.setDate(monday.getDate() - 7);
+            const sunday = new Date(monday); sunday.setDate(monday.getDate() - 1);
+            return [prev.getTime(), monday.getTime(), prev, sunday];
+        }
+        function renderWeekly() {
+            const el = document.getElementById('weekly-container');
+            if (!el) return;
+            const [from, to, d1, d2] = weekRange(weekTab), fmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            document.querySelectorAll('.week-tab').forEach(b => {
+                b.className = `week-tab px-3 py-1 rounded-lg ${b.dataset.week === weekTab ? 'bg-[#d9b571] text-black font-bold' : 'text-zinc-400 hover:text-white'}`;
+                b.onclick = () => { weekTab = b.dataset.week; renderWeekly(); };
+            });
+            // "NEW" once a week, until you've looked at last week's report.
+            const lastMon = weekRange('last')[0], seen = +(localStorage.getItem('hawk_weekSeen') || 0);
+            const isOpen = !document.getElementById('view-history').classList.contains('hidden');
+            document.getElementById('weekly-new').classList.toggle('hidden', seen >= lastMon);
+            if (isOpen && weekTab === 'last' && seen < lastMon) { try { localStorage.setItem('hawk_weekSeen', String(lastMon)); } catch (e) { /* private window */ } }
+
+            const inWeek = (t) => t >= from && t < to;
+            const settled = bets.filter(b => b.status !== 'PENDING' && inWeek(settleTime(b)));
+            const placed = bets.filter(b => inWeek(+((/bet_(\d+)/.exec(b.id || '') || [])[1] || 0)));
+            const pending = placed.filter(b => b.status === 'PENDING').length;
+            const staked = settled.reduce((s, b) => s + b.stake, 0), back = settled.reduce((s, b) => s + betReturn(b), 0), pl = back - staked;
+            const won = settled.filter(b => b.status === 'WON').length, lost = settled.filter(b => b.status === 'LOST').length;
+            const byPl = settled.map(b => ({ b, pl: betReturn(b) - b.stake })).sort((x, y) => y.pl - x.pl);
+            const name = (b) => escHtml((b.legs || []).map(l => l.fixture).filter(Boolean).slice(0, 2).join(' + ') || 'a ticket');
+            // Legs from those bets: closing prices, and how each market did against HAWK's chance.
+            const legs = settled.flatMap(b => (b.legs || []).flatMap(l => (l.hawk && l.hawk.legs) || []));
+            const clvLegs = legs.filter(h => h.bookPrice > 1 && h.close > 1), clv = clvLegs.length ? clvLegs.reduce((s, h) => s + h.bookPrice / h.close - 1, 0) / clvLegs.length : null;
+            const graded = legs.filter(h => (h.result === 'won' || h.result === 'lost') && h.p > 0), mk = {};
+            graded.forEach(h => { const g = (mk[h.market || 'Other'] ||= { n: 0, said: 0, got: 0 }); g.n++; g.said += h.p; if (h.result === 'won') g.got++; });
+            const markets = Object.entries(mk).filter(([, g]) => g.n >= 2).map(([m, g]) => ({ m, n: g.n, said: g.said / g.n, got: g.got / g.n, gap: g.got / g.n - g.said / g.n }));
+            const working = markets.filter(x => x.gap >= 0.1).sort((a, b) => b.gap - a.gap).slice(0, 2);
+            const costing = markets.filter(x => x.gap <= -0.1).sort((a, b) => a.gap - b.gap).slice(0, 2);
+            // HAWK on every match that week (graded on GitHub): its week-by-week tally,
+            // or — for a week graded before the tally existed — its last 40 matches.
+            const pad = (x) => String(x).padStart(2, '0'), wkKey = `${d1.getFullYear()}-${pad(d1.getMonth() + 1)}-${pad(d1.getDate())}`;
+            const W = gradedAll && gradedAll.weeks && gradedAll.weeks[wkKey];
+            const rec = W ? { length: W.matches } : ((gradedAll && gradedAll.recent) || []).filter(r => inWeek(Date.parse(r.kickoff)));
+            const nLegs = W ? W.legs : rec.reduce((s, r) => s + r.n, 0);
+            const hawkSaid = !nLegs ? null : W ? W.said / W.legs : rec.reduce((s, r) => s + r.said * r.n, 0) / nLegs;
+            const hawkGot = !nLegs ? null : W ? W.won / W.legs : rec.reduce((s, r) => s + r.got * r.n, 0) / nLegs;
+            const bigCalls = W ? { length: W.bigCalls } : rec.filter(r => r.upset && r.upset.level >= 2);
+            const bigRight = W ? W.bigRight : bigCalls.filter(r => r.upset.failed).length;
+
+            const money = (x) => `${x >= 0 ? '+' : '−'}€${Math.abs(x).toFixed(2)}`, pc = (x) => `${Math.round(100 * x)}%`;
+            const tile = (k, v, sub, tone = '') => `<div class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2"><div class="text-[10px] text-zinc-500 uppercase tracking-wider">${k}</div>
+                <div class="text-lg font-extrabold ${tone}">${v}</div><div class="text-[10px] text-zinc-500">${sub}</div></div>`;
+            // The takeaway, in words.
+            const say = [];
+            if (!settled.length) say.push(placed.length ? `${placed.length} bet${placed.length > 1 ? 's' : ''} placed, none settled yet.` : 'No bets settled this week.');
+            else say.push(pl > 0 ? `A winning week: ${money(pl)} on €${staked.toFixed(2)} staked.` : pl < 0 ? `A losing week: ${money(pl)} on €${staked.toFixed(2)} staked.` : 'You broke even.');
+            if (clv != null) say.push(clv > 0.005 ? `You beat Bet365's closing prices by ${(100 * clv).toFixed(1)}% — the good sign to look for.` : clv < -0.005 ? `Bet365's closing prices were ${(100 * -clv).toFixed(1)}% better than yours — try betting earlier, or Value first.` : 'Your prices matched Bet365\'s closing prices.');
+            if (working.length) say.push(`Working for you: ${working.map(x => escHtml(x.m)).join(', ')}.`);
+            if (costing.length) say.push(`Costing you: ${costing.map(x => escHtml(x.m)).join(', ')} — they landed less than HAWK said.`);
+            if (hawkSaid != null) say.push(Math.abs(hawkGot - hawkSaid) < 0.05 ? `HAWK was spot on across ${rec.length} matches: said ${pc(hawkSaid)}, landed ${pc(hawkGot)}.` : hawkGot > hawkSaid ? `HAWK was a bit cautious: said ${pc(hawkSaid)}, landed ${pc(hawkGot)}.` : `HAWK was a bit high: said ${pc(hawkSaid)}, landed ${pc(hawkGot)} — it learns from that.`);
+            if (settled.length >= 3 && settled.length < 10) say.push('Still a small sample — one week says little on its own; watch the trend over a month.');
+
+            el.innerHTML = `
+                <div class="text-[11px] text-zinc-500">${weekTab === 'last' ? `Monday ${fmt(d1)} – Sunday ${fmt(d2)}` : `Since Monday ${fmt(d1)}`}${pending ? ` · ${pending} still pending` : ''}</div>
+                <div class="text-sm text-zinc-200 leading-relaxed bg-zinc-950 border border-[#d9b571]/25 rounded-xl px-3 py-2">💬 ${say.join(' ')}</div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    ${tile('Profit / loss', settled.length ? money(pl) : '—', settled.length ? `${won} won · ${lost} lost${settled.length - won - lost ? ` · ${settled.length - won - lost} cashed out` : ''}` : 'nothing settled', pl > 0 ? 'text-emerald-400' : pl < 0 ? 'text-red-400' : 'text-zinc-200')}
+                    ${tile('ROI', staked ? `${pl >= 0 ? '+' : ''}${(100 * pl / staked).toFixed(1)}%` : '—', staked ? `€${staked.toFixed(2)} staked` : '', pl > 0 ? 'text-emerald-400' : pl < 0 ? 'text-red-400' : 'text-zinc-200')}
+                    ${tile('vs closing price', clv != null ? `${clv >= 0 ? '+' : ''}${(100 * clv).toFixed(1)}%` : '—', clvLegs.length ? `beat it on ${clvLegs.filter(h => h.bookPrice > h.close).length} of ${clvLegs.length} legs` : 'no priced legs settled', clv > 0.005 ? 'text-emerald-400' : clv < -0.005 ? 'text-red-400' : 'text-zinc-200')}
+                    ${tile('HAWK on every match', hawkSaid != null ? `${pc(hawkSaid)} → ${pc(hawkGot)}` : '—', rec.length ? `said → landed · ${rec.length} matches${bigCalls.length ? ` · ⚡ ${bigRight}/${bigCalls.length} upset calls right` : ''}` : 'no graded matches', 'text-[#d9b571]')}
+                </div>
+                ${byPl.length ? `<div class="grid md:grid-cols-2 gap-2 text-xs">
+                    <div class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2"><span class="text-zinc-500">Best:</span> <b class="text-emerald-400">${money(byPl[0].pl)}</b> <span class="text-zinc-300">${name(byPl[0].b)}</span></div>
+                    ${byPl.length > 1 ? `<div class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2"><span class="text-zinc-500">Worst:</span> <b class="text-red-400">${money(byPl[byPl.length - 1].pl)}</b> <span class="text-zinc-300">${name(byPl[byPl.length - 1].b)}</span></div>` : ''}</div>` : ''}
+                ${markets.length ? `<div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-1">Your markets this week (HAWK said → landed)</div>
+                    <div class="flex flex-wrap gap-1.5">${markets.sort((a, b) => b.n - a.n).slice(0, 8).map(x => `<span class="text-[11px] px-2 py-1 rounded-lg border ${x.gap >= 0.1 ? 'border-emerald-500/40 text-emerald-300' : x.gap <= -0.1 ? 'border-red-500/40 text-red-300' : 'border-zinc-800 text-zinc-300'}">${escHtml(x.m)} <b>${pc(x.said)} → ${pc(x.got)}</b> <span class="text-zinc-500">(${x.n})</span></span>`).join('')}</div>` : ''}`;
         }
 
         // Link that reopens a HAWK ticket's match in the builder with the same legs.
@@ -2237,7 +2331,7 @@
         loadAllFixtures();                        // fills the fixture search box for every league
         fetch('data/graded.json').then(r => (r.ok ? r.json() : null)).then(g => {   // HAWK graded on every match
             gradedAll = g;
-            if (!document.getElementById('view-history').classList.contains('hidden')) renderTrackRecord();
+            if (!document.getElementById('view-history').classList.contains('hidden')) { renderTrackRecord(); renderWeekly(); }
         }).catch(() => { /* not built yet */ });
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { /* not over https */ });
         setTimeout(autoSettle, 1500);             // settle finished HAWK bets…

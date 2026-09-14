@@ -52,6 +52,12 @@ async function loadState() {
   return { pending: {}, totals: newTotals() };
 }
 
+// The Monday (UTC date) of the week a kick-off falls in: "2026-09-14".
+const mondayKey = (iso) => {
+  const d = new Date(iso), back = (d.getUTCDay() + 6) % 7;
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - back)).toISOString().slice(0, 10);
+};
+
 const state = await loadState();
 const T = state.totals;
 T.upsets ||= newUpsets();
@@ -95,6 +101,10 @@ for (const [id, pr] of Object.entries(state.pending)) {
   }
   if (!n) continue;
   T.matches++; T.legs += n; graded++;
+  // Week by week (Monday to Sunday, by kick-off) for the Vault's weekly report.
+  const W = ((T.weeks ||= {})[mondayKey(pr.kickoff)] ||= { matches: 0, legs: 0, said: 0, won: 0, bigCalls: 0, bigRight: 0 });
+  W.matches++; W.legs += n; W.said = +(W.said + said).toFixed(3); W.won += won;
+  if (upset && upset.level >= 2) { W.bigCalls++; if (upset.failed) W.bigRight++; }
   T.recent.unshift({ id, league: pr.league, home: pr.home, away: pr.away, kickoff: pr.kickoff, score: f.ft.join("-"),
                      n, said: +(said / n).toFixed(3), got: +(won / n).toFixed(3), upset });
   T.recent = T.recent.slice(0, KEEP_RECENT);
@@ -130,11 +140,13 @@ const predictions = {};
 for (const [id, pr] of Object.entries(state.pending)) if (pr.probs) predictions[id] = { probs: pr.probs, level: pr.upset ? pr.upset.level : null, kickoff: pr.kickoff };
 for (const [id, d] of Object.entries(state.done || {})) predictions[id] = d;
 await writeFile(path.join(ROOT, "data", "predictions.json"), JSON.stringify({ updated: new Date().toISOString(), matches: predictions }));
+// Keep the last 12 weeks.
+if (T.weeks) for (const k of Object.keys(T.weeks).sort().slice(0, -12)) delete T.weeks[k];
 await mkdir(path.dirname(STATE_FILE), { recursive: true });
 await writeFile(STATE_FILE, JSON.stringify(state));
 await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   updated: new Date().toISOString(), matches: T.matches, legs: T.legs, waiting: Object.keys(state.pending).length,
-  byMarket: T.byMarket, byKey: T.byKey, bands: T.bands, recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets,
+  byMarket: T.byMarket, byKey: T.byKey, bands: T.bands, recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets, weeks: T.weeks || {},
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
 process.exit(0);   // the engine's timers shouldn't keep the job alive

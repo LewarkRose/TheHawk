@@ -399,6 +399,24 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .thr{position:absolute;left:0;right:0;border-top:2px dashed var(--gold);pointer-events:none;opacity:.85}
 .thr span{position:absolute;right:0;top:-18px;font-size:11px;font-weight:800;color:var(--gold)}
 /* trusted-market badges */
+/* build options (Build again) */
+.optbar{display:flex;align-items:center;gap:6px;margin:12px 0 -4px;flex-wrap:wrap}
+.optbar .muted{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin-right:2px}
+.optbar button{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:10px;padding:5px 10px;cursor:pointer;
+  font-weight:900;font-size:14px;display:flex;flex-direction:column;align-items:center;line-height:1.1;transition:.12s}
+.optbar button small{font-size:10px;font-weight:700;color:var(--muted)}
+.optbar button:hover{border-color:#3a4a55}
+.optbar button.on{border-color:var(--accent);background:rgba(20,227,161,.12);color:var(--accent)}
+/* Bet365 checklist */
+.chk-list{display:flex;flex-direction:column;margin-top:8px}
+.chk-grp{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:12px 0 4px}
+.chk-row{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:10px;
+  margin-bottom:6px;cursor:pointer;font-weight:600;background:var(--panel2)}
+.chk-row input{width:18px;height:18px;accent-color:var(--accent)}
+.chk-row .muted{font-size:12px;font-weight:500}
+.chk-row.done{border-color:rgba(20,227,161,.5);background:rgba(20,227,161,.08)}
+.chk-row.done span:first-of-type{text-decoration:line-through;color:var(--muted)}
+.chk-price{margin-top:12px;font-size:14px}
 .dhealth{margin-top:10px;font-size:12px;border-top:1px solid var(--line);padding-top:8px;line-height:1.7}
 .dhealth .ok{color:var(--accent)}
 .dhealth .bad{color:var(--gold);font-weight:700}
@@ -582,6 +600,7 @@ async function api(path, body) {
     case "/api/monster": return body ? HAWK.startMonster(body) : HAWK.monsterStatus();
     case "/api/monster/stop": return HAWK.stopMonster();
     case "/api/build": return HAWK.build(body);
+    case "/api/options": return HAWK.buildOptions(body);
     case "/api/evaluate": return HAWK.evaluate(body);
     case "/api/scan": return body ? HAWK.startScan(body) : HAWK.scanStatus();
     case "/api/scan/stop": return HAWK.stopScan();
@@ -1106,8 +1125,11 @@ function renderSlip() {
       <label>Max legs <select id="mx">${[3,4,5,6,7,8,9,10,12].map(n => `<option ${n === S.maxLegs ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>
     <div class="opts" style="margin-top:6px"><label title="These are counted from each player's own record, with no allowance for the opponent or referee, so HAWK is less sure of them. You can always add them yourself.">
       <input type="checkbox" id="xtra" ${S.extras ? "checked" : ""}> Auto-build can use fouls, tackles &amp; offsides</label></div>
-    <button class="build" id="go" ${m ? "" : "disabled"}>⚡ BUILD MY BET BUILDER</button>
+    <button class="build" id="go" ${m ? "" : "disabled"}>${sameOptions() && S.options.list.length > 1
+      ? `🔄 BUILD AGAIN — option ${(S.options.at + 1) % S.options.list.length + 1} of ${S.options.list.length}` : "⚡ BUILD MY BET BUILDER"}</button>
     ${S.slip.length ? `
+    ${sameOptions() && S.options.list.length > 1 ? `<div class="optbar" id="optbar"><span class="muted">Options</span>${S.options.list.map((o, i) =>
+      `<button class="${i === S.options.at ? "on" : ""}" data-opt="${i}" title="${o.legs.length} legs · ${pct(o.p, 1)} to land · fair ${odds(o.fair)}">${i + 1}<small>${o.legs.length} legs · ${odds(o.fair)}</small></button>`).join("")}</div>` : ""}
     <div class="ticket">
       <div class="th"><b>BET BUILDER</b><span class="odds">${r && r.fair ? odds(r.fair) : "…"}</span></div>
       <div class="legs">${legRows}</div>
@@ -1119,7 +1141,8 @@ function renderSlip() {
       <div><label title="Winnings boost, e.g. 25 for a 25% boost">Boost %</label><input id="boost" inputmode="decimal" placeholder="0" value="${esc(S.chk.boost)}"></div>
       <div><label>Stake (€)</label><input id="stake" inputmode="decimal" value="${esc(S.chk.stake)}"></div></div>
       <div id="verdict"></div></div>
-    <button class="ghost" id="copy">📋 Copy slip</button>
+    <button class="ghost" id="b365" title="The legs in Bet365's order, with tick boxes, to build it there">📋 Build it on Bet365</button>
+    <button class="ghost" id="copy">⧉ Copy slip</button>
     <button class="ghost" id="toAcca" title="Put this builder on your acca, with builders from other matches">➕ Add to acca${S.acca.some(pt => m && pt.id === String(m.id)) ? " (replaces this match)" : ""}</button>
     <button class="ghost vault" id="vault" title="Log this builder in your Vault's Bankroll & History">🦅 Send to Vault</button>
     ${predicted ? `<div class="warn">Lineups are predicted. HAWK assumes the named starters start — most bookmakers void a player's legs if he doesn't play (check yours). Rebuild once lineups are confirmed, about an hour before kickoff.</div>` : ""}
@@ -1148,6 +1171,8 @@ function renderSlip() {
     // Remember what you typed, so adding or removing a leg doesn't clear it.
     for (const key of ["price", "boost", "stake"]) $("#" + key).oninput = (e) => { S.chk[key] = e.target.value; verdict(); };
     $("#copy").onclick = copySlip; $("#vault").onclick = sendToVault; $("#toAcca").onclick = addSlipToAcca; verdict();
+    $("#b365").onclick = openChecklist;
+    if ($("#optbar")) $("#optbar").onclick = (e) => { const b = e.target.closest("[data-opt]"); if (b) showOption(+b.dataset.opt); };
   }
 }
 
@@ -1263,19 +1288,78 @@ function bindStakeAdvice(root, useStake) {
   if (use) use.onclick = () => useStake(use.dataset.usestake);
 }
 
+// Build: HAWK finds up to 5 different tickets for your settings. Pressing
+// Build again (same settings) moves to the next one; the numbered buttons on
+// the ticket jump straight to one. Changing a setting, or locking/removing a
+// leg, starts a fresh set.
+function buildBody() {
+  const locked = S.slip.filter(id => S.locked.has(id));
+  return { id: String(S.match.id), target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs,
+           favourite: S.favourite, extras: S.extras, picks: S.picks, locked, banned: [...S.banned] };
+}
+const sameOptions = () => S.options && S.match && S.options.sig === JSON.stringify(buildBody())
+  && S.slip.join("|") === S.options.list[S.options.at].legs.map(l => l.id).join("|");
+function showOption(i) {
+  const o = S.options; o.at = (i + o.list.length) % o.list.length;
+  S.result = o.list[o.at]; S.slip = S.result.legs.map(l => l.id);
+  renderSlip(); refreshTab();
+}
 async function build() {
   if (!S.match) return;
+  if (sameOptions() && S.options.list.length > 1) {
+    showOption(S.options.at + 1);
+    toast(`Option ${S.options.at + 1} of ${S.options.list.length}`);
+    return;
+  }
   const btn = $("#go"); btn.disabled = true; btn.textContent = "SIMULATING…";
   try {
-    const locked = S.slip.filter(id => S.locked.has(id));
-    S.result = await api("/api/build", { id: String(S.match.id), target: S.target, style: S.style, focus: S.focus, maxLegs: S.maxLegs,
-                                         favourite: S.favourite, extras: S.extras, picks: S.picks, locked, banned: [...S.banned] });
+    const body = buildBody(), { options } = await api("/api/options", body);
+    S.options = { sig: JSON.stringify(body), list: options, at: 0 };
+    S.result = options[0];
     S.slip = S.result.legs.map(l => l.id);
+    // Keep the build's settings signature valid: the new slip's locks are the same ones.
     if (!S.slip.length) toast("No legs fit this style — try another style or target.");
     else if (S.result.fair < S.target * 0.97) toast(`Best found: ${odds(S.result.fair)} — raise max legs or change style to go higher.`);
+    else if (options.length > 1) toast(`${options.length} options found — press Build again to see the next.`);
   } catch (err) { toast(err.message); }
   renderSlip(); refreshTab();
   if (narrow() && S.slip.length) $("#slip").scrollIntoView({ behavior: "smooth" });
+}
+
+/* ---------- Bet365 checklist ---------- */
+// HAWK can't place bets on Bet365 (no public API, and it would mean a bot on
+// their site). This lays the ticket out in the order you'll find the legs in
+// Bet365's Bet Builder, with tick boxes, and the price that makes it worth it.
+const CHECK_SECTIONS = [["Result", /Result|Double Chance|Win to Nil|Winning Margin|Handicap|Correct Score|First Team/],
+  ["Goals", /Goals|Both Teams|Clean Sheet/], ["Corners", /Corners/], ["Cards", /Cards/], ["Shots on target (match)", /Match Shots on Target/]];
+function openChecklist() {
+  const m = S.match, r = S.result;
+  if (!m || !S.slip.length) return;
+  const legs = S.slip.map(id => S.legs[id]).filter(Boolean);
+  const groups = [];
+  for (const [name, re] of CHECK_SECTIONS) { const g = legs.filter(l => l.kind !== "player" && re.test(l.market)); if (g.length) groups.push([name, g]); }
+  const other = legs.filter(l => l.kind !== "player" && !groups.some(([, g]) => g.includes(l)));
+  if (other.length) groups.push(["Other", other]);
+  const players = {};
+  for (const l of legs.filter(l => l.kind === "player")) (players[l.player] ||= []).push(l);
+  for (const [name, g] of Object.entries(players)) groups.push([`Player: ${name}`, g]);
+  const fair = r && r.fair, worth = fair ? fair * 1.02 : null;
+  modal(`<div class="mhead"><div><div style="font-size:20px;font-weight:800">📋 Build it on Bet365</div>
+      <div class="muted">${esc(m.home)} v ${esc(m.away)} · open the match on Bet365 → <b>Bet Builder</b> tab, then tick each leg as you add it.</div></div>
+      <button class="x" data-close title="Close">✕</button></div>
+    <div class="chk-list">${groups.map(([name, g]) => `<div class="chk-grp">${esc(name)}</div>${g.map(l => `
+      <label class="chk-row"><input type="checkbox"><span>${esc(l.player ? capitalise(l.label.replace(l.player + ": ", "").replace(l.player + " ", "")) : l.label)}</span>
+        <span class="muted">${esc(l.market)}</span></label>`).join("")}`).join("")}</div>
+    <div class="chk-price">${fair ? `HAWK's fair odds <b>${odds(fair)}</b> — it's worth it if Bet365 pays <b style="color:var(--accent)">${odds(worth)}+</b>.
+      Type Bet365's price into the slip's price box and HAWK checks it (and suggests a stake).` : ""}</div>
+    <div class="note">Bet365 names some legs a little differently (e.g. "Anytime Goalscorer", "Player Shots on Target 1+"). If a leg isn't offered,
+      remove it here and rebuild — HAWK finds the next best.</div>`);
+  const bg = document.querySelector(".modal-bg");
+  bg.querySelectorAll(".chk-row input").forEach(cb => cb.onchange = () => {
+    cb.closest(".chk-row").classList.toggle("done", cb.checked);
+    const all = [...bg.querySelectorAll(".chk-row input")];
+    if (all.every(x => x.checked)) toast("✅ All legs added — now check Bet365's price against HAWK's.");
+  });
 }
 
 async function evaluateSlip() {

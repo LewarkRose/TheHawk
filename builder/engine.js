@@ -25,7 +25,7 @@
     { key: "top5", name: "Top 5", icon: "👑", ids: { "Premier League": 7, "La Liga": 11, "Serie A": 17, "Bundesliga": 25, "Ligue 1": 35 } },
     { key: "europe", name: "Europe", icon: "🏆", ids: { "Champions League": 572, "Europa League": 573, "Conference League": 7685 } },
     { key: "more", name: "More Europe", icon: "🌍", ids: { "Eredivisie": 57, "Liga Portugal": 73, "Scottish Premiership": 61, "Belgian Pro League": 98,
-        "Süper Lig": 78, "Greek Super League": 84, "Austrian Bundesliga": 111, "Swiss Super League": 95, "Danish Superliga": 119 } },
+        "Süper Lig": 78, "Greek Super League": 84, "Austrian Bundesliga": 111, "Swiss Super League": 95, "Danish Superliga": 119, "Allsvenskan": 122 } },
     { key: "second", name: "Second tier", icon: "🥈", ids: { "Championship": 1, "League One": 2, "2. Bundesliga": 26, "Serie B": 18, "LaLiga 2": 12, "Ligue 2": 36 } },
     { key: "cups", name: "Cups", icon: "🏅", ids: { "FA Cup": 8, "EFL Cup": 9, "Copa del Rey": 13, "Coppa Italia": 20, "DFB-Pokal": 28, "Coupe de France": 37 } },
     { key: "world", name: "World", icon: "🌎", ids: { "MLS": 104, "Brasileirão": 113, "Argentina Primera": 72, "Liga MX": 141, "Saudi Pro League": 649,
@@ -1122,6 +1122,37 @@
                      body.favourite !== false, body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely");
   }
   const evaluateBody = (body) => evaluate(entryFor(body.id).legs, body.legs || []);
+  // "Build again": up to `count` different tickets for the same settings. The
+  // first is the normal build; the others come from building again with one
+  // of its legs (or all of them) left out, and so on, keeping only tickets
+  // that still reach the target. They're picked to differ from each other as
+  // much as possible, best first (fewest legs = least bookmaker margin).
+  function buildOptions(body, count = 5) {
+    const e = entryFor(body.id), target = +body.target || 3, locked = body.locked || [];
+    const run = (banned) => autoBuild(e.legs, target, body.style, +body.maxLegs || 10, locked, banned, body.favourite !== false,
+                                      body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely");
+    const base = new Set(body.banned || []), key = (t) => t.legs.map((l) => l.id).sort().join("|");
+    const first = run(base);
+    if (!first.legs.length) return { options: [first] };
+    const reaches = (t) => t.legs.length && t.fair >= target * 0.97;
+    const free = (t) => t.legs.map((l) => l.id).filter((id) => !locked.includes(id) && e.legs[id].group !== "result");
+    const found = new Map([[key(first), first]]);
+    const tryBan = (ids) => { const t = run(new Set([...base, ...ids])); if (reaches(t) && !found.has(key(t))) found.set(key(t), t); return t; };
+    for (const id of free(first)) tryBan([id]);
+    const fresh = tryBan(free(first));                      // a ticket with none of the first one's legs
+    for (const id of free(fresh)) tryBan([...free(first), id]);
+    // Best first, then as different as possible from the ones already chosen.
+    const quality = (t) => t.legs.length * 10 + Math.abs(Math.log(t.fair / target));
+    const pool = [...found.values()].slice(1).sort((a, b) => quality(a) - quality(b));
+    const chosen = [first];
+    while (chosen.length < count && pool.length) {
+      const overlap = (t) => Math.max(...chosen.map((c) => t.legs.filter((l) => c.legs.some((x) => x.id === l.id)).length / t.legs.length));
+      let bestI = 0, bestV = Infinity;
+      pool.forEach((t, i) => { const v = quality(t) + 12 * overlap(t); if (v < bestV) { bestV = v; bestI = i; } });
+      chosen.push(pool.splice(bestI, 1)[0]);
+    }
+    return { options: chosen.sort((a, b) => quality(a) - quality(b)) };
+  }
 
   // Head to head: the last 5 finished meetings of the two clubs (any
   // competition), each with its corners, cards and shots on target. Past
@@ -1774,7 +1805,7 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, h2h, learnKey, liveMatch,
+  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, h2h, learnKey, liveMatch,
                   scores, matchReport, ticketLive,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },

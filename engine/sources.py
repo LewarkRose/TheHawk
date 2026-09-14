@@ -66,6 +66,7 @@ COMPETITIONS = {
     "Austrian Bundesliga": dict(s365=111, fd="AUT", sh=45, pm="11636"),
     "Swiss Super League": dict(s365=95, fd="SWZ", sh=215, pm="12319"),
     "Danish Superliga": dict(s365=119, fd="DNK", sh=39, pm="10363"),
+    "Allsvenskan": dict(s365=122, fd="SWE", sh=40, pm="11637"),
     # Second tier
     "Championship": dict(s365=1, fd="E1", sh=18, pm="10355"),
     "League One": dict(s365=2, fd="E2", sh=24, pm="11435"),

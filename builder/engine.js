@@ -998,6 +998,27 @@
     }
     return chosen;
   }
+  // The best upset in a match: a result-type leg against the favourite (the
+  // underdog to win, the draw, underdog double chance or +handicap) that
+  // Bet365 prices at or above HAWK's fair odds — so it's value, not just a
+  // long shot. minRatio = Bet365 price × HAWK's chance (1 = exactly fair).
+  // How likely an upset must be, per style: safe = underdog double chance or
+  // +handicap territory, mixed = the draw / a live underdog, bold = long shots.
+  const UPSET_MIN_P = { Banker: 0.45, Balanced: 0.3, Punchy: 0.18 }, UPSET_BUILDER_RATIO = 0.95;
+  function upsetLeg(legs, banned = new Set(), minRatio = 1, style = "Balanced") {
+    const fav = ((legs["res:home"] || {}).p || 0) >= ((legs["res:away"] || {}).p || 0) ? "home" : "away";
+    const dog = fav === "home" ? "away" : "home", minP = UPSET_MIN_P[style] || 0.3;
+    let best = null;
+    for (const id of [`res:${dog}`, "res:draw", `dc:${dog}`, `ah:${dog}:+1.5`, `ah:${dog}:+2.5`]) {
+      const l = legs[id];
+      if (!l || banned.has(id) || !(l.bookPrice > 1) || l.p < minP || l.p > 0.8) continue;
+      const ratio = l.bookPrice * l.p;
+      if (ratio >= minRatio && (!best || ratio > best.ratio + 1e-9 || (Math.abs(ratio - best.ratio) <= 1e-9 && l.p > best.leg.p))) best = { leg: l, ratio };
+    }
+    return best;
+  }
+  // favourite: true = start with the favourite to win (or double chance),
+  // "upset" = start with the best-value upset, false = no result leg forced.
   function autoBuild(legs, target, style = "Balanced", maxLegs = 10, locked = [], banned = new Set(), favourite = true, focus = "Mix", extras = false, picks = "likely") {
     const [lo, hi] = STYLES[style] || STYLES.Balanced;
     let [minPlayers, maxMatch] = FOCUS[focus] || FOCUS.Mix;
@@ -1005,7 +1026,12 @@
     if (!all.length) return evaluate(legs, []);
     const n = all[0].arr.length;
     let chosen = locked.filter((i) => legs[i]);
-    if (favourite && !chosen.some((i) => legs[i].group === "result")) {
+    let upset = null;
+    if (favourite === "upset") {
+      // In a builder an upset priced like the favourite (within Bet365's usual
+      // margin) is a fair swap; the best-priced one is taken.
+      if (!chosen.some((i) => legs[i].group === "result")) { const u = upsetLeg(legs, banned, UPSET_BUILDER_RATIO, style); if (u) { upset = u.leg.id; chosen.unshift(upset); } }
+    } else if (favourite && !chosen.some((i) => legs[i].group === "result")) {
       const side = ["home", "away"].sort((a, b) => ((legs[`res:${b}`] || {}).p || 0) - ((legs[`res:${a}`] || {}).p || 0))[0];
       for (const [id, floor] of [[`res:${side}`, 0.5], [`dc:${side}`, 0.6]]) if (legs[id] && !banned.has(id) && legs[id].p >= floor) { chosen.unshift(id); break; }
     }
@@ -1041,8 +1067,9 @@
       chosen = pruneImplied(legs, chosen, keep, n);
       m = maskOf(legs, chosen, n);
     }
-    return evaluate(legs, chosen);
+    return { ...evaluate(legs, chosen), upset };
   }
+  const favouriteOf = (body) => (body.favourite === "upset" ? "upset" : body.favourite !== false);
 
   // ---------------------------------------------------------------------------
   // Public API — same shapes as the local server's /api endpoints
@@ -1119,7 +1146,7 @@
   function build(body) {
     const e = entryFor(body.id);
     return autoBuild(e.legs, +body.target || 3, body.style, +body.maxLegs || 10, body.locked || [], new Set(body.banned || []),
-                     body.favourite !== false, body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely");
+                     favouriteOf(body), body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely");
   }
   const evaluateBody = (body) => evaluate(entryFor(body.id).legs, body.legs || []);
   // "Build again": up to `count` different tickets for the same settings. The
@@ -1129,13 +1156,14 @@
   // much as possible, best first (fewest legs = least bookmaker margin).
   function buildOptions(body, count = 5) {
     const e = entryFor(body.id), target = +body.target || 3, locked = body.locked || [];
-    const run = (banned) => autoBuild(e.legs, target, body.style, +body.maxLegs || 10, locked, banned, body.favourite !== false,
+    const run = (banned) => autoBuild(e.legs, target, body.style, +body.maxLegs || 10, locked, banned, favouriteOf(body),
                                       body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely");
     const base = new Set(body.banned || []), key = (t) => t.legs.map((l) => l.id).sort().join("|");
     const first = run(base);
     if (!first.legs.length) return { options: [first] };
     const reaches = (t) => t.legs.length && t.fair >= target * 0.97;
-    const free = (t) => t.legs.map((l) => l.id).filter((id) => !locked.includes(id) && e.legs[id].group !== "result");
+    // Legs the variants may leave out: not your locked ones, the result leg or the upset it starts from.
+    const free = (t) => t.legs.map((l) => l.id).filter((id) => !locked.includes(id) && e.legs[id].group !== "result" && id !== t.upset);
     const found = new Map([[key(first), first]]);
     const tryBan = (ids) => { const t = run(new Set([...base, ...ids])); if (reaches(t) && !found.has(key(t))) found.set(key(t), t); return t; };
     for (const id of free(first)) tryBan([id]);
@@ -1254,6 +1282,7 @@
     runFixtureJob(monster, (league, f, json, e) => {
       if (json.started) return;
       const info = fixtureInfo(league, f, json);
+      let normal = null;
       if (params.perMatch === 1) {
         let best = null;
         for (const leg of json.legs) {
@@ -1262,13 +1291,23 @@
           const ratio = leg.bookPrice * leg.p; // above 1 = Bet365 pays more than fair
           if (!best || ratio > best.ratio + 1e-9 || (Math.abs(ratio - best.ratio) <= 1e-9 && leg.p > best.leg.p)) best = { leg, ratio };
         }
-        if (best) monster.results.push({ ...info, legs: [legSummary(e, json, best.leg.id)], p: best.leg.p, fair: best.leg.fair,
-                                         bookPrice: best.leg.bookPrice, ratio: best.ratio });
+        if (best) normal = { legs: [legSummary(e, json, best.leg.id)], p: best.leg.p, fair: best.leg.fair, bookPrice: best.leg.bookPrice, ratio: best.ratio };
       } else {
         const t = autoBuild(e.legs, 1e6, params.style, params.perMatch, [], new Set(), true, params.focus, params.extras);
-        if (t.legs.length) monster.results.push({ ...info, legs: t.legs.map((r) => legSummary(e, json, r.id)), p: t.p, fair: t.fair,
-                                                  bookPrice: null, ratio: null });
+        if (t.legs.length) normal = { legs: t.legs.map((r) => legSummary(e, json, r.id)), p: t.p, fair: t.fair, bookPrice: null, ratio: null };
       }
+      // This match's best-value upset too (the page decides how many to use),
+      // on its own or with safe legs around it for a builder.
+      let upset = null;
+      const u = upsetLeg(e.legs, new Set(), 0.97, params.style);
+      if (u && u.leg.bookPrice >= MIN_ACCA_PRICE) {
+        if (params.perMatch === 1) upset = { legs: [legSummary(e, json, u.leg.id)], p: u.leg.p, fair: u.leg.fair, bookPrice: u.leg.bookPrice, ratio: u.ratio };
+        else {
+          const t = autoBuild(e.legs, 1e6, params.style, params.perMatch, [u.leg.id], new Set(), false, params.focus, params.extras);
+          if (t.legs.length) upset = { legs: t.legs.map((r) => legSummary(e, json, r.id)), p: t.p, fair: t.fair, bookPrice: null, ratio: u.ratio };
+        }
+      }
+      if (normal || upset) monster.results.push({ ...info, ...(normal || { legs: [], p: 0, fair: null, bookPrice: null, ratio: null }), upset });
     });
     return jobStatus(monster);
   }

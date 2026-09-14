@@ -831,6 +831,10 @@ async function openFromUrl() {
   // App shortcuts (long-press the HAWK icon): builder/?view=radar | scores | value | acca | scan
   const views = { radar: showRadar, scores: showScores, value: showValue, acca: showAcca, scan: showScan };
   if (view && views[view]) { history.replaceState(null, "", location.pathname); return views[view](); }
+  // From a goal notification: builder/?view=live&id=GAME&league=L
+  if (view === "live" && q.get("id")) { history.replaceState(null, "", location.pathname); return goToLive(q.get("league"), q.get("id")); }
+  // From a lineup notification: rebuild that match's builder with the confirmed XIs.
+  if (view === "build" && q.get("id")) { history.replaceState(null, "", location.pathname); return goToMatch(q.get("league"), q.get("id")).then(build); }
   if (!id) return;
   history.replaceState(null, "", location.pathname);   // so a refresh doesn't reopen it
   const league = q.get("league"), legs = (q.get("legs") || "").split(",").filter(Boolean);
@@ -2633,14 +2637,23 @@ function renderScores() {
     <div class="section" style="border-top:0">
       <h3 style="display:flex;align-items:center;gap:10px">⚽ Scores
         <button class="ghost" id="goalToggle" style="width:auto;margin:0 0 0 auto;padding:4px 10px;font-size:12px;text-transform:none;letter-spacing:0"
-          title="A goal pops up for matches you have a HAWK bet on, a lineup alert on, or open in the live view">${goalState.on ? "⚽ Goal alerts: on" : "🔕 Goal alerts: off"}</button></h3>
+          title="A goal pops up for matches you have a HAWK bet on, a lineup alert on, or open in the live view — and as a PC / phone notification while HAWK is open in the background">${goalToggleText()}</button></h3>
       <div class="leagues" id="scDays" style="flex-wrap:wrap;margin:0 0 10px">${days.map(([d, t]) => `<button class="pill ${d === sc.day ? "on" : ""}" data-day="${d}">${esc(t)}</button>`).join("")}</div>
       <div class="qchips" id="scLeagues">${scoreChips()}</div>
     </div>
     <div class="section" id="scList"><div class="note">Loading scores…</div></div>`;
-  $("#goalToggle").onclick = (e) => {
+  $("#goalToggle").onclick = async (e) => {
+    const btn = e.currentTarget;
+    if (goalState.on && "Notification" in window && Notification.permission === "default") {
+      // On, but pop-ups not allowed yet: this tap asks for them.
+      try { await Notification.requestPermission(); } catch { /* ignored */ }
+      btn.textContent = goalToggleText();
+      if (Notification.permission === "granted") { toast("🔔 Pop-ups on — goals show on your screen while HAWK is open in the background"); systemNotify("⚽ HAWK goal alerts are on", "Like this, when a match you follow scores."); }
+      return;
+    }
+    if (goalState.on && "Notification" in window && Notification.permission === "denied" && !confirm("Pop-ups are blocked for HAWK in your browser settings (the 🔒 next to the address). Turn goal alerts off?")) return;
     goalState.on = !goalState.on; savePref("hawk.goalAlerts", goalState.on);
-    e.currentTarget.textContent = goalState.on ? "⚽ Goal alerts: on" : "🔕 Goal alerts: off";
+    btn.textContent = goalToggleText();
     toast(goalState.on ? "⚽ Goal alerts on — for your bets, lineup alerts and the live view" : "🔕 Goal alerts off");
     if (goalState.on) checkGoals();
   };
@@ -3154,7 +3167,8 @@ function valueAlert(what, price, fair, onClick) {
   const msg = `💰 Value: ${what} — Bet365 ${odds(price)}, fair ${odds(fair)} (+${(100 * (price / fair - 1)).toFixed(1)}%)`;
   beep(); flashTitle("💰 Value!"); toast(msg);
   if ("Notification" in window && Notification.permission === "granted") {
-    try { const n = new Notification("HAWK", { body: msg }); n.onclick = () => { window.focus(); if (onClick) onClick(); }; } catch {}
+    try { const n = new Notification("HAWK", { body: msg }); n.onclick = () => { window.focus(); if (onClick) onClick(); }; }
+    catch { systemNotify("💰 Value!", msg, { tag: "value" }); }   // phones only allow it through the service worker
   }
 }
 let trackingPrices = false;
@@ -3264,12 +3278,12 @@ async function checkLineups() {
 async function lineupsIn(w, source) {
   const msg = `Lineups confirmed: ${w.home} v ${w.away}${source === "ESPN" ? " (ESPN — first to publish)" : ""}`;
   beep(); flashTitle("🔔 Lineups in!"); toast("🔔 " + msg);
-  if ("Notification" in window && Notification.permission === "granted") {
-    try {
-      const n = new Notification("HAWK", { body: msg + " — click to rebuild your builder." });
-      n.onclick = () => { window.focus(); goToMatch(w.league, w.id).then(build); };
-    } catch {}
-  }
+  // Its lineup alert is done, but keep following it for goals.
+  const follow = loadPref("hawk.goalFollow", {});
+  follow[String(w.id)] = w.kickoff || new Date().toISOString();
+  savePref("hawk.goalFollow", follow);
+  systemNotify("🔔 Lineups in!", `${msg}\nTap to rebuild your builder with them.`,
+               { tag: `lineups-${w.id}`, url: `?view=build&id=${w.id}&league=${encodeURIComponent(w.league || "")}` });
   if (S.view === "match" && S.match && String(S.match.id) === String(w.id)) {
     await openMatch(w.id, true);   // keeps your slip and locked legs
     await build();
@@ -3290,6 +3304,13 @@ function followedGames() {
       if (b.status === "PENDING") for (const l of b.legs || []) if (l.hawk && l.hawk.game) ids.add(String(l.hawk.game));
   } catch { /* no Vault data */ }
   for (const w of S.watch || []) ids.add(String(w.id));
+  // Matches whose lineup alert has already gone off: followed until 3 hours after kick-off.
+  const follow = loadPref("hawk.goalFollow", {}), now = Date.now();
+  let changed = false;
+  for (const [id, ko] of Object.entries(follow)) {
+    if (now - Date.parse(ko) < 3 * 3600e3) ids.add(id); else { delete follow[id]; changed = true; }
+  }
+  if (changed) savePref("hawk.goalFollow", follow);
   if (S.view === "inplay" && S.inplay) ids.add(String(S.inplay.id));
   return ids;
 }
@@ -3333,13 +3354,43 @@ async function goalAlert(g, side, score) {
   card.onclick = (e) => { if (e.target.closest(".gx")) { card.remove(); return; } card.remove(); goToLive(g.league, g.id); };
   box.prepend(card);
   while (box.children.length > 3) box.lastElementChild.remove();
-  setTimeout(() => card.classList.add("bye"), GOAL_SHOW_MS);
-  setTimeout(() => card.remove(), GOAL_SHOW_MS + 600);
-  const msg = off ? `🚫 Goal off: ${g.home} ${score[0]}–${score[1]} ${g.away}` : `⚽ GOAL! ${g.home} ${score[0]}–${score[1]} ${g.away}${scorer && scorer.player ? ` · ${scorer.player} ${scorer.minute}` : ""}${bet ? ` · your bet ${pct(bet.p)}` : ""}`;
+  // Away from HAWK when it happened? The card waits for you to come back.
+  const hideLater = () => { setTimeout(() => card.classList.add("bye"), GOAL_SHOW_MS); setTimeout(() => card.remove(), GOAL_SHOW_MS + 600); };
+  if (document.hidden) document.addEventListener("visibilitychange", function once() { if (!document.hidden) { document.removeEventListener("visibilitychange", once); hideLater(); } });
+  else hideLater();
   if (!off) { beep(); flashTitle("⚽ GOAL!"); }
-  if (document.hidden && "Notification" in window && Notification.permission === "granted") {
-    try { const n = new Notification("HAWK", { body: msg }); n.onclick = () => { window.focus(); goToLive(g.league, g.id); }; } catch {}
+  // A PC / phone notification when HAWK isn't the window you're looking at.
+  if (document.hidden || !document.hasFocus()) {
+    const title = off ? `🚫 Goal off · ${g.home} ${score[0]}–${score[1]} ${g.away}` : `⚽ GOAL! ${g.home} ${score[0]}–${score[1]} ${g.away}`;
+    const body = [off ? `${team}'s goal was taken off` : scorer && scorer.player ? `${scorer.player} ${scorer.minute}${scorer.assist ? ` (assist ${scorer.assist})` : ""}` : `${team} score · ${g.clock || ""}`,
+                  bet ? `🎟 Your bet: ${pct(bet.p, bet.p < 0.1 ? 1 : 0)} to land now · worth ≈ €${(bet.p * bet.ret).toFixed(2)}` : ""].filter(Boolean).join("\n");
+    systemNotify(title, body, { icon: g[who + "Crest"], tag: `goal-${g.id}`, url: `?view=live&id=${g.id}&league=${encodeURIComponent(g.league)}` });
   }
+}
+// PC / phone notifications. Through the service worker where there is one
+// (phones only allow it that way); tapping one opens the page it points to.
+async function systemNotify(title, body, { icon, tag, url } = {}) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  const opts = { body, icon: icon || new URL("../icon-192.png", location.href).href, badge: new URL("../icon-192.png", location.href).href,
+                 tag, renotify: !!tag, data: { url: url ? new URL(url, location.href).href : location.href } };
+  try {
+    const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration("../") : null;
+    if (reg) return await reg.showNotification(title, opts);
+  } catch { /* fall back below */ }
+  try { const n = new Notification(title, opts); n.onclick = () => { window.focus(); if (url) openHawkUrl(opts.data.url); n.close(); }; } catch { /* not allowed here */ }
+}
+// Opens a HAWK link (from a notification) in this page without reloading.
+function openHawkUrl(href) {
+  const q = new URL(href).searchParams;
+  if (q.get("view") === "live" && q.get("id")) goToLive(q.get("league"), q.get("id"));
+  if (q.get("view") === "build" && q.get("id")) goToMatch(q.get("league"), q.get("id")).then(build);
+}
+if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (e) => { if (e.data && e.data.open) { window.focus(); openHawkUrl(e.data.open); } });
+// Goal-alert button on the Scores page: on/off, and asks for pop-up permission.
+function goalToggleText() {
+  if (!goalState.on) return "🔕 Goal alerts: off";
+  const perm = "Notification" in window ? Notification.permission : "unsupported";
+  return perm === "granted" ? "⚽ Goal alerts: on · pop-ups ✓" : perm === "denied" ? "⚽ Goal alerts: on · pop-ups blocked" : "⚽ Goal alerts: on · 🔔 allow pop-ups";
 }
 function beep() {
   try {

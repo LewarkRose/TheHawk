@@ -14,6 +14,17 @@ self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
+// Tapping a HAWK notification (a goal, a lineup): back to HAWK at that match —
+// the open HAWK window if there is one, otherwise a new one.
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || new URL("./builder/", self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+    const hawk = list.find((c) => c.url.includes("/builder/"));
+    if (hawk) { hawk.postMessage({ open: url }); return hawk.focus(); }
+    return self.clients.openWindow(url);
+  }));
+});
 self.addEventListener("fetch", (e) => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== location.origin) return;

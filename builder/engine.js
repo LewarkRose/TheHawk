@@ -1206,6 +1206,28 @@
   }
   const adjOf = (legs, ids) => ids.reduce((s, id) => s * ((legs[id] && legs[id].adj) || 1), 1);
 
+  // Bet365's likely price for a builder: each leg at Bet365's own price (match
+  // legs), Unibet's turned into Bet365's (scorer, assist, shots on target) or
+  // HAWK's estimate, multiplied together and corrected for legs that go
+  // together (HAWK's joint chance against the chances multiplied) — then by
+  // how far off that has been on the builder prices you've typed (aim.c).
+  // With aim on, auto-build builds to this price instead of HAWK's fair odds,
+  // so a 3.25 target shows about 3.25 on Bet365.
+  let aim = null;
+  function setAim(a) { aim = a && typeof a === "object" ? { c: Number.isFinite(+a.c) ? +a.c : 0 } : null; }
+  const UNPRICED_CUT = 0.05;   // a leg nobody prices: about 5% under HAWK's fair odds
+  const hasPrice = (leg) => leg.bookPrice > 1 || leg.refPrice > 1;
+  const legB365 = (leg) => (leg.bookPrice > 1 ? leg.bookPrice : propEstimate(leg) || Math.max(1.01, Math.exp(-UNPRICED_CUT) / leg.p));
+  function b365Raw(legs, ids, joint) {
+    if (!ids.length || !(joint > 0)) return null;
+    let prod = 1, pp = 1;
+    for (const id of ids) { const l = legs[id]; prod *= legB365(l); pp *= l.p * (l.adj || 1); }
+    return prod * Math.min(1.5, Math.max(0.3, pp / joint));
+  }
+  const b365Of = (legs, ids, joint) => { const r = b365Raw(legs, ids, joint); return r && r * Math.exp(aim ? aim.c : 0); };
+  // What auto-build compares with your target.
+  const priceOf = (legs, ids, joint) => (aim ? b365Of(legs, ids, joint) || 0 : joint > 0 ? 1 / joint : 0);
+
   const FIXED_BOOK_LINES = { "res:home": [1, "", "1"], "res:draw": [1, "", "X"], "res:away": [1, "", "2"], "dc:home": [14, "", "1X"],
     "dc:away": [14, "", "X2"], "btts:yes": [12, "", "Yes"], "btts:no": [12, "", "No"], "cs:home": [144, "", "Yes"], "cs:away": [145, "", "Yes"],
     "h1res:home": [5, "", "1"], "h1res:draw": [5, "", "X"], "h1res:away": [5, "", "2"],
@@ -1301,7 +1323,9 @@
       rows.push({ id, p: legs[id].p, cond: before ? Math.min(1, (mean(m) * adj) / before) : 0 });
     }
     const p = Math.min(1, mean(m) * adj, ...chosen.map((id) => legs[id].p));
-    return { p, fair: p > 0 ? 1 / p : null, legs: rows };
+    const raw = b365Raw(legs, chosen, p);
+    return { p, fair: p > 0 ? 1 / p : null, legs: rows, b365: raw && raw * Math.exp(aim ? aim.c : 0), b365raw: raw, price: priceOf(legs, chosen, p) || null,
+             guessed: chosen.filter((id) => !hasPrice(legs[id])).length };
   }
   function pruneImplied(legs, chosen, keep, n) {
     for (const id of chosen.slice()) {
@@ -1326,26 +1350,33 @@
     let m = maskOf(legs, chosen, n);
     while (chosen.length < maxLegs) {
       const adjNow = adjOf(legs, chosen), pNow = mean(m) * adjNow;
-      if (pNow === 0 || 1 / pNow >= target) break;
+      if (pNow === 0 || priceOf(legs, chosen, pNow) >= target) break;
       const groups = new Set(chosen.map((i) => legs[i].group)), perPlayer = {};
       for (const i of chosen) { const k = playerKey(legs[i]); if (k) perPlayer[k] = (perPlayer[k] || 0) + 1; }
       const nPlayers = Object.values(perPlayer).reduce((s, x) => s + x, 0), nMatch = chosen.length - nPlayers;
       let want = nPlayers < minPlayers || nMatch >= maxMatch ? "player" : null;
       if (focus === "Match") want = "match";
       let best = null, bestScore = null;
-      for (const leg of all) {
-        if (chosen.includes(leg.id) || banned.has(leg.id) || groups.has(leg.group) || leg.low_data || (leg.extra && !extras)) continue;
-        if (want && leg.kind !== want) continue;
-        if (leg.kind === "player") { const est = propEstimate(leg); if (est && est <= DEAD_PRICE) continue; }   // Bet365 pays ~nothing for it
-        const k = playerKey(leg);
-        if (k && (perPlayer[k] || 0) >= MAX_LEGS_PER_PLAYER) continue;
-        let c = 0; const a = leg.arr;
-        for (let s = 0; s < n; s++) c += m[s] & a[s];
-        const joint = (c / n) * adjNow * (leg.adj || 1), cond = joint / pNow;
-        if (cond < lo || cond > hi) continue;
-        const reaches = joint > 0 && 1 / joint >= target, t = trust[leg.market] || 1;
-        const score = picks === "value" ? [reaches ? 1 : 0, valueScore(leg) - (1 - t), cond] : [reaches ? 1 : 0, (reaches ? joint : cond) * t];
-        if (!bestScore || isBetter(score, bestScore)) { best = leg.id; bestScore = score; }
+      // Legs with a known price first (Bet365's own, or Unibet's): they're the
+      // ones you'll find on Bet365 at about the price HAWK expects. Guessed legs
+      // (tackles, fouls, saves…) only when none of those fits.
+      for (const guessOk of [false, true]) {
+        for (const leg of all) {
+          if (chosen.includes(leg.id) || banned.has(leg.id) || groups.has(leg.group) || leg.low_data || (leg.extra && !extras)) continue;
+          if (!guessOk && !hasPrice(leg)) continue;
+          if (want && leg.kind !== want) continue;
+          if (leg.kind === "player") { const est = propEstimate(leg); if (est && est <= DEAD_PRICE) continue; }   // Bet365 pays ~nothing for it
+          const k = playerKey(leg);
+          if (k && (perPlayer[k] || 0) >= MAX_LEGS_PER_PLAYER) continue;
+          let c = 0; const a = leg.arr;
+          for (let s = 0; s < n; s++) c += m[s] & a[s];
+          const joint = (c / n) * adjNow * (leg.adj || 1), cond = joint / pNow;
+          if (cond < lo || cond > hi) continue;
+          const reaches = joint > 0 && priceOf(legs, [...chosen, leg.id], joint) >= target, t = trust[leg.market] || 1;
+          const score = picks === "value" ? [reaches ? 1 : 0, valueScore(leg) - (1 - t), cond] : [reaches ? 1 : 0, (reaches ? joint : cond) * t];
+          if (!bestScore || isBetter(score, bestScore)) { best = leg.id; bestScore = score; }
+        }
+        if (best) break;
       }
       if (!best) {
         if (want === "player" && nMatch < maxMatch && focus !== "Match" && minPlayers > 0) { minPlayers = 0; continue; }
@@ -1564,7 +1595,8 @@
     const base = new Set(body.banned || []), key = (t) => t.legs.map((l) => l.id).sort().join("|");
     const first = run(base);
     if (!first.legs.length) return { options: [first] };
-    const reaches = (t) => t.legs.length && t.fair >= target * 0.97;
+    const at = (t) => t.price || t.fair;   // Bet365's likely price with aim on, else HAWK's fair odds
+    const reaches = (t) => t.legs.length && at(t) >= target * 0.97;
     const free = (t) => t.legs.map((l) => l.id).filter((id) => !locked.includes(id) && e.legs[id].group !== "result");
     const found = new Map([[key(first), first]]);
     const tryBan = (ids) => { const t = run(new Set([...base, ...ids])); if (reaches(t) && !found.has(key(t))) found.set(key(t), t); return t; };
@@ -1572,7 +1604,7 @@
     const fresh = tryBan(free(first));                      // a ticket with none of the first one's legs
     for (const id of free(fresh)) tryBan([...free(first), id]);
     // Best first, then as different as possible from the ones already chosen.
-    const quality = (t) => t.legs.length * 10 + Math.abs(Math.log(t.fair / target));
+    const quality = (t) => t.legs.length * 10 + Math.abs(Math.log(at(t) / target)) + 3 * (t.guessed || 0);   // (fewer guessed prices = fewer surprises)
     const pool = [...found.values()].slice(1).sort((a, b) => quality(a) - quality(b));
     const chosen = [first];
     while (chosen.length < count && pool.length) {
@@ -2323,7 +2355,7 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, propEstimate, propKey, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
+  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
                   scores, matchReport, ticketLive,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },

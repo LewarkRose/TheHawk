@@ -48,10 +48,20 @@
     const events = (game.events || []).filter((e) => e.eventType && regular(e));
     const goals = events.filter((e) => e.eventType.id === 1).sort((a, b) => (a.order || 0) - (b.order || 0));
     const cardEvents = events.filter((e) => /card/i.test(e.eventType.name || ""));
-    const team = {};
+    const team = {}, tackles = [0, 0];
     for (const s of (st && st.statistics) || []) {
       const side = s.competitorId === homeId ? 0 : s.competitorId === awayId ? 1 : -1;
       if (side >= 0) (team[s.name] ||= [null, null])[side] = countOf(s.value);
+      if (side >= 0 && s.name === "Tackles Won") tackles[side] = countOf(s.value, true);   // won or not
+    }
+    // Bet365's Early Payout: a Full Time Result leg is paid once that team has
+    // been 2 goals ahead in normal time (only trusted when the goals add up).
+    const ft90 = s90 ? [s90.homeCompetitorScore, s90.awayCompetitorScore] : [game.homeCompetitor.score, game.awayCompetitor.score];
+    let twoUp = null;
+    if (goals.filter((e) => e.competitorId === homeId).length === ft90[0] && goals.filter((e) => e.competitorId === awayId).length === ft90[1]) {
+      twoUp = { home: false, away: false };
+      let d = 0;
+      for (const e of goals) { d += e.competitorId === homeId ? 1 : -1; if (d >= 2) twoUp.home = true; if (d <= -2) twoUp.away = true; }
     }
     const pair = (name) => (team[name] && team[name][0] != null && team[name][1] != null ? team[name] : null);
     const yellow = pair("Yellow Cards"), red = pair("Red Cards") || [0, 0];
@@ -80,7 +90,7 @@
     } catch (e) { /* no closing prices — the result still settles */ }
     return (facts[gameId] = {
       finished: true, homeId,
-      ft: s90 ? [s90.homeCompetitorScore, s90.awayCompetitorScore] : [game.homeCompetitor.score, game.awayCompetitor.score],
+      ft: ft90, twoUp, tackles,
       ht: ht ? [ht.homeCompetitorScore, ht.awayCompetitorScore] : null,
       first: goals.length ? (goals[0].competitorId === homeId ? "home" : "away") : null,
       corners: pair("Corners"), sot: pair("Shots On Target"), cards, players, closing,
@@ -118,7 +128,9 @@
   }
 
   // 'won' | 'lost' | 'void' (player didn't play) | 'unknown' (no data)
-  function legResult(h, f) {
+  // opts.earlyPayout: settle Full Time Result legs the way Bet365's Early
+  // Payout does (the Vault, for your bets) — not for grading HAWK's chances.
+  function legResult(h, f, opts = {}) {
     const id = h.id || "", W = (c) => (c ? "won" : "lost");
     const [H, A] = f.ft, side = (s) => (s === "home" ? [H, A] : [A, H]);
     const line = (ou, value, x) => (ou === "o" ? x > value : x < value);
@@ -134,8 +146,18 @@
                   assist: countOf(s["Assists"]), soa: countOf(s["Goals"]) + countOf(s["Assists"]), booked: pl.booked ? 1 : 0,
                   fouls: countOf(s["Fouls Made"]), fouled: countOf(s["Was Fouled"]), tackles: countOf(s["Tackles Won"], true),
                   offsides: countOf(s["Offsides"]), saves: countOf(s["Goalkeeper Saves"]) }[stat];
-      return v === undefined ? "unknown" : W(v >= need);
+      if (v === undefined) return "unknown";
+      // 365Scores names a player's tackles only once he's won one; Bet365 also
+      // counts the ones that lost the ball. If his team has tackles nobody is
+      // named for, some may be his — HAWK can't tell, so it doesn't guess.
+      if (stat === "tackles" && v < need && s["Tackles Won"] == null && f.tackles) {
+        const sideIdx = sd === "home" ? 0 : 1;
+        const named = (f.players[sd] || []).reduce((a, p) => a + countOf(p.stats["Tackles Won"], true), 0);
+        if (f.tackles[sideIdx] > named) return "unknown";
+      }
+      return W(v >= need);
     }
+    if ((m = /^res:(home|away)$/.exec(id)) && opts.earlyPayout && f.twoUp && f.twoUp[m[1]]) return "won";
     if ((m = /^res:(home|draw|away)$/.exec(id))) return W(m[1] === "home" ? H > A : m[1] === "away" ? A > H : H === A);
     if ((m = /^dc:(home|away)$/.exec(id))) return W(m[1] === "home" ? H >= A : A >= H);
     if ((m = /^goals:([ou])([\d.]+)$/.exec(id))) return W(line(m[1], +m[2], H + A));

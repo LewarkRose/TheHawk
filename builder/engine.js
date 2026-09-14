@@ -1909,6 +1909,14 @@
     const ht = (game.stages || []).find((s) => s.id === 7 && s.isEnded);
     const inFirstHalf = !ht && /1st/i.test(st.statusText || "");
     const goals = (game.events || []).filter((e) => e.eventType && e.eventType.id === 1).sort((a, b) => (a.order || 0) - (b.order || 0));
+    // Bet365's Early Payout: a Full Time Result leg is paid as won once that
+    // team has been 2 goals ahead at any point. Followed through the goals in
+    // order (only when they add up to the score; otherwise the score now).
+    const twoUp = { home: sh - sa >= 2, away: sa - sh >= 2 };
+    if (goals.filter((e) => e.competitorId === hc.id).length === sh && goals.filter((e) => e.competitorId === ac.id).length === sa) {
+      let d = 0;
+      for (const e of goals) { d += e.competitorId === hc.id ? 1 : -1; if (d >= 2) twoUp.home = true; if (d <= -2) twoUp.away = true; }
+    }
     // Players: live numbers, who's still on, and their usual rates.
     const names = Object.fromEntries((game.members || []).map((m) => [m.id, m.name]));
     const subsIn = new Set(), subsOut = new Set(), sentOff = new Set(), booked = new Set();
@@ -1966,7 +1974,10 @@
     for (const h of legs) {
       const id2 = h.id || "", row = { id: id2, label: h.label, state: "live", p: null, note: "" };
       let m, t;
-      if ((t = goalTest(id2))) {
+      if ((m = /^res:(home|away)$/.exec(id2)) && twoUp[m[1]]) {
+        row.state = "won"; row.p = 1; row.ep = true;
+        row.note = `score ${sh}-${sa} · Early Payout: ${m[1] === "home" ? hc.name : ac.name} went 2 goals ahead, so Bet365 pays this leg as won (if your slip shows EP)`;
+      } else if ((t = goalTest(id2))) {
         goalTests.push(t);
         row.p = sumCells(M, t);
         if (row.p > 0.9999) { row.state = "won"; row.p = 1; } else if (row.p < 1e-4) { row.state = "lost"; row.p = 0; }

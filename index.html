@@ -1844,14 +1844,16 @@
                         if (!f) { allDone = false; allWon = false; continue; }
                         if (f.off) { issues.push(`${l.fixture}: ${f.off}`); allWon = false; continue; }
                         l.hawk.score = `${f.ft[0]}-${f.ft[1]}`;
-                        for (const h of l.hawk.legs) h.result = legResult(h, f);
+                        for (const h of l.hawk.legs) h.result = legResult(h, f, { earlyPayout: true });
                         const rs = l.hawk.legs.map(h => h.result);
                         if (rs.includes('lost')) anyLost = true;
                         else if (!rs.every(r => r === 'won')) {
                             allWon = false;
                             l.hawk.legs.forEach(h => {
                                 if (h.result === 'void') issues.push(`${h.label} — didn't play (Bet365 voids that leg)`);
-                                else if (h.result === 'unknown') issues.push(`${h.label} — no result data`);
+                                else if (h.result === 'unknown') issues.push(/Tackles/.test(h.label)
+                                    ? `${h.label} — his team made tackles 365Scores doesn't name (lost the ball); Bet365 counts those, check your slip`
+                                    : `${h.label} — no result data`);
                             });
                         }
                     }

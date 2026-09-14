@@ -2077,7 +2077,10 @@ function renderAcca() {
   $("#mHrs").onchange = (e) => { mo.hours = windowValue(e.target.value); updateMonster(); };  $("#mStyle").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; mo.style = b.dataset.s;
     $("#mStyle").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); updateMonster(); };
   $("#monGo").onclick = toggleMonster;
-  $("#monRes").onclick = monsterClick;
+  // Swap out acts the moment you press (mouse or finger), so a redraw during
+  // the scan can't swallow the tap; keyboard Enter still arrives as a click.
+  $("#monRes").onpointerdown = (e) => { if (e.button === 0 && e.target.closest("[data-mskip]")) { e.preventDefault(); monsterClick(e); } };
+  $("#monRes").onclick = (e) => { if (e.detail === 0) monsterClick(e); };
   renderAccaBody();
   updateMonster();
 }
@@ -2224,7 +2227,10 @@ function monsterPick() {
   picked.sort((a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""));
   return { picked, bench };
 }
-function updateMonster() {
+// force: redraw even if the picks look the same (after a swap). Otherwise the
+// list is only redrawn when it changes, so a tap during a scan isn't lost to a
+// redraw every 1.5 seconds.
+function updateMonster(force = false) {
   if (S.view !== "acca" || !$("#monRes")) return;
   const d = S.monster.data || { running: false, total: 0, done: 0, errors: 0, results: [] };
   $("#monGo").textContent = d.running ? "■ STOP" : d.total ? (monsterStale() ? "👹 BUILD AGAIN (settings changed)" : "👹 BUILD AGAIN") : "👹 BUILD MONSTER ACCA";
@@ -2238,7 +2244,7 @@ function updateMonster() {
     return;
   }
   const ev = t.known ? t.known * t.p - 1 : null;
-  $("#monRes").innerHTML = `
+  const html = `
     <div class="monhead"><div><div class="bigodds">${odds(t.known || t.fair)}</div>
         <div class="muted" style="font-size:12px">${t.known ? `Bet365 price · fair ${odds(t.fair)}` : "fair odds · Bet365 prices builders itself"}</div></div>
       <div><b>${t.legs} legs</b> · ${picked.length} matches<br><span class="muted">lands ${pct(t.p, t.p < 0.1 ? 2 : 1)} — about 1 in ${Math.round(1 / t.p)}</span>
@@ -2253,13 +2259,32 @@ function updateMonster() {
       so a negative figure is normal — an acca boost (Boost % in your acca) can flip it.`
       : `Each match is a ${d.params.perMatch}-leg builder, safest first. Bet365 prices each builder itself — add it to your acca and type the price it shows.`}
       Matches are independent, so the chance is the product of each match's chance.</div>`;
+  const box = $("#monRes");
+  if (!force && box.dataset.html === html) return;   // nothing changed: keep the buttons you're about to tap
+  box.innerHTML = html; box.dataset.html = html;
   $("#monUse").onclick = () => { if (S.acca.length && !confirm("Replace your current acca with this one?")) return;
     S.acca = []; picked.forEach(r => putPart(makePart(r, r.legs, r.p))); S.accaChk.price = ""; renderAccaBody(); updateMonster(); toast(`🧩 Your acca: ${t.legs} legs.`); };
   $("#monAdd").onclick = () => { picked.forEach(r => putPart(makePart(r, r.legs, r.p))); renderAccaBody(); toast(`🧩 Added — your acca has ${accaLegCount()} legs.`); };
 }
+// Swap out: drop that match and let the next best take its place. If the
+// ticket is already your acca ("Use as my acca"), your acca is swapped too.
 function monsterClick(e) {
   const s = e.target.closest("[data-mskip]");
-  if (s) { S.monster.skip.add(s.dataset.mskip); updateMonster(); }
+  if (!s) return;
+  const id = s.dataset.mskip, before = monsterPick().picked;
+  const out = before.find(r => String(r.id) === id);
+  S.monster.skip.add(id);
+  const after = monsterPick().picked, incoming = after.filter(r => !before.some(b => String(b.id) === String(r.id)));
+  const inAcca = S.acca.findIndex(pt => String(pt.id) === id);
+  if (inAcca >= 0) {
+    S.acca.splice(inAcca, 1);
+    incoming.forEach(r => { if (!S.acca.some(pt => String(pt.id) === String(r.id))) putPart(makePart(r, r.legs, r.p)); });
+    saveAcca(); renderAccaBody();
+  }
+  const name = (r) => `${r.home} v ${r.away}`;
+  toast(incoming.length ? `🔄 ${out ? name(out) : "Match"} → ${incoming.map(name).join(" + ")}${inAcca >= 0 ? " (your acca too)" : ""}`
+    : `Removed ${out ? name(out) : "that match"} — no other match fits these settings (try more leagues or a longer window).`);
+  updateMonster(true);
 }
 
 /* ---------- page navigation ---------- */

@@ -1546,15 +1546,21 @@
       if (json.started) return;
       const info = fixtureInfo(league, f, json);
       if (params.perMatch === 1) {
-        let best = null;
-        for (const leg of json.legs) {
-          // Below 1.15 a leg adds risk but hardly any odds, so it's left out.
-          if (!leg.bookPrice || leg.bookPrice < MIN_ACCA_PRICE || leg.kind !== "match" || leg.p < lo || leg.p > hi) continue;
-          const ratio = leg.bookPrice * leg.p; // above 1 = Bet365 pays more than fair
-          if (!best || ratio > best.ratio + 1e-9 || (Math.abs(ratio - best.ratio) <= 1e-9 && leg.p > best.leg.p)) best = { leg, ratio };
+        // Every Bet365-priced match leg in the style's range, best first (Bet365
+        // paying closest to — or above — fair). The first is used; the rest are
+        // this match's "other leg" options. Below 1.15 a leg adds risk but
+        // hardly any odds, so it's left out.
+        const ranked = json.legs.filter((leg) => leg.bookPrice && leg.bookPrice >= MIN_ACCA_PRICE && leg.kind === "match" && leg.p >= lo && leg.p <= hi)
+          .map((leg) => ({ leg, ratio: leg.bookPrice * leg.p }))   // above 1 = Bet365 pays more than fair
+          .sort((a, b) => b.ratio - a.ratio || b.leg.p - a.leg.p);
+        // One per group: "Over 2.5" and "Over 1.5 goals" aren't two different options.
+        const seen = new Set(), alts = [];
+        for (const { leg, ratio } of ranked) {
+          if (seen.has(leg.group) || alts.length >= 6) continue;
+          seen.add(leg.group);
+          alts.push({ legs: [legSummary(e, json, leg.id)], p: leg.p, fair: leg.fair, bookPrice: leg.bookPrice, ratio });
         }
-        if (best) monster.results.push({ ...info, legs: [legSummary(e, json, best.leg.id)], p: best.leg.p, fair: best.leg.fair,
-                                         bookPrice: best.leg.bookPrice, ratio: best.ratio, upset: json.upset });
+        if (alts.length) monster.results.push({ ...info, ...alts[0], alts, upset: json.upset });
       } else {
         const t = autoBuild(e.legs, 1e6, params.style, params.perMatch, [], new Set(), true, params.focus, params.extras);
         if (t.legs.length) monster.results.push({ ...info, legs: t.legs.map((r) => legSummary(e, json, r.id)), p: t.p, fair: t.fair,

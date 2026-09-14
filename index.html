@@ -1399,7 +1399,10 @@
                             // Legs sent from the HAWK builder carry each selection and, once
                             // the match is over, its result.
                             const hawkLegs = l.hawk && Array.isArray(l.hawk.legs) ? l.hawk.legs : null;
-                            const parts = hawkLegs ? hawkLegs.map(h => ({ text: escHtml(h.label), res: h.result }))
+                            // Closing price check: your Bet365 price for the leg vs its last price before kick-off.
+                            const clv = (h) => h.bookPrice && h.close
+                                ? ` <span class="text-[10px] ${h.bookPrice > h.close ? 'text-emerald-400' : h.bookPrice < h.close ? 'text-red-400' : 'text-zinc-500'}" title="Bet365's price when you bet vs its last price before kick-off">· you ${Number(h.bookPrice).toFixed(2)} → close ${Number(h.close).toFixed(2)}</span>` : '';
+                            const parts = hawkLegs ? hawkLegs.map(h => ({ text: escHtml(h.label) + clv(h), res: h.result }))
                                 : l.selection.split(' & ').map(p => ({ text: p.trim() })).filter(p => p.text);
                             const mark = (r) => r === 'won' ? '<span class="text-emerald-400 shrink-0">✓</span>'
                                 : r === 'lost' ? '<span class="text-red-400 shrink-0">✗</span>'
@@ -1416,7 +1419,8 @@
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <span class="text-xs text-zinc-400 font-bold">@ ${l.odds.toFixed(2)}</span>
-                                    ${hawkLegs && l.hawk.game ? `<a href="${hawkLink(l)}" class="bg-[#c9a05c]/15 hover:bg-[#c9a05c]/25 text-[#d9b571] px-2 py-1 rounded text-[10px] font-bold transition whitespace-nowrap" title="Open this match in the HAWK builder (live view or match report if it has started)">Open in HAWK</a>` : ''}
+                                    ${hawkLegs && l.hawk.game ? `<a href="${hawkLink(l)}" class="bg-[#c9a05c]/15 hover:bg-[#c9a05c]/25 text-[#d9b571] px-2 py-1 rounded text-[10px] font-bold transition whitespace-nowrap" title="Open this match in the HAWK builder (live view or match report if it has started)">${
+                                        bet.status === 'PENDING' && Date.parse(l.hawk.kickoff || 0) < Date.now() && !l.hawk.score ? '🔴 Live · cash out?' : 'Open in HAWK'}</a>` : ''}
                                     <button onclick="reuseLeg('${bet.id}', ${li})" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded text-[10px] transition" title="Reuse this selection">Reuse</button>
                                 </div>
                             </div>
@@ -1703,7 +1707,20 @@
                 <div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-2">By market</div>
                 ${markets.map(([m, l]) => row(escHtml(m), l)).join('')}
                 ${tickets.length ? `<div class="text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 mt-2">Tickets: HAWK expected
-                    <b>${expWins.toFixed(1)}</b> of your ${tickets.length} settled HAWK tickets to win — <b class="${wins >= expWins ? 'text-emerald-400' : 'text-red-400'}">${wins}</b> did.</div>` : ''}`;
+                    <b>${expWins.toFixed(1)}</b> of your ${tickets.length} settled HAWK tickets to win — <b class="${wins >= expWins ? 'text-emerald-400' : 'text-red-400'}">${wins}</b> did.</div>` : ''}
+                ${closingSummary()}`;
+        }
+        // Did you get better prices than Bet365's last price before kick-off? Beating
+        // that "closing price" regularly is the quickest sign of a real edge — much
+        // faster than waiting for wins and losses to even out.
+        function closingSummary() {
+            const legs = bets.flatMap(b => (b.legs || []).flatMap(l => (l.hawk && l.hawk.legs) || [])).filter(h => h.bookPrice > 1 && h.close > 1);
+            if (!legs.length) return `<div class="text-[11px] text-zinc-500 pt-2">📉 Closing price check: after each match HAWK compares the Bet365 price you got with its last price before kick-off. It fills in as your HAWK bets settle.</div>`;
+            const beat = legs.filter(h => h.bookPrice > h.close).length;
+            const avg = legs.reduce((s, h) => s + (h.bookPrice / h.close - 1), 0) / legs.length;
+            return `<div class="text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 mt-2">📉 Closing price: you beat Bet365's closing price on
+                <b>${beat} of ${legs.length}</b> legs, by <b class="${avg >= 0 ? 'text-emerald-400' : 'text-red-400'}">${avg >= 0 ? '+' : ''}${(100 * avg).toFixed(1)}%</b> on average.
+                <span class="text-zinc-500">Consistently positive = HAWK is finding prices before the market moves to them.</span></div>`;
         }
 
         // --- AUTO-SETTLE: bets sent from the HAWK builder settle themselves ---
@@ -1753,14 +1770,41 @@
                     return { name: names[m.id] || '', minutes: countOf(stats['Minutes']), stats, booked: bookedIds.has(m.id) };
                 });
             }
+            // Closing prices: once a match is over, 365Scores shows each Bet365 line at
+            // its last price before kick-off (the opening price is kept separately).
+            const closing = {};
+            try {
+                const lines = await s365('bets/lines', { games: gameId, userCountryId: 21 });
+                const b365 = new Set(((lines && lines.bookmakers) || []).filter(b => /bet365/i.test(b.name || '')).map(b => b.id));
+                for (const l of (lines && lines.lines) || []) {
+                    if (!b365.has(l.bookmakerId)) continue;
+                    closing[`${l.lineTypeId}|${l.internalOptionValue ?? ''}`] = Object.fromEntries((l.options || [])
+                        .map(o => [String(o.name), o.rate && o.rate.decimal]).filter(([, v]) => v > 1));
+                }
+            } catch (e) { /* no closing prices — the result still settles */ }
             return (matchFacts[gameId] = {
                 finished: true, homeId,
                 ft: s90 ? [s90.homeCompetitorScore, s90.awayCompetitorScore] : [game.homeCompetitor.score, game.awayCompetitor.score],
                 ht: ht ? [ht.homeCompetitorScore, ht.awayCompetitorScore] : null,
                 first: goals.length ? (goals[0].competitorId === homeId ? 'home' : 'away') : null,
-                corners: pair('Corners'), sot: pair('Shots On Target'), cards, players,
+                corners: pair('Corners'), sot: pair('Shots On Target'), cards, players, closing,
             });
         }
+        // The Bet365 line a HAWK leg is on: [365Scores line type, value, option]
+        // (same mapping as the builder's engine; handicap values are the home side's).
+        const FIXED_BOOK_LINES = { 'res:home': [1, '', '1'], 'res:draw': [1, '', 'X'], 'res:away': [1, '', '2'], 'dc:home': [14, '', '1X'],
+            'dc:away': [14, '', 'X2'], 'btts:yes': [12, '', 'Yes'], 'btts:no': [12, '', 'No'], 'cs:home': [144, '', 'Yes'], 'cs:away': [145, '', 'Yes'],
+            'h1res:home': [5, '', '1'], 'h1res:draw': [5, '', 'X'], 'h1res:away': [5, '', '2'], 'first:home': [7, '', 'Home'], 'first:away': [7, '', 'Away'] };
+        const LINE_TYPES = { goals: 3, corners: 137, cards: 141, h1goals: 9, sot: 139 };
+        function bookLine(id) {
+            if (FIXED_BOOK_LINES[id]) return FIXED_BOOK_LINES[id];
+            const [kind, rest, extra] = String(id).split(':');
+            if (LINE_TYPES[kind] && rest && (rest[0] === 'o' || rest[0] === 'u')) return [LINE_TYPES[kind], rest.slice(1), rest[0] === 'o' ? 'Over' : 'Under'];
+            if (kind === 'ah' && extra) { const h = parseFloat(extra); return [11, String(rest === 'home' ? h : -h), rest === 'home' ? 'Home' : 'Away']; }
+            if (kind === 'cs' && /^\d-\d$/.test(rest || '')) return [126, rest, 'Yes'];
+            return null;
+        }
+        const closingPrice = (h, f) => { const b = bookLine(h.id); return b && f.closing ? (f.closing[`${b[0]}|${b[1]}`] || {})[b[2]] || null : null; };
         const normName = (s) => String(s || '').replace(/[øØ]/g, 'o').replace(/ß/g, 'ss').normalize('NFKD').replace(/\p{M}/gu, '')
             .toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
         function findPlayer(list, name) {
@@ -1835,10 +1879,20 @@
             try {
                 // 1. Fetch the finished matches (slow part), 2. apply to the freshest copy of your bets.
                 const due = (l) => l.hawk && l.hawk.game && Date.now() > Date.parse(l.hawk.kickoff || 0) + 105 * 60000;
-                const games = [...new Set(bets.filter(b => b.status === 'PENDING').flatMap(b => b.legs.filter(due).map(l => String(l.hawk.game))))];
+                // Settled HAWK tickets from the last 2 weeks that haven't had their closing prices read yet.
+                const needsClose = (l) => due(l) && !l.hawk.closeChecked && (l.hawk.legs || []).some(h => h.bookPrice)
+                    && Date.now() - Date.parse(l.hawk.kickoff || 0) < 14 * 86400000;
+                const games = [...new Set(bets.flatMap(b => b.legs.filter(l => (b.status === 'PENDING' && due(l)) || needsClose(l)).map(l => String(l.hawk.game))))];
                 for (const g of games) { try { await fetchMatchFacts(g); } catch (e) { console.warn('[vault] result check failed', g, e); } }
 
                 reloadFromStorage();
+                // Closing prices for every finished HAWK leg we have them for.
+                for (const bet of bets) for (const l of bet.legs || []) {
+                    const f = l.hawk && due(l) ? matchFacts[String(l.hawk.game)] : null;
+                    if (!f || !f.finished || f.off || l.hawk.closeChecked) continue;
+                    for (const h of l.hawk.legs || []) { const c = closingPrice(h, f); if (c) h.close = c; }
+                    l.hawk.closeChecked = true;
+                }
                 const settledNow = [];
                 let waiting = 0;
                 for (const bet of bets) {

@@ -168,6 +168,15 @@ img{max-width:100%}
 .sc-state{font-size:12px;font-weight:700}
 .sc-live{color:var(--red);font-weight:800}
 .sc-soon{color:var(--gold);font-weight:800;white-space:nowrap}
+.co-card{border:1px solid rgba(255,209,102,.35);border-radius:14px;padding:14px;margin-bottom:12px;background:rgba(255,209,102,.04)}
+.co-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.co-leg{display:grid;grid-template-columns:24px 1fr auto;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
+.co-leg small{display:block;color:var(--muted);font-size:11px}
+.co-worth{margin-top:8px;font-size:13px}
+.co-worth b{color:var(--gold)}
+.co-offer{margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.co-offer label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.co-offer input{width:120px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:#12181c;font-size:16px;font-weight:700}
 .badge.soon{background:rgba(255,209,102,.14);color:var(--gold)}
 .kick-cd{margin-top:6px;font-size:13px;color:var(--gold);font-weight:600}
 .kick-cd b{font-weight:900}
@@ -481,6 +490,7 @@ async function api(path, body) {
     case "/api/live": return HAWK.liveMatch(q.id);
     case "/api/scores": return HAWK.scores(q.day);
     case "/api/report": return HAWK.matchReport(q.id);
+    case "/api/ticketlive": return HAWK.ticketLive(q.id, body.legs);
     case "/api/legprices": return HAWK.legPrices(body.items);
     case "/api/monster": return body ? HAWK.startMonster(body) : HAWK.monsterStatus();
     case "/api/monster/stop": return HAWK.stopMonster();
@@ -975,7 +985,8 @@ function sendToVault() {
 function hawkPart(info, legs, p) {
   return { game: String(info.id), league: info.league, home: info.home, away: info.away, kickoff: info.kickoff, p,
            legs: legs.map(l => ({ id: l.id, label: l.label, market: l.market, p: l.p, pRaw: l.pRaw != null ? l.pRaw : l.p,
-                                  player: l.player || null, side: l.side || null })) };
+                                  player: l.player || null, side: l.side || null,
+                                  bookPrice: l.bookPrice || null })) };   // Bet365's single price when you bet (closing price check)
 }
 // Adds a PENDING bet to the Vault and takes the stake off its bankroll.
 function saveToVault(legs, stake, price, extra = {}) {
@@ -1730,7 +1741,75 @@ async function refreshInPlay() {
   if (document.hidden && ip.data) return;
   try { ip.data = await api(`/api/live?id=${ip.id}`); ip.error = null; }
   catch (err) { ip.error = err.message; }
+  if (ip.data && ip.data.live) { try { ip.mine = await myLiveTickets(ip.id); } catch (err) { console.warn("[hawk] cash-out helper:", err.message); } }
   if (S.view === "inplay" && S.inplay === ip) renderInPlay();
+}
+
+/* ---------- cash-out helper ---------- */
+// Your pending HAWK tickets on the match in play: the live chance of each leg
+// and of the whole ticket (other matches in an acca count at their result, or
+// HAWK's pre-match chance if they haven't finished), what the ticket is worth
+// on average right now, and whether Bet365's cash-out offer beats that.
+async function myLiveTickets(gameId) {
+  let bets = [];
+  try { bets = JSON.parse(localStorage.getItem("hawk_bets")) || []; } catch { return []; }
+  const out = [];
+  for (const b of bets) {
+    if (b.status !== "PENDING" || !(b.legs || []).some(l => l.hawk && String(l.hawk.game) === String(gameId))) continue;
+    let p = 1, approx = false, unknown = 0;
+    const parts = [];
+    for (const l of b.legs) {
+      if (!l.hawk) { unknown++; continue; }
+      if (String(l.hawk.game) === String(gameId)) {
+        const live = await api(`/api/ticketlive?id=${gameId}`, { legs: l.hawk.legs });
+        if (!live) { unknown++; continue; }
+        parts.push({ fixture: l.fixture, live });
+        p *= live.p; unknown += live.unknown;
+      } else {
+        const rs = (l.hawk.legs || []).map(h => h.result);
+        if (rs.includes("lost")) p = 0;
+        else if (rs.length && rs.every(r => r === "won")) { /* already landed */ }
+        else { p *= l.hawk.p || 1; approx = true; }
+        parts.push({ fixture: l.fixture, other: rs.includes("lost") ? "lost" : rs.length && rs.every(r => r === "won") ? "won" : "pending", p: l.hawk.p });
+      }
+    }
+    out.push({ id: b.id, stake: b.stake, odds: b.odds, ret: b.potentialReturn, p, approx, unknown, parts });
+  }
+  return out;
+}
+function cashOutSection() {
+  const mine = (S.inplay && S.inplay.mine) || [];
+  if (!mine.length) return "";
+  S.inplay.offers ||= {};
+  const icon = { won: "✅", lost: "❌", live: "⏳", wait: "⏸", void: "⊘" };
+  return `<div class="section"><h3>🎟 Your bet${mine.length > 1 ? "s" : ""} on this match</h3>${mine.map(t => {
+    const hold = t.p * t.ret, offer = parseFloat(String(S.inplay.offers[t.id] || "").replace(",", "."));
+    const legRows = t.parts.map(pt => pt.live ? pt.live.legs.map(r => `<div class="co-leg"><span>${icon[r.state] || "⏳"}</span><span>${esc(r.label)}<small>${esc(r.note || "")}</small></span>
+        <b>${r.state === "won" ? "done" : r.state === "lost" ? "lost" : r.p == null ? "—" : pct(r.p, r.p < 0.1 ? 1 : 0)}</b></div>`).join("")
+      : `<div class="co-leg"><span>${pt.other === "won" ? "✅" : pt.other === "lost" ? "❌" : "🕒"}</span><span>${esc(pt.fixture)}<small>${pt.other === "pending" ? "other match — HAWK's pre-match chance" : "other match"}</small></span>
+        <b>${pt.other === "won" ? "done" : pt.other === "lost" ? "lost" : pct(pt.p, 0)}</b></div>`).join("");
+    const verdict = !(offer > 0) ? `<div class="note" style="margin:6px 0 0">Type Bet365's cash-out offer to see if it's worth taking.</div>`
+      : offer >= hold ? `<div class="verdict good">💰 TAKE IT<small>€${offer.toFixed(2)} is more than the ticket is worth on average right now (€${hold.toFixed(2)}).</small></div>`
+      : `<div class="verdict bad">✋ KEEP IT<small>On average the ticket is worth €${hold.toFixed(2)} — €${(hold - offer).toFixed(2)} more than the offer. Cash-out offers usually sit 5–10% below fair.</small></div>`;
+    return `<div class="co-card">
+      <div class="co-top"><div><b>€${t.stake.toFixed(2)} @ ${odds(t.odds)}</b><div class="muted" style="font-size:12px">returns €${t.ret.toFixed(2)} if it lands</div></div>
+        <div style="text-align:right"><div class="bigodds" style="color:${t.p > 0 ? "var(--accent)" : "#ff8a8a"}">${pct(t.p, t.p < 0.1 ? 1 : 0)}</div><div class="muted" style="font-size:12px">chance it lands now</div></div></div>
+      ${legRows}
+      <div class="co-worth">Worth now ≈ <b>€${hold.toFixed(2)}</b> on average${t.approx ? " (other matches at HAWK's pre-match chance)" : ""}${t.unknown ? ` · ${t.unknown} leg${t.unknown === 1 ? "" : "s"} not counted` : ""}</div>
+      <div class="co-offer"><label>Bet365 cash-out offer (€)</label><input inputmode="decimal" data-offer="${esc(t.id)}" value="${esc(S.inplay.offers[t.id] || "")}" placeholder="e.g. 4.20"></div>
+      <div data-verdict="${esc(t.id)}">${verdict}</div></div>`;
+  }).join("")}
+    <div class="note">Only the goal legs are linked to each other; everything else is treated as independent, so take the % as a guide. Chances update every 30 seconds.</div></div>`;
+}
+function bindCashOut() {
+  document.querySelectorAll("[data-offer]").forEach(inp => inp.oninput = () => {
+    S.inplay.offers[inp.dataset.offer] = inp.value;
+    // redraw just this ticket's verdict so the cursor stays in the box
+    const el = document.querySelector(`[data-verdict="${inp.dataset.offer}"]`);
+    const tmp = document.createElement("div"); tmp.innerHTML = cashOutSection();
+    const fresh = tmp.querySelector(`[data-verdict="${inp.dataset.offer}"]`);
+    if (el && fresh) el.innerHTML = fresh.innerHTML;
+  });
 }
 function renderInPlay() {
   const ip = S.inplay, d = ip.data;
@@ -1774,7 +1853,7 @@ function renderInPlay() {
       <div>${k && k.stake ? `<b style="color:var(--gold)">€${k.stake.toFixed(2)}</b>` : '<span class="muted">—</span>'}</div></div>`;
   };
   const headRow = `<div class="ip-row head"><div>Bet</div><div>Bet365</div><div class="hide-sm">Fair</div><div class="hide-sm">Chance</div><div>Edge</div><div>Stake</div></div>`;
-  $("#match").innerHTML = head + `
+  $("#match").innerHTML = head + cashOutSection() + `
     <div class="section"><h3>Live win chances</h3>
       <div class="bar3"><div class="h" style="flex:${p.home}">${pct(p.home)}</div><div class="d" style="flex:${p.draw}">${pct(p.draw)}</div><div class="a" style="flex:${p.away}">${pct(p.away)}</div></div>
       <div class="note">From ${d.basis === "live prices" ? `the live prices of ${d.books || "several"} bookmakers` : "HAWK's pre-match ratings (no live prices yet)"}${
@@ -1792,6 +1871,7 @@ function renderInPlay() {
         Only selections with a 20%+ chance count as value. Asian handicaps aren't listed (in play they're settled on goals scored after you bet),
         and nor are corners and cards (bookmakers update those live lines too unevenly to compare).
         <b>Losing a bet on this match? Don't chase it</b> — only bet what shows as value, at the stake shown.</div></div>`;
+  bindCashOut();
 }
 
 /* ---------- learning from your results ---------- */

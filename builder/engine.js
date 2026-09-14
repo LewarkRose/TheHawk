@@ -1430,6 +1430,8 @@
     });
     const M = finalMatrix(sh, sa, rates[0] * tilt[0], rates[1] * tilt[1]);
     const anLive = { M, lamBlend: rates };
+    liveState[id] = { M, sh, sa, rem, elapsed, statusText: game.statusText, rates: [rates[0] * tilt[0], rates[1] * tilt[1]], stats, game,
+                      league: (file && file.fixtures && file.fixtures[id] && file.fixtures[id].league) || null, t: Date.now() };
     const liveModel = (type, value, option) => selectionModel(anLive, {}, type, value, option);
     const rows = [];
     const byLine = {};
@@ -1452,6 +1454,159 @@
     return { ...base, live: true, score: [sh, sa], reds, stats, basis, remaining: rem, books: c1 ? c1.books : 0, tilt,
              probs: { home: res("1") ?? sumCells(M, (i, j) => i > j), draw: res("X") ?? sumCells(M, (i, j) => i === j), away: res("2") ?? sumCells(M, (i, j) => i < j) },
              rows, checked: new Date().toISOString() };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Live chance of your HAWK legs (the cash-out helper). For a match in play:
+  //  - goal-based legs (result, goals, BTTS, clean sheet, handicap, margin,
+  //    correct score) are checked together on the live final-score matrix,
+  //    so they're correlated properly;
+  //  - corners/cards/shots-on-target: what's happened + a Poisson count for
+  //    the time left (live pace blended with a normal match's pace);
+  //  - player legs: his numbers so far + his usual per-90 rate for the
+  //    minutes he has left (none if he's been subbed off or sent off).
+  // Those groups are combined as if independent — a fair approximation.
+  // ---------------------------------------------------------------------------
+  const liveState = {};   // game id -> internals of the last liveMatch() for it
+  const poisAtLeast = (lam, k) => { if (k <= 0) return 1; if (!(lam > 1e-9)) return 0; let c = 0; for (let i = 0; i < k; i++) c += pmf(lam, i); return Math.max(0, 1 - c); };
+  const poisAtMost = (lam, k) => { if (k < 0) return 0; if (!(lam > 1e-9)) return 1; let c = 0; for (let i = 0; i <= k; i++) c += pmf(lam, i); return Math.min(1, c); };
+  // A line on a count: x so far, lam still to come.
+  function lineChance(x, lam, ou, line) {
+    if (ou === "o") { const need = Math.floor(line) + 1 - x; return need <= 0 ? { state: "won", p: 1 } : { state: "live", p: poisAtLeast(lam, need) }; }
+    const room = Math.ceil(line) - 1 - x;
+    return room < 0 ? { state: "lost", p: 0 } : { state: "live", p: poisAtMost(lam, room) };
+  }
+  const TYPICAL_90 = { corners: 5, cards: 2.1, sot: 4.2 };   // per team, a normal match
+  async function ticketLive(id, legs) {
+    id = String(id);
+    if (!liveState[id] || Date.now() - liveState[id].t > 25000) await liveMatch(id);
+    const st = liveState[id];
+    if (!st) return null;
+    const { M, sh, sa, rem, elapsed, stats, game } = st, [rh, ra] = st.rates;
+    const hc = game.homeCompetitor, ac = game.awayCompetitor;
+    const pair = (name) => (stats[name] || [0, 0]).map((v) => v || 0);
+    const now = { corners: pair("Corners"), sot: pair("Shots On Target"), cards: pair("Yellow Cards").map((v, k) => v + pair("Red Cards")[k]) };
+    const w = elapsed / (elapsed + 40);
+    const lamStat = (stat, k) => rem * (w * (elapsed > 0 ? now[stat][k] / elapsed : 0) + (1 - w) * TYPICAL_90[stat] / 90);
+    // Half-time and first goal.
+    const ht = (game.stages || []).find((s) => s.id === 7 && s.isEnded);
+    const inFirstHalf = !ht && /1st/i.test(st.statusText || "");
+    const goals = (game.events || []).filter((e) => e.eventType && e.eventType.id === 1).sort((a, b) => (a.order || 0) - (b.order || 0));
+    // Players: live numbers, who's still on, and their usual rates.
+    const names = Object.fromEntries((game.members || []).map((m) => [m.id, m.name]));
+    const subsIn = new Set(), subsOut = new Set(), sentOff = new Set(), booked = new Set();
+    for (const e of game.events || []) {
+      const n = ((e.eventType || {}).name || "").toLowerCase();
+      if (n.includes("substitution")) { subsIn.add(e.playerId); (e.extraPlayers || []).forEach((p) => subsOut.add(p)); }
+      if (n.includes("card")) booked.add(e.playerId);
+      if (n.includes("red")) sentOff.add(e.playerId);
+    }
+    const livePlayers = {};
+    for (const [side, key] of [["home", "homeCompetitor"], ["away", "awayCompetitor"]]) {
+      livePlayers[side] = (((game[key] || {}).lineups || {}).members || []).map((m) => {
+        const s = Object.fromEntries((m.stats || []).map((x) => [x.name, x.value]));
+        const count = (k, total) => { const v = s[k]; if (v == null) return 0; const mm = /^(\d+)\s*\/\s*(\d+)/.exec(String(v)); return mm ? +(total ? mm[2] : mm[1]) : parseFloat(v) || 0; };
+        const started = m.statusText === "Starting", mins = count("Minutes");
+        const on = !sentOff.has(m.id) && !subsOut.has(m.id) && (started ? !(mins > 0 && mins < elapsed - 5 && !subsIn.has(m.id)) : subsIn.has(m.id));
+        return { name: names[m.id] || "", pos: POSITIONS[(m.position || {}).name] || "M", on, played: started || subsIn.has(m.id) || mins > 0, booked: booked.has(m.id),
+                 v: { shots: count("Total Shots"), sot: count("Shots On Target"), score: count("Goals"), assist: count("Assists"), fouls: count("Fouls Made"),
+                      fouled: count("Was Fouled"), tackles: count("Tackles Won", true), offsides: count("Offsides"), saves: count("Goalkeeper Saves") } };
+      });
+    }
+    const meta = ((await data("fixtures.json")) || { fixtures: {} }).fixtures[id];
+    const files = meta && meta.sh ? await Promise.all(meta.sh.map((t) => data(`players/${t}.json`))) : [null, null];
+    const history = { home: playerRows(files[0]), away: playerRows(files[1]) };
+    const usual = (side, name, pos) => {
+      const rows = history[side] || [], hit = rows.length ? bestMatch(name, rows.map((p) => p.name), 0.6) : null;
+      const mt = hit ? rows.find((p) => p.name === hit).matches : [];
+      const r = rates(mt, DEFAULT_RATES[pos] || DEFAULT_RATES.M, pos, EXTRA_DEFAULTS[pos] || EXTRA_DEFAULTS.M);
+      const x = r.x || EXTRA_DEFAULTS[pos] || EXTRA_DEFAULTS.M;
+      return { shots: r.sh90, sot: r.sot90, score: r.g90, cards: r.c90, assist: x.assists, fouls: x.fouls, fouled: x.fouled, tackles: x.tackles, offsides: x.offsides };
+    };
+    // Goal legs as conditions on the final score (i = home, j = away).
+    const goalTest = (legId) => {
+      let m;
+      if ((m = /^res:(home|draw|away)$/.exec(legId))) return (i, j) => (m[1] === "home" ? i > j : m[1] === "away" ? j > i : i === j);
+      if ((m = /^dc:(home|away)$/.exec(legId))) return (i, j) => (m[1] === "home" ? i >= j : j >= i);
+      if ((m = /^goals:([ou])([\d.]+)$/.exec(legId))) return (i, j) => (m[1] === "o" ? i + j > +m[2] : i + j < +m[2]);
+      if ((m = /^btts:(yes|no)$/.exec(legId))) return (i, j) => (i > 0 && j > 0) === (m[1] === "yes");
+      if ((m = /^team:(home|away):o([\d.]+)$/.exec(legId))) return (i, j) => (m[1] === "home" ? i : j) > +m[2];
+      if ((m = /^cs:(home|away)$/.exec(legId))) return (i, j) => (m[1] === "home" ? j : i) === 0;
+      if ((m = /^cs:(\d+)-(\d+)$/.exec(legId))) return (i, j) => i === +m[1] && j === +m[2];
+      if ((m = /^wtn:(home|away)$/.exec(legId))) return (i, j) => (m[1] === "home" ? i > 0 && j === 0 : j > 0 && i === 0);
+      if ((m = /^margin:(home|away):(\d)$/.exec(legId))) return (i, j) => { const d = m[1] === "home" ? i - j : j - i; return +m[2] === 3 ? d >= 3 : d === +m[2]; };
+      if ((m = /^ah:(home|away):([+-][\d.]+)$/.exec(legId))) return (i, j) => (m[1] === "home" ? i - j : j - i) + parseFloat(m[2]) > 0;
+      return null;
+    };
+    const out = [], goalTests = [];
+    for (const h of legs) {
+      const id2 = h.id || "", row = { id: id2, label: h.label, state: "live", p: null, note: "" };
+      let m, t;
+      if ((t = goalTest(id2))) {
+        goalTests.push(t);
+        row.p = sumCells(M, t);
+        if (row.p > 0.9999) { row.state = "won"; row.p = 1; } else if (row.p < 1e-4) { row.state = "lost"; row.p = 0; }
+        row.note = `score ${sh}-${sa}`;
+      } else if ((m = /^first:(home|away)$/.exec(id2))) {
+        if (goals.length) { const won = (goals[0].competitorId === hc.id) === (m[1] === "home"); row.state = won ? "won" : "lost"; row.p = won ? 1 : 0; }
+        else row.p = ((m[1] === "home" ? rh : ra) / Math.max(rh + ra, 1e-9)) * (1 - Math.exp(-(rh + ra)));
+      } else if ((m = /^h([12])(res|goals):(.+)$/.exec(id2))) {
+        const rem1 = inFirstHalf ? Math.max(0, 47 - elapsed) : 0, remAll = Math.max(rem, 1);
+        let base, lam;
+        if (m[1] === "1") {
+          if (!inFirstHalf) { base = ht ? [ht.homeCompetitorScore, ht.awayCompetitorScore] : [sh, sa]; lam = [0, 0]; }
+          else { base = [sh, sa]; lam = [rh * rem1 / remAll, ra * rem1 / remAll]; }
+        } else if (inFirstHalf) { base = [0, 0]; lam = [rh * (remAll - rem1) / remAll, ra * (remAll - rem1) / remAll]; }
+        else { base = ht ? [sh - ht.homeCompetitorScore, sa - ht.awayCompetitorScore] : [0, 0]; lam = [rh, ra]; }
+        const HM = finalMatrix(base[0], base[1], Math.max(lam[0], 1e-9), Math.max(lam[1], 1e-9)), g = /^([ou])([\d.]+)$/.exec(m[3]);
+        const test = m[2] === "res" ? (i, j) => (m[3] === "home" ? i > j : m[3] === "away" ? j > i : i === j) : g ? (i, j) => (g[1] === "o" ? i + j > +g[2] : i + j < +g[2]) : null;
+        row.p = test ? sumCells(HM, test) : null;
+        if (row.p != null && (lam[0] + lam[1] === 0)) row.state = row.p > 0.5 ? "won" : "lost";
+      } else if ((m = /^(corners|cards|sot):([ou])([\d.]+)$/.exec(id2))) {
+        const x = now[m[1]][0] + now[m[1]][1], r = lineChance(x, lamStat(m[1], 0) + lamStat(m[1], 1), m[2], +m[3]);
+        Object.assign(row, r, { note: `${x} so far` });
+      } else if ((m = /^t(corners|cards):(home|away):([ou])([\d.]+)$/.exec(id2))) {
+        const k = m[2] === "home" ? 0 : 1, x = now[m[1]][k], r = lineChance(x, lamStat(m[1], k), m[3], +m[4]);
+        Object.assign(row, r, { note: `${x} so far` });
+      } else if ((m = /^mostcorners:(home|away)$/.exec(id2))) {
+        const [ch, ca] = now.corners, lh = lamStat("corners", 0), la = lamStat("corners", 1);
+        let p = 0; for (let a = 0; a < 25; a++) for (let b = 0; b < 25; b++) { const fh = ch + a, fa = ca + b; if (m[1] === "home" ? fh > fa : fa > fh) p += pmf(Math.max(lh, 1e-9), a) * pmf(Math.max(la, 1e-9), b); }
+        row.p = Math.min(1, p); row.note = `corners ${ch}-${ca}`;
+      } else if ((m = /^p:(home|away):\d+:([a-z]+?)(\d*)$/.exec(id2))) {
+        const side = m[1], stat = m[2], need = +m[3] || 1;
+        const pl = (() => { const list = livePlayers[side] || [], hit = list.length ? bestMatch(h.player || h.label.split(/:| to /)[0], list.map((p) => p.name), 0.6) : null; return list.find((p) => p.name === hit); })();
+        if (!pl) { row.state = "void"; row.note = "not in the squad list"; }
+        else if (!pl.played) { row.state = "wait"; row.p = null; row.note = "hasn't come on (Bet365 voids the leg if he doesn't play)"; }
+        else {
+          const left = pl.on ? rem : 0;
+          if (stat === "booked") {
+            if (pl.booked) { row.state = "won"; row.p = 1; }
+            else if (!left) { row.state = "lost"; row.p = 0; }
+            else { const r = usual(side, pl.name, pl.pos); row.p = 1 - Math.exp(-(r.cards * left) / 90); }
+          } else if (stat === "saves") {
+            const opp = side === "home" ? 1 : 0;
+            Object.assign(row, lineChance(pl.v.saves, left ? lamStat("sot", opp) * 0.7 : 0, "o", need - 0.5));
+          } else {
+            const key = stat === "soa" ? null : stat, r = usual(side, pl.name, pl.pos);
+            const x = stat === "soa" ? pl.v.score + pl.v.assist : pl.v[key] || 0;
+            const per90 = stat === "soa" ? r.score + r.assist : r[key] || 0;
+            Object.assign(row, lineChance(x, (per90 * left) / 90, "o", need - 0.5));
+          }
+          row.note = `${pl.on ? "on the pitch" : "off"} · ${stat === "booked" ? (pl.booked ? "booked" : "not booked") : `${stat === "soa" ? pl.v.score + pl.v.assist : pl.v[stat] || 0} so far`}`;
+        }
+      } else row.note = "HAWK can't follow this one live";
+      out.push(row);
+    }
+    // Goal legs together (correlated), everything else multiplied in.
+    const goalJoint = goalTests.length ? sumCells(M, (i, j) => goalTests.every((t) => t(i, j))) : 1;
+    let p = goalJoint, unknown = 0;
+    out.forEach((r) => {
+      if (goalTest(r.id)) return;
+      if (r.state === "lost") p = 0;
+      else if (r.p == null) unknown++;
+      else p *= r.p;
+    });
+    return { legs: out, p: out.some((r) => r.state === "lost") ? 0 : p, unknown, minute: game.gameTimeDisplay, score: [sh, sa] };
   }
 
   // ---------------------------------------------------------------------------
@@ -1511,12 +1666,12 @@
   }
 
   global.HAWK = { LEAGUES, COMPETITIONS, fixtures, match, build, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, learnKey, liveMatch,
-                  scores, matchReport,
+                  scores, matchReport, ticketLive,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },
                   meta: () => data("meta.json"),
                   _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas,
-                                selectionModel, priceRows, entry: (id) => matches.get(String(id)),
+                                selectionModel, priceRows, entry: (id) => matches.get(String(id)), liveState, finalMatrix,
                                 fitTotalLambda, scoreMatrix, nameSimilarity, bestMatch } };
 })(window);

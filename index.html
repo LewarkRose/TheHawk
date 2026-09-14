@@ -394,17 +394,10 @@
                 <div id="pl-chart" class="w-full"></div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🎯</span> HAWK Track Record</h3>
-                    <p class="text-[10px] text-zinc-500">Bets sent from the HAWK builder settle themselves after the match. This checks whether HAWK's chances come true — its 70% legs should land about 70% of the time. 🧠 Once a market has 30+ settled legs, the builder corrects that market's chances by what actually happened.</p>
-                    <div id="track-record-container" class="space-y-2 pt-1"></div>
-                </div>
-                <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🧾</span> Profit by Bet Type</h3>
-                    <p class="text-[10px] text-zinc-500">Your settled tickets grouped by their badge (Bet Builder / Acca / Mixed) and by who built them: 🦅 HAWK = sent from the HAWK builder, "Your" = built here in the Ticket Builder. Profit = what came back minus what you staked.</p>
-                    <div id="type-breakdown-container" class="space-y-2 pt-1"></div>
-                </div>
+            <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🎯</span> HAWK Track Record</h3>
+                <p class="text-[10px] text-zinc-500">Bets sent from the HAWK builder settle themselves after the match. This checks whether HAWK's chances come true — its 70% legs should land about 70% of the time. 🧠 Once a market has 30+ settled legs, the builder corrects that market's chances by what actually happened.</p>
+                <div id="track-record-container" class="space-y-2 pt-1"></div>
             </div>
 
             <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
@@ -1626,7 +1619,6 @@
             renderLeagueBreakdown();
             renderProfitChart();
             renderTrackRecord();
-            renderTypeBreakdown();
         }
 
         // Link that reopens a HAWK ticket's match in the builder with the same legs.
@@ -1670,37 +1662,11 @@
             cap.textContent = `${settled.length} settled tickets · top-ups and bankroll edits not included`;
         }
 
-        // --- PROFIT BY BET TYPE ---
-        // A ticket's type is exactly the badge it shows in the history: Bet Builder,
-        // Acca, or Mixed (its legs are a mix of both).
+        // A ticket's type is the badge it shows in the history: Bet Builder, Acca,
+        // or Mixed (its legs are a mix of both).
         function ticketType(b) {
             const types = new Set((b.legs || []).map(l => l.type || 'builder'));
             return types.size > 1 ? 'Mixed' : types.has('acca') ? 'Acca' : 'Bet Builder';
-        }
-        const TYPE_PLURAL = { 'Bet Builder': 'Bet Builders', 'Acca': 'Accas', 'Mixed': 'Mixed tickets' };
-        function renderTypeBreakdown() {
-            const el = document.getElementById('type-breakdown-container');
-            if (!el) return;
-            const settled = bets.filter(b => b.status !== 'PENDING');
-            if (!settled.length) { el.innerHTML = '<div class="text-center py-6 text-zinc-500 text-xs">Settle some tickets to see this.</div>'; return; }
-            const groups = {};
-            settled.forEach(b => {
-                const hawk = isHawkBet(b), type = ticketType(b);
-                const key = `${hawk ? '🦅 HAWK' : 'Your'} ${TYPE_PLURAL[type]}`;
-                const g = (groups[key] ||= { n: 0, wins: 0, staked: 0, returned: 0 });
-                g.n++; g.staked += b.stake; g.returned += betReturn(b);
-                if (b.status === 'WON') g.wins++;
-            });
-            el.innerHTML = Object.entries(groups).sort((a, b) => (b[1].returned - b[1].staked) - (a[1].returned - a[1].staked)).map(([k, g]) => {
-                const net = g.returned - g.staked, roi = g.staked ? (100 * net) / g.staked : 0;
-                return `<div class="flex items-center justify-between bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs gap-3">
-                    <div><div class="font-semibold text-white">${k}</div>
-                        <div class="text-zinc-500 mt-0.5">${g.n} ticket${g.n === 1 ? '' : 's'} · ${g.wins} won (${Math.round((100 * g.wins) / g.n)}%) · €${g.staked.toFixed(2)} staked</div></div>
-                    <div class="text-right shrink-0">
-                        <div class="font-bold text-sm ${net >= 0 ? 'text-emerald-400' : 'text-red-400'}">${net >= 0 ? '+' : '−'}€${Math.abs(net).toFixed(2)}</div>
-                        <div class="text-zinc-500" title="Profit as a share of what you staked">${roi >= 0 ? '+' : ''}${roi.toFixed(0)}% return</div>
-                    </div></div>`;
-            }).join('');
         }
 
         // --- HAWK TRACK RECORD: do HAWK's chances come true? ---

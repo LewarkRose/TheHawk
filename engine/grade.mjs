@@ -67,6 +67,8 @@ for (const [id, pr] of Object.entries(state.pending)) {
   if (!f || !f.finished) { if (now > ko + GIVE_UP_AFTER_D * 86400e3) delete state.pending[id]; continue; }
   delete state.pending[id];
   if (f.off) continue;   // postponed / abandoned
+  // Kept a few days for the Scores page: HAWK's prediction next to the result.
+  if (pr.probs && f.ft) (state.done ||= {})[id] = { probs: pr.probs, level: pr.upset ? pr.upset.level : null, kickoff: pr.kickoff, ft: f.ft };
   // The upset radar's call against the result.
   let upset = null;
   if (pr.upset && f.ft) {
@@ -113,6 +115,7 @@ for (const league of HAWK.LEAGUES) {
         legs: m.legs.filter((l) => !l.low_data).map((l) => ({ id: l.id, market: l.market, p: +(l.pRaw ?? l.p).toFixed(4),
                                                              ...(l.player ? { player: l.player } : {}) })),
         upset: m.upset ? { level: m.upset.level, fav: m.upset.fav, favFail: +m.upset.favFail.toFixed(3), dogWin: +m.upset.dogWin.toFixed(3) } : null,
+        probs: { home: +m.probs.home.toFixed(3), draw: +m.probs.draw.toFixed(3), away: +m.probs.away.toFixed(3) },
       };
       predicted++;
     } catch (e) { console.warn(`skipped ${f.home} v ${f.away}: ${e.message}`); }
@@ -120,6 +123,13 @@ for (const league of HAWK.LEAGUES) {
 }
 
 // 3. Write.
+// HAWK's 1X2 prediction for every match it saved (upcoming, and finished in
+// the last 4 days with the score) — the Scores page shows them in its list.
+for (const [id, d] of Object.entries(state.done || {})) if (now - Date.parse(d.kickoff) > 4 * 86400e3) delete state.done[id];
+const predictions = {};
+for (const [id, pr] of Object.entries(state.pending)) if (pr.probs) predictions[id] = { probs: pr.probs, level: pr.upset ? pr.upset.level : null, kickoff: pr.kickoff };
+for (const [id, d] of Object.entries(state.done || {})) predictions[id] = d;
+await writeFile(path.join(ROOT, "data", "predictions.json"), JSON.stringify({ updated: new Date().toISOString(), matches: predictions }));
 await mkdir(path.dirname(STATE_FILE), { recursive: true });
 await writeFile(STATE_FILE, JSON.stringify(state));
 await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({

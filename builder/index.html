@@ -203,7 +203,10 @@ img{max-width:100%}
 .sc-league{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;display:flex;align-items:center;gap:7px}
 .sc-league img{width:16px;height:16px;object-fit:contain}
 .sc-league:first-child{margin-top:0}
-.sc-row{display:grid;grid-template-columns:58px 1fr 64px 1fr 64px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;
+.sc-hawk{font-size:10.5px;font-weight:600;color:var(--muted);letter-spacing:0;white-space:nowrap;margin-top:1px}
+.sc-hawk b{color:var(--accent);font-weight:900}
+.sc-hawk .ok{color:var(--accent)}.sc-hawk .bad{color:var(--red)}
+.sc-row{display:grid;grid-template-columns:58px 1fr 92px 1fr 64px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;
   border:1px solid transparent;transition:.12s}
 .sc-row:hover{background:var(--panel2);border-color:var(--line)}
 .sc-row.is-live{background:rgba(255,93,115,.05)}
@@ -238,7 +241,7 @@ img{max-width:100%}
 .rp-ev{display:flex;gap:8px;font-size:13px;padding:4px 0}
 .rp-ev.away{flex-direction:row-reverse;text-align:right}
 .rp-ev .min{color:var(--muted);font-weight:700;min-width:36px}
-@media (max-width:560px){.sc-row{grid-template-columns:44px 1fr 48px 1fr 34px;gap:6px;font-size:13px}.sc-team img{display:none}
+@media (max-width:560px){.sc-row{grid-template-columns:40px 1fr 74px 1fr 30px;gap:5px;font-size:13px}.sc-team img{display:none}.sc-hawk{font-size:9.5px}
   .sc-bell{width:28px;height:28px}}
 .kelly{margin-top:8px;font-size:13px;padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line)}
 .kelly b{color:var(--gold)}
@@ -2364,6 +2367,7 @@ function showScores() {
   if (!S.scores.day) S.scores.day = localDay(new Date());
   renderScores();
   loadScores();
+  loadPredictions();
   clearInterval(S.scores.timer);
   S.scores.timer = setInterval(() => {
     if (S.view !== "scores") { clearInterval(S.scores.timer); return; }
@@ -2432,10 +2436,35 @@ function renderScoreList() {
         return `<div class="sc-row ${g.status === 3 ? "is-live" : ""}" data-sid="${g.id}" title="${g.status === 3 ? "Open the live view" : g.status === 4 ? "Match report" : "Open in the builder"}">
           <div class="sc-state">${state}</div>
           <div class="sc-team ${g.winner === 1 ? "win" : ""}"><img src="${esc(g.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(g.home)}</div>
-          <div class="sc-score">${g.score[0] == null ? "–" : `${sc0} – ${sc1}`}</div>
+          <div class="sc-score">${g.score[0] == null ? "–" : `${sc0} – ${sc1}`}${predLine(g)}</div>
           <div class="sc-team away ${g.winner === 2 ? "win" : ""}">${esc(g.away)}<img src="${esc(g.awayCrest)}" alt="" onerror="this.style.visibility='hidden'"></div>
           <div class="sc-bet">${alert}${bet}</div></div>`;
       }).join("")}`).join("");
+}
+// HAWK's prediction in the Scores list: home · draw · away %, the likeliest in
+// green, ⚡ when the upset radar says High+. Finished: ✓/✗ for whether the
+// likeliest result happened. From data/predictions.json (GitHub saves them for
+// every match in the 6 hours before kick-off); other matches: tap for the full page.
+async function loadPredictions() {
+  if (S.preds && Date.now() - S.preds.t < 10 * 60e3) return;
+  try {
+    const r = await fetch(new URL("../data/predictions.json", location.href), { cache: "no-cache" });
+    S.preds = { t: Date.now(), m: r.ok ? (await r.json()).matches || {} : {} };
+  } catch { S.preds = { t: Date.now(), m: {} }; }
+  if (S.view === "scores") renderScoreList();
+}
+function predLine(g) {
+  const p = S.preds && S.preds.m[String(g.id)];
+  if (!p || !p.probs) return "";
+  const v = pct100([p.probs.home, p.probs.draw, p.probs.away]), top = v.indexOf(Math.max(...v));
+  let mark = "";
+  if (g.status === 4 && g.score[0] != null) {
+    const res = g.score[0] > g.score[1] ? 0 : g.score[0] === g.score[1] ? 1 : 2;
+    mark = res === top ? ` <span class="ok">✓</span>` : ` <span class="bad">✗</span>`;
+  }
+  const names = [g.home, "Draw", g.away];
+  return `<div class="sc-hawk" title="HAWK before kick-off: ${esc(names.map((n, i) => `${n} ${v[i]}%`).join(" · "))}${p.level >= 2 ? " — ⚡ High upset risk" : ""}">🦅 ${
+    v.map((x, i) => i === top ? `<b>${x}</b>` : x).join("·")}${p.level >= 2 ? " ⚡" : ""}${mark}</div>`;
 }
 async function openScore(id) {
   const g = (S.scores.data || []).find(x => x.id === String(id));

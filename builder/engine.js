@@ -260,6 +260,76 @@
     }
     return out.join("");
   }
+  // ---------------------------------------------------------------------------
+  // Second lineup source: ESPN's public API, readable from the page like
+  // 365Scores. It publishes the official XIs (about an hour before kick-off)
+  // for every competition HAWK covers. Used when 365Scores hasn't confirmed a
+  // lineup yet, and to double-check it when both have.
+  // ---------------------------------------------------------------------------
+  const ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer";
+  const ESPN_SLUGS = { "Premier League": "eng.1", "La Liga": "esp.1", "Serie A": "ita.1", "Bundesliga": "ger.1", "Ligue 1": "fra.1",
+    "Champions League": "uefa.champions", "Europa League": "uefa.europa", "Conference League": "uefa.europa.conf",
+    "Eredivisie": "ned.1", "Liga Portugal": "por.1", "Scottish Premiership": "sco.1", "Belgian Pro League": "bel.1", "Süper Lig": "tur.1",
+    "Greek Super League": "gre.1", "Austrian Bundesliga": "aut.1", "Swiss Super League": "sui.1", "Danish Superliga": "den.1", "Allsvenskan": "swe.1",
+    "Championship": "eng.2", "League One": "eng.3", "2. Bundesliga": "ger.2", "Serie B": "ita.2", "LaLiga 2": "esp.2", "Ligue 2": "fra.2",
+    "FA Cup": "eng.fa", "EFL Cup": "eng.league_cup", "Copa del Rey": "esp.copa_del_rey", "Coppa Italia": "ita.coppa_italia",
+    "DFB-Pokal": "ger.dfb_pokal", "Coupe de France": "fra.coupe_de_france",
+    "MLS": "usa.1", "Brasileirão": "bra.1", "Argentina Primera": "arg.1", "Liga MX": "mex.1", "Saudi Pro League": "ksa.1",
+    "Copa Libertadores": "conmebol.libertadores" };
+  const espnCache = new Map();
+  async function espnJSON(url, ttl) {
+    const hit = espnCache.get(url);
+    if (hit && Date.now() - hit.t < ttl) return hit.v;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch(url);
+        if (r.ok) { const v = await r.json(); espnCache.set(url, { t: Date.now(), v }); return v; }
+        if (r.status < 500) return null;
+      } catch { /* network hiccup: try once more */ }
+      await sleep(600);
+    }
+    return null;
+  }
+  const ymdUTC = (t) => new Date(t).toISOString().slice(0, 10).replace(/-/g, "");
+  const espnPos = (abbr) => {
+    const a = String(abbr || "").toUpperCase();
+    if (a === "G" || a === "GK") return "G";
+    if (/^(CD|CB|LB|RB|D|LWB|RWB|SW)/.test(a)) return "D";
+    if (/^(CM|LM|RM|DM|AM|M|CDM|CAM)/.test(a)) return "M";
+    return "F";
+  };
+  // {confirmed, home: {formation, starters, subs}, away: …} or null (not on ESPN).
+  async function espnLineups(league, home, away, kickoff) {
+    const slug = ESPN_SLUGS[league];
+    if (!slug || !kickoff) return null;
+    const t = kickoff.getTime();
+    for (const day of new Set([ymdUTC(t), ymdUTC(t - 86400e3), ymdUTC(t + 86400e3)])) {
+      const sb = await espnJSON(`${ESPN}/${slug}/scoreboard?dates=${day}`, 10 * 60e3);
+      const ev = ((sb && sb.events) || []).find((e) => {
+        const cs = ((e.competitions || [])[0] || {}).competitors || [];
+        const h = cs.find((c) => c.homeAway === "home"), a = cs.find((c) => c.homeAway === "away");
+        return h && a && Math.abs(Date.parse(e.date) - t) < 6 * 3600e3
+          && nameSimilarity(home, h.team.displayName) >= 0.6 && nameSimilarity(away, a.team.displayName) >= 0.6;
+      });
+      if (!ev) continue;
+      const s = await espnJSON(`${ESPN}/${slug}/summary?event=${ev.id}`, 90e3);
+      const out = { id: ev.id };
+      for (const r of (s && s.rosters) || []) {
+        const nm = (r.team || {}).displayName || "";
+        const side = r.homeAway === "home" || r.homeAway === "away" ? r.homeAway : nameSimilarity(home, nm) >= nameSimilarity(away, nm) ? "home" : "away";
+        const players = (r.roster || []).map((p) => ({ name: (p.athlete || {}).displayName || "?", num: +p.jersey || null,
+                                                       pos: espnPos((p.position || {}).abbreviation), starter: !!p.starter }));
+        out[side] = { formation: r.formation || null, starters: players.filter((p) => p.starter), subs: players.filter((p) => !p.starter) };
+      }
+      out.confirmed = ["home", "away"].every((sd) => out[sd] && out[sd].starters.length >= 11);
+      return out;
+    }
+    return null;
+  }
+  // Same player in both sources? ("Carl Rushworth" / "C. Rushworth" / accents.)
+  const lastName = (n) => norm(n).split(" ").filter(Boolean).pop() || "";
+  const samePlayer = (a, b) => nameSimilarity(a, b) >= 0.75 || (lastName(a).length > 2 && lastName(a) === lastName(b));
+
   async function polymarket(slug, home, away) {
     const events = await getJSON(`${PM_BASE}/events?slug=${encodeURIComponent(slug)}`, 2 * 60 * 1000);
     const ev = events && events[0];
@@ -416,12 +486,14 @@
     const home = hc.name, away = ac.name, kickoff = game.startTime ? new Date(game.startTime) : null;
     const meta = ((await data("fixtures.json")) || { fixtures: {} }).fixtures[id] || null;
     const fd = (meta && meta.fd) || {};
-    const [quotes365, detailResp, table, formH, formA, pm, profH, profA, playersH, playersA, recentH, recentA] = await Promise.all([
+    const [quotes365, detailResp, table, formH, formA, pm, profH, profA, playersH, playersA, recentH, recentA, espn] = await Promise.all([
       odds365(id), s365("game", { gameId: id }), standings(league), form(hc.id), form(ac.id),
       meta && meta.pm_slug ? polymarket(meta.pm_slug, home, away) : null,
       fd.home ? data(`profiles/${fd.home[0]}.json`) : null, fd.away ? data(`profiles/${fd.away[0]}.json`) : null,
       meta && meta.sh ? data(`players/${meta.sh[0]}.json`) : null, meta && meta.sh ? data(`players/${meta.sh[1]}.json`) : null,
       recentForm(hc.id), recentForm(ac.id),
+      // ESPN's lineups only matter close to kick-off (they're published about an hour before).
+      kickoff && kickoff.getTime() - Date.now() < 4 * 3600e3 ? espnLineups(league, home, away, kickoff).catch(() => null) : null,
     ]);
     const detail = (detailResp && detailResp.game) || {};
     const fdH = fd.home && fd.home[1], fdA = fd.away && fd.away[1];
@@ -440,12 +512,30 @@
     const cons = consensus(quotes);
     if (!quotes.length) warnings.push("No odds found for this game on any source yet.");
 
-    const lineups = {};
+    const lineups = {}, lineupCheck = {};
+    const memberName = Object.fromEntries((detail.members || []).map((m) => [m.id, m.name]));
     for (const [side, key] of [["home", "homeCompetitor"], ["away", "awayCompetitor"]]) {
       const lu = (detail[key] || {}).lineups || {};
-      lineups[side] = { status: lu.status || "Not published", formation: lu.formation || null };
+      lineups[side] = { status: lu.status || "Not published", formation: lu.formation || null, source: lu.status === "Confirmed" ? "365Scores" : null };
+      const e = espn && espn[side];
+      if (!e || e.starters.length < 11) continue;
+      if (lineups[side].status !== "Confirmed") {
+        // 365Scores hasn't confirmed it yet — ESPN has: use ESPN's XI.
+        lineups[side] = { status: "Confirmed", formation: e.formation || lineups[side].formation, source: "ESPN" };
+      } else {
+        // Both have it: do they name the same XI?
+        const xi365 = (lu.members || []).filter((m) => m.statusText === "Starting").map((m) => memberName[m.id]).filter(Boolean);
+        const only365 = xi365.filter((n) => !e.starters.some((p) => samePlayer(n, p.name)));
+        const onlyEspn = e.starters.map((p) => p.name).filter((n) => !xi365.some((x) => samePlayer(x, n)));
+        lineupCheck[side] = { agree: !only365.length && !onlyEspn.length, only365, onlyEspn };
+        lineups[side].source = "365Scores + ESPN";
+      }
     }
     const confirmed = lineups.home.status === "Confirmed" && lineups.away.status === "Confirmed";
+    for (const side of ["home", "away"]) {
+      const c = lineupCheck[side];
+      if (c && !c.agree) warnings.push(`${side === "home" ? home : away}: 365Scores and ESPN disagree on the XI — 365Scores has ${c.only365.join(", ") || "—"}, ESPN has ${c.onlyEspn.join(", ") || "—"}. HAWK uses 365Scores'; check before you bet.`);
+    }
     if (!confirmed) warnings.push("Lineups not confirmed yet — HAWK rule: don't lock the ticket until they are.");
 
     let refName = ((detail.officials || [])[0] || {}).name || null, refAvg = null, refGames = null, refSource = null;
@@ -491,7 +581,7 @@
     }
     return {
       id, league, home, away, homeComp: hc, awayComp: ac, kickoff, inPlay: !!(kickoff && kickoff < new Date()),
-      quotes, cons, polymarket: pm, lineups, confirmed, detail, table, form: { home: formH, away: formA }, recentForm: { home: recentH, away: recentA },
+      quotes, cons, polymarket: pm, lineups, confirmed, espn, lineupCheck, detail, table, form: { home: formH, away: formA }, recentForm: { home: recentH, away: recentA },
       referee: { name: refName, avg: refAvg, games: refGames, source: refSource, factor: refFactor },
       profiles: [profH, fdH, profA, fdA], lamModel, lamMarket, lamBlend, M: lamBlend ? scoreMatrix(...lamBlend) : null,
       // Both teams rated within the same league: only then can HAWK's own
@@ -574,7 +664,7 @@
     an.lineupGuess = lineupGuess;   // side -> true when HAWK guessed the XI (365Scores had none)
     for (const [side, key] of [["home", "homeCompetitor"], ["away", "awayCompetitor"]]) {
       const lineup = (an.detail[key] || {}).lineups || {};
-      const confirmed = lineup.status === "Confirmed";
+      const fromEspn = an.lineups[side].source === "ESPN", confirmed = an.lineups[side].status === "Confirmed";
       const byName = Object.fromEntries(sh[side].filter((p) => p.name).map((p) => [p.name, p]));
       const teamHasExtras = sh[side].some((p) => hasExtras(p.matches));
       // Team news: 365Scores lists injured/suspended ("Missing") and doubtful players.
@@ -592,7 +682,13 @@
         return [info.name || "?", m.statusText, POSITIONS[(m.position || {}).name], info.athleteId ? athletePhoto(info) : null,
                 field, info.jerseyNumber || null, info.shortName || null];
       });
-      if (!entries.some((e) => e[1] === "Starting") && sh[side].length) {
+      if (fromEspn) {
+        // The confirmed XI from ESPN (365Scores didn't have it yet). No pitch
+        // positions: the lineup view lays these out by position.
+        const e = an.espn[side];
+        entries = [...e.starters.map((p) => [p.name, "Starting", p.pos, null, null, p.num, null]),
+                   ...e.subs.map((p) => [p.name, "Substitute", p.pos, null, null, p.num, null])];
+      } else if (!entries.some((e) => e[1] === "Starting") && sh[side].length) {
         // No lineup from 365Scores: the most-used players in the team's last 5
         // games, minus the injured and suspended — and a keeper in goal.
         const games = teamGames(sh[side]), mins = (p) => minutesIn(p.matches, games);
@@ -1238,7 +1334,8 @@
       id: an.id, league: an.league, home: an.home, away: an.away, homeCrest: crest(an.homeComp), awayCrest: crest(an.awayComp),
       kickoff: an.kickoff ? an.kickoff.toISOString() : null, started: an.inPlay, referee: an.referee,
       // guess: 365Scores had no lineup yet, so HAWK picked the XI from the team's last 5 games
-      lineups: Object.fromEntries(Object.entries(an.lineups).map(([s, v]) => [s, { ...v, guess: !!(an.lineupGuess || {})[s] }])),
+      lineups: Object.fromEntries(Object.entries(an.lineups).map(([s, v]) => [s, { ...v, guess: !!(an.lineupGuess || {})[s],
+                                                                                   check: (an.lineupCheck || {})[s] || null }])),
       probs: { home: sumCells(M, (i, j) => i > j), draw: sumCells(M, (i, j) => i === j), away: sumCells(M, (i, j) => i < j),
                market, polymarket: an.polymarket, model },
       expected: sim.exp, grid, table: { home: tableRow(an.homeComp), away: tableRow(an.awayComp) }, form: an.form,
@@ -1323,8 +1420,13 @@
     const d = await s365("game", { gameId: id });
     const g = (d && d.game) || {};
     const st = { home: ((g.homeCompetitor || {}).lineups || {}).status, away: ((g.awayCompetitor || {}).lineups || {}).status };
-    return { ...st, confirmed: st.home === "Confirmed" && st.away === "Confirmed",
-             started: !!(g.startTime && new Date(g.startTime) < new Date()) };
+    let confirmed = st.home === "Confirmed" && st.away === "Confirmed", source = confirmed ? "365Scores" : null;
+    // Not confirmed on 365Scores yet? ESPN may already have the official XIs.
+    if (!confirmed && g.startTime && Date.parse(g.startTime) - Date.now() < 3 * 3600e3 && g.homeCompetitor && LEAGUE_OF[g.competitionId]) {
+      const e = await espnLineups(LEAGUE_OF[g.competitionId], g.homeCompetitor.name, g.awayCompetitor.name, new Date(g.startTime)).catch(() => null);
+      if (e && e.confirmed) { confirmed = true; source = "ESPN"; }
+    }
+    return { ...st, confirmed, source, started: !!(g.startTime && new Date(g.startTime) < new Date()) };
   }
 
   // Background jobs over every fixture in a time window, two matches at a
@@ -1966,7 +2068,7 @@
                   startRadar, radarStatus: () => jobStatus(radarJob), stopRadar: () => { radarJob.stop = true; return jobStatus(radarJob); },
                   startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },
                   meta: () => data("meta.json"),
-                  _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas,
+                  _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas, espnLineups,
                                 selectionModel, priceRows, entry: (id) => matches.get(String(id)), liveState, finalMatrix,
                                 fitTotalLambda, scoreMatrix, nameSimilarity, bestMatch } };
 })(window);

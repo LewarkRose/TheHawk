@@ -551,6 +551,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .pp-line{font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
 .pp-line input{width:58px;padding:2px 6px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:600 12px inherit}
 .pp-line.dead b{color:var(--gold);font-weight:700}
+.pp-line .est{color:var(--text);font-weight:700}.pp-line .linkbtn{font-size:11.5px}
 .chk-row .muted{font-size:12px;font-weight:500}
 .chk-row.done{border-color:rgba(20,227,161,.5);background:rgba(20,227,161,.08)}
 .chk-row.done span:first-of-type{text-decoration:line-through;color:var(--muted)}
@@ -1324,7 +1325,7 @@ function lineupCard(m, live = null) {
   // Two sources: 365Scores and ESPN. Both named = checked against each other.
   const srcs = [lu.home.source, lu.away.source], bothChecked = srcs.every(s => s === "365Scores + ESPN"), espnOnly = srcs.includes("ESPN");
   const disagree = ["home", "away"].filter(s => lu[s].check && !lu[s].check.agree);
-  const badge = !confirmed ? null : disagree.length ? ["warn", "⚠️ Confirmed — but 365Scores and ESPN name different players"]
+  const badge = !confirmed ? null : disagree.length ? ["ok", "✅ Confirmed · HAWK uses 365Scores' XI"]
     : bothChecked ? ["ok", "✅ Confirmed · 365Scores + ESPN agree"] : espnOnly ? ["ok", "✅ Confirmed by ESPN — 365Scores hasn't published it yet"]
     : ["ok", "✅ Confirmed by 365Scores — ESPN's not out yet"];
   const diffNote = disagree.map(s => { const c = lu[s].check;
@@ -1368,7 +1369,7 @@ function lineupCard(m, live = null) {
     <div class="lu-head"><h3 style="margin:0">👕 Lineups${live ? " — live" : ""}</h3>
       ${live ? `<span class="badge live">🔴 ${esc(live.clock || "LIVE")} · goals, cards &amp; subs</span>` : `<span class="badge ${badge ? badge[0] : "warn"}">${badge ? badge[1]
         : guess ? "🤔 HAWK's guess — no lineup out yet (from the team's last 5 games)" : "🕐 Predicted — confirmed about an hour before kick-off"}</span>`}</div>
-    ${diffNote && !live ? `<div class="warn" style="margin:0 0 10px">${diffNote}<br>HAWK uses 365Scores' XI — check the team sheet before you bet.</div>` : ""}
+    ${diffNote && !live ? `<div class="note" style="margin:0 0 10px">ESPN names someone else: ${diffNote} — HAWK went with 365Scores.</div>` : ""}
     <div class="pitch">
       <svg class="pl-h" viewBox="0 0 160 100" preserveAspectRatio="none"><rect x="1" y="1" width="158" height="98"/><line x1="80" y1="1" x2="80" y2="99"/><circle cx="80" cy="50" r="9"/>
         <rect x="1" y="22" width="16" height="56"/><rect x="1" y="38" width="6" height="24"/><rect x="143" y="22" width="16" height="56"/><rect x="153" y="38" width="6" height="24"/></svg>
@@ -1498,6 +1499,11 @@ function applyPropBook() {
     const d = lg(Math.min(0.995, 1 / x.price)) - lg(x.p);
     if (Math.abs(d) <= 4) (book[x.key] ||= []).push({ x: lg(x.p), d });   // (a typo like 14.0 for 1.40 is left out)
   }
+  // …and from the builder prices you type in the price box (no typing per leg).
+  for (const x of loadPref("hawk.b365prices", [])) {
+    const f = propShiftFromBuilder(x);
+    if (f) for (const d of f.props) (book[d.k] ||= []).push({ x: lg(d.p), d: f.s, w: 1 / f.props.length });
+  }
   S.propBook = { book, n: Object.fromEntries(Object.entries(book).map(([k, pts]) => [k, pts.length])) };
   HAWK.setPropBook(book);
 }
@@ -1520,10 +1526,12 @@ function propLine(l) {
   // The price you typed for this very leg beats HAWK's estimate.
   const typed = propPrices().find(x => x.match === String(S.match && S.match.id) && x.leg === l.id);
   const est = typed ? typed.price : HAWK.propEstimate(l), dead = est && est <= HAWK.DEAD_PRICE;
-  return `<div class="pp-line ${dead ? "dead" : ""}"><span>Bet365</span><input data-pprice="${esc(l.id)}" inputmode="decimal" placeholder="${est ? odds(est) : "price?"}"
-      value="${typed ? odds(typed.price) : ""}" title="Type this leg's Bet365 price — HAWK learns how Bet365 prices ${esc(propKeyLabel(key || ""))} legs">${
+  // No typing needed: HAWK learns from the builder price in the price box. The ✎ is there if you want to give one leg's price.
+  const box = S.ppEdit === l.id || typed;
+  if (!est && !box) return `<div class="pp-line"><button class="linkbtn" data-ppedit="${esc(l.id)}" title="Optional — HAWK also learns from the builder price you type below">✎ Bet365 price</button></div>`;
+  return `<div class="pp-line ${dead ? "dead" : ""}"><span>Bet365</span>${box ? `<input data-pprice="${esc(l.id)}" inputmode="decimal" placeholder="${est ? odds(est) : "price"}" value="${typed ? odds(typed.price) : ""}">` : ""}${
     typed ? ` <span class="muted">✓ you typed it</span>`
-    : est ? ` <span class="muted" title="From ${n} Bet365 price${n === 1 ? "" : "s"} you've typed for ${esc(propKeyLabel(key))} legs">≈ ${odds(est)}</span>` : ` <span class="muted">type it once, HAWK learns</span>`}${
+    : ` <b class="est" title="HAWK's estimate, from ${n} Bet365 price${n === 1 ? "" : "s"} for ${esc(propKeyLabel(key))} legs (your builder prices included)">≈ ${odds(est)}</b>${box ? "" : ` <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Give this leg's real Bet365 price (optional)">✎</button>`}`}${
     dead ? ` <b>· adds next to nothing at Bet365 — 🔄 swap it</b>` : est && l.p ? ` <span class="muted">· ${est * l.p >= 1 ? "value" : `${(100 * (1 - est * l.p)).toFixed(0)}% under fair`}</span>` : ""}</div>`;
 }
 // Corners and cards: Bet365's builder words the same leg with a whole number
@@ -1616,6 +1624,7 @@ function renderSlip() {
     // Remember what you typed, so adding or removing a leg doesn't clear it.
     for (const key of ["price", "boost", "stake"]) $("#" + key).oninput = (e) => { S.chk[key] = e.target.value; verdict(); };
     $("#price").onchange = () => { recordB365Price(); renderSlip(); };
+    $("#slip").querySelectorAll("[data-ppedit]").forEach(b => b.onclick = () => { S.ppEdit = b.dataset.ppedit; renderSlip(); const i = $(`[data-pprice="${b.dataset.ppedit}"]`); if (i) i.focus(); });
     $("#slip").querySelectorAll("[data-pprice]").forEach(inp => inp.onchange = () => {
       const v = parseFloat(String(inp.value).replace(",", "."));
       if (v > 1) { recordPropPrice(inp.dataset.pprice, v); renderSlip(); }
@@ -1638,8 +1647,30 @@ function recordB365Price() {
   if (!m || !r || !r.fair || !(price > 1) || !S.slip.length) return;
   const key = `${m.id}|${S.slip.slice().sort().join(",")}`;
   const list = loadPref("hawk.b365prices", []).filter(x => x.key !== key);
-  list.push({ key, fair: +r.fair.toFixed(3), price, legs: S.slip.length, t: Date.now() });
+  // Each leg too: with Bet365's own prices for the match legs, the builder
+  // price tells HAWK roughly what Bet365 paid for the player legs (applyPropBook).
+  const detail = S.slip.map(id => { const l = S.legs[id]; return { k: HAWK.propKey(l), p: +l.p.toFixed(4), b: l.bookPrice || null }; });
+  list.push({ key, fair: +r.fair.toFixed(3), joint: +r.p.toFixed(5), price, legs: S.slip.length, detail, t: Date.now() });
   savePref("hawk.b365prices", list.slice(-B365_KEEP));
+  applyPropBook();
+}
+// From one builder price: the Bet365 price of its player legs, as a shift in
+// log-odds (the same for all of them). Bet365's builder price ≈ its single
+// prices multiplied together, corrected for how the legs go together (HAWK's
+// joint chance against its chances multiplied). Null when a match leg has no
+// Bet365 price, or the answer is silly (a boosted or mistyped price).
+function propShiftFromBuilder(x) {
+  if (!x.detail || !(x.joint > 0) || !(x.price > 1)) return null;
+  const props = x.detail.filter(d => d.k), match = x.detail.filter(d => !d.k);
+  if (!props.length || match.some(d => !(d.b > 1))) return null;
+  const lg = (p) => Math.log(p / (1 - p));
+  const together = x.detail.reduce((a, d) => a * d.p, 1) / x.joint;   // < 1 when the legs go together
+  const target = Math.log(x.price) - match.reduce((a, d) => a + Math.log(d.b), 0) - Math.log(together);   // what the props pay, in logs
+  const pays = (s) => props.reduce((a, d) => a - Math.log(Math.min(0.995, 1 / (1 + Math.exp(-(lg(d.p) + s))))), 0);
+  if (target <= pays(4) || target >= pays(-2)) return null;
+  let lo = -2, hi = 4;   // pays() falls as the shift grows: find where it hits the target
+  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (pays(mid) > target) lo = mid; else hi = mid; }
+  return { s: (lo + hi) / 2, props };
 }
 function b365Guess(fair, legs) {
   if (!(fair > 1) || !legs) return null;
@@ -1834,10 +1865,9 @@ function openChecklist() {
     <div class="chk-list">${groups.map(([name, g]) => `<div class="chk-grp">${esc(name)}</div>${g.map(l => `
       <label class="chk-row"><input type="checkbox"><span>${l.b365 ? `<b>${esc(l.b365)}</b> <span class="muted">= ${esc(l.label.replace(/^.*?(Over|Under)/, "$1"))}</span>`
         : esc(l.player ? capitalise(l.label.replace(l.player + ": ", "").replace(l.player + " ", "")) : l.label)}</span>
-        <span class="muted">${esc(l.market)}${l.kind === "player" ? ` <input class="chk-pp" data-cprice="${esc(l.id)}" inputmode="decimal" placeholder="${(() => { const e = HAWK.propEstimate(l); return e ? odds(e) : "price"; })()}" title="Type Bet365's price for this leg — HAWK learns how Bet365 prices legs like it">` : ""}</span></label>`).join("")}`).join("")}</div>
-    <div class="note" style="margin-top:8px">Tip: type Bet365's price next to a player leg as you add it — HAWK learns how Bet365 prices that kind of leg and stops picking ones it pays next to nothing for (like 1.01).</div>
+        <span class="muted">${esc(l.market)}</span></label>`).join("")}`).join("")}</div>
     <div class="chk-price">${fair ? `HAWK's fair odds <b>${odds(fair)}</b> — it's worth it if Bet365 pays <b style="color:var(--accent)">${odds(worth)}+</b>.
-      Type Bet365's price into the slip's price box and HAWK checks it (and suggests a stake).` : ""}</div>
+      Type Bet365's price into the slip's price box and HAWK checks it (and suggests a stake) — and learns from it how Bet365 prices player legs, so there's nothing else to type.` : ""}</div>
     <div class="note">Bet365 names some legs a little differently (e.g. "Anytime Goalscorer", "Player Shots on Target 1+"). If a leg isn't offered,
       tap <b>🔄 swap</b> on it in the slip — HAWK puts the next best leg in.</div>`);
   const bg = document.querySelector(".modal-bg");

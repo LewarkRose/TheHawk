@@ -516,6 +516,7 @@
 
     const lineups = {}, lineupCheck = {};
     const memberName = Object.fromEntries((detail.members || []).map((m) => [m.id, m.name]));
+    const memberNum = Object.fromEntries((detail.members || []).map((m) => [m.id, m.jerseyNumber]));
     for (const [side, key] of [["home", "homeCompetitor"], ["away", "awayCompetitor"]]) {
       const lu = (detail[key] || {}).lineups || {};
       lineups[side] = { status: lu.status || "Not published", formation: lu.formation || null, source: lu.status === "Confirmed" ? "365Scores" : null };
@@ -525,19 +526,23 @@
         // 365Scores hasn't confirmed it yet — ESPN has: use ESPN's XI.
         lineups[side] = { status: "Confirmed", formation: e.formation || lineups[side].formation, source: "ESPN" };
       } else {
-        // Both have it: do they name the same XI?
-        const xi365 = (lu.members || []).filter((m) => m.statusText === "Starting").map((m) => memberName[m.id]).filter(Boolean);
-        const only365 = xi365.filter((n) => !e.starters.some((p) => samePlayer(n, p.name)));
-        const onlyEspn = e.starters.map((p) => p.name).filter((n) => !xi365.some((x) => samePlayer(x, n)));
-        lineupCheck[side] = { agree: !only365.length && !onlyEspn.length, only365, onlyEspn };
+        // Both have it: do they name the same XI? The same player can be spelt
+        // two ways ("Fabrício Garcia" / "Fabrício Andrade" — one man, two
+        // surnames), so the shirt number settles it, and a single leftover name
+        // on each side with the same first name is the same player too.
+        const xi365 = (lu.members || []).filter((m) => m.statusText === "Starting").map((m) => ({ name: memberName[m.id], num: +memberNum[m.id] || null })).filter((x) => x.name);
+        const same = (a, b) => samePlayer(a.name, b.name) || (a.num && b.num && a.num === b.num);
+        let only365 = xi365.filter((a) => !e.starters.some((b) => same(a, b)));
+        let onlyEspn = e.starters.filter((b) => !xi365.some((a) => same(a, b)));
+        const first = (n) => norm(n).split(" ")[0] || "";
+        const firsts = (list) => list.map((x) => first(x.name)).sort().join("|");
+        if (only365.length && only365.length === onlyEspn.length && firsts(only365) === firsts(onlyEspn)) { only365 = []; onlyEspn = []; }
+        lineupCheck[side] = { agree: !only365.length && !onlyEspn.length, only365: only365.map((a) => a.name), onlyEspn: onlyEspn.map((b) => b.name) };
         lineups[side].source = "365Scores + ESPN";
       }
     }
     const confirmed = lineups.home.status === "Confirmed" && lineups.away.status === "Confirmed";
-    for (const side of ["home", "away"]) {
-      const c = lineupCheck[side];
-      if (c && !c.agree) warnings.push(`${side === "home" ? home : away}: 365Scores and ESPN disagree on the XI — 365Scores has ${c.only365.join(", ") || "—"}, ESPN has ${c.onlyEspn.join(", ") || "—"}. HAWK uses 365Scores'; check before you bet.`);
-    }
+    // (If they still name someone different, HAWK goes with 365Scores' XI — the lineup card says so quietly.)
     if (!confirmed) warnings.push("Lineups not confirmed yet — HAWK rule: don't lock the ticket until they are.");
 
     let refName = ((detail.officials || [])[0] || {}).name || null, refAvg = null, refGames = null, refSource = null;
@@ -1193,7 +1198,7 @@
     if (!pts || !pts.length || !(leg.p > 0)) return null;
     const x = logitP(leg.p);
     let w = PROP_PRIOR_W, s = PROP_PRIOR_D * PROP_PRIOR_W;
-    for (const pt of pts) { const wi = Math.exp(-((x - pt.x) ** 2) / (2 * PROP_WIDTH ** 2)); w += wi; s += wi * pt.d; }
+    for (const pt of pts) { const wi = (pt.w ?? 1) * Math.exp(-((x - pt.x) ** 2) / (2 * PROP_WIDTH ** 2)); w += wi; s += wi * pt.d; }
     const q = 1 / (1 + Math.exp(-(x + s / w)));
     return Math.max(1.01, Math.round(100 / q) / 100);
   }

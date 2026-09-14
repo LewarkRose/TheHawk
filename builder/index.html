@@ -167,6 +167,10 @@ img{max-width:100%}
 .sc-row.is-live{background:rgba(255,93,115,.05)}
 .sc-state{font-size:12px;font-weight:700}
 .sc-live{color:var(--red);font-weight:800}
+.sc-soon{color:var(--gold);font-weight:800;white-space:nowrap}
+.badge.soon{background:rgba(255,209,102,.14);color:var(--gold)}
+.kick-cd{margin-top:6px;font-size:13px;color:var(--gold);font-weight:600}
+.kick-cd b{font-weight:900}
 .sc-team{display:flex;align-items:center;gap:8px;font-weight:600;min-width:0}
 .sc-team.away{justify-content:flex-end;text-align:right}
 .sc-team img{width:20px;height:20px;flex-shrink:0}
@@ -568,7 +572,8 @@ function renderFixtures() {
     <div class="fx ${String(f.id) === openId ? "on" : ""}" data-id="${f.id}">
       <div class="team"><img src="${esc(f.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(f.home)}${isWatched(f.id) ? '<span class="bellmark" title="Lineup alert on">🔔</span>' : ""}</div>
       <div class="team"><img src="${esc(f.awayCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(f.away)}</div>
-      <div class="when">${f.started ? '<span class="badge live" title="In play — opens the live view">🔴 LIVE</span>' : esc(fmtKick(f.kickoff)).replace(" · ", "<br>")}</div>
+      <div class="when">${f.started ? '<span class="badge live" title="In play — opens the live view">🔴 LIVE</span>'
+        : soon(f.kickoff) ? `<span class="badge soon" title="Kicks off ${esc(fmtKick(f.kickoff))}">in ${kickIn(f.kickoff)}</span>` : esc(fmtKick(f.kickoff)).replace(" · ", "<br>")}</div>
     </div>`).join("") : `<div class="empty">No upcoming fixtures.</div>`;
   $("#fixtures").onclick = (e) => { const f = e.target.closest(".fx"); if (f) openMatch(f.dataset.id); };
 }
@@ -621,7 +626,7 @@ function renderMatch() {
       <div class="vs">
         <div class="side"><img src="${esc(m.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(m.home)}</div>
           <div class="muted">${esc(tbl("home"))}${m.form.home ? " · " + esc(m.form.home) : ""}</div>${chip("home")}</div>
-        <div class="mid"><div class="x">VS</div><div class="ko">${esc(fmtKick(m.kickoff))}</div>
+        <div class="mid"><div class="x">VS</div><div class="ko">${esc(fmtKick(m.kickoff))}</div><div class="kick-cd" id="kickCountdown"></div>
           ${m.started ? '<div class="chips"><span class="badge live">STARTED — pre-match model</span></div>' : ""}
           ${m.referee && m.referee.name ? `<div class="ko" style="margin-top:6px">Ref: ${esc(m.referee.name)}${m.referee.avg ? ` · ${m.referee.avg.toFixed(2)} cards/g` : ""}</div>` : ""}
           <button class="ghost" style="width:auto;padding:5px 10px;margin-top:8px" onclick="openMatch('${m.id}', true)" title="Re-run everything: odds, lineups and the simulation">↻ Refresh</button>
@@ -660,7 +665,30 @@ function renderMatch() {
   $("#match").querySelector(".tabs").onclick = (ev) => { const t = ev.target.closest(".tab"); if (t) { S.tab = t.dataset.t; renderMatch(); } };
   renderTab();
   renderLive();
+  renderCountdown();
 }
+
+/* ---------- kick-off countdown (last hour only) ---------- */
+// Before that the kick-off time says enough; in the last hour it matters,
+// because that's when lineups come out.
+const minsToKick = (iso) => (iso ? (new Date(iso).getTime() - Date.now()) / 60000 : Infinity);
+const soon = (iso) => { const m = minsToKick(iso); return m > 0 && m <= 60; };
+const kickIn = (iso) => { const m = minsToKick(iso); return m > 59.5 ? "1 hr" : `${Math.max(1, Math.ceil(m))} min`; };
+function renderCountdown() {
+  const el = $("#kickCountdown");
+  if (el && S.match) {
+    const m = minsToKick(S.match.kickoff), lu = S.match.lineups || {};
+    const confirmed = (lu.home || {}).status === "Confirmed" && (lu.away || {}).status === "Confirmed";
+    el.innerHTML = soon(S.match.kickoff) ? `⏱ Kicks off in <b>${kickIn(S.match.kickoff)}</b><span class="muted"> · ${confirmed ? "lineups are in ✓" : "lineups due any minute"}</span>`
+      : m <= 0 && m > -5 ? "⏱ Kicking off now" : "";
+  }
+}
+setInterval(() => {
+  if (S.view === "match") renderCountdown();
+  // keep the "in 25 min" labels in the fixture list and Scores ticking
+  if (S.fixtures.some(f => { const m = minsToKick(f.kickoff); return m > -2 && m <= 61; })) renderFixtures();
+  if (S.view === "scores" && (S.scores.data || []).some(g => g.status === 2 && minsToKick(g.kickoff) <= 61)) renderScoreList();
+}, 30 * 1000);
 
 /* ---------- live Bet365 prices ---------- */
 // While a match is open, HAWK re-reads Bet365's prices every 2 minutes
@@ -1630,7 +1658,8 @@ function renderScoreList() {
       ${list.map(g => {
         const state = g.status === 3 ? `<span class="sc-live">${esc(g.clock || "LIVE")}</span>`
           : g.status === 4 ? `<span class="muted">${/postpon|cancel|abandon/i.test(g.statusText) ? esc(g.statusText) : "FT"}</span>`
-          : g.status === 2 ? `<span class="muted">${new Date(g.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>` : `<span class="muted">${esc(g.statusText)}</span>`;
+          : g.status === 2 ? (soon(g.kickoff) ? `<span class="sc-soon">in ${kickIn(g.kickoff)}</span>`
+            : `<span class="muted">${new Date(g.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>`) : `<span class="muted">${esc(g.statusText)}</span>`;
         const sc0 = g.score[0] == null ? "" : g.score[0], sc1 = g.score[1] == null ? "" : g.score[1];
         const bet = mine[g.id] ? `<span title="You have a HAWK bet on this match (${esc(mine[g.id].toLowerCase())})">🎟</span>` : "";
         // Upcoming: a bell for a lineup alert, or "XI ✓" once both lineups are out.

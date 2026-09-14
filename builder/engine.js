@@ -185,14 +185,15 @@
       if (!d) continue;
       const names = Object.fromEntries((d.bookmakers || []).map((b) => [b.id, b.name]));
       for (const line of d.lines || []) {
-        const prices = {};
+        const prices = {}, opens = {};   // opens = the bookmaker's opening price for each option
         for (const o of line.options || []) {
-          const price = o.rate && o.rate.decimal;
+          const price = o.rate && o.rate.decimal, open = o.originalRate && o.originalRate.decimal;
           if (o.name && price > 1) prices[String(o.name)] = +price;
+          if (o.name && open > 1) opens[String(o.name)] = +open;
         }
         if (Object.keys(prices).length) quotes.push({
           book: names[line.bookmakerId] || `Book ${line.bookmakerId}`, type: line.lineTypeId,
-          market: (line.lineType || {}).name || "", value: String(line.internalOptionValue || ""), prices, source: "365Scores" });
+          market: (line.lineType || {}).name || "", value: String(line.internalOptionValue || ""), prices, opens, source: "365Scores" });
       }
     }
     return dedupeQuotes(quotes);
@@ -914,9 +915,9 @@
     if (kind === "cs" && /^\d-\d$/.test(rest || "")) return [126, rest, "Yes"];
     return null;
   }
-  function bookPrices(an, legs, book = PRICE_BOOK) {
+  function bookPrices(an, legs, book = PRICE_BOOK, which = "prices") {
     const quotes = {};
-    for (const q of an.quotes) if (q.book === book) quotes[`${q.type}|${q.value}`] = q.prices;
+    for (const q of an.quotes) if (q.book === book) quotes[`${q.type}|${q.value}`] = q[which] || {};
     const out = {};
     for (const id of Object.keys(legs)) {
       const line = bookLine(id);
@@ -1037,8 +1038,8 @@
     const c1x2 = an.cons["1|"];
     const market = c1x2 && ["1", "X", "2"].every((k) => k in c1x2.probs)
       ? { home: c1x2.probs["1"], draw: c1x2.probs.X, away: c1x2.probs["2"], sources: c1x2.books } : null;
-    const prices = bookPrices(an, legs);
-    const legJSON = Object.values(legs).map(({ arr, ...rest }) => ({ ...rest, bookPrice: prices[rest.id] || null }));
+    const prices = bookPrices(an, legs), opens = bookPrices(an, legs, PRICE_BOOK, "opens");
+    const legJSON = Object.values(legs).map(({ arr, ...rest }) => ({ ...rest, bookPrice: prices[rest.id] || null, bookOpen: opens[rest.id] || null }));
     const value = legJSON.filter((l) => l.bookPrice && l.bookPrice > l.fair * 1.02)
       .map((l) => ({ label: l.label, price: l.bookPrice, p: l.p, edge: l.bookPrice / l.fair - 1 })).sort((a, b) => b.edge - a.edge).slice(0, 5);
     const tableRow = (c) => { const r = an.table[c.id]; return r ? { position: r.position, points: r.points } : null; };
@@ -1053,6 +1054,7 @@
         name: p.name, pos: p.pos, status: p.status, photo: p.photo, start_p: p.start_p, doubtful: p.doubtful, sh90: p.sh90, sot90: p.sot90,
         g90: p.g90, c90: p.c90, x: p.x, sv90: p.sv90, minutes: p.minutes, has_data: p.has_data, recent: p.recent }))])),
       warnings: an.warnings, value: { book: PRICE_BOOK, legs: value }, sims: sim.n, missing: an.missing || { home: [], away: [] },
+      movers: an.inPlay ? [] : moverRows(an, sim.exp).slice(0, 8),
     };
   }
   function entryFor(id) {
@@ -1079,7 +1081,7 @@
   // Background jobs over every fixture in a time window, two matches at a
   // time: the "Best builders" scan and the Value finder.
   function newJob() { return { running: false, stop: false, total: 0, done: 0, errors: 0, results: [], params: null }; }
-  const jobStatus = (job) => ({ ...job, results: job.results.slice() });
+  const jobStatus = (job) => ({ ...job, results: job.results.slice(), movers: (job.movers || []).slice() });
   function windowParams(body) {
     return { leagues: (body.leagues || []).filter((l) => LEAGUES.includes(l)), hours: Math.min(Math.max(+body.hours || 24, 1), 168) };
   }
@@ -1654,13 +1656,43 @@
              competition: game.competitionDisplayName || "", events, stats };
   }
 
+  // Market movers: Bet365 selections whose price has moved 5%+ since it opened.
+  // A shortening price means money has come for it. "agree" = the move went
+  // towards HAWK's fair price (it shortened from above HAWK's fair, or drifted
+  // from below it); "value" = what's left of the edge at today's price.
+  // Correct scores and long shots are left out: their prices jump in big steps
+  // (100 → 150) that say nothing about where the money is going.
+  const MOVER_SKIP_TYPES = new Set([126, 127]), MOVER_MAX_PRICE = 10;
+  function moverRows(an, exp, minMove = 0.05) {
+    const rows = [];
+    for (const b of an.quotes) {
+      if (b.book !== PRICE_BOOK || !b.opens || b.source !== "365Scores" || MOVER_SKIP_TYPES.has(b.type)) continue;
+      const cons = an.cons[`${b.type}|${b.value}`];
+      for (const [option, price] of Object.entries(b.prices)) {
+        const open = b.opens[option];
+        if (!(open > 1) || Math.max(open, price) > MOVER_MAX_PRICE) continue;
+        const move = price / open - 1;
+        if (Math.abs(move) < minMove) continue;
+        const model = selectionModel(an, exp, b.type, b.value, option), pMarket = cons ? cons.probs[option] : null;
+        const [w, ignored] = marketTrust(model && model.q, pMarket, cons ? cons.books : 0);
+        const q = ignored ? pMarket : blend(model ? model.q : null, pMarket, w);
+        if (!(q > 0 && q < 1)) continue;
+        const fair = 1 / q;
+        rows.push({ type: b.type, market: b.market, label: marketLabel(b.type, b.market, b.value, option, an.home, an.away),
+                    open, price, move, p: q, fair, agree: move < 0 ? fair < open : fair > open, value: price * q - 1 });
+      }
+    }
+    return rows.sort((a, b) => Math.abs(b.move) - Math.abs(a.move));
+  }
+
   const valueJob = newJob();
   function startValue(body) {
     if (valueJob.running) return jobStatus(valueJob);
-    Object.assign(valueJob, newJob(), { running: true, params: windowParams(body) });
+    Object.assign(valueJob, newJob(), { running: true, params: windowParams(body), movers: [] });
     runFixtureJob(valueJob, (league, f, json, e) => {
       const info = fixtureInfo(league, f, json);
       for (const row of priceRows(e)) valueJob.results.push({ ...info, ...row });
+      for (const row of moverRows(e.an, json.expected)) valueJob.movers.push({ ...info, ...row });
     });
     return jobStatus(valueJob);
   }

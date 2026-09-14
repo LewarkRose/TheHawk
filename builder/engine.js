@@ -715,14 +715,20 @@
                    ...e.subs.map((p) => [p.name, "Substitute", p.pos, null, null, p.num, null])];
       } else if (!entries.some((e) => e[1] === "Starting") && sh[side].length) {
         // No lineup from 365Scores: the most-used players in the team's last 5
-        // games, minus the injured and suspended — and a keeper in goal.
+        // games (minus the injured and suspended) in a real shape — a keeper,
+        // 4 at the back, and 3-3 or 4-2 up front depending on whether a third
+        // forward has been playing. Short lines are filled with the next most-used.
         const games = teamGames(sh[side]), mins = (p) => minutesIn(p.matches, games);
         const recent = sh[side].filter((p) => !listed(p.name, "Missing") && mins(p) > 0).sort((a, b) => mins(b) - mins(a));
-        const keeper = recent.find((p) => p.position === "G");
-        const xi = [keeper, ...recent.filter((p) => p.position !== "G")].filter(Boolean).slice(0, 11);
+        const of = (pos) => recent.filter((p) => (p.position || "M") === pos);
+        const fwd = of("F"), threeUp = fwd.length >= 3 && mins(fwd[2]) >= 200;
+        const xi = [of("G")[0], ...of("D").slice(0, 4), ...of("M").slice(0, threeUp ? 3 : 4), ...fwd.slice(0, threeUp ? 3 : 2)].filter(Boolean);
+        for (const p of recent) { if (xi.length >= 11) break; if (!xi.includes(p) && p.position !== "G") xi.push(p); }
         const bench = recent.filter((p) => !xi.includes(p)).slice(0, 7);
         entries = [...xi.map((p) => [p.name, "Starting", p.position, null]), ...bench.map((p) => [p.name, "Substitute", p.position, null])];
         lineupGuess[side] = true;
+        const count = (pos) => xi.filter((p) => (p.position || "M") === pos).length;
+        if (!an.lineups[side].formation) an.lineups[side].formation = `${count("D")}-${count("M")}-${count("F")}`;
       }
       const lastGames = teamGames(sh[side]);
       squads[side] = entries.map(([name, status, pos, photo, field = null, num = null, short = null]) => {

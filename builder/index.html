@@ -1222,14 +1222,14 @@ function lineupCard(m) {
     return `<div class="pm ${side}" style="--hl:${hl.toFixed(1)}%;--ht:${ht.toFixed(1)}%;--vl:${vl.toFixed(1)}%;--vt:${vt.toFixed(1)}%"
         data-lp="${side}" data-name="${esc(p.name)}" title="${esc(p.name)}${p.doubtful ? " — doubtful" : ""}${!p.has_data ? " — no recent data (new or young player)" : ""}${
         fresh ? ` — hasn't played in ${side === "home" ? m.home : m.away}'s last 5 games: new signing, back from injury, or a lineup mistake` : ""}">
-      <div class="shirt">${p.num || "·"}</div><div class="nm">${p.doubtful ? "❓" : ""}${fresh ? "🆕" : ""}${esc(p.short || p.name.split(" ").slice(-1)[0])}</div>
+      <div class="shirt" ${p.num ? "" : `title="No shirt number yet"`}>${p.num || p.pos || "·"}</div><div class="nm">${p.doubtful ? "❓" : ""}${fresh ? "🆕" : ""}${esc(p.short || p.name.split(" ").slice(-1)[0])}</div>
       ${tag || booked ? `<div class="tg">${tag}${booked ? ` 🟨` : ""}</div>` : ""}</div>`;
   };
   const bench = (side) => (m.players[side] || []).filter(p => p.status === "Substitute")
     .map(p => `<span class="lu-chip" data-lp="${side}" data-name="${esc(p.name)}">${p.num ? `<b>${p.num}</b> ` : ""}${esc(p.short || p.name)}</span>`).join("") || '<span class="muted">—</span>';
   const out = (side) => ((m.missing || {})[side] || []).map(o => `<span class="lu-chip out" title="${esc(o.reason || o.status)}${o.back ? " · back " + esc(o.back) : ""}">${o.status === "Doubtful" ? "❓" : "✚"} ${esc(o.name)}</span>`).join("");
   const team = (side) => `<div class="lu-team"><div class="lu-tname"><span class="dot ${side}"></span>${esc(side === "home" ? m.home : m.away)}
-      <span class="muted">${esc(lu[side].formation || "")}</span></div>
+      <span class="muted">${esc(lu[side].formation || "")}${lu[side].guess && lu[side].formation ? " (guess)" : ""}</span></div>
     <div class="lu-row"><span class="muted">Bench</span>${bench(side)}</div>${out(side) ? `<div class="lu-row"><span class="muted">Out</span>${out(side)}</div>` : ""}</div>`;
   return `<div class="section" id="lineups">
     <div class="lu-head"><h3 style="margin:0">👕 Lineups</h3>

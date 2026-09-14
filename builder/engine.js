@@ -332,6 +332,50 @@
   const lastName = (n) => norm(n).split(" ").filter(Boolean).pop() || "";
   const samePlayer = (a, b) => nameSimilarity(a, b) >= 0.75 || (lastName(a).length > 2 && lastName(a) === lastName(b));
 
+  // Unibet's player-prop prices (Kambi's public odds feed, the one Unibet's
+  // own site reads): to score, assist, score or assist, and shots on target —
+  // the big leagues mostly; smaller ones often only have scorers. A real
+  // bookmaker's price for the leg, used where Bet365's isn't available.
+  const KAMBI = "https://eu-offering-api.kambicdn.com/offering/v2018/ub", KAMBI_Q = "lang=en_GB&market=GB", REF_BOOK = "Unibet";
+  const KAMBI_PATH = {
+    "Premier League": "england", "Championship": "england", "League One": "england", "FA Cup": "england", "EFL Cup": "england",
+    "La Liga": "spain", "LaLiga 2": "spain", "Copa del Rey": "spain", "Serie A": "italy", "Serie B": "italy", "Coppa Italia": "italy",
+    "Bundesliga": "germany", "2. Bundesliga": "germany", "DFB-Pokal": "germany", "Ligue 1": "france", "Ligue 2": "france", "Coupe de France": "france",
+    "Champions League": "champions_league", "Europa League": "europa_league", "Conference League": "conference_league",
+    "Eredivisie": "netherlands", "Liga Portugal": "portugal", "Scottish Premiership": "scotland", "Belgian Pro League": "belgium",
+    "Süper Lig": "turkey", "Greek Super League": "greece", "Austrian Bundesliga": "austria", "Swiss Super League": "switzerland",
+    "Danish Superliga": "denmark", "Allsvenskan": "sweden", "MLS": "usa", "Brasileirão": "brazil", "Argentina Primera": "argentina",
+    "Liga MX": "mexico", "Saudi Pro League": "saudi_arabia", "Copa Libertadores": "copa_libertadores",
+  };
+  const KAMBI_STAT = [[/^To Score$/i, "score"], [/^To give an assist/i, "assist"], [/^To score or give an assist/i, "soa"], [/^Player's shots on target/i, "sot"]];
+  // {event, rows: [{player, key ("score", "sot1", …), price}]} or null.
+  async function kambiProps(league, home, away, kickoff) {
+    const path = KAMBI_PATH[league];
+    if (!path || !kickoff) return null;
+    const list = await getJSON(`${KAMBI}/listView/football/${path}.json?${KAMBI_Q}`, 10 * 60e3);
+    let ev = null, best = 0;
+    for (const e of (list && list.events) || []) {
+      const x = e.event || {};
+      if (Math.abs(Date.parse(x.start) - kickoff.getTime()) > 3 * 3600e3) continue;
+      const s = nameSimilarity(home, x.homeName || "") + nameSimilarity(away, x.awayName || "");
+      if (s > best) { best = s; ev = x; }
+    }
+    if (!ev || best < 1.2) return null;
+    const j = await getJSON(`${KAMBI}/betoffer/event/${ev.id}.json?${KAMBI_Q}`, 5 * 60e3);
+    const rows = [];
+    for (const o of (j && j.betOffers) || []) {
+      const label = (o.criterion || {}).englishLabel || (o.criterion || {}).label || "";
+      const stat = (KAMBI_STAT.find(([re]) => re.test(label)) || [])[1];
+      if (!stat) continue;
+      for (const x of o.outcomes || []) {
+        if (x.status !== "OPEN" || !x.participant || !(x.odds > 1000)) continue;
+        if (stat === "sot") { if (x.type === "OT_OVER") rows.push({ player: x.participant, key: `sot${Math.floor(x.line / 1000) + 1}`, price: x.odds / 1000 }); }
+        else if (x.type === "OT_YES") rows.push({ player: x.participant, key: stat, price: x.odds / 1000 });
+      }
+    }
+    return { event: ev.name, rows };
+  }
+
   async function polymarket(slug, home, away) {
     const events = await getJSON(`${PM_BASE}/events?slug=${encodeURIComponent(slug)}`, 2 * 60 * 1000);
     const ev = events && events[0];
@@ -1194,6 +1238,7 @@
   // and with no close price it falls back towards Bet365's usual prop margin (PROP_PRIOR_D).
   const PROP_PRIOR_D = 0.3, PROP_PRIOR_W = 0.15, PROP_WIDTH = 1;
   function propEstimate(leg) {
+    if (leg && leg.refPrice > 1) return leg.refPrice;   // Unibet's real price for it (Kambi) beats a guess
     const k = leg && leg.kind === "player" ? propKey(leg) : null, pts = k ? propBook[k] : null;
     if (!pts || !pts.length || !(leg.p > 0)) return null;
     const x = logitP(leg.p);
@@ -1303,6 +1348,18 @@
     const an = await analyse(league, await gameFor(league, id));
     if (!an.M) throw new Error("no odds or ratings for this match yet");
     const squads = buildSquads(an), sim = simulate(an, squads), legs = catalogue(an, sim);
+    // Unibet's prices for the player legs it offers (a few seconds at most; the match loads without them).
+    try {
+      const ref = await Promise.race([kambiProps(league, an.home, an.away, an.kickoff), sleep(5000).then(() => null)]);
+      if (ref && ref.rows.length) {
+        for (const leg of Object.values(legs)) {
+          const k = leg.kind === "player" ? propKey(leg) : null;
+          const hit = k && ref.rows.find((r) => r.key === k && samePlayer(r.player, leg.player));
+          if (hit) { leg.refPrice = hit.price; leg.refBook = REF_BOOK; }
+        }
+        an.refEvent = ref.event;
+      }
+    } catch (e) { console.warn("[hawk] Unibet prices:", e.message); }
     const json = matchJSON(an, sim, squads, legs);
     keep(id, { t: Date.now(), an, legs, json });
     return json;

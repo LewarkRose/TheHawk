@@ -1529,8 +1529,10 @@ function propLine(l) {
   // No typing needed: HAWK learns from the builder price in the price box. The ✎ is there if you want to give one leg's price.
   const box = S.ppEdit === l.id || typed;
   if (!est && !box) return `<div class="pp-line"><button class="linkbtn" data-ppedit="${esc(l.id)}" title="Optional — HAWK also learns from the builder price you type below">✎ Bet365 price</button></div>`;
-  return `<div class="pp-line ${dead ? "dead" : ""}"><span>Bet365</span>${box ? `<input data-pprice="${esc(l.id)}" inputmode="decimal" placeholder="${est ? odds(est) : "price"}" value="${typed ? odds(typed.price) : ""}">` : ""}${
+  const ref = !typed && l.refPrice > 1;
+  return `<div class="pp-line ${dead ? "dead" : ""}"><span>${ref ? `${esc(l.refBook || "Unibet")}` : "Bet365"}</span>${box ? `<input data-pprice="${esc(l.id)}" inputmode="decimal" placeholder="${est ? odds(est) : "price"}" value="${typed ? odds(typed.price) : ""}">` : ""}${
     typed ? ` <span class="muted">✓ you typed it</span>`
+    : ref ? ` <b class="est" title="${esc(l.refBook || "Unibet")}'s real price for this leg right now (from its public odds feed) — Bet365's can differ a little">${odds(l.refPrice)}</b>${box ? "" : ` <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Give Bet365's price for it (optional)">✎</button>`}`
     : ` <b class="est" title="HAWK's estimate, from ${n} Bet365 price${n === 1 ? "" : "s"} for ${esc(propKeyLabel(key))} legs (your builder prices included)">≈ ${odds(est)}</b>${box ? "" : ` <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Give this leg's real Bet365 price (optional)">✎</button>`}`}${
     dead ? ` <b>· adds next to nothing at Bet365 — 🔄 swap it</b>` : est && l.p ? ` <span class="muted">· ${est * l.p >= 1 ? "value" : `${(100 * (1 - est * l.p)).toFixed(0)}% under fair`}</span>` : ""}</div>`;
 }
@@ -1553,7 +1555,8 @@ function renderSlip() {
       <div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div>
       <div class="acts"><button class="${S.locked.has(id) ? "on" : ""}" data-lock="${id}">${S.locked.has(id) ? "🔒 locked" : "lock"}</button>
         <button data-swap="${id}" title="Take this leg out and let HAWK put the best replacement in, back up to your target odds">🔄 swap</button>
-        <button data-rm="${id}" title="Just take this leg out">remove</button></div></div>`;
+        <button data-rm="${id}" title="Just take this leg out">remove</button>
+        <button data-no365="${id}" title="Bet365 doesn't offer ${esc(l.market)} for this league — HAWK stops using it there and puts the next best leg in">🚫 not on Bet365</button></div></div>`;
   }).join("");
   const predicted = m && Object.values(m.lineups).some(lu => lu.status !== "Confirmed");
   $("#slip").innerHTML = `
@@ -1596,6 +1599,7 @@ function renderSlip() {
     ${predicted ? `<div class="warn">Lineups are predicted. HAWK assumes the named starters start — most bookmakers void a player's legs if he doesn't play (check yours). Rebuild once lineups are confirmed, about an hour before kickoff.</div>` : ""}
     ` : `<div class="note" style="margin-top:14px">${m ? "Set your target odds and hit build — or add legs yourself from the Players tab." : "Pick a fixture to start."}</div>`}
     ${m && m.warnings.length ? m.warnings.map(w => `<div class="warn">${esc(w)}</div>`).join("") : ""}
+    ${no365Note()}
     <div class="note">Fair odds = 1 ÷ chance to land, from ${m ? m.sims.toLocaleString() : "12,000"} simulated matches.
       Match legs are calibrated to the bookmakers; player legs are HAWK's own estimates (no free feed has player-prop prices).
 </div>
@@ -1616,6 +1620,11 @@ function renderSlip() {
   $("#go").onclick = build;
   $("#slip").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => removeLeg(b.dataset.rm));
   $("#slip").querySelectorAll("[data-swap]").forEach(b => b.onclick = () => swapLeg(b.dataset.swap));
+  $("#slip").querySelectorAll("[data-no365]").forEach(b => b.onclick = () => notOnBet365(b.dataset.no365));
+  $("#slip").querySelectorAll("[data-on365]").forEach(b => b.onclick = () => {
+    const set = notOn365(); set.delete(b.dataset.on365); savePref("hawk.notOn365", [...set]);
+    toast("HAWK can use it again"); renderSlip();
+  });
   $("#slip").querySelectorAll("[data-hist]").forEach(b => b.onclick = () => openLegHistory(b.dataset.hist));
   $("#slip").querySelectorAll("[data-lock]").forEach(b => b.onclick = () => { const id = b.dataset.lock;
     S.locked.has(id) ? S.locked.delete(id) : S.locked.add(id); renderSlip(); });
@@ -1809,7 +1818,7 @@ function bindStakeAdvice(root, useStake) {
 function buildBody() {
   const locked = S.slip.filter(id => S.locked.has(id));
   return { id: String(S.match.id), target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs,
-           favourite: S.favourite, extras: S.extras, picks: S.picks, locked, banned: [...S.banned],
+           favourite: S.favourite, extras: S.extras, picks: S.picks, locked, banned: [...new Set([...S.banned, ...unofferedLegIds()])],
            learnt: propPrices().length };   // (a new Bet365 prop price → fresh options)
 }
 const sameOptions = () => S.options && S.match && S.options.sig === JSON.stringify(buildBody())
@@ -1865,7 +1874,7 @@ function openChecklist() {
     <div class="chk-list">${groups.map(([name, g]) => `<div class="chk-grp">${esc(name)}</div>${g.map(l => `
       <label class="chk-row"><input type="checkbox"><span>${l.b365 ? `<b>${esc(l.b365)}</b> <span class="muted">= ${esc(l.label.replace(/^.*?(Over|Under)/, "$1"))}</span>`
         : esc(l.player ? capitalise(l.label.replace(l.player + ": ", "").replace(l.player + " ", "")) : l.label)}</span>
-        <span class="muted">${esc(l.market)}</span></label>`).join("")}`).join("")}</div>
+        <span class="muted">${esc(l.market)} <button class="linkbtn muted" data-cno365="${esc(l.id)}" title="Can't find it on Bet365? HAWK stops using ${esc(l.market)} for this league and swaps in the next best leg">not there?</button></span></label>`).join("")}`).join("")}</div>
     <div class="chk-price">${fair ? `HAWK's fair odds <b>${odds(fair)}</b> — it's worth it if Bet365 pays <b style="color:var(--accent)">${odds(worth)}+</b>.
       Type Bet365's price into the slip's price box and HAWK checks it (and suggests a stake) — and learns from it how Bet365 prices player legs, so there's nothing else to type.` : ""}</div>
     <div class="note">Bet365 names some legs a little differently (e.g. "Anytime Goalscorer", "Player Shots on Target 1+"). If a leg isn't offered,
@@ -1875,6 +1884,11 @@ function openChecklist() {
     cb.closest(".chk-row").classList.toggle("done", cb.checked);
     const all = [...bg.querySelectorAll(".chk-row input[type=checkbox]")];
     if (all.every(x => x.checked)) toast("✅ All legs added — now check Bet365's price against HAWK's.");
+  });
+  bg.querySelectorAll("[data-cno365]").forEach(b => b.onclick = async (e) => {
+    e.preventDefault();   // (inside the row's label: don't tick it)
+    await notOnBet365(b.dataset.cno365);
+    openChecklist();      // the list again, with the replacement leg in
   });
   bg.querySelectorAll("[data-cprice]").forEach(inp => {
     inp.onclick = (e) => e.preventDefault() || inp.focus();   // typing a price doesn't tick the row
@@ -1907,6 +1921,28 @@ function removeLeg(id) { S.slip = S.slip.filter(x => x !== id); S.locked.delete(
 // Swap: take a leg out, keep every other leg as it is, and let HAWK add the
 // best replacement(s) to get back up to the target odds (same style, focus
 // and picks as a normal build). The swapped-out leg stays banned.
+// "🚫 Not on Bet365": Bet365 doesn't offer that market for this league (e.g.
+// goalkeeper saves in Liga Portugal). One tap and HAWK stops building with it
+// there, swapping the next best leg in; the slip lists them to undo.
+const notOn365 = () => new Set(loadPref("hawk.notOn365", []));
+const no365Key = (l, league = S.match && S.match.league) => `${league}|${l.market}`;
+function unofferedLegIds() {
+  const set = notOn365();
+  return S.match && set.size ? Object.values(S.legs).filter(l => set.has(no365Key(l))).map(l => l.id) : [];
+}
+async function notOnBet365(id) {
+  const l = S.legs[id];
+  if (!l || !S.match) return;
+  const set = notOn365(); set.add(no365Key(l)); savePref("hawk.notOn365", [...set]);
+  toast(`🚫 Got it: no ${l.market} at Bet365 in ${S.match.league} — HAWK leaves it out there`);
+  await swapLeg(id);
+}
+function no365Note() {
+  const league = S.match && S.match.league, mine = [...notOn365()].filter(k => k.startsWith(league + "|"));
+  if (!mine.length) return "";
+  return `<div class="note">🚫 Not on Bet365 in ${esc(league)}: ${mine.map(k => { const mk = k.slice(league.length + 1);
+    return `${esc(mk)} <button class="linkbtn muted" data-on365="${esc(k)}" title="It is on Bet365 after all — let HAWK use it again">✕</button>`; }).join(" · ")}</div>`;
+}
 async function swapLeg(id) {
   if (!S.match) return;
   const out = S.legs[id], keep = S.slip.filter(x => x !== id);

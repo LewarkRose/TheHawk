@@ -71,11 +71,41 @@ jobs:
           path: data/grading
           key: hawk-grading-${{ github.run_id }}
 
+      # Data health: a summary on the run's page, and which sources (if any)
+      # haven't worked for 24 hours+ (the "alert" job below then fails, and
+      # GitHub emails you). The site still publishes with the last good data.
+      - name: Data health
+        id: health
+        if: always()
+        run: |
+          python - <<'EOF'
+          import json, os
+          try:
+              m = json.load(open("data/meta.json", encoding="utf-8"))
+          except Exception as e:
+              m = {"alerts": ["data build"], "problems": [f"no meta.json ({e})"], "sources": {}}
+          lines = ["## HAWK data health", ""]
+          for name, s in (m.get("sources") or {}).items():
+              lines.append(f"- {'✅' if s.get('ok') else '⚠️'} **{name}** — last worked {s.get('last_ok')}")
+          h = m.get("health") or {}
+          if h:
+              p, r = h.get("players", {}), h.get("ratings", {})
+              lines.append(f"- Player stats: {p.get('fresh', 0)} fresh, {p.get('reused', 0)} from the last run, {p.get('missing', 0)} missing")
+              lines.append(f"- Team ratings: {r.get('fresh', 0)} fresh, {r.get('reused', 0)} from the last run, {r.get('missing', 0)} missing")
+          lines += ["", *[f"- {x}" for x in m.get("problems", [])[:30]]]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+              f.write("\n".join(lines) + "\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write(f"alerts={', '.join(m.get('alerts') or [])}\n")
+          EOF
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
+    outputs:
+      alerts: ${{ steps.health.outputs.alerts }}
 
   deploy:
     needs: build
@@ -86,3 +116,13 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Fails (so GitHub emails you) only when a source has been down 24h+.
+  alert:
+    needs: [build, deploy]
+    if: needs.build.outputs.alerts != ''
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::HAWK data source down for 24h+: ${{ needs.build.outputs.alerts }}. The site is running on the last good data — see the run summary."
+          exit 1

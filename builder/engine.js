@@ -409,6 +409,12 @@
     const fdH = fd.home && fd.home[1], fdA = fd.away && fd.away[1];
     const warnings = [];
     if (!meta) warnings.push("This fixture isn't in HAWK's data files yet (they refresh every few hours) — using bookmaker prices only, no player legs.");
+    // A source that was down leaves last-good files behind: say how old they are.
+    const builtAt = (files, hours) => files.map((f) => f && f.built && Date.parse(f.built)).filter((t) => t && Date.now() - t > hours * 3600e3);
+    const when = (t) => new Date(t).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    const oldPlayers = builtAt([playersH, playersA], 12), oldRatings = builtAt([profH, profA], 48);
+    if (oldPlayers.length) warnings.push(`Player stats are from ${when(Math.min(...oldPlayers))} — StatsHub hasn't answered since, so any newer games aren't in them.`);
+    if (oldRatings.length) warnings.push(`Team ratings are from ${when(Math.min(...oldRatings))} — football-data hasn't answered since.`);
 
     let quotes = dedupeQuotes([...quotes365, ...((meta && meta.uk) || [])]);
     if (pm) quotes.push({ book: "Polymarket", type: 1, market: "Full Time Result", value: "", source: "Polymarket",

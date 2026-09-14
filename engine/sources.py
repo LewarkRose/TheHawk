@@ -136,10 +136,32 @@ class _Throttle:
 _THROTTLES = {"www.statshub.com": _Throttle(concurrent=2, gap=0.25)}
 
 
+# Circuit breaker: after this many requests in a row to one host fail even
+# with retries, that host is treated as down for the rest of the run (so a
+# dead source costs seconds, not the 30-minute Action limit).
+_BREAK_AFTER = 6
+_host_fails = {}
+
+
 def _get(url, params=None, timeout=TIMEOUT):
+    host = urllib.parse.urlparse(url).netloc
+    if _host_fails.get(host, 0) >= _BREAK_AFTER:
+        return None
+    r = _get_retrying(url, params, timeout)
+    if r is False:   # failed with retries: network, 5xx or rate limit
+        _host_fails[host] = _host_fails.get(host, 0) + 1
+        if _host_fails[host] == _BREAK_AFTER:
+            print(f"[http] {host} looks down ({_BREAK_AFTER} failures in a row) — skipping it for the rest of this run")
+        return None
+    _host_fails[host] = 0
+    return r
+
+
+def _get_retrying(url, params=None, timeout=TIMEOUT):
     # Retries: several requests fire in parallel per fixture; 365Scores
     # occasionally times out or returns a 504, and StatsHub rate-limits
-    # with 429 (so back off before trying again).
+    # with 429 (so back off before trying again). None = a plain "no"
+    # (404 etc.), False = failed after retries.
     throttle = _THROTTLES.get(urllib.parse.urlparse(url).netloc)
     error = None
     for attempt, attempt_timeout in enumerate((timeout, timeout * 2, timeout * 2)):
@@ -152,7 +174,7 @@ def _get(url, params=None, timeout=TIMEOUT):
             continue
         except requests.RequestException as e:
             print(f"[http] {url} failed: {e}")
-            return None
+            return False
         finally:
             if throttle:
                 throttle.release()
@@ -168,7 +190,7 @@ def _get(url, params=None, timeout=TIMEOUT):
             return None
         return r
     print(f"[http] {url} failed after retries: {error}")
-    return None
+    return False
 
 
 def _get_json(url, params=None, timeout=TIMEOUT):

@@ -399,6 +399,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .thr{position:absolute;left:0;right:0;border-top:2px dashed var(--gold);pointer-events:none;opacity:.85}
 .thr span{position:absolute;right:0;top:-18px;font-size:11px;font-weight:800;color:var(--gold)}
 /* trusted-market badges */
+.dhealth{margin-top:10px;font-size:12px;border-top:1px solid var(--line);padding-top:8px;line-height:1.7}
+.dhealth .ok{color:var(--accent)}
+.dhealth .bad{color:var(--gold);font-weight:700}
 .tb{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:8px;letter-spacing:0;text-transform:none;vertical-align:1px;cursor:help;white-space:nowrap}
 .tb.ok{background:rgba(20,227,161,.14);color:var(--accent)}
 .tb.hi{background:rgba(255,209,102,.14);color:var(--gold)}
@@ -625,8 +628,8 @@ async function init() {
   renderWatch();
   HAWK.meta().then(meta => {
     if (!meta || !meta.generated) return;
-    const mins = Math.round((Date.now() - new Date(meta.generated).getTime()) / 60000);
-    S.dataAge = mins < 90 ? `${mins} min ago` : `${Math.round(mins / 60)} h ago`;
+    S.meta = meta;
+    S.dataAge = ago(meta.generated);
     renderSlip();
   });
   renderSlip();
@@ -1124,8 +1127,8 @@ function renderSlip() {
     ${m && m.warnings.length ? m.warnings.map(w => `<div class="warn">${esc(w)}</div>`).join("") : ""}
     <div class="note">Fair odds = 1 ÷ chance to land, from ${m ? m.sims.toLocaleString() : "12,000"} simulated matches.
       Match legs are calibrated to the bookmakers; player legs are HAWK's own estimates (no free feed has player-prop prices).
-      ${S.dataAge ? `Player &amp; team data updated ${esc(S.dataAge)}.` : ""}</div>
-    ${learningNote()}${trustNote()}`;
+</div>
+    ${healthLine()}${learningNote()}${trustNote()}`;
 
   $("#rng").oninput = (e) => { S.target = sliderToOdds(+e.target.value); $("#tgt").textContent = S.target.toFixed(2); };
   $("#rng").onchange = () => renderSlip();
@@ -2162,6 +2165,26 @@ function applyLearning() {
   HAWK.setLearning(S.learn.on ? S.learn.shifts : {});
   S.trust = computeTrust();
   HAWK.setTrust(Object.fromEntries(Object.entries(S.trust).filter(([, t]) => t.kind === "hi").map(([market]) => [market, TRUST_RUNS_HIGH])));
+}
+
+/* ---------- data health ---------- */
+// How fresh HAWK's data files are, source by source (data/meta.json, built
+// on GitHub every 3 hours). When a source is down, the files keep the last
+// good data, so this says which part is older and since when.
+const ago = (iso) => {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  return mins < 90 ? `${mins} min ago` : mins < 36 * 60 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} days ago`;
+};
+const SOURCE_LABELS = { "365Scores": "Fixtures", "football-data": "Team ratings", "StatsHub": "Player stats" };
+function healthLine() {
+  const m = S.meta;
+  if (!m) return "";
+  const stuck = Date.now() - new Date(m.generated).getTime() > 6 * 3600e3;   // updates run every 3 hours
+  const parts = Object.entries(m.sources || {}).map(([name, s]) => s.ok
+    ? `<span class="ok">✅ ${esc(SOURCE_LABELS[name] || name)}</span>`
+    : `<span class="bad" title="${esc(name)} didn't answer — HAWK is using its last good data">⚠️ ${esc(SOURCE_LABELS[name] || name)} from ${esc(s.last_ok ? ago(s.last_ok) : "an earlier run")}</span>`);
+  return `<div class="dhealth ${stuck || parts.some(p => p.includes("bad")) ? "warn" : ""}">📡 ${parts.join(" · ") || "Data"}
+    <span class="muted">— updated ${esc(S.dataAge)}${stuck ? " (the 3-hourly update seems stuck — check GitHub Actions)" : ""}</span></div>`;
 }
 
 /* ---------- trusted markets ---------- */

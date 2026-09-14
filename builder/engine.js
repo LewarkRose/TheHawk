@@ -1175,7 +1175,34 @@
   // their own (player props) are assumed to carry its usual builder margin on
   // props (~7%), so they're used when the priced legs are worse than that.
   const UNPRICED_EDGE = -0.07;
-  const valueScore = (leg) => (leg.bookPrice > 1 ? leg.bookPrice * leg.p - 1 : UNPRICED_EDGE) + (leg.agree === true ? 0.015 : leg.agree === false ? -0.015 : 0);
+  // Bet365's prices for player props, learnt from the ones you type in (no
+  // free feed has them): per kind of leg ("tackles1" = 1+ tackles), how much
+  // more (or less) sure Bet365 is than HAWK, in log-odds. The builder works
+  // it out from your prices and hands it over with setPropBook().
+  let propBook = {};
+  function setPropBook(book) { propBook = book && typeof book === "object" ? book : {}; }
+  const propKey = (leg) => { const m = /^p:(?:home|away):\d+:([a-z]+?)(\d*)$/.exec(leg.id || ""); return m ? m[1] + m[2] : null; };
+  const logitP = (p) => { p = Math.min(Math.max(p, 1e-4), 1 - 1e-4); return Math.log(p / (1 - p)); };
+  // Bet365's likely price for a prop leg (it never goes below 1.01), or null if HAWK hasn't learnt that kind yet.
+  // propBook[kind] = [{x: HAWK's log-odds, d: Bet365's minus HAWK's}] from your prices. A price counts
+  // most for legs HAWK rates about the same (a defender's 89% tackle says little about a forward's 50%),
+  // and with no close price it falls back towards Bet365's usual prop margin (PROP_PRIOR_D).
+  const PROP_PRIOR_D = 0.3, PROP_PRIOR_W = 0.15, PROP_WIDTH = 1;
+  function propEstimate(leg) {
+    const k = leg && leg.kind === "player" ? propKey(leg) : null, pts = k ? propBook[k] : null;
+    if (!pts || !pts.length || !(leg.p > 0)) return null;
+    const x = logitP(leg.p);
+    let w = PROP_PRIOR_W, s = PROP_PRIOR_D * PROP_PRIOR_W;
+    for (const pt of pts) { const wi = Math.exp(-((x - pt.x) ** 2) / (2 * PROP_WIDTH ** 2)); w += wi; s += wi * pt.d; }
+    const q = 1 / (1 + Math.exp(-(x + s / w)));
+    return Math.max(1.01, Math.round(100 / q) / 100);
+  }
+  // A leg Bet365 pays this little for adds nothing to the builder's price but can still lose it.
+  const DEAD_PRICE = 1.03;
+  const valueScore = (leg) => {
+    const est = leg.bookPrice > 1 ? null : propEstimate(leg);
+    return (leg.bookPrice > 1 ? leg.bookPrice * leg.p - 1 : est ? est * leg.p - 1 : UNPRICED_EDGE) + (leg.agree === true ? 0.015 : leg.agree === false ? -0.015 : 0);
+  };
   const playerKey = (leg) => (leg.kind === "player" ? `${leg.side}|${leg.player}` : null);
   // Compare two scores item by item: the first difference decides.
   const isBetter = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
@@ -1227,6 +1254,7 @@
       for (const leg of all) {
         if (chosen.includes(leg.id) || banned.has(leg.id) || groups.has(leg.group) || leg.low_data || (leg.extra && !extras)) continue;
         if (want && leg.kind !== want) continue;
+        if (leg.kind === "player") { const est = propEstimate(leg); if (est && est <= DEAD_PRICE) continue; }   // Bet365 pays ~nothing for it
         const k = playerKey(leg);
         if (k && (perPlayer[k] || 0) >= MAX_LEGS_PER_PLAYER) continue;
         let c = 0; const a = leg.arr;
@@ -2191,7 +2219,7 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, h2h, learnKey, liveMatch,
+  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, propEstimate, propKey, DEAD_PRICE, h2h, learnKey, liveMatch,
                   scores, matchReport, ticketLive,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },

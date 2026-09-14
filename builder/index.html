@@ -546,6 +546,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .chk-row{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:10px;
   margin-bottom:6px;cursor:pointer;font-weight:600;background:var(--panel2)}
 .chk-row input{width:18px;height:18px;accent-color:var(--accent)}
+.chk-row input.chk-pp{width:62px;height:auto;margin-left:6px;padding:3px 6px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:600 12px inherit}
+.chk-row.deadrow{border-color:rgba(255,209,102,.5)}
+.pp-line{font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.pp-line input{width:58px;padding:2px 6px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:600 12px inherit}
+.pp-line.dead b{color:var(--gold);font-weight:700}
 .chk-row .muted{font-size:12px;font-weight:500}
 .chk-row.done{border-color:rgba(20,227,161,.5);background:rgba(20,227,161,.08)}
 .chk-row.done span:first-of-type{text-decoration:line-through;color:var(--muted)}
@@ -1470,6 +1475,53 @@ function priceLine(l) {
   return `<div class="bp ${val ? "val" : ""}" title="${val ? book + "'s price beats HAWK's fair odds" : book + " pays less than HAWK's fair odds"}">fair ${odds(l.fair)} · ${esc(book)} <b>${odds(l.bookPrice)}</b>${moveMark(l)}</div>`;
 }
 
+// Bet365's player-prop prices, learnt from you. Type a prop's Bet365 price
+// once (in the slip or the Build-it-on-Bet365 list) and HAWK learns how
+// Bet365 prices that kind of leg — e.g. 1+ tackles for a regular defender at
+// 1.01. It then shows Bet365's likely price on similar legs, leaves out the
+// ones Bet365 pays next to nothing for, and "Value first" uses the estimates.
+// Your first one came from Bastoni 1+ tackles: HAWK 89% (1.12), Bet365 1.01.
+const PROP_KEEP = 400;
+const PROP_SEED = [{ key: "tackles1", p: 0.89, price: 1.01, t: 0, label: "Alessandro Bastoni: 1+ Tackles" }];
+const propNames = { tackles: "Tackles", fouls: "Fouls", fouled: "Fouls Won", offsides: "Offsides", shots: "Shots", sot: "Shots on Target", score: "to Score", soa: "Score or Assist", assist: "to Assist", booked: "to be Booked", saves: "Saves" };
+const propKeyLabel = (k) => { const m = /^([a-z]+?)(\d*)$/.exec(k) || []; return `${m[2] ? m[2] + "+ " : ""}${propNames[m[1]] || m[1]}`; };
+function propPrices() { return loadPref("hawk.propPrices", PROP_SEED); }
+function applyPropBook() {
+  const lg = (p) => { p = Math.min(Math.max(p, 1e-4), 1 - 1e-4); return Math.log(p / (1 - p)); };
+  const book = {};
+  for (const x of propPrices()) {
+    if (!(x.price > 1 && x.p > 0 && x.p < 1)) continue;
+    const d = lg(Math.min(0.995, 1 / x.price)) - lg(x.p);
+    if (Math.abs(d) <= 4) (book[x.key] ||= []).push({ x: lg(x.p), d });   // (a typo like 14.0 for 1.40 is left out)
+  }
+  S.propBook = { book, n: Object.fromEntries(Object.entries(book).map(([k, pts]) => [k, pts.length])) };
+  HAWK.setPropBook(book);
+}
+function recordPropPrice(legId, price) {
+  const l = S.legs[legId], key = l && HAWK.propKey(l);
+  if (!key || !(price > 1)) return;
+  const list = propPrices().filter(x => !(x.match === String(S.match && S.match.id) && x.leg === legId));
+  list.push({ key, p: +l.p.toFixed(4), price, t: Date.now(), label: l.label, match: String(S.match && S.match.id), leg: legId });
+  savePref("hawk.propPrices", list.slice(-PROP_KEEP));
+  applyPropBook();
+  const n = S.propBook.n[key] || 0;
+  toast(price <= HAWK.DEAD_PRICE
+    ? `🧠 Got it: Bet365 pays next to nothing for ${l.label} — HAWK leaves legs like it out now`
+    : `🧠 Got it: Bet365 ${odds(price)} for ${l.label} — HAWK now estimates other ${propKeyLabel(key)} legs (${n} price${n === 1 ? "" : "s"} so far)`);
+}
+// The line under a prop leg: Bet365's likely price and a box to type the real one.
+function propLine(l) {
+  if (l.kind !== "player") return "";
+  const key = HAWK.propKey(l), n = key && S.propBook ? S.propBook.n[key] || 0 : 0;
+  // The price you typed for this very leg beats HAWK's estimate.
+  const typed = propPrices().find(x => x.match === String(S.match && S.match.id) && x.leg === l.id);
+  const est = typed ? typed.price : HAWK.propEstimate(l), dead = est && est <= HAWK.DEAD_PRICE;
+  return `<div class="pp-line ${dead ? "dead" : ""}"><span>Bet365</span><input data-pprice="${esc(l.id)}" inputmode="decimal" placeholder="${est ? odds(est) : "price?"}"
+      value="${typed ? odds(typed.price) : ""}" title="Type this leg's Bet365 price — HAWK learns how Bet365 prices ${esc(propKeyLabel(key || ""))} legs">${
+    typed ? ` <span class="muted">✓ you typed it</span>`
+    : est ? ` <span class="muted" title="From ${n} Bet365 price${n === 1 ? "" : "s"} you've typed for ${esc(propKeyLabel(key))} legs">≈ ${odds(est)}</span>` : ` <span class="muted">type it once, HAWK learns</span>`}${
+    dead ? ` <b>· adds next to nothing at Bet365 — 🔄 swap it</b>` : est && l.p ? ` <span class="muted">· ${est * l.p >= 1 ? "value" : `${(100 * (1 - est * l.p)).toFixed(0)}% under fair`}</span>` : ""}</div>`;
+}
 // Corners and cards: Bet365's builder words the same leg with a whole number
 // ("Over 3" = 4+), so show exactly what to pick there.
 function b365Line(l) {
@@ -1483,7 +1535,7 @@ function renderSlip() {
     const l = S.legs[id]; if (!l) return "";
     const row = r && r.legs ? r.legs.find(x => x.id === id) : null;
     return `<div class="leg" style="animation-delay:${n * 60}ms"><div class="ck">✓</div>
-      <div class="l1"><div><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}${hitChip(l)}</div>${b365Line(l)}${moveLine(l)}</div>
+      <div class="l1"><div><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}${hitChip(l)}</div>${b365Line(l)}${propLine(l)}${moveLine(l)}</div>
         <div class="rt"><div class="pp">${pct(l.p)}</div>${row && n > 0 ? `<div class="fo">${pct(row.cond)} given above</div>` : ""}
           ${priceLine(l)}</div></div>
       <div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div>
@@ -1560,6 +1612,10 @@ function renderSlip() {
     // Remember what you typed, so adding or removing a leg doesn't clear it.
     for (const key of ["price", "boost", "stake"]) $("#" + key).oninput = (e) => { S.chk[key] = e.target.value; verdict(); };
     $("#price").onchange = () => { recordB365Price(); renderSlip(); };
+    $("#slip").querySelectorAll("[data-pprice]").forEach(inp => inp.onchange = () => {
+      const v = parseFloat(String(inp.value).replace(",", "."));
+      if (v > 1) { recordPropPrice(inp.dataset.pprice, v); renderSlip(); }
+    });
     $("#copy").onclick = copySlip; $("#vault").onclick = sendToVault; $("#toAcca").onclick = addSlipToAcca; verdict();
     $("#b365").onclick = openChecklist;
     if ($("#optbar")) $("#optbar").onclick = (e) => { const b = e.target.closest("[data-opt]"); if (b) showOption(+b.dataset.opt); };
@@ -1718,7 +1774,8 @@ function bindStakeAdvice(root, useStake) {
 function buildBody() {
   const locked = S.slip.filter(id => S.locked.has(id));
   return { id: String(S.match.id), target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs,
-           favourite: S.favourite, extras: S.extras, picks: S.picks, locked, banned: [...S.banned] };
+           favourite: S.favourite, extras: S.extras, picks: S.picks, locked, banned: [...S.banned],
+           learnt: propPrices().length };   // (a new Bet365 prop price → fresh options)
 }
 const sameOptions = () => S.options && S.match && S.options.sig === JSON.stringify(buildBody())
   && S.slip.join("|") === S.options.list[S.options.at].legs.map(l => l.id).join("|");
@@ -1773,16 +1830,28 @@ function openChecklist() {
     <div class="chk-list">${groups.map(([name, g]) => `<div class="chk-grp">${esc(name)}</div>${g.map(l => `
       <label class="chk-row"><input type="checkbox"><span>${l.b365 ? `<b>${esc(l.b365)}</b> <span class="muted">= ${esc(l.label.replace(/^.*?(Over|Under)/, "$1"))}</span>`
         : esc(l.player ? capitalise(l.label.replace(l.player + ": ", "").replace(l.player + " ", "")) : l.label)}</span>
-        <span class="muted">${esc(l.market)}</span></label>`).join("")}`).join("")}</div>
+        <span class="muted">${esc(l.market)}${l.kind === "player" ? ` <input class="chk-pp" data-cprice="${esc(l.id)}" inputmode="decimal" placeholder="${(() => { const e = HAWK.propEstimate(l); return e ? odds(e) : "price"; })()}" title="Type Bet365's price for this leg — HAWK learns how Bet365 prices legs like it">` : ""}</span></label>`).join("")}`).join("")}</div>
+    <div class="note" style="margin-top:8px">Tip: type Bet365's price next to a player leg as you add it — HAWK learns how Bet365 prices that kind of leg and stops picking ones it pays next to nothing for (like 1.01).</div>
     <div class="chk-price">${fair ? `HAWK's fair odds <b>${odds(fair)}</b> — it's worth it if Bet365 pays <b style="color:var(--accent)">${odds(worth)}+</b>.
       Type Bet365's price into the slip's price box and HAWK checks it (and suggests a stake).` : ""}</div>
     <div class="note">Bet365 names some legs a little differently (e.g. "Anytime Goalscorer", "Player Shots on Target 1+"). If a leg isn't offered,
       tap <b>🔄 swap</b> on it in the slip — HAWK puts the next best leg in.</div>`);
   const bg = document.querySelector(".modal-bg");
-  bg.querySelectorAll(".chk-row input").forEach(cb => cb.onchange = () => {
+  bg.querySelectorAll(".chk-row input[type=checkbox]").forEach(cb => cb.onchange = () => {
     cb.closest(".chk-row").classList.toggle("done", cb.checked);
-    const all = [...bg.querySelectorAll(".chk-row input")];
+    const all = [...bg.querySelectorAll(".chk-row input[type=checkbox]")];
     if (all.every(x => x.checked)) toast("✅ All legs added — now check Bet365's price against HAWK's.");
+  });
+  bg.querySelectorAll("[data-cprice]").forEach(inp => {
+    inp.onclick = (e) => e.preventDefault() || inp.focus();   // typing a price doesn't tick the row
+    inp.onchange = () => {
+      const v = parseFloat(String(inp.value).replace(",", "."));
+      if (!(v > 1)) return;
+      recordPropPrice(inp.dataset.cprice, v);
+      renderSlip();
+      const est = HAWK.propEstimate(S.legs[inp.dataset.cprice]);
+      if (v <= HAWK.DEAD_PRICE || (est && est <= HAWK.DEAD_PRICE)) inp.closest(".chk-row").classList.add("deadrow");
+    };
   });
 }
 
@@ -2954,6 +3023,7 @@ function applyLearning() {
   S.learn = { on: loadPref("hawk.learn", true), ...computeLearning() };
   HAWK.setLearning(S.learn.on ? S.learn.shifts : {});
   HAWK.setEarlyPayout(S.ep);
+  applyPropBook();
   S.trust = computeTrust();
   HAWK.setTrust(Object.fromEntries(Object.entries(S.trust).filter(([, t]) => t.kind === "hi").map(([market]) => [market, TRUST_RUNS_HIGH])));
 }

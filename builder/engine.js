@@ -34,7 +34,9 @@
   const COMPETITIONS = Object.assign({}, ...LEAGUE_GROUPS.map((g) => g.ids));
   const LEAGUES = Object.keys(COMPETITIONS);
   const S365 = "https://webws.365scores.com/web";
-  const S365_PARAMS = { appTypeId: 5, langId: 1, timezoneName: "Europe/London", userCountryId: -1 };
+  // Your device's time zone (e.g. Europe/Malta), so a "day" of scores runs midnight to midnight for you.
+  const LOCAL_TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/London"; } catch { return "Europe/London"; } })();
+  const S365_PARAMS = { appTypeId: 5, langId: 1, timezoneName: LOCAL_TZ, userCountryId: -1 };
   const ODDS_COUNTRIES = [21, 31, 37]; // each exposes a different bookmaker set
   const PM_BASE = "https://gamma-api.polymarket.com";
   const DATA_URL = new URL("../data/", document.baseURI).href;
@@ -600,6 +602,29 @@
     return file.players.map((p) => ({ name: p.name, position: p.position,
       matches: p.m.map((row) => Object.fromEntries(f.map((k, i) => [k, k === "home" || k === "sub_in" ? !!row[i] : row[i]]))) }));
   }
+  // Which of the team's StatsHub players is this lineup name? The usual name
+  // match, plus two careful extras for names the sources write differently:
+  //  - transliterations: nearly the same surname ("Yarmolyuk" / "Yarmoliuk")
+  //  - keepers: same first name and both goalkeepers ("Daniel Heuer" /
+  //    "Daniel Fernandes") — only for keepers, where it can't pick the wrong man.
+  // A new signing with no StatsHub record stays unmatched (no borrowed stats).
+  function matchPlayer(name, pos, rows) {
+    const names = rows.map((r) => r.name);
+    if (!names.length) return null;
+    const hit = bestMatch(name, names, 0.6);
+    if (hit) return hit;
+    const tok = (s) => norm(s).split(" ").filter((t) => t.length >= 3);
+    const mine = tok(name), last = mine[mine.length - 1] || "";
+    const scored = rows.map((r) => {
+      const t = tok(r.name), l = t[t.length - 1] || "";
+      let s = 0;
+      if (last && l && last[0] === l[0] && bigramRatio(last, l) >= 0.7) s = 0.7;
+      if (pos === "G" && r.position === "G" && mine[0] && t[0] === mine[0]) s = Math.max(s, 0.65);
+      if (pos && r.position && pos !== r.position) s -= 0.3;
+      return [s, r.name];
+    }).sort((a, b) => b[0] - a[0]);
+    return scored[0][0] >= 0.6 && (!scored[1] || scored[0][0] - scored[1][0] >= 0.1) ? scored[0][1] : null;
+  }
   // The team's last n games (their kick-off times) from all its players' logs,
   // and a player's minutes in them. "Who plays lately" must be measured in the
   // team's recent games: a player's own last 5 can be from last season (he's
@@ -699,14 +724,18 @@
         entries = [...xi.map((p) => [p.name, "Starting", p.position, null]), ...bench.map((p) => [p.name, "Substitute", p.position, null])];
         lineupGuess[side] = true;
       }
+      const lastGames = teamGames(sh[side]);
       squads[side] = entries.map(([name, status, pos, photo, field = null, num = null, short = null]) => {
-        const match = Object.keys(byName).length ? bestMatch(name, Object.keys(byName), 0.6) : null;
+        const match = matchPlayer(name, pos, sh[side]);
         const matches = match ? byName[match].matches : [];
+        // Minutes in the team's last 5 games: 0 for a starter = new signing, back
+        // from a long injury — or a lineup mistake (the lineup view flags it).
+        const teamMins = lastGames.size ? minutesIn(matches, lastGames) : null;
         pos = pos || (match && byName[match].position) || "M";
         const r = rates(matches, priors[pos] || DEFAULT_RATES.M, pos, teamHasExtras ? xpriors[pos] || EXTRA_DEFAULTS.M : null);
         // A doubtful player in a predicted lineup may well not start (and gets no legs).
         const doubt = !confirmed && listed(name, "Doubtful") ? DOUBTFUL_START : 1;
-        return { ...r, name, pos, status, photo, field, num, short, start_p: START_PROB[confirmed][status] * doubt, doubtful: doubt < 1,
+        return { ...r, name, pos, status, photo, field, num, short, teamMins, start_p: START_PROB[confirmed][status] * doubt, doubtful: doubt < 1,
                  sub_p: status === "Substitute" ? SUB_APPEAR_PROB : 0, has_data: !!match, recent: matches.slice(0, 10),
                  recent_starts: matches.filter((m) => !m.sub_in).slice(0, 10) };
       });
@@ -1343,7 +1372,7 @@
       players: Object.fromEntries(Object.entries(squads).map(([side, sq]) => [side, sq.map((p) => ({
         name: p.name, pos: p.pos, status: p.status, photo: p.photo, start_p: p.start_p, doubtful: p.doubtful, sh90: p.sh90, sot90: p.sot90,
         g90: p.g90, c90: p.c90, x: p.x, sv90: p.sv90, minutes: p.minutes, has_data: p.has_data, recent: p.recent,
-        recent_starts: p.recent_starts, field: p.field, num: p.num, short: p.short }))])),
+        recent_starts: p.recent_starts, field: p.field, num: p.num, short: p.short, teamMins: p.teamMins }))])),
       warnings: an.warnings, value: { book: PRICE_BOOK, legs: value }, sims: sim.n, missing: an.missing || { home: [], away: [] },
       movers: an.inPlay ? [] : moverRows(an, sim.exp).slice(0, 8),
       upset: upsetRadar(an, M, squads, sim.exp),
@@ -2068,7 +2097,7 @@
                   startRadar, radarStatus: () => jobStatus(radarJob), stopRadar: () => { radarJob.stop = true; return jobStatus(radarJob); },
                   startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },
                   meta: () => data("meta.json"),
-                  _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas, espnLineups,
+                  _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas, espnLineups, matchPlayer, playerRows,
                                 selectionModel, priceRows, entry: (id) => matches.get(String(id)), liveState, finalMatrix,
                                 fitTotalLambda, scoreMatrix, nameSimilarity, bestMatch } };
 })(window);

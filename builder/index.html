@@ -1217,9 +1217,12 @@ function lineupCard(m) {
     const hl = side === "home" ? 6 + depth * 0.4 : 94 - depth * 0.4, ht = side === "home" ? 12 + s * 0.74 : 88 - s * 0.74;
     const vt = side === "home" ? 94 - depth * 0.4 : 6 + depth * 0.4, vl = side === "home" ? 12 + s * 0.76 : 88 - s * 0.76;
     const tag = playerTag(side, p), booked = legsFor(side, p.name).find(l => /:booked$/.test(l.id) && l.p >= 0.3);
+    // 🆕 hasn't played in the team's last 5 games: new signing, back from injury — or a lineup mistake.
+    const fresh = p.teamMins === 0 && p.has_data;
     return `<div class="pm ${side}" style="--hl:${hl.toFixed(1)}%;--ht:${ht.toFixed(1)}%;--vl:${vl.toFixed(1)}%;--vt:${vt.toFixed(1)}%"
-        data-lp="${side}" data-name="${esc(p.name)}" title="${esc(p.name)}${p.doubtful ? " — doubtful" : ""}${!p.has_data ? " — no recent data" : ""}">
-      <div class="shirt">${p.num || "·"}</div><div class="nm">${p.doubtful ? "❓" : ""}${esc(p.short || p.name.split(" ").slice(-1)[0])}</div>
+        data-lp="${side}" data-name="${esc(p.name)}" title="${esc(p.name)}${p.doubtful ? " — doubtful" : ""}${!p.has_data ? " — no recent data (new or young player)" : ""}${
+        fresh ? ` — hasn't played in ${side === "home" ? m.home : m.away}'s last 5 games: new signing, back from injury, or a lineup mistake` : ""}">
+      <div class="shirt">${p.num || "·"}</div><div class="nm">${p.doubtful ? "❓" : ""}${fresh ? "🆕" : ""}${esc(p.short || p.name.split(" ").slice(-1)[0])}</div>
       ${tag || booked ? `<div class="tg">${tag}${booked ? ` 🟨` : ""}</div>` : ""}</div>`;
   };
   const bench = (side) => (m.players[side] || []).filter(p => p.status === "Substitute")
@@ -1240,7 +1243,7 @@ function lineupCard(m) {
         <rect x="22" y="1" width="56" height="16"/><rect x="38" y="1" width="24" height="6"/><rect x="22" y="143" width="56" height="16"/><rect x="38" y="153" width="24" height="6"/></svg>
       ${["home", "away"].map(side => pitchSpots(m.players[side] || []).map(spot => marker(side, spot)).join("")).join("")}
     </div>
-    <div class="lu-legend">⚽ chance to score · 🎯 1+ shot on target · 🧤 2+ saves · 🟨 30%+ to be booked · ❓ doubtful — tap any player for his record and legs</div>
+    <div class="lu-legend">⚽ chance to score · 🎯 1+ shot on target · 🧤 2+ saves · 🟨 30%+ to be booked · ❓ doubtful · 🆕 not in the team's last 5 games — tap any player for his record and legs</div>
     <div class="lu-teams">${team("home")}${team("away")}</div>
   </div>`;
 }

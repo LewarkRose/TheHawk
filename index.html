@@ -732,7 +732,8 @@
 
         // --- LIVE FIXTURE FEED: 365Scores, the same source the HAWK builder uses ---
         const S365 = 'https://webws.365scores.com/web';
-        const S365_PARAMS = { appTypeId: 5, langId: 1, timezoneName: 'Europe/London', userCountryId: -1 };
+        const S365_PARAMS = { appTypeId: 5, langId: 1, userCountryId: -1,   // your device's time zone (e.g. Europe/Malta)
+                              timezoneName: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London'; } catch (e) { return 'Europe/London'; } })() };
         const S365_COMPETITIONS = Object.assign({}, ...LEAGUE_GROUPS.map(([, ids]) => ids));
         const CUP_LEAGUES = new Set(Object.keys(LEAGUE_GROUPS.find(([label]) => label.includes('Cups'))[1]));
         async function s365(path, params) {

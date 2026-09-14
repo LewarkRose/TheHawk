@@ -228,6 +228,10 @@ img{max-width:100%}
 .monhead{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--line)}
 @media (max-width:640px){.monhead{grid-template-columns:1fr}.apart{grid-template-columns:1fr}.apart>div:last-child{text-align:left!important}}
 .mvo{font-size:10.5px;font-weight:700;margin-left:6px;white-space:nowrap}
+.agree{font-size:9.5px;font-weight:800;margin-left:5px;padding:1px 5px;border-radius:5px;white-space:nowrap;letter-spacing:.02em}
+.agree.yes{background:rgba(20,227,161,.14);color:var(--accent)}
+.agree.no{background:rgba(255,209,102,.14);color:var(--gold)}
+.seg2{grid-template-columns:repeat(2,1fr)}
 .mvo.dn,.mv-prices .dn{color:var(--accent)}
 .mvo.up,.mv-prices .up{color:#ff8a8a}
 .mover{display:grid;grid-template-columns:1.4fr auto auto auto;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
@@ -460,7 +464,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             chk: { price: "", boost: "", stake: "5" }, extras: false, cat: "All",
             live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
-            inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25),
+            inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },
             view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "legs", data: null, timer: null },
@@ -527,6 +531,11 @@ async function init() {
   S.value.leagues = new Set(leagues);
   S.monster.leagues = new Set(leagues);
   applyLearning();
+  // HAWK's graded predictions on every match (built on GitHub by engine/grade.mjs).
+  fetch(new URL("../data/graded.json", location.href)).then(r => (r.ok ? r.json() : null)).then(g => {
+    if (!g) return;
+    S.graded = g; applyLearning(); renderSlip();
+  }).catch(() => { /* not built yet */ });
   $("#valueBtn").onclick = showValue;
   $("#accaBtn").onclick = showAcca;
   $("#scoresBtn").onclick = showScores;
@@ -857,7 +866,10 @@ function openMark(l) {
   if (!(l.bookOpen > 1 && l.bookPrice > 1)) return "";
   const move = l.bookPrice / l.bookOpen - 1;
   if (Math.abs(move) < 0.03) return "";
-  return `<span class="mvo ${move < 0 ? "dn" : "up"}" title="Bet365 opened at ${odds(l.bookOpen)} — ${move < 0 ? "shortened: money has come for it" : "drifted: money has gone against it"}">${move < 0 ? "▼" : "▲"} from ${odds(l.bookOpen)}</span>`;
+  // HAWK agrees when the move went towards its fair price.
+  const agree = move < 0 ? l.fair < l.bookOpen : l.fair > l.bookOpen;
+  return `<span class="mvo ${move < 0 ? "dn" : "up"}" title="Bet365 opened at ${odds(l.bookOpen)} — ${move < 0 ? "shortened: money has come for it" : "drifted: money has gone against it"}">${move < 0 ? "▼" : "▲"} from ${odds(l.bookOpen)}</span>`
+    + `<span class="agree ${agree ? "yes" : "no"}" title="${agree ? "The market moved towards HAWK's fair price" : "The market moved away from HAWK's fair price"}">${agree ? "HAWK agrees" : "HAWK disagrees"}</span>`;
 }
 // Match page: the biggest Bet365 moves since opening, and HAWK's take on each.
 function moversCard(m) {
@@ -931,6 +943,9 @@ function renderSlip() {
     <div class="seg" id="seg" title="How likely each leg should be">${Object.entries(STYLES).map(([s, st]) => `<button class="${S.style === s ? "on" : ""}" data-s="${s}">${st.label}</button>`).join("")}</div>
     <div class="hint">${STYLES[S.style].hint}</div>
     <div class="seg" id="focus" style="margin-top:0" title="What the builder is made of">${[["Mix", "Mix"], ["Players", "Player props"], ["Match", "Match stats"]].map(([f, lab]) => `<button class="${S.focus === f ? "on" : ""}" data-f="${f}">${lab}</button>`).join("")}</div>
+    <div class="seg seg2" id="picks" style="margin-top:0" title="How HAWK chooses between legs">${[["likely", "🎯 Most likely"], ["value", "💰 Value first"]].map(([k, lab]) => `<button class="${S.picks === k ? "on" : ""}" data-p="${k}">${lab}</button>`).join("")}</div>
+    <div class="hint">${S.picks === "value" ? "Prefers legs where Bet365's own price beats HAWK's fair odds, and moves HAWK agrees with — usually a better builder price."
+      : "Picks the legs most likely to land together at your target odds."}</div>
     <div class="opts"><label><input type="checkbox" id="fav" ${S.favourite ? "checked" : ""}> Start with the favourite to win</label>
       <label>Max legs <select id="mx">${[3,4,5,6,7,8,9,10,12].map(n => `<option ${n === S.maxLegs ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>
     <div class="opts" style="margin-top:6px"><label title="These are counted from each player's own record, with no allowance for the opponent or referee, so HAWK is less sure of them. You can always add them yourself.">
@@ -963,6 +978,7 @@ function renderSlip() {
   $("#rng").onchange = () => renderSlip();
   $("#seg").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.style = b.dataset.s; renderSlip(); } };
   $("#focus").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.focus = b.dataset.f; renderSlip(); } };
+  $("#picks").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.picks = b.dataset.p; savePref("hawk.picks", S.picks); renderSlip(); } };
   $("#fav").onchange = (e) => { S.favourite = e.target.checked; };
   $("#xtra").onchange = (e) => { S.extras = e.target.checked; };
   $("#mx").onchange = (e) => { S.maxLegs = +e.target.value; };
@@ -1096,7 +1112,7 @@ async function build() {
   try {
     const locked = S.slip.filter(id => S.locked.has(id));
     S.result = await api("/api/build", { id: String(S.match.id), target: S.target, style: S.style, focus: S.focus, maxLegs: S.maxLegs,
-                                         favourite: S.favourite, extras: S.extras, locked, banned: [...S.banned] });
+                                         favourite: S.favourite, extras: S.extras, picks: S.picks, locked, banned: [...S.banned] });
     S.slip = S.result.legs.map(l => l.id);
     if (!S.slip.length) toast("No legs fit this style — try another style or target.");
     else if (S.result.fair < S.target * 0.97) toast(`Best found: ${odds(S.result.fair)} — raise max legs or change style to go higher.`);
@@ -1207,7 +1223,7 @@ async function toggleScan() {
     else {
       if (!S.scan.leagues.size) return toast("Pick at least one league.");
       S.scan.data = await api("/api/scan", { leagues: [...S.scan.leagues], hours: S.scan.hours, target: S.target,
-                                             style: S.style, focus: S.focus, maxLegs: S.maxLegs, extras: S.extras });
+                                             style: S.style, focus: S.focus, maxLegs: S.maxLegs, extras: S.extras, picks: S.picks });
     }
   } catch (err) { toast(err.message); }
   updateScan();
@@ -1951,6 +1967,12 @@ function computeLearning() {
     const g = (by[key] ||= { n: 0, said: 0, won: 0 });
     g.n++; g.said += p; if (h.result === "won") g.won++;
   }
+  // Plus HAWK's graded predictions on every match (engine/grade.mjs on GitHub).
+  let fromAll = 0;
+  for (const [key, g] of Object.entries((S.graded && S.graded.byKey) || {})) {
+    const b = (by[key] ||= { n: 0, said: 0, won: 0 });
+    b.n += g.n; b.said += g.p; b.won += g.won; fromAll += g.n;
+  }
   const shifts = {}, changes = [];
   let total = 0;
   for (const [market, g] of Object.entries(by)) {
@@ -1962,8 +1984,8 @@ function computeLearning() {
     shifts[market] = shift;
     changes.push({ market, n: g.n, pts: 100 * (ilg(lg(said) + shift) - said) });
   }
-  return { shifts, changes: changes.sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts)), total,
-           best: Math.max(0, ...Object.values(by).map((g) => g.n)) };
+  return { shifts, changes: changes.sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts)), total, fromAll,
+           matches: (S.graded && S.graded.matches) || 0, best: Math.max(0, ...Object.values(by).map((g) => g.n)) };
 }
 function applyLearning() {
   S.learn = { on: loadPref("hawk.learn", true), ...computeLearning() };
@@ -1972,10 +1994,12 @@ function applyLearning() {
 function learningNote() {
   const L = S.learn;
   if (!L) return "";
+  const source = L.matches ? `HAWK's graded predictions on ${L.matches} match${L.matches === 1 ? "" : "es"}` + (L.total - L.fromAll ? ` + ${L.total - L.fromAll} of your legs` : "")
+    : `${L.total} of your settled legs`;
   if (!L.changes.length)
-    return `<div class="learn">🧠 HAWK learns from your settled bets: once a market has ${LEARN_MIN}+ settled legs it adjusts that market's chances.
-      ${L.total ? `You have ${L.total} so far (best market: ${L.best}).` : "Send bets with 🦅 Send to Vault to start."}</div>`;
-  return `<div class="learn">🧠 ${L.on ? "Adjusted" : "Could adjust"} from your ${L.total} settled legs:
+    return `<div class="learn">🧠 HAWK learns from ${L.matches ? "every match it predicts and " : ""}your settled bets: once a market has ${LEARN_MIN}+ graded legs it adjusts that market's chances.
+      ${L.total ? `So far: ${source}.` : "It starts as soon as the first matches are graded."}</div>`;
+  return `<div class="learn">🧠 ${L.on ? "Adjusted" : "Could adjust"} from ${source}:
     ${L.changes.slice(0, 4).map((c) => `<b>${esc(c.market)}</b> ${c.pts >= 0 ? "+" : ""}${c.pts.toFixed(1)} pts`).join(" · ")}
     <button class="linkbtn" onclick="toggleLearning()">${L.on ? "turn off" : "turn on"}</button></div>`;
 }

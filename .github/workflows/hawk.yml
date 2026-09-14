@@ -43,6 +43,34 @@ jobs:
         working-directory: engine
         run: python build_data.py ../data
 
+      # HAWK grades itself: saves its chances for matches kicking off soon and
+      # marks earlier ones right or wrong (engine/grade.mjs). The state it needs
+      # between runs is kept in the Actions cache.
+      - name: Restore grading state
+        uses: actions/cache/restore@v4
+        with:
+          path: data/grading
+          key: hawk-grading-${{ github.run_id }}
+          restore-keys: hawk-grading-
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Grade HAWK's predictions
+        continue-on-error: true
+        run: |
+          python -m http.server 8000 --bind 127.0.0.1 &
+          sleep 2
+          node engine/grade.mjs
+
+      - name: Save grading state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/grading
+          key: hawk-grading-${{ github.run_id }}
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

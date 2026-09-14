@@ -927,7 +927,23 @@
     return out;
   }
 
+  // Has Bet365's price moved 3%+ since it opened, and did it move towards HAWK's
+  // fair price? true = HAWK agrees with the move, false = disagrees, null = no real move.
+  function marketAgrees(leg) {
+    if (!(leg.bookOpen > 1 && leg.bookPrice > 1 && leg.fair > 1)) return null;
+    const move = leg.bookPrice / leg.bookOpen - 1;
+    if (Math.abs(move) < 0.03) return null;
+    return move < 0 ? leg.fair < leg.bookOpen : leg.fair > leg.bookOpen;
+  }
+  // "Value first" builds rank legs by how much Bet365 over-pays on them (plus a
+  // little for a market move HAWK agrees with). Legs Bet365 doesn't price on
+  // their own (player props) are assumed to carry its usual builder margin on
+  // props (~7%), so they're used when the priced legs are worse than that.
+  const UNPRICED_EDGE = -0.07;
+  const valueScore = (leg) => (leg.bookPrice > 1 ? leg.bookPrice * leg.p - 1 : UNPRICED_EDGE) + (leg.agree === true ? 0.015 : leg.agree === false ? -0.015 : 0);
   const playerKey = (leg) => (leg.kind === "player" ? `${leg.side}|${leg.player}` : null);
+  // Compare two scores item by item: the first difference decides.
+  const isBetter = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
   function maskOf(legs, ids, n) { const m = new Uint8Array(n).fill(1); for (const id of ids) { const a = legs[id].arr; for (let s = 0; s < n; s++) m[s] &= a[s]; } return m; }
   function evaluate(legs, ids) {
     const chosen = ids.filter((i) => legs[i]);
@@ -951,7 +967,7 @@
     }
     return chosen;
   }
-  function autoBuild(legs, target, style = "Balanced", maxLegs = 10, locked = [], banned = new Set(), favourite = true, focus = "Mix", extras = false) {
+  function autoBuild(legs, target, style = "Balanced", maxLegs = 10, locked = [], banned = new Set(), favourite = true, focus = "Mix", extras = false, picks = "likely") {
     const [lo, hi] = STYLES[style] || STYLES.Balanced;
     let [minPlayers, maxMatch] = FOCUS[focus] || FOCUS.Mix;
     const all = Object.values(legs);
@@ -983,8 +999,8 @@
         const joint = (c / n) * adjNow * (leg.adj || 1), cond = joint / pNow;
         if (cond < lo || cond > hi) continue;
         const reaches = joint > 0 && 1 / joint >= target;
-        const score = [reaches ? 1 : 0, reaches ? joint : cond];
-        if (!bestScore || score[0] > bestScore[0] || (score[0] === bestScore[0] && score[1] > bestScore[1])) { best = leg.id; bestScore = score; }
+        const score = picks === "value" ? [reaches ? 1 : 0, valueScore(leg), cond] : [reaches ? 1 : 0, reaches ? joint : cond];
+        if (!bestScore || isBetter(score, bestScore)) { best = leg.id; bestScore = score; }
       }
       if (!best) {
         if (want === "player" && nMatch < maxMatch && focus !== "Match" && minPlayers > 0) { minPlayers = 0; continue; }
@@ -1039,7 +1055,12 @@
     const market = c1x2 && ["1", "X", "2"].every((k) => k in c1x2.probs)
       ? { home: c1x2.probs["1"], draw: c1x2.probs.X, away: c1x2.probs["2"], sources: c1x2.books } : null;
     const prices = bookPrices(an, legs), opens = bookPrices(an, legs, PRICE_BOOK, "opens");
-    const legJSON = Object.values(legs).map(({ arr, ...rest }) => ({ ...rest, bookPrice: prices[rest.id] || null, bookOpen: opens[rest.id] || null }));
+    // Keep Bet365's prices on the legs themselves too: "Value first" builds use them.
+    for (const [id, leg] of Object.entries(legs)) {
+      leg.bookPrice = prices[id] || null; leg.bookOpen = opens[id] || null;
+      leg.agree = marketAgrees(leg);
+    }
+    const legJSON = Object.values(legs).map(({ arr, ...rest }) => rest);
     const value = legJSON.filter((l) => l.bookPrice && l.bookPrice > l.fair * 1.02)
       .map((l) => ({ label: l.label, price: l.bookPrice, p: l.p, edge: l.bookPrice / l.fair - 1 })).sort((a, b) => b.edge - a.edge).slice(0, 5);
     const tableRow = (c) => { const r = an.table[c.id]; return r ? { position: r.position, points: r.points } : null; };
@@ -1066,7 +1087,7 @@
   function build(body) {
     const e = entryFor(body.id);
     return autoBuild(e.legs, +body.target || 3, body.style, +body.maxLegs || 10, body.locked || [], new Set(body.banned || []),
-                     body.favourite !== false, body.focus || "Mix", !!body.extras);
+                     body.favourite !== false, body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely");
   }
   const evaluateBody = (body) => evaluate(entryFor(body.id).legs, body.legs || []);
 
@@ -1116,10 +1137,10 @@
     if (scan.running) return jobStatus(scan);
     const params = { ...windowParams(body), target: Math.min(Math.max(+body.target || 3, 1.2), 50),
                      style: STYLES[body.style] ? body.style : "Balanced", focus: FOCUS[body.focus] ? body.focus : "Mix",
-                     maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12), extras: !!body.extras };
+                     maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12), extras: !!body.extras, picks: body.picks === "value" ? "value" : "likely" };
     Object.assign(scan, newJob(), { running: true, params });
     runFixtureJob(scan, (league, f, json, e) => {
-      const t = autoBuild(e.legs, params.target, params.style, params.maxLegs, [], new Set(), true, params.focus, params.extras);
+      const t = autoBuild(e.legs, params.target, params.style, params.maxLegs, [], new Set(), true, params.focus, params.extras, params.picks);
       scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair, legs: t.legs.map((r) => legSummary(e, json, r.id)),
         value: json.value.legs.slice(0, 4).map((v) => ({ label: v.label, price: v.price, edge: v.edge })) });
     });

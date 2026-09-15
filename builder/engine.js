@@ -319,8 +319,9 @@
       for (const r of (s && s.rosters) || []) {
         const nm = (r.team || {}).displayName || "";
         const side = r.homeAway === "home" || r.homeAway === "away" ? r.homeAway : nameSimilarity(home, nm) >= nameSimilarity(away, nm) ? "home" : "away";
-        const players = (r.roster || []).map((p) => ({ name: (p.athlete || {}).displayName || "?", num: +p.jersey || null,
-                                                       pos: espnPos((p.position || {}).abbreviation), starter: !!p.starter }));
+        const players = (r.roster || []).map((p) => { const a = p.athlete || {};
+          return { name: a.displayName || "?", num: +p.jersey || null, pos: espnPos((p.position || {}).abbreviation), starter: !!p.starter,
+                   photo: (a.headshot && a.headshot.href) || (a.id ? `https://a.espncdn.com/i/headshots/soccer/players/full/${a.id}.png` : null) }; });
         out[side] = { formation: r.formation || null, starters: players.filter((p) => p.starter), subs: players.filter((p) => !p.starter) };
       }
       out.confirmed = ["home", "away"].every((sd) => out[sd] && out[sd].starters.length >= 11);
@@ -783,12 +784,16 @@
         return [info.name || "?", m.statusText, POSITIONS[(m.position || {}).name], info.athleteId ? athletePhoto(info) : null,
                 field, info.jerseyNumber || null, info.shortName || null];
       });
+      // Faces: 365Scores' photo, else ESPN's headshot (a second source for the players 365Scores has none for).
+      const espnSide = (an.espn && an.espn[side]) || null, espnAll = espnSide ? [...espnSide.starters, ...espnSide.subs] : [];
+      const espnPhoto = (name) => { const p = espnAll.find((x) => x.photo && samePlayer(x.name, name)); return p ? p.photo : null; };
+      const photo365 = (name) => { const m = Object.values(members).find((x) => x.athleteId && x.name && samePlayer(x.name, name)); return m ? athletePhoto(m) : null; };
       if (fromEspn) {
         // The confirmed XI from ESPN (365Scores didn't have it yet). No pitch
         // positions: the lineup view lays these out by position.
         const e = an.espn[side];
-        entries = [...e.starters.map((p) => [p.name, "Starting", p.pos, null, null, p.num, null]),
-                   ...e.subs.map((p) => [p.name, "Substitute", p.pos, null, null, p.num, null])];
+        entries = [...e.starters.map((p) => [p.name, "Starting", p.pos, photo365(p.name) || p.photo, null, p.num, null]),
+                   ...e.subs.map((p) => [p.name, "Substitute", p.pos, photo365(p.name) || p.photo, null, p.num, null])];
       } else if (!entries.some((e) => e[1] === "Starting") && sh[side].length) {
         // No lineup from 365Scores: the most-used players in the team's last 5
         // games (minus the injured and suspended) in a real shape — a keeper,
@@ -801,7 +806,7 @@
         const xi = [of("G")[0], ...of("D").slice(0, 4), ...of("M").slice(0, threeUp ? 3 : 4), ...fwd.slice(0, threeUp ? 3 : 2)].filter(Boolean);
         for (const p of recent) { if (xi.length >= 11) break; if (!xi.includes(p) && p.position !== "G") xi.push(p); }
         const bench = recent.filter((p) => !xi.includes(p)).slice(0, 7);
-        entries = [...xi.map((p) => [p.name, "Starting", p.position, null]), ...bench.map((p) => [p.name, "Substitute", p.position, null])];
+        entries = [...xi.map((p) => [p.name, "Starting", p.position, photo365(p.name)]), ...bench.map((p) => [p.name, "Substitute", p.position, photo365(p.name)])];
         lineupGuess[side] = true;
         const count = (pos) => xi.filter((p) => (p.position || "M") === pos).length;
         if (!an.lineups[side].formation) an.lineups[side].formation = `${count("D")}-${count("M")}-${count("F")}`;
@@ -817,7 +822,8 @@
         const r = rates(matches, priors[pos] || DEFAULT_RATES.M, pos, teamHasExtras ? xpriors[pos] || EXTRA_DEFAULTS.M : null);
         // A doubtful player in a predicted lineup may well not start (and gets no legs).
         const doubt = !confirmed && listed(name, "Doubtful") ? DOUBTFUL_START : 1;
-        return { ...r, name, pos, status, photo, field, num, short, teamMins, start_p: START_PROB[confirmed][status] * doubt, doubtful: doubt < 1,
+        const alt = espnPhoto(name), photo2 = alt && alt !== photo ? alt : null;
+        return { ...r, name, pos, status, photo: photo || photo2, photo2: photo ? photo2 : null, field, num, short, teamMins, start_p: START_PROB[confirmed][status] * doubt, doubtful: doubt < 1,
                  sub_p: status === "Substitute" ? SUB_APPEAR_PROB : 0, has_data: !!match, recent: matches.slice(0, 10),
                  recent_starts: matches.filter((m) => !m.sub_in).slice(0, 10) };
       });
@@ -1642,7 +1648,7 @@
       expected: sim.exp, grid, table: { home: tableRow(an.homeComp), away: tableRow(an.awayComp) }, form: an.form,
       legs: legJSON, priceBook: PRICE_BOOK,
       players: Object.fromEntries(Object.entries(squads).map(([side, sq]) => [side, sq.map((p) => ({
-        name: p.name, pos: p.pos, status: p.status, photo: p.photo, start_p: p.start_p, doubtful: p.doubtful, sh90: p.sh90, sot90: p.sot90,
+        name: p.name, pos: p.pos, status: p.status, photo: p.photo, photo2: p.photo2 || null, start_p: p.start_p, doubtful: p.doubtful, sh90: p.sh90, sot90: p.sot90,
         g90: p.g90, c90: p.c90, x: p.x, sv90: p.sv90, minutes: p.minutes, has_data: p.has_data, recent: p.recent,
         recent_starts: p.recent_starts, field: p.field, num: p.num, short: p.short, teamMins: p.teamMins }))])),
       warnings: an.warnings, value: { book: PRICE_BOOK, legs: value }, sims: sim.n, missing: an.missing || { home: [], away: [] },

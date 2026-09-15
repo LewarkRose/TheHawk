@@ -637,6 +637,19 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   background:repeating-linear-gradient(90deg,#1c5a39 0 6.25%,#195133 6.25% 12.5%);box-shadow:inset 0 0 40px rgba(0,0,0,.35)}
 .pitch svg{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke:rgba(255,255,255,.35);stroke-width:.5;vector-effect:non-scaling-stroke}
 .pitch .pl-v{display:none}
+/* 3D pitch: tilted like the view from the stands; drag sideways to spin it (mouse: up/down tilts). Players stand up facing you. */
+.stage3d{perspective:1100px;perspective-origin:50% 25%;touch-action:pan-y;cursor:grab;user-select:none;-webkit-user-select:none}
+.stage3d.grabbing{cursor:grabbing}
+.stage3d img{pointer-events:none;-webkit-user-drag:none}
+.stage3d.p3d .pitch{overflow:visible;transform-style:preserve-3d;transform:rotateX(var(--rx)) rotateZ(var(--rz));transition:transform .5s;margin:-5% 0 -3%}
+.stage3d.p3d .pm{transform-style:preserve-3d;transform-origin:50% 100%;transform:translate(-50%,-100%) rotateZ(calc(var(--rz) * -1)) rotateX(calc(var(--rx) * -1));transition:transform .5s}
+.stage3d.p3d .pm:hover{transform:translate(-50%,-100%) rotateZ(calc(var(--rz) * -1)) rotateX(calc(var(--rx) * -1)) scale(1.1)}
+.stage3d.p3d.grabbing .pitch,.stage3d.p3d.grabbing .pm{transition:none}
+.stage3d.p3d .pm .shirt{box-shadow:0 6px 10px -3px rgba(0,0,0,.6)}
+.stage3d.p3d .pm.star .shirt{box-shadow:0 0 0 3px rgba(255,209,102,.55),0 0 16px rgba(255,209,102,.7),0 6px 10px -3px rgba(0,0,0,.6)}
+.p3d-ctl{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:6px 0 0;font-size:12px}
+.p3d-ctl .p3d-hint{margin-right:auto}
+.p3d-ctl button{width:auto;margin:0;padding:3px 10px;font-size:12px;text-transform:none;letter-spacing:0}
 .pm{position:absolute;left:var(--hl);top:var(--ht);transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:1px;
   cursor:pointer;width:74px;z-index:1;transition:transform .12s}
 .pm:hover{transform:translate(-50%,-50%) scale(1.08);z-index:2}
@@ -766,6 +779,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .jump{display:none;position:fixed;right:14px;bottom:18px;z-index:15;padding:11px 16px;border-radius:999px;border:0;cursor:pointer;
   font-weight:900;color:#03261b;background:linear-gradient(90deg,#10c98e,#3ff5bd);box-shadow:0 8px 24px rgba(0,0,0,.45)}
 @media (max-width:1250px){.jump{display:block}}
+/* 🎟 My bets in the page menu on wide screens (phones and tablets have the floating button) */
+@media (max-width:1250px){.nav.betsnav{display:none}}
+.nav.betsnav .jn{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:5px;border-radius:999px;background:var(--gold);color:#2e2200;font-size:11px}
 .jump .jn{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;margin-left:4px;border-radius:999px;background:#03261b;color:#3ff5bd;font-size:12px}
 /* 🎟 My bets */
 .mb-h{margin:16px 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
@@ -858,6 +874,7 @@ a.nav{text-decoration:none}
       <button class="nav" id="scanBtn" data-nav="scan" title="HAWK's builder for every fixture">🏆 <span class="nl">Best builders</span><span class="ns">Best</span></button>
       <button class="nav" id="valueBtn" data-nav="value" title="Every bookmaker price that beats HAWK's fair odds">💰 <span>Value</span></button>
       <button class="nav" id="accaBtn" data-nav="acca" title="Several matches on one ticket, and the Monster Acca">🧩 <span>Acca</span></button>
+      <button class="nav betsnav" id="navBets" onclick="openMyBets()" title="Your bets from the Vault: the ones still running and the last settled">🎟 <span>My bets</span><b class="jn" id="navBetsN" hidden></b></button>
       <a class="nav vaultnav" href="../" title="Your bets, bankroll and track record (the Vault)">🏦 <span>Vault</span></a>
     </nav>
     <div class="topright">
@@ -894,7 +911,7 @@ function loadPref(key, fallback) { try { const v = localStorage.getItem(key); re
 function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
             target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), favourite: true, result: null, tab: "players", q: "",
-            chk: { price: "", boost: "", stake: "5" }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
+            chk: { price: "", boost: "", stake: "5" }, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
@@ -1415,7 +1432,7 @@ function playerCard(side, p) {
   const rates = keeper ? (p.sv90 != null ? `${p.sv90.toFixed(1)} saves per 90 · ${Math.round(p.minutes)} min` : "saves come from the shots HAWK expects against")
     : p.has_data ? `${p.sh90.toFixed(1)} shots · ${p.sot90.toFixed(1)} SoT · ${p.g90.toFixed(2)} xG per 90 · ${Math.round(p.minutes)} min` : "no recent data — position average";
   const more = legs.length > chips.length ? `<span class="qc" ${open}>+${legs.length - chips.length} more</span>` : "";
-  return `<div class="pl"><div class="ph" ${open}>${p.photo ? `<img src="${esc(p.photo)}" alt="" onerror="this.remove()">` : ""}</div>
+  return `<div class="pl"><div class="ph" ${open}>${p.photo ? `<img src="${esc(p.photo)}" alt="" data-alt="${esc(p.photo2 || "")}" onerror="if(this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt=''}else{this.remove()}">` : ""}</div>
     <div><div class="top1"><div><span class="nm" ${open}>${esc(p.name)}</span><span class="pos">${esc(p.pos)}</span>${
       p.doubtful ? '<span class="badge warn" style="margin-left:6px" title="Listed as doubtful — no legs until lineups are confirmed">doubtful</span>' : ""}</div>${spark}</div>
       <div class="rates">${rates}</div>
@@ -1524,9 +1541,11 @@ function myBetPlayers(gameId) {
 // number as a badge — or just the number when there's no photo. (Without
 // 365Scores' grey default the image fails for players with no photo, and
 // the number shows instead of a silhouette.)
+// No photo at 365Scores? ESPN's headshot (photo2) is tried before the number.
+const PHOTO_FALLBACK = "if(this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt=''}else{this.parentNode.classList.remove('face');this.remove()}";
 function shirtHTML(p) {
   const no = p.num || p.pos || "·", src = p.photo ? String(p.photo).replace(/,d_[^,/]+/, "") : null;
-  return src ? `<div class="shirt face"><img src="${esc(src)}" alt="" onerror="this.parentNode.classList.remove('face');this.remove()"><span class="no">${esc(no)}</span></div>`
+  return src ? `<div class="shirt face"><img src="${esc(src)}" alt="" data-alt="${esc(p.photo2 || "")}" onerror="${PHOTO_FALLBACK}"><span class="no">${esc(no)}</span></div>`
     : `<div class="shirt" ${p.num ? "" : `title="No shirt number yet"`}><span class="no">${esc(no)}</span></div>`;
 }
 function lineupCard(m, live = null) {
@@ -1582,18 +1601,61 @@ function lineupCard(m, live = null) {
       ${live ? `<span class="badge live">🔴 ${esc(live.clock || "LIVE")} · goals, cards &amp; subs</span>` : `<span class="badge ${badge ? badge[0] : "warn"}">${badge ? badge[1]
         : guess ? "🤔 HAWK's guess — no lineup out yet (from the team's last 5 games)" : "🕐 Predicted — confirmed about an hour before kick-off"}</span>`}</div>
     ${diffNote && !live ? `<div class="note" style="margin:0 0 10px">ESPN names someone else: ${diffNote} — HAWK went with 365Scores.</div>` : ""}
-    <div class="pitch">
+    <div class="stage3d ${S.p3d.flat ? "" : "p3d"}" style="--rx:${S.p3dView.rx}deg;--rz:${S.p3dView.rz}deg"><div class="pitch">
       <svg class="pl-h" viewBox="0 0 160 100" preserveAspectRatio="none"><rect x="1" y="1" width="158" height="98"/><line x1="80" y1="1" x2="80" y2="99"/><circle cx="80" cy="50" r="9"/>
         <rect x="1" y="22" width="16" height="56"/><rect x="1" y="38" width="6" height="24"/><rect x="143" y="22" width="16" height="56"/><rect x="153" y="38" width="6" height="24"/></svg>
       <svg class="pl-v" viewBox="0 0 100 160" preserveAspectRatio="none"><rect x="1" y="1" width="98" height="158"/><line x1="1" y1="80" x2="99" y2="80"/><circle cx="50" cy="80" r="9"/>
         <rect x="22" y="1" width="56" height="16"/><rect x="38" y="1" width="24" height="6"/><rect x="22" y="143" width="56" height="16"/><rect x="38" y="153" width="24" height="6"/></svg>
       ${["home", "away"].map(side => pitchSpots(m.players[side] || []).map(spot => marker(side, spot)).join("")).join("")}
-    </div>
+    </div></div>
+    <div class="p3d-ctl"><span class="muted p3d-hint">${S.p3d.flat ? "" : "Drag the pitch to spin it"}</span>
+      <button class="ghost" data-p3d="reset" ${S.p3d.flat ? "hidden" : ""}>⟲ Reset</button><button class="ghost" data-p3d="flat">${S.p3d.flat ? "🧊 3D" : "▭ Flat"}</button></div>
     <div class="lu-legend">${live ? "⚽ goal · 🅰️ assist · 🟨 🟥 cards · ↑ came on · ↓ went off · 🎟 in your bet — updates every 15 seconds"
       : "⚽ chance to score · 🎯 1+ shot on target · 🧤 2+ saves · 🟨 30%+ to be booked · ❓ doubtful · 🆕 not in the team's last 5 games — tap any player for his record and legs"}</div>
     <div class="lu-teams">${team("home")}${team("away")}</div>
   </div>`;
 }
+// 3D pitch: drag sideways to spin it (with a mouse, up/down tilts it too). A
+// vertical swipe on a phone still scrolls the page, and a drag isn't a tap on a player.
+(function pitch3d() {
+  let d = null, moved = false;
+  const put = (st) => { st.style.setProperty("--rx", S.p3dView.rx + "deg"); st.style.setProperty("--rz", S.p3dView.rz + "deg"); };
+  document.addEventListener("pointerdown", (e) => {
+    const st = e.target.closest && e.target.closest(".stage3d.p3d");
+    if (!st || e.button > 0) return;
+    d = { st, x: e.clientX, y: e.clientY, rx: S.p3dView.rx, rz: S.p3dView.rz, touch: e.pointerType !== "mouse" };
+    moved = false;
+  });
+  document.addEventListener("pointermove", (e) => {
+    if (!d) return;
+    const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (!moved && Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+    if (!moved && d.touch && Math.abs(dy) > Math.abs(dx)) { d = null; return; }
+    moved = true;
+    d.st.classList.add("grabbing");
+    S.p3dView.rz = d.rz + dx * 0.4;
+    if (!d.touch) S.p3dView.rx = Math.max(0, Math.min(65, d.rx - dy * 0.3));
+    put(d.st);
+  });
+  // (a face photo would otherwise start the browser's own image drag and cancel the spin)
+  document.addEventListener("dragstart", (e) => { if (e.target.closest && e.target.closest(".stage3d")) e.preventDefault(); });
+  const end = () => { if (d) d.st.classList.remove("grabbing"); d = null; };
+  document.addEventListener("pointerup", end);
+  document.addEventListener("pointercancel", end);
+  document.addEventListener("click", (e) => {
+    if (moved && e.target.closest && e.target.closest(".stage3d")) { e.stopPropagation(); e.preventDefault(); moved = false; return; }
+    const b = e.target.closest && e.target.closest("[data-p3d]");
+    if (!b) return;
+    if (b.dataset.p3d === "flat") { S.p3d.flat = !S.p3d.flat; savePref("hawk.p3d", S.p3d); }
+    else S.p3dView = { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 };
+    document.querySelectorAll(".stage3d").forEach(st => { st.classList.toggle("p3d", !S.p3d.flat); put(st); });
+    document.querySelectorAll(".p3d-ctl").forEach(c => {
+      c.querySelector(".p3d-hint").textContent = S.p3d.flat ? "" : "Drag the pitch to spin it";
+      c.querySelector('[data-p3d="reset"]').hidden = S.p3d.flat;
+      c.querySelector('[data-p3d="flat"]').textContent = S.p3d.flat ? "🧊 3D" : "▭ Flat";
+    });
+  }, true);
+})();
 // Whole percentages that add up to exactly 100 (largest remainder), so three
 // rounded chances never show 101%.
 function pct100(ps) {
@@ -1736,7 +1798,7 @@ function legFace(l, part = null) {
     const p = m && m.players && (m.players[l.side] || []).find(x => x.name === l.player) || {};
     const ini = String(l.player || "?").split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
     const src = (l.photo || p.photo) ? String(l.photo || p.photo).replace(/,d_[^,/]+/, "") : null;
-    return `<div class="lface ${l.side}"><span class="ini">${esc(ini)}</span>${src ? `<img src="${esc(src)}" alt="" onerror="this.remove()">` : ""}${p.num ? `<span class="no">${esc(p.num)}</span>` : ""}</div>`;
+    return `<div class="lface ${l.side}"><span class="ini">${esc(ini)}</span>${src ? `<img src="${esc(src)}" alt="" data-alt="${esc(p.photo2 || "")}" onerror="if(this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt=''}else{this.remove()}">` : ""}${p.num ? `<span class="no">${esc(p.num)}</span>` : ""}</div>`;
   }
   const side = /(^|:)home(:|$)/.test(l.id) ? "home" : /(^|:)away(:|$)/.test(l.id) ? "away" : null;
   if (side && m && (side === "home" ? m.homeCrest : m.awayCrest)) return `<div class="lface crest ${side}"><img src="${esc(side === "home" ? m.homeCrest : m.awayCrest)}" alt="" onerror="this.remove()"></div>`;
@@ -4384,7 +4446,7 @@ function openLegHistory(id) {
   const verdict = Math.abs(gap) < 0.12 ? `✅ HAWK's ${pct(l.p)} agrees with his record.`
     : gap > 0 ? `His record (${pct(rate)}) is better than HAWK's ${pct(l.p)}. HAWK also weighs today's opponent, his expected minutes and the match odds, so it's more cautious than the raw record — check the lineup and the opponent before trusting the streak.`
     : `HAWK's ${pct(l.p)} is higher than his record (${pct(rate)}) — usually because this match looks more open, or he's expected to play more minutes than in those games.`;
-  modal(`<div class="mhead"><div class="ph">${p.photo ? `<img src="${esc(p.photo)}" alt="" onerror="this.remove()">` : ""}</div>
+  modal(`<div class="mhead"><div class="ph">${p.photo ? `<img src="${esc(p.photo)}" alt="" data-alt="${esc(p.photo2 || "")}" onerror="if(this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt=''}else{this.remove()}">` : ""}</div>
       <div><div style="font-size:20px;font-weight:800">${esc(l.player)} · ${esc(capitalise(what))}</div>
         <div class="muted">${esc(l.side === "home" ? m.home : m.away)} · his last ${l.games} ${l.basis === "starts" ? "starts" : "games"} · oldest → newest</div></div>
       <button class="x" data-close title="Close">✕</button></div>
@@ -4457,7 +4519,7 @@ function openPlayer(side, name) {
   const n = games.length, count = (f) => games.filter(f).length;
   const hit = (label, k) => `<div class="tile"><div class="k">${label}</div><div class="v">${k}/${n}</div></div>`;
   const legs = legsFor(side, name).sort((a, b) => b.p - a.p);
-  modal(`<div class="mhead"><div class="ph">${p.photo ? `<img src="${esc(p.photo)}" alt="" onerror="this.remove()">` : ""}</div>
+  modal(`<div class="mhead"><div class="ph">${p.photo ? `<img src="${esc(p.photo)}" alt="" data-alt="${esc(p.photo2 || "")}" onerror="if(this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt=''}else{this.remove()}">` : ""}</div>
       <div><div style="font-size:20px;font-weight:800">${esc(p.name)} <span class="pos">${esc(p.pos)}</span></div>
         <div class="muted">${esc(team)} · ${p.status === "Starting" ? "starting" : "on the bench"} · ${!p.has_data ? "no recent data"
           : keeper ? (p.sv90 != null ? `${p.sv90.toFixed(1)} saves per 90 · ${Math.round(p.minutes)} min in his last 20 games` : `${Math.round(p.minutes)} min in his last 20 games`)
@@ -4545,6 +4607,7 @@ async function linkVaultBets() {
 function jumpLabel() {
   const n = vaultBets().filter(b => b.status === "PENDING").length;
   $("#jump").innerHTML = `🎟 My bets${n ? ` <span class="jn">${n}</span>` : ""}`;
+  const nb = $("#navBetsN"); if (nb) { nb.textContent = n; nb.hidden = !n; }   // the same button in the page menu (PC)
 }
 function openMyBets() {
   const bets = vaultBets(), pend = bets.filter(b => b.status === "PENDING"), done = bets.filter(b => b.status !== "PENDING").slice(0, 8);

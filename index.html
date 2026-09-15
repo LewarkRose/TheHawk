@@ -2166,17 +2166,42 @@
         const b64url = (bytes) => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
                                     return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
         const pipe = async (bytes, stream) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
-        async function packSync() {
+        function syncData() {
             const data = { v: 1, at: new Date().toISOString(), bankroll, bets, bankrollLog, learn: {} };
             for (const k of SYNC_LEARN) { try { const v = JSON.parse(localStorage.getItem(k)); if (v != null) data.learn[k] = v; } catch (e) { /* skip */ } }
-            const raw = new TextEncoder().encode(JSON.stringify(data));
-            return 'CompressionStream' in window ? 'z.' + b64url(await pipe(raw, new CompressionStream('deflate-raw'))) : 'n.' + b64url(raw);
+            return data;
+        }
+        // The link says how long it should be ("y" + length + "."), so a link an app cut
+        // short is told apart from one that got changed on the way.
+        async function packSync() {
+            const raw = new TextEncoder().encode(JSON.stringify(syncData()));
+            if (!('CompressionStream' in window)) return 'n.' + b64url(raw);
+            const body = b64url(await pipe(raw, new CompressionStream('deflate-raw')));
+            return 'y' + body.length.toString(36) + '.' + body;
         }
         async function unpackSync(s) {
-            const [kind, body] = [s.slice(0, 2), s.slice(2)];
+            let kind = s.slice(0, 2), body = s.slice(2);
+            if (s[0] === 'y') {
+                const dot = s.indexOf('.'), want = parseInt(s.slice(1, dot), 36);
+                body = s.slice(dot + 1);
+                if (!(want > 0) || body.length < want) { const e = new Error('cut short'); e.cut = [body.length, want]; throw e; }
+                body = body.slice(0, want); kind = 'z.';
+            }
             let bytes = Uint8Array.from(atob(body.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
             if (kind === 'z.') bytes = await pipe(bytes, new DecompressionStream('deflate-raw'));
             return JSON.parse(new TextDecoder().decode(bytes));
+        }
+        // Too long for some apps? The same thing as a file: it can't be cut short.
+        async function sendSyncFile() {
+            const name = `hawk-sync-${new Date().toISOString().slice(0, 10)}.json`;
+            const file = new File([JSON.stringify(syncData())], name, { type: 'application/json' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try { await navigator.share({ files: [file], title: 'My HAWK Vault' }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+            }
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(file); a.download = name; a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+            alert(`Saved as ${name} (in your Downloads). Send it to yourself, then on the other device: Vault → 📲 Sync → 📂 Add from a sync file.`);
         }
         async function openSync() {
             let link;
@@ -2191,13 +2216,16 @@
                 <p class="text-xs text-zinc-400">🔒 Everything is inside the link — nothing goes to any server. Keep it to yourself.</p>
                 <div class="flex gap-2">${navigator.share ? '<button data-share class="flex-1 bg-[#c9a05c] hover:bg-[#d9b571] text-black font-bold rounded-xl py-2.5 text-sm">Share…</button>' : ''}
                     <button data-copy class="flex-1 bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm">Copy link</button></div>
-                <p class="text-[11px] text-zinc-500">Send it to yourself (WhatsApp “Message yourself”, email or notes). The link is a snapshot: after new bets, make a new one. (${Math.max(1, Math.round(link.length / 1024))} KB)</p>
+                <button data-file-out class="w-full bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm">📄 Send as a file instead</button>
+                <p class="text-[11px] text-zinc-500">Send it to yourself (WhatsApp “Message yourself”, email or notes). The link is a snapshot: after new bets, make a new one.
+                    ${link.length > 4000 ? `<b class="text-amber-300">This link is long (${link.length.toLocaleString()} characters) — some apps cut long links short. If it doesn't work, use “Send as a file”.</b>` : ''}</p>
                 <div class="border-t border-zinc-800 pt-3 space-y-2">
                     <div class="text-white text-sm font-bold">📥 Got a link from your other device?</div>
                     <p class="text-[11px] text-zinc-400">If tapping it opened the wrong browser (not the one you use HAWK in): long-press the link → <b class="text-zinc-200">Copy</b>, then paste it here.</p>
                     <textarea data-in rows="2" placeholder="Paste the sync link here" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white" style="font-size:16px"></textarea>
                     <div class="flex gap-2">${navigator.clipboard && navigator.clipboard.readText ? '<button data-clip class="flex-1 bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm">📋 Paste</button>' : ''}
                         <button data-add class="flex-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold rounded-xl py-2.5 text-sm">Add to this Vault</button></div>
+                    <label class="block text-center w-full bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm cursor-pointer">📂 Add from a sync file<input type="file" accept=".json,application/json" data-file-in class="hidden"></label>
                 </div>
             </div>`;
             wrap.onclick = async (e) => {
@@ -2207,11 +2235,21 @@
                     return;
                 }
                 if (e.target.closest('[data-add]')) { if (await pasteSync(wrap.querySelector('[data-in]').value)) wrap.remove(); return; }
+                if (e.target.closest('[data-file-out]')) { await sendSyncFile(); return; }
                 const b = e.target.closest('[data-copy],[data-share]');
                 if (!b) return;
                 if (b.hasAttribute('data-share')) { try { await navigator.share({ title: 'My HAWK Vault', url: link }); } catch (err) { /* cancelled */ } return; }
                 try { await navigator.clipboard.writeText(link); b.textContent = 'Copied ✓'; }
                 catch (err) { prompt('Copy this link:', link); }
+            };
+            wrap.querySelector('[data-file-in]').onchange = async (e) => {
+                const f = e.target.files && e.target.files[0];
+                if (!f) return;
+                let data = null;
+                try { data = JSON.parse(await f.text()); } catch (err) { alert("That file isn't a HAWK sync file."); return; }
+                if (!data || !Array.isArray(data.bets)) { alert("That file has no HAWK tickets in it."); return; }
+                wrap.remove();
+                await applySyncData(data);
             };
             document.body.appendChild(wrap);
         }
@@ -2230,19 +2268,29 @@
         // A link pasted into the Sync box (when the link opened in another browser,
         // e.g. Samsung Internet or Chrome instead of Brave, where HAWK's data is).
         async function pasteSync(text) {
-            const t = String(text || '').replace(/\s+/g, ''), m = /#sync=([zn]\.[A-Za-z0-9_-]+)/.exec(t) || /^([zn]\.[A-Za-z0-9_-]+)$/.exec(t);
+            const t = String(text || '').replace(/\s+/g, ''), code = /(?:[zn]\.|y[0-9a-z]+\.)[A-Za-z0-9_-]+/;
+            const m = new RegExp('#sync=(' + code.source + ')').exec(t) || new RegExp('^(' + code.source + ')$').exec(t);
             if (!m) { alert("That isn't a HAWK sync link. On the other device tap 📲 Sync → Copy link, then paste it here."); return false; }
             await applySync(m[1]);
             return true;
         }
         async function applySync(code) {
             let data;
-            try { data = await unpackSync(code); } catch (e) { alert("This sync link is damaged or cut short — make a new one on the other device."); return; }
+            try { data = await unpackSync(code); }
+            catch (e) {
+                alert(e && e.cut
+                    ? `Only part of the link arrived (${e.cut[0].toLocaleString()} of ${e.cut[1].toLocaleString()} characters) — the app you sent it with cut it short.\n\nOn the other device: 📲 Sync → “Send as a file instead”, then here: 📲 Sync → “Add from a sync file”.`
+                    : "This sync link got changed on the way, so it can't be read.\n\nOn the other device: 📲 Sync → “Send as a file instead”, then here: 📲 Sync → “Add from a sync file”.");
+                return;
+            }
+            await applySyncData(data);
+        }
+        async function applySyncData(data) {
             if (!data || !Array.isArray(data.bets)) return;
             const here = new Map(bets.map(b => [b.id, b]));
             const add = data.bets.filter(b => b && b.id && !here.has(b.id));
             const upd = data.bets.filter(b => b && here.has(b.id) && newer(b, here.get(b.id)));
-            const made = new Date(data.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+            const made = data.at ? new Date(data.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'a backup file';
             if (!add.length && !upd.length && Math.abs((data.bankroll || 0) - bankroll) < 0.005) { alert(`📲 Sync link from ${made}: this device already has everything in it.`); return; }
             if (!confirm(`📲 Sync link from your other device (made ${made}):\n\n• ${add.length} new ticket${add.length === 1 ? '' : 's'} to add\n• ${upd.length} ticket${upd.length === 1 ? '' : 's'} settled or updated there\n\nTickets already here are kept. Add them?`)) return;
             add.forEach(b => bets.push(b));

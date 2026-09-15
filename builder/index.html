@@ -612,6 +612,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* the slip's one-line answer: bet it or skip it */
 .call{margin:10px 14px 4px;padding:11px 14px;border-radius:12px;font-weight:900;font-size:15px;letter-spacing:.02em;border:1px solid}
 .call small{display:block;margin-top:3px;font-weight:600;font-size:12.5px;letter-spacing:0;opacity:.9}
+.call small.risk{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.1);color:var(--text);opacity:1}
 .call.good{color:var(--accent);background:rgba(20,227,161,.1);border-color:rgba(20,227,161,.4)}
 .call.warn{color:var(--gold);background:rgba(255,209,102,.1);border-color:rgba(255,209,102,.4)}
 .call.bad{color:#ff8a9a;background:rgba(255,93,115,.1);border-color:rgba(255,93,115,.4)}
@@ -1688,7 +1689,7 @@ function legPrice(l) {
   const typed = propPrices().find(x => x.match === String(S.match && S.match.id) && x.leg === l.id);
   if (typed) return { price: typed.price, src: "typed" };
   const est = HAWK.propEstimate(l);
-  return est ? { price: est, src: l.refPrice > 1 ? "priced" : "guess" } : { price: null, src: "guess" };
+  return est ? { price: est, src: l.refPrice > 1 && !HAWK.refOff(l) ? "priced" : "guess" } : { price: null, src: "guess" };
 }
 // The price line: Bet365 1.22 · fair 1.27 · 4% under fair — plus EP, the market move, and ✎ for a player leg.
 function legPriceRow(l) {
@@ -1925,7 +1926,7 @@ function propLine(l) {
   const box = S.ppEdit === l.id || typed;
   const seen = !l.refPrice && S.match && onBet365().has(no365Key(l)) ? ` <span class="muted" title="You've built ${esc(l.market)} on Bet365 in ${esc(S.match.league)} before">· ✓ on Bet365 here</span>` : "";
   if (!est && !box) return `<div class="pp-line"><span class="muted">Bet365 price: guessed</span>${seen} <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Optional — HAWK also learns from the builder price you type below">✎</button></div>`;
-  const ref = !typed && l.refPrice > 1;
+  const ref = !typed && l.refPrice > 1 && !HAWK.refOff(l);
   // Only Bet365 numbers on screen; where it came from is in the tooltip.
   return `<div class="pp-line ${dead ? "dead" : ""}"><span>Bet365</span>${box ? `<input data-pprice="${esc(l.id)}" inputmode="decimal" placeholder="${est ? odds(est) : "price"}" value="${typed ? odds(typed.price) : ""}">` : ""}${
     typed ? ` <span class="muted">✓ you typed it</span>`
@@ -2128,16 +2129,24 @@ function easyCall(r) {
   if (!r || !(r.fair > 1) || !r.p) return "";
   const { price, boost, eff } = checkerInputs();
   const need = r.fair * 1.02, needQuoted = 1 + (need - 1) / (1 + boost / 100);   // the Bet365 price that makes it worth it
-  const g = r.b365 > 1 ? null : b365Guess(r.fair, S.slip.length), expect = r.b365 > 1 ? r.b365 : g ? g.mid : null;
+  // How risky, in plain words: how often it lands.
+  const in10 = Math.round(r.p * 10), risk = `<small class="risk">${r.p >= 0.6 ? `🙂 Likely — lands about ${in10} in 10`
+    : r.p >= 0.4 ? `🪙 Coin flip — lands about ${in10} in 10` : r.p >= 0.2 ? `🎲 Risky — lands about ${Math.max(2, in10)} in 10, loses the rest`
+    : `🎯 Long shot — lands about 1 in ${Math.round(1 / r.p)}`}</small>`;
+  const call = (tone, head, sub) => `<div class="call ${tone}">${head}${sub ? `<small>${sub}</small>` : ""}${risk}</div>`;
   if (eff > 1) {
-    if (eff >= need) return `<div class="call good">✅ BET IT<small>${odds(price)}${boost ? ` + ${boost}% boost` : ""} is worth it — HAWK needs ${odds(needQuoted)} or more.</small></div>`;
-    if (eff >= r.fair) return `<div class="call warn">🤏 JUST OK<small>${odds(price)} is about fair — no real edge. Worth it from ${odds(needQuoted)}.</small></div>`;
-    return `<div class="call bad">❌ SKIP IT<small>${odds(price)} is too low — it needs ${odds(needQuoted)} or more. Tap Build again for another option.</small></div>`;
+    if (eff >= need) return call("good", "✅ BET IT", `${odds(price)}${boost ? ` + ${boost}% boost` : ""} is worth it — HAWK needs ${odds(needQuoted)} or more.`);
+    if (eff >= r.fair) return call("warn", "🤏 JUST OK", `${odds(price)} is about fair — no real edge. Worth it from ${odds(needQuoted)}.`);
+    return call("bad", "❌ SKIP IT", `${odds(price)} is too low — it needs ${odds(needQuoted)} or more. Tap Build again for another option.`);
   }
-  if (!expect) return `<div class="call warn">👉 BET IT if Bet365 shows ${odds(needQuoted)} or more</div>`;
-  if (expect >= need) return `<div class="call good">✅ BET IT if Bet365 shows ${odds(needQuoted)} or more<small>HAWK expects about ${odds(expect)} there.</small></div>`;
-  if (expect >= need * 0.95) return `<div class="call warn">🤏 CHECK THE PRICE — bet only at ${odds(needQuoted)} or more<small>HAWK expects about ${odds(expect)} — it's close.</small></div>`;
-  return `<div class="call bad">❌ PROBABLY SKIP — needs ${odds(needQuoted)}, Bet365 should pay about ${odds(expect)}<small>Tap Build again for another option, or try 💰 Value first.</small></div>`;
+  // A leg price that says HAWK's chance pays nearly double is a data mix-up, not a bargain: don't build a "bet it" on it.
+  const odd = S.slip.map(id => S.legs[id]).find(l => { const pr = l && legPrice(l); return pr && pr.price && pr.price * l.p > 1.8; });
+  if (odd) return call("warn", `⚠️ CHECK ${esc(odd.label)} ON BET365 FIRST`, `HAWK's price for it (${odds(legPrice(odd).price)}) looks wrong. Type Bet365's builder price below and HAWK tells you if it's worth it — it needs ${odds(needQuoted)}+.`);
+  const g = r.b365 > 1 ? null : b365Guess(r.fair, S.slip.length), expect = r.b365 > 1 ? r.b365 : g ? g.mid : null;
+  if (!expect) return call("warn", `👉 BET IT if Bet365 shows ${odds(needQuoted)} or more`);
+  if (expect >= need) return call("good", `✅ BET IT if Bet365 shows ${odds(needQuoted)} or more`, `HAWK expects about ${odds(expect)} there.`);
+  if (expect >= need * 0.95) return call("warn", `🤏 CHECK THE PRICE — bet only at ${odds(needQuoted)} or more`, `HAWK expects about ${odds(expect)} — it's close.`);
+  return call("bad", `❌ PROBABLY SKIP — needs ${odds(needQuoted)}, Bet365 should pay about ${odds(expect)}`, "Tap Build again for another option, or try 💰 Value first.");
 }
 function guessLine(r) {
   if (r && r.b365 > 1) {
@@ -4255,13 +4264,26 @@ async function systemNotify(title, body, { icon, tag, url } = {}) {
 }
 // "📳 Test": shows a notification now, or says what's blocking it.
 async function testNotify() {
-  if (!("Notification" in window)) return toast("This browser can't show notifications.");
-  if (Notification.permission === "default") { try { await Notification.requestPermission(); } catch { /* ignored */ } }
-  if (Notification.permission === "denied")
-    return toast("Blocked for HAWK. In Brave: tap the icon left of the address → Site settings → Notifications → Allow. Then tap Test again.", 9000);
-  const ok = await systemNotify("🦅 HAWK test", "Notifications work. Goals, red cards and your bets show like this.", { tag: "hawk-test" });
-  toast(ok ? "Sent — nothing showed? Android: Settings → Apps → Brave → Notifications on. (Brave also needs Notifications allowed in its own Settings → Site settings.)"
-    : "Couldn't show one — reload HAWK and try again.", 9000);
+  const has = "Notification" in window;
+  if (has && Notification.permission === "default") { try { await Notification.requestPermission(); } catch { /* ignored */ } }
+  const perm = has ? Notification.permission : "none";
+  let reg = null;
+  try { reg = "serviceWorker" in navigator ? (await navigator.serviceWorker.getRegistration("../")) || null : null; } catch { /* none */ }
+  const sent = perm === "granted" ? await systemNotify("🦅 HAWK test", "Notifications work. Goals, red cards and your bets show like this.", { tag: "hawk-test" }) : false;
+  const row = (ok, text) => `<div class="mb-leg" style="font-size:14px;padding:4px 0"><span class="mb-m ${ok ? "won" : "lost"}">${ok ? "✓" : "✗"}</span>${text}</div>`;
+  modal(`<div class="mhead" style="justify-content:space-between"><h2 style="margin:0">📳 Notification check</h2><button class="ghost" data-close style="width:auto;padding:6px 12px">✕</button></div>
+    <div style="margin-top:12px">
+      ${row(has, has ? "This browser can show notifications" : "This browser can't show notifications")}
+      ${row(perm === "granted", perm === "granted" ? "HAWK is allowed to notify you" : perm === "denied" ? "<b>Blocked</b> for HAWK in the browser" : "Not allowed yet — tap Test again and choose Allow")}
+      ${row(!!reg, reg ? "HAWK's helper is running" : "HAWK's helper isn't running — reload the page once")}
+      ${row(sent, sent ? "Test notification sent just now" : "No test sent")}
+      <h3 class="mb-h">Nothing showed? On your phone (Brave):</h3>
+      <div class="note" style="margin:0;line-height:1.6">
+        1. Brave: <b>⋮ → Settings → Site settings → Notifications</b> → make sure <b>lewarkrose.github.io</b> is under <b>Allowed</b>.<br>
+        2. Android: <b>Settings → Apps → Brave → Notifications</b> → on, including <b>Sites</b> / <b>lewarkrose.github.io</b>.<br>
+        3. Do Not Disturb (or a Mode) off.<br>
+        4. Keep HAWK open: phones pause web pages when the browser is closed or the screen is off, so HAWK can only alert you while it's running.
+      </div></div>`);
 }
 // Opens a HAWK link (from a notification) in this page without reloading.
 function openHawkUrl(href) {

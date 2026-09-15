@@ -1216,7 +1216,7 @@
   let aim = null;
   function setAim(a) { aim = a && typeof a === "object" ? { c: Number.isFinite(+a.c) ? +a.c : 0 } : null; }
   const UNPRICED_CUT = 0.05;   // a leg nobody prices: about 5% under HAWK's fair odds
-  const hasPrice = (leg) => leg.bookPrice > 1 || leg.refPrice > 1;
+  const hasPrice = (leg) => leg.bookPrice > 1 || (leg.refPrice > 1 && !refOff(leg));
   const legB365 = (leg) => (leg.bookPrice > 1 ? leg.bookPrice : propEstimate(leg) || Math.max(1.01, Math.exp(-UNPRICED_CUT) / leg.p));
   function b365Raw(legs, ids, joint) {
     if (!ids.length || !(joint > 0)) return null;
@@ -1285,6 +1285,11 @@
   const b365FromRef = (leg) => { const k = propKey(leg), r = k && refRatio[k] != null ? refRatio[k] : REF_TO_B365;
                                   return Math.max(1.01, Math.round(100 * leg.refPrice * Math.exp(r)) / 100); };
   const propKey = (leg) => { const m = /^p:(?:home|away):\d+:([a-z]+?)(\d*)$/.exec(leg.id || ""); return m ? m[1] + m[2] : null; };
+  // A Unibet-based price that pays nearly double what HAWK's chance is worth is a
+  // mix-up (wrong player or market, or a bad learnt ratio), not a bargain: it's
+  // ignored and the leg counts as guessed. Real prop edges are nowhere near +80%.
+  const REF_MAX_VALUE = 1.8;
+  const refOff = (leg) => leg.refPrice > 1 && leg.p > 0 && b365FromRef(leg) * leg.p > REF_MAX_VALUE;
   const logitP = (p) => { p = Math.min(Math.max(p, 1e-4), 1 - 1e-4); return Math.log(p / (1 - p)); };
   // Bet365's likely price for a prop leg (it never goes below 1.01), or null if HAWK hasn't learnt that kind yet.
   // propBook[kind] = [{x: HAWK's log-odds, d: Bet365's minus HAWK's}] from your prices. A price counts
@@ -1292,7 +1297,7 @@
   // and with no close price it falls back towards Bet365's usual prop margin (PROP_PRIOR_D).
   const PROP_PRIOR_D = 0.3, PROP_PRIOR_W = 0.15, PROP_WIDTH = 1;
   function propEstimate(leg) {
-    if (leg && leg.refPrice > 1) return b365FromRef(leg);   // Unibet's real price for it (Kambi), turned into Bet365's, beats a guess
+    if (leg && leg.refPrice > 1 && !refOff(leg)) return b365FromRef(leg);   // Unibet's real price for it (Kambi), turned into Bet365's, beats a guess
     const k = leg && leg.kind === "player" ? propKey(leg) : null, pts = k ? propBook[k] : null;
     if (!pts || !pts.length || !(leg.p > 0)) return null;
     const x = logitP(leg.p);
@@ -2417,7 +2422,7 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
+  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, refOff, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
                   scores, matchReport, ticketLive, gameEvents, halfStats,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },

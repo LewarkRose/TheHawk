@@ -2151,8 +2151,6 @@
         async function packSync() {
             const data = { v: 1, at: new Date().toISOString(), bankroll, bets, bankrollLog, learn: {} };
             for (const k of SYNC_LEARN) { try { const v = JSON.parse(localStorage.getItem(k)); if (v != null) data.learn[k] = v; } catch (e) { /* skip */ } }
-            // 📲 Screen-off alerts: the same ntfy topic and Cloudflare worker on the other device.
-            try { const p = JSON.parse(localStorage.getItem('hawk.push')); if (p && p.topic) data.push = { topic: p.topic, worker: p.worker || '' }; } catch (e) { /* none */ }
             const raw = new TextEncoder().encode(JSON.stringify(data));
             return 'CompressionStream' in window ? 'z.' + b64url(await pipe(raw, new CompressionStream('deflate-raw'))) : 'n.' + b64url(raw);
         }
@@ -2233,13 +2231,6 @@
             upd.forEach(b => { const i = bets.findIndex(x => x.id === b.id); if (i >= 0) bets[i] = b; });
             const ms = (b) => { const t = /^bet_(\d{12,})/.exec(b.id || ''); return t ? +t[1] : 0; };
             bets.sort((a, b) => ms(b) - ms(a));
-            // Screen-off alerts set up there but not here: use the same topic and worker (this device gets its own name).
-            try {
-                const mine = JSON.parse(localStorage.getItem('hawk.push') || 'null');
-                if (data.push && data.push.worker && !(mine && mine.worker))
-                    localStorage.setItem('hawk.push', JSON.stringify({ topic: data.push.topic, worker: data.push.worker,
-                        device: (/android|iphone|ipad/i.test(navigator.userAgent) ? 'phone-' : 'pc-') + Math.random().toString(36).slice(2, 8) }));
-            } catch (e) { /* skip */ }
             // HAWK's price learning: add what the other device learned.
             for (const [k, v] of Object.entries(data.learn || {})) {
                 try {

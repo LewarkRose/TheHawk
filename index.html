@@ -1508,6 +1508,7 @@
                             </div>
                         `; }).join('')}
                     </div>
+                    ${bet.lostEarly ? `<div class="text-[11px] text-red-300 bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2">❌ Settled during the match: ${escHtml(bet.lostEarly)} was lost, so the bet couldn't land.</div>` : ''}
                     ${bet.status === 'PENDING' && bet.needsCheck ? `<div class="text-[11px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2">⚠️ HAWK couldn't settle this one: ${escHtml(bet.needsCheck)}. Settle it yourself with what Bet365 paid (✏️ Edit lets you set the exact return).</div>` : ''}
                     <div class="flex justify-between items-center pt-2 border-t border-zinc-900 text-xs">
                         <div><span class="text-zinc-400">Stake:</span> <span class="text-white font-bold">€${bet.stake.toFixed(2)}</span><span class="text-zinc-400 ml-3">${bet.status === 'CASHED_OUT' ? 'Cashed Out:' : 'Return:'}</span> <span class="text-[#d9b571] font-bold">€${(bet.status === 'CASHED_OUT' ? (bet.cashOutAmount || 0) : bet.potentialReturn).toFixed(2)}</span></div>

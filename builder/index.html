@@ -4212,6 +4212,27 @@ function pendingBetsOn(gameId) {
   try { return (JSON.parse(localStorage.getItem("hawk_bets")) || []).filter(b => b.status === "PENDING" && (b.legs || []).some(l => l.hawk && String(l.hawk.game) === String(gameId))); }
   catch { return []; }
 }
+// A bet that can't land any more: marked LOST in the Vault straight away (not at
+// full time), with each leg's result so far, so it drops out of your running bets,
+// the 🎟 on Scores and the alerts. (The stake already came off your bankroll.)
+function settleLost(betId, label, gameId, rows) {
+  let bets;
+  try { bets = JSON.parse(localStorage.getItem("hawk_bets")) || []; } catch { return; }
+  const b = bets.find(x => x.id === betId);
+  if (!b || b.status !== "PENDING") return;
+  const st = Object.fromEntries(rows.map(r => [r.id, r.state]));
+  for (const l of b.legs || []) if (l.hawk && String(l.hawk.game) === String(gameId))
+    for (const h of l.hawk.legs || []) if (st[h.id] === "won" || st[h.id] === "lost") h.result = st[h.id];
+  b.status = "LOST"; b.settledAt = new Date().toISOString(); b.settledBy = "HAWK"; b.lostEarly = label;
+  delete b.needsCheck;
+  try { localStorage.setItem("hawk_bets", JSON.stringify(bets)); } catch { return; }
+  // Clear this match's notifications already sitting on your PC / phone.
+  if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistration("../").then(reg => reg ? reg.getNotifications() : [])
+    .then(ns => ns.filter(n => String(n.tag || "").includes(String(gameId))).forEach(n => n.close())).catch(() => {});
+  toast(`❌ Bet settled as lost — ${label}. Its alerts stop.`, 5000);
+  jumpLabel();
+  if (S.view === "scores") renderScoreList();
+}
 async function matchAlerts(games) {
   const states = loadPref("hawk.betStates", {});
   for (const g of games) {
@@ -4240,6 +4261,10 @@ async function matchAlerts(games) {
         const rows = t.parts.filter(pt => pt.live).flatMap(pt => pt.live.legs), was = states[t.id];
         states[t.id] = Object.fromEntries(rows.map(r => [r.id, r.state]));
         if (!was) continue;   // first look at this bet: just remember where it stands
+        // A leg lost on two checks in a row (10+ s apart, so a data blip can't do it): the
+        // bet is settled as lost in the Vault now, and its alerts stop.
+        const gone = rows.find(r => r.state === "lost" && was[r.id] === "lost");
+        if (gone) { settleLost(t.id, gone.label, g.id, rows); continue; }
         for (const r of rows) {
           if (was[r.id] === r.state) continue;
           if (r.state === "won" && firstTime(`leg|${t.id}|${r.id}|won`))

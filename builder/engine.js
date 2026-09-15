@@ -355,9 +355,12 @@
     if (!path || !kickoff) return null;
     const list = await getJSON(`${KAMBI}/listView/football/${path}.json?${KAMBI_Q}`, 10 * 60e3);
     let ev = null, best = 0;
+    // Not the club's U21 / reserves / women's side playing the same evening.
+    const youth = /\b(u\d{2}|reserves|women|ladies)\b|\(w\)/i, grown = !youth.test(`${home} ${away}`);
     for (const e of (list && list.events) || []) {
       const x = e.event || {};
       if (Math.abs(Date.parse(x.start) - kickoff.getTime()) > 3 * 3600e3) continue;
+      if (grown && youth.test(`${x.homeName || ""} ${x.awayName || ""} ${x.group || ""}`)) continue;
       const s = nameSimilarity(home, x.homeName || "") + nameSimilarity(away, x.awayName || "");
       if (s > best) { best = s; ev = x; }
     }
@@ -384,6 +387,32 @@
         .filter((x) => !x.none).sort((a, b) => b.p - a.p).slice(0, 5);
     }
     return team || scorers.length ? { book: REF_BOOK, team, scorers } : null;
+  }
+  // Live scores straight from Unibet's feed for the matches you follow: a 1 KB
+  // file per match that changes within seconds of a goal (a bookmaker has to
+  // stop betting at once) — usually well before the score apps.
+  const kambiIds = new Map();   // 365Scores game id -> Unibet event id (or null)
+  async function kambiEventId(game) {
+    const k = String(game.id);
+    if (!kambiIds.has(k)) {
+      const ev = await kambiEvent(game.league, game.home, game.away, game.kickoff ? new Date(game.kickoff) : null).catch(() => null);
+      kambiIds.set(k, ev ? ev.id : null);
+    }
+    return kambiIds.get(k);
+  }
+  async function kambiLive(games) {
+    const pairs = [];
+    for (const g of games) { const id = await kambiEventId(g); if (id) pairs.push([String(g.id), id]); }
+    if (!pairs.length) return {};
+    const j = await getJSON(`${KAMBI}/event/livedata/${pairs.map(([, id]) => id).join(",")}.json?${KAMBI_Q}`);
+    const by = Object.fromEntries(((j && j.liveData) || []).map((x) => [x.eventId, x]));
+    const out = {};
+    for (const [gid, id] of pairs) {
+      const x = by[id], st = x && x.statistics && x.statistics.football;
+      if (x && x.score) out[gid] = { score: [+x.score.home || 0, +x.score.away || 0], minute: x.matchClock ? x.matchClock.minute : null,
+                                      reds: st ? [(st.home || {}).redCards || 0, (st.away || {}).redCards || 0] : null };
+    }
+    return out;
   }
   async function kambiProps(league, home, away, kickoff) {
     const ev = await kambiEvent(league, home, away, kickoff);
@@ -2493,7 +2522,7 @@
   }
 
   global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, refOff, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
-                  scores, matchReport, ticketLive, gameEvents, halfStats, readLeg, isPlayerText, nameSimilarity,
+                  scores, matchReport, ticketLive, gameEvents, halfStats, readLeg, isPlayerText, nameSimilarity, kambiLive,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   startRadar, radarStatus: () => jobStatus(radarJob), stopRadar: () => { radarJob.stop = true; return jobStatus(radarJob); },

@@ -1043,15 +1043,16 @@ async function init() {
   const last = loadPref("hawk.league", leagues[0]);
   await selectLeague(leagues.includes(last) ? last : leagues[0]);
   checkLineups();
-  // Goals every 12 s, lineups every minute. The beat comes from a tiny Web Worker:
-  // browsers slow a background tab's own timers to once a minute, but not a
-  // worker's, so alerts stay quick while HAWK sits in another tab.
+  // A beat every 5 s: Unibet's live scores (the fast lane) every beat, 365Scores
+  // every other one (10 s), lineups every minute. The beat comes from a tiny Web
+  // Worker: browsers slow a background tab's own timers to once a minute, but not
+  // a worker's, so alerts stay quick while HAWK sits in another tab.
   let beat = 0;
-  const tick = () => { checkGoals(); renderDrawer(); if (++beat % 5 === 0) checkLineups(); if (beat % 25 === 0) linkVaultBets(); };
+  const tick = () => { fastGoals(); if (++beat % 2 === 0) { checkGoals(); renderDrawer(); } if (beat % 12 === 0) checkLineups(); if (beat % 60 === 0) linkVaultBets(); };
   if (loadPref("hawk.drawer", false) && WIDE()) toggleDrawer(true);
   linkVaultBets();
-  try { new Worker(URL.createObjectURL(new Blob([`setInterval(() => postMessage(0), ${GOALS_MS})`], { type: "text/javascript" }))).onmessage = tick; }
-  catch { setInterval(tick, GOALS_MS); }
+  try { new Worker(URL.createObjectURL(new Blob([`setInterval(() => postMessage(0), ${FAST_MS})`], { type: "text/javascript" }))).onmessage = tick; }
+  catch { setInterval(tick, FAST_MS); }
   setTimeout(checkGoals, 4000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { checkGoals(); checkLineups(); } });
   openFromUrl();
@@ -4100,8 +4101,8 @@ async function lineupsIn(w, source) {
 // you have a HAWK bet on, a lineup alert on, or the live view open. It says who
 // scored and what the goal did to your bet. Checked every 12 s from the same
 // scores feed as the Scores page; a goal taken off (VAR) shows too.
-const GOALS_MS = 12 * 1000, GOAL_SHOW_MS = 15000;
-const goalState = { last: {}, busy: false, on: loadPref("hawk.goalAlerts", true) };
+const GOALS_MS = 10 * 1000, FAST_MS = 5 * 1000, GOAL_SHOW_MS = 15000;
+const goalState = { last: {}, fast: {}, ok: {}, games: [], busy: false, on: loadPref("hawk.goalAlerts", true) };
 // 🔔 on a live match (live view, Scores): goal and red-card alerts for it,
 // even after you leave its page. A match you have a bet on is always followed.
 function followState(id) {
@@ -4140,6 +4141,33 @@ function followedGames() {
   if (S.view === "inplay" && S.inplay) ids.add(String(S.inplay.id));
   return ids;
 }
+// ⚡ Fast lane: Unibet's live score for the matches you follow, every 5 s. A
+// goal shows the moment Unibet has it (usually well before 365Scores); the
+// scorer's name fills in when 365Scores has it. A match is only trusted once
+// Unibet's score has matched 365Scores' — so a mix-up with another game can't
+// set off a false alert.
+let fastBusy = false;
+async function fastGoals() {
+  if (!goalState.on || fastBusy || !goalState.games.length) return;
+  const follow = followedGames(), games = goalState.games.filter(g => g.status === 3 && follow.has(g.id));
+  if (!games.length) return;
+  fastBusy = true;
+  try {
+    const live = await HAWK.kambiLive(games);
+    for (const g of games) {
+      const k = live[g.id], was = goalState.last[g.id];
+      if (!k || !was) continue;
+      const now = k.score;
+      if (now[0] === was[0] && now[1] === was[1]) { goalState.ok[g.id] = true; continue; }
+      if (!goalState.ok[g.id]) continue;
+      goalState.last[g.id] = now;
+      goalState.fast[g.id] = { score: now, at: Date.now() };
+      const side = now[0] > was[0] ? "home" : now[1] > was[1] ? "away" : now[0] < was[0] ? "home-off" : "away-off";
+      goalAlert({ ...g, score: now, clock: k.minute != null ? `${k.minute}'` : g.clock }, side, now, true).catch(e => console.warn("[hawk] goal alert:", e.message));
+    }
+  } catch (e) { console.warn("[hawk] fast lane:", e.message); }
+  finally { fastBusy = false; }
+}
 async function checkGoals() {
   if (!goalState.on || goalState.busy) return;
   const follow = followedGames();
@@ -4150,8 +4178,15 @@ async function checkGoals() {
     let list = await HAWK.scores(localDay(new Date()));
     if (new Date().getHours() < 5) { const y = new Date(); y.setDate(y.getDate() - 1); list = list.concat(await HAWK.scores(localDay(y))); }
     const seen = new Set(), games = list.filter(g => follow.has(g.id) && (g.status === 3 || g.status === 4) && !seen.has(g.id) && seen.add(g.id));
+    goalState.games = games;
     for (const g of games) {
       const now = [g.score[0] || 0, g.score[1] || 0], was = goalState.last[g.id];
+      // Unibet already had this goal (fast lane): 365Scores is just catching up — not a goal off.
+      const fast = goalState.fast[g.id];
+      if (fast && Date.now() - fast.at < 5 * 60e3 && now[0] <= fast.score[0] && now[1] <= fast.score[1]) {
+        if (now[0] === fast.score[0] && now[1] === fast.score[1]) delete goalState.fast[g.id];
+        continue;
+      }
       goalState.last[g.id] = now;
       if (!was || g.status === 4 && was[0] === now[0] && was[1] === now[1]) continue;   // first look: just remember it
       const side = now[0] > was[0] ? "home" : now[1] > was[1] ? "away" : now[0] < was[0] ? "home-off" : now[1] < was[1] ? "away-off" : null;
@@ -4299,11 +4334,13 @@ window.addEventListener("storage", (e) => {
                                  : { tone: "bad", icon: "❌", word: "BET LOST", g, body: `€${(+b.stake).toFixed(2)} stake <span>· booked in your Vault</span>` });
   }
 });
-async function goalAlert(g, side, score) {
+async function goalAlert(g, side, score, fast = false) {
   const off = side.endsWith("-off"), who = side.startsWith("home") ? "home" : "away", team = g[who];
   // Who scored (the latest goal for that side) and what it did to your bet.
   let scorer = null, bet = null;
-  try { const rep = await HAWK.matchReport(g.id); scorer = rep.events.filter(e => e.type === "goal" && e.side === who).pop() || null; } catch { /* just the score */ }
+  // (only once 365Scores lists this goal too — otherwise its latest goal would be the previous one)
+  try { const goals = (await HAWK.matchReport(g.id)).events.filter(e => e.type === "goal" && e.side === who);
+        scorer = goals.length >= score[who === "home" ? 0 : 1] ? goals[goals.length - 1] : null; } catch { /* just the score */ }
   try { const mine = await myLiveTickets(g.id); if (mine.length) bet = mine[0]; } catch { /* no bet */ }
   const box = $("#goalfeed");
   const card = document.createElement("div");
@@ -4320,6 +4357,20 @@ async function goalAlert(g, side, score) {
     ${bet ? `<div class="g-bet">🎟 Your bet: <b>${pct(bet.p, bet.p < 0.1 ? 1 : 0)}</b> to land now · worth ≈ €${(bet.p * bet.ret).toFixed(2)}</div>` : ""}
     <div class="g-bar"><i></i></div>`;
   card.onclick = (e) => { if (e.target.closest(".gx")) { card.remove(); return; } card.remove(); goToLive(g.league, g.id); };
+  // From Unibet, before 365Scores had the goal: the scorer's name follows (checked every 10 s for 2 minutes).
+  if (fast && !off && !(scorer && scorer.player)) {
+    const n0 = score[who === "home" ? 0 : 1];
+    (async () => {
+      for (let i = 0; i < 12 && card.isConnected; i++) {
+        await new Promise(r => setTimeout(r, 10000));
+        try {
+          const goals = (await HAWK.matchReport(g.id)).events.filter(e => e.type === "goal" && e.side === who);
+          const sc = goals.length >= n0 ? goals[goals.length - 1] : null;
+          if (sc && sc.player) { card.querySelector(".g-who").innerHTML = `${esc(sc.player)} ${esc(sc.minute)}${sc.detail ? ` · ${esc(sc.detail)}` : ""}${sc.assist ? ` <span>· assist ${esc(sc.assist)}</span>` : ""}`; return; }
+        } catch { /* try again */ }
+      }
+    })();
+  }
   box.prepend(card);
   while (box.children.length > 3) box.lastElementChild.remove();
   // Away from HAWK when it happened? The card waits for you to come back.

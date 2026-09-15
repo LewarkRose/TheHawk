@@ -2240,10 +2240,10 @@
     }
     // Players: live numbers, who's still on, and their usual rates.
     const names = Object.fromEntries((game.members || []).map((m) => [m.id, m.name]));
-    const subsIn = new Set(), subsOut = new Set(), sentOff = new Set(), booked = new Set();
+    const subsIn = new Set(), subsOut = new Set(), sentOff = new Set(), booked = new Set(), replacedBy = {};
     for (const e of game.events || []) {
       const n = ((e.eventType || {}).name || "").toLowerCase();
-      if (n.includes("substitution")) { subsIn.add(e.playerId); (e.extraPlayers || []).forEach((p) => subsOut.add(p)); }
+      if (n.includes("substitution")) { subsIn.add(e.playerId); (e.extraPlayers || []).forEach((p) => { subsOut.add(p); replacedBy[p] = e.playerId; }); }
       if (n.includes("card")) booked.add(e.playerId);
       if (n.includes("red")) sentOff.add(e.playerId);
     }
@@ -2254,7 +2254,7 @@
         const count = (k, total) => { const v = s[k]; if (v == null) return 0; const mm = /^(\d+)\s*\/\s*(\d+)/.exec(String(v)); return mm ? +(total ? mm[2] : mm[1]) : parseFloat(v) || 0; };
         const started = m.statusText === "Starting", mins = count("Minutes");
         const on = !sentOff.has(m.id) && !subsOut.has(m.id) && (started ? !(mins > 0 && mins < elapsed - 5 && !subsIn.has(m.id)) : subsIn.has(m.id));
-        return { name: names[m.id] || "", pos: POSITIONS[(m.position || {}).name] || "M", on, played: started || subsIn.has(m.id) || mins > 0, booked: booked.has(m.id),
+        return { id: m.id, name: names[m.id] || "", pos: POSITIONS[(m.position || {}).name] || "M", on, played: started || subsIn.has(m.id) || mins > 0, booked: booked.has(m.id),
                  mins, tkShown: s["Tackles Won"] != null,
                  v: { shots: count("Total Shots"), sot: count("Shots On Target"), score: count("Goals"), assist: count("Assists"), fouls: count("Fouls Made"),
                       fouled: count("Was Fouled"), tackles: count("Tackles Won", true), offsides: count("Offsides"), saves: count("Goalkeeper Saves") } };
@@ -2333,7 +2333,22 @@
         row.p = Math.min(1, p); row.note = `corners ${ch}-${ca}`;
       } else if ((m = /^p:(home|away):\d+:([a-z]+?)(\d*)$/.exec(id2))) {
         const side = m[1], stat = m[2], need = +m[3] || 1;
-        const pl = (() => { const list = livePlayers[side] || [], hit = list.length ? bestMatch(h.player || h.label.split(/:| to /)[0], list.map((p) => p.name), 0.6) : null; return list.find((p) => p.name === hit); })();
+        let pl = (() => { const list = livePlayers[side] || [], hit = list.length ? bestMatch(h.player || h.label.split(/:| to /)[0], list.map((p) => p.name), 0.6) : null; return list.find((p) => p.name === hit); })();
+        // Bet365's Sub On Play On: your player subbed off before the leg landed → the
+        // bet moves to the player who came on for him (only the sub's own numbers
+        // count; a sub of the sub carries it on). Not for a red card.
+        const done = (p) => (stat === "booked" ? p.booked : (stat === "soa" ? p.v.score + p.v.assist : p.v[stat] || 0) >= need);
+        let subFrom = null;
+        if (pl && pl.played && h.subOn && !done(pl) && subsOut.has(pl.id)) {
+          let cur = pl;
+          for (let hop = 0; hop < 5 && replacedBy[cur.id]; hop++) {
+            const nx = (livePlayers[side] || []).find((p) => p.id === replacedBy[cur.id]);
+            if (!nx) break;
+            cur = nx;
+            if (done(cur) || !subsOut.has(cur.id)) break;
+          }
+          if (cur !== pl) { subFrom = pl; pl = cur; }
+        }
         if (!pl) { row.state = "void"; row.note = "not in the squad list"; }
         else if (!pl.played) { row.state = "wait"; row.p = null; row.note = "hasn't come on (Bet365 voids the leg if he doesn't play)"; }
         else {
@@ -2369,7 +2384,8 @@
               row.unnamed = u;
             }
           }
-          row.note = `${pl.on ? "on the pitch" : "off"} · ${stat === "booked" ? (pl.booked ? "booked" : "not booked") : `${stat === "soa" ? pl.v.score + pl.v.assist : pl.v[stat] || 0} so far`}`;
+          row.note = `${subFrom ? `🔄 ${pl.name} on for ${subFrom.name} (Sub On Play) · ` : ""}${pl.on ? "on the pitch" : "off"} · ${stat === "booked" ? (pl.booked ? "booked" : "not booked") : `${stat === "soa" ? pl.v.score + pl.v.assist : pl.v[stat] || 0} so far`}`;
+          if (subFrom) row.sub = { from: subFrom.name, to: pl.name };
           if (row.unnamed) row.note += ` · ${side === "home" ? hc.name : ac.name} have ${row.unnamed} more tackle${row.unnamed > 1 ? "s" : ""} 365Scores doesn't name (lost the ball) — Bet365 counts those, so he may already have one`;
         }
       } else row.note = "HAWK can't follow this one live";

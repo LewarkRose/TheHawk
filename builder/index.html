@@ -924,7 +924,7 @@ function loadPref(key, fallback) { try { const v = localStorage.getItem(key); re
 function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
             target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), favourite: true, result: null, tab: "players", q: "",
-            chk: { price: "", boost: "", stake: "5" }, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
+            chk: { price: "", boost: "", stake: "5" }, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
@@ -2068,6 +2068,8 @@ function renderSlip() {
       <input type="checkbox" id="xtra" ${S.extras ? "checked" : ""}> Auto-build can use fouls, tackles &amp; offsides</label></div>
     <div class="opts" style="margin-top:6px"><label title="Bet365 pays a Full Time Result leg early once that team goes 2 goals ahead (the EP badge on your slip). With this on, HAWK's Result chances include it.">
       <input type="checkbox" id="epOn" ${S.ep ? "checked" : ""}> Bet365 Early Payout (EP) on Result legs</label></div>
+    <div class="opts" style="margin-top:6px"><label title="Bet365's Sub On Play On: if your player is subbed off before his leg lands, the bet moves to the player who comes on for him. HAWK follows the sub live and the Vault settles it that way.">
+      <input type="checkbox" id="subOn" ${S.subOn ? "checked" : ""}> Bet365 Sub On Play On for player legs</label></div>
     <button class="build" id="go" ${m ? "" : "disabled"}>${sameOptions() && S.options.list.length > 1
       ? `🔄 BUILD AGAIN — option ${(S.options.at + 1) % S.options.list.length + 1} of ${S.options.list.length}` : "⚡ BUILD MY BET BUILDER"}</button>
     ${S.slip.length ? `
@@ -2111,6 +2113,7 @@ function renderSlip() {
     S.ep = e.target.checked; savePref("hawk.ep", S.ep); HAWK.setEarlyPayout(S.ep);
     if (S.match) openMatch(S.match.id, true);   // re-run the match with (or without) it
   };
+  if ($("#subOn")) $("#subOn").onchange = (e) => { S.subOn = e.target.checked; savePref("hawk.subOn", S.subOn); toast(S.subOn ? "Sub On Play On: a subbed-off player\u2019s leg moves to his sub" : "Sub On Play On off"); };
   $("#mx").onchange = (e) => { S.maxLegs = +e.target.value; savePref("hawk.maxLegs", S.maxLegs); };
   $("#go").onclick = build;
   $("#slip").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => removeLeg(b.dataset.rm));
@@ -3535,7 +3538,7 @@ async function myLiveTickets(gameId) {
     for (const l of b.legs) {
       if (!l.hawk) { unknown++; continue; }
       if (String(l.hawk.game) === String(gameId)) {
-        const live = await api(`/api/ticketlive?id=${gameId}`, { legs: l.hawk.legs });
+        const live = await api(`/api/ticketlive?id=${gameId}`, { legs: l.hawk.legs.map(h => ({ ...h, subOn: S.subOn && b.subOn !== false })) });
         if (!live) { unknown++; continue; }
         parts.push({ fixture: l.fixture, live });
         p *= live.p; unknown += live.unknown;

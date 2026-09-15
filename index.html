@@ -2039,6 +2039,9 @@
         const { facts: matchFacts, fetchMatchFacts, legResult, closingPrice } = HawkSettle;
 
         let settling = false;
+        // Bet365's Sub On Play On (a player leg moves to the sub if your player comes off) — on unless
+        // you switched it off in the builder.
+        const subOnPref = () => { try { return JSON.parse(localStorage.getItem('hawk.subOn') ?? 'true') !== false; } catch (e) { return true; } };
         async function autoSettle() {
             if (settling) return;
             settling = true;
@@ -2073,7 +2076,7 @@
                         if (f.off) { issues.push(`${l.fixture}: ${f.off}`); allWon = false; continue; }
                         l.hawk.score = `${f.ft[0]}-${f.ft[1]}`;
                         // A leg you ticked as done during the match (Bet365 showed it) counts as won.
-                        for (const h of l.hawk.legs) h.result = h.userDone ? 'won' : legResult(h, f, { earlyPayout: true });
+                        for (const h of l.hawk.legs) h.result = h.userDone ? 'won' : legResult(h, f, { earlyPayout: true, subOn: bet.subOn !== false && subOnPref() });
                         const rs = l.hawk.legs.map(h => h.result);
                         if (rs.includes('lost')) anyLost = true;
                         else if (!rs.every(r => r === 'won')) {

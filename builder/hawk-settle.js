@@ -73,9 +73,12 @@
     for (const [side, key] of [["home", "homeCompetitor"], ["away", "awayCompetitor"]]) {
       players[side] = (((game[key] || {}).lineups || {}).members || []).map((m) => {
         const stats = Object.fromEntries((m.stats || []).map((s) => [s.name, s.value]));
-        return { name: names[m.id] || "", minutes: countOf(stats["Minutes"]), stats, booked: bookedIds.has(m.id) };
+        return { id: m.id, name: names[m.id] || "", minutes: countOf(stats["Minutes"]), stats, booked: bookedIds.has(m.id) };
       });
     }
+    // Substitutions in normal time: who came on for whom (Bet365's Sub On Play On).
+    const replacedBy = {};
+    for (const e of events) if (/substitution/i.test(e.eventType.name || "")) for (const off of e.extraPlayers || []) replacedBy[off] = e.playerId;
     // Closing prices: once a match is over, 365Scores shows each Bet365 line at
     // its last price before kick-off (the opening price is kept separately).
     const closing = {};
@@ -93,7 +96,7 @@
       ft: ft90, twoUp, tackles,
       ht: ht ? [ht.homeCompetitorScore, ht.awayCompetitorScore] : null,
       first: goals.length ? (goals[0].competitorId === homeId ? "home" : "away") : null,
-      corners: pair("Corners"), sot: pair("Shots On Target"), cards, players, closing,
+      corners: pair("Corners"), sot: pair("Shots On Target"), cards, players, closing, replacedBy,
     });
   }
 
@@ -130,6 +133,9 @@
   // 'won' | 'lost' | 'void' (player didn't play) | 'unknown' (no data)
   // opts.earlyPayout: settle Full Time Result legs the way Bet365's Early
   // Payout does (the Vault, for your bets) — not for grading HAWK's chances.
+  // opts.subOn: Bet365's Sub On Play On — a player subbed off before his leg
+  // landed passes it to the player who came on for him (only the sub's own
+  // numbers count; a sub of the sub carries it on).
   function legResult(h, f, opts = {}) {
     const id = h.id || "", W = (c) => (c ? "won" : "lost");
     const [H, A] = f.ft, side = (s) => (s === "home" ? [H, A] : [A, H]);
@@ -141,12 +147,25 @@
       const pl = findPlayer(f.players[sd] || [], who);
       if (!pl) return (f.players[sd] || []).length ? "void" : "unknown";
       if (!(pl.minutes > 0)) return "void";
-      const s = pl.stats;
-      const v = { shots: countOf(s["Total Shots"]), sot: countOf(s["Shots On Target"]), score: countOf(s["Goals"]),
-                  assist: countOf(s["Assists"]), soa: countOf(s["Goals"]) + countOf(s["Assists"]), booked: pl.booked ? 1 : 0,
+      const val = (p) => { const s = p.stats;
+        return { shots: countOf(s["Total Shots"]), sot: countOf(s["Shots On Target"]), score: countOf(s["Goals"]),
+                  assist: countOf(s["Assists"]), soa: countOf(s["Goals"]) + countOf(s["Assists"]), booked: p.booked ? 1 : 0,
                   fouls: countOf(s["Fouls Made"]), fouled: countOf(s["Was Fouled"]), tackles: countOf(s["Tackles Won"], true),
-                  offsides: countOf(s["Offsides"]), saves: countOf(s["Goalkeeper Saves"]) }[stat];
+                  offsides: countOf(s["Offsides"]), saves: countOf(s["Goalkeeper Saves"]) }[stat]; };
+      let v = val(pl);
       if (v === undefined) return "unknown";
+      if (opts.subOn && v < need && f.replacedBy) {
+        const list = f.players[sd] || [];
+        let cur = pl;
+        for (let hop = 0; hop < 5 && f.replacedBy[cur.id]; hop++) {
+          const nx = list.find((p) => p.id === f.replacedBy[cur.id]);
+          if (!nx) break;
+          cur = nx;
+          if (val(cur) >= need || f.replacedBy[cur.id] == null) break;
+        }
+        if (cur !== pl) return W(val(cur) >= need);
+      }
+      const s = pl.stats;
       // 365Scores names a player's tackles only once he's won one; Bet365 also
       // counts the ones that lost the ball. If his team has tackles nobody is
       // named for, some may be his — HAWK can't tell, so it doesn't guess.

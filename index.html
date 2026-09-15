@@ -2052,7 +2052,11 @@
                 // Settled HAWK tickets from the last 2 weeks that haven't had their closing prices read yet.
                 const needsClose = (l) => due(l) && !l.hawk.closeChecked && (l.hawk.legs || []).some(h => h.bookPrice)
                     && Date.now() - Date.parse(l.hawk.kickoff || 0) < 14 * 86400000;
-                const games = [...new Set(bets.flatMap(b => b.legs.filter(l => (b.status === 'PENDING' && due(l)) || needsClose(l)).map(l => String(l.hawk.game))))];
+                // Tickets settled before HAWK could mark their legs (settled by hand, or lost early during the
+                // match): each leg still gets its ✓ or ✗ once the match is over.
+                const needsMarks = (b, l) => b.status !== 'PENDING' && due(l) && !l.hawk.marked && (l.hawk.legs || []).some(h => !h.result)
+                    && Date.now() - Date.parse(l.hawk.kickoff || 0) < 14 * 86400000;
+                const games = [...new Set(bets.flatMap(b => b.legs.filter(l => (b.status === 'PENDING' && due(l)) || needsClose(l) || needsMarks(b, l)).map(l => String(l.hawk.game))))];
                 for (const g of games) { try { await fetchMatchFacts(g); } catch (e) { console.warn('[vault] result check failed', g, e); } }
 
                 reloadFromStorage();
@@ -2062,6 +2066,16 @@
                     if (!f || !f.finished || f.off || l.hawk.closeChecked) continue;
                     for (const h of l.hawk.legs || []) { const c = closingPrice(h, f); if (c) h.close = c; }
                     l.hawk.closeChecked = true;
+                }
+                for (const bet of bets) for (const l of bet.legs || []) {
+                    if (!l.hawk || !needsMarks(bet, l)) continue;
+                    const f = matchFacts[String(l.hawk.game)];
+                    if (!f || !f.finished) continue;
+                    if (!f.off) {
+                        l.hawk.score = l.hawk.score || `${f.ft[0]}-${f.ft[1]}`;
+                        for (const h of l.hawk.legs || []) if (!h.result) h.result = h.userDone ? 'won' : legResult(h, f, { earlyPayout: true, subOn: bet.subOn !== false && subOnPref() });
+                    }
+                    l.hawk.marked = true;
                 }
                 const settledNow = [];
                 let waiting = 0;

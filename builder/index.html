@@ -117,7 +117,7 @@ img{max-width:100%}
 @media (max-width:820px){
   body:not([data-view="match"]) .fixtures{display:none}
   /* the slip and its settings belong to the builder page */
-  body:not([data-view="match"]) .slipcol,body:not([data-view="match"]) .jump{display:none!important}
+  body:not([data-view="match"]) .slipcol{display:none!important}
   .fixtures{position:static;max-height:none}
   .fx-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:11px 12px;border-radius:12px;border:1px solid #294640;cursor:pointer;
     background:linear-gradient(180deg,#1b2a27,#151d20);color:var(--text);font:600 14px inherit;text-align:left;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
@@ -145,7 +145,7 @@ img{max-width:100%}
   font:700 12px inherit;color:var(--muted);background:linear-gradient(180deg,#25333a,#1a2328);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 4px 10px -4px rgba(0,0,0,.6)}
 .ip-bell.on{color:#2e2200;background:linear-gradient(180deg,#ffe08f,#f2b93b);border-color:#c8911f;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 12px -4px rgba(255,209,102,.6)}
 .ip-bell:hover{filter:brightness(1.1)}
-@media (max-width:560px){.ip-bell{top:8px;right:8px;padding:5px 9px}.ip-bell span{display:none}}
+@media (max-width:560px){.ip-bell{top:7px;right:7px;width:30px;height:30px;padding:0;justify-content:center;font-size:14px}.ip-bell span{display:none}}
 .hero{position:relative}
 .hero{padding:22px 24px;border-radius:16px 16px 0 0;
   background:radial-gradient(1200px 200px at 50% -60px,rgba(20,227,161,.18),transparent),linear-gradient(180deg,#18242a,#151b1f)}
@@ -270,8 +270,16 @@ img{max-width:100%}
 .rp-ev{display:flex;gap:8px;font-size:13px;padding:4px 0}
 .rp-ev.away{flex-direction:row-reverse;text-align:right}
 .rp-ev .min{color:var(--muted);font-weight:700;min-width:36px}
-@media (max-width:560px){.sc-row{grid-template-columns:40px 1fr 74px 1fr 30px;gap:5px;font-size:13px}.sc-team img{display:none}.sc-hawk{font-size:9.5px}
-  .sc-bell{width:28px;height:28px}}
+/* Phones: the two teams stack (home over away), the score and HAWK's line beside them, the bell and 🎟 in their own column. */
+@media (max-width:560px){
+  .sc-row{grid-template-columns:46px minmax(0,1fr) auto auto;grid-template-areas:"st home sc bet" "st away sc bet";gap:3px 8px;font-size:13.5px;padding:8px 6px}
+  .sc-state{grid-area:st;font-size:11px;line-height:1.25}.sc-soon{white-space:normal}
+  .sc-team{grid-area:home;gap:6px}.sc-team.away{grid-area:away;flex-direction:row-reverse;justify-content:flex-end;text-align:left}
+  .sc-team img{width:16px;height:16px}
+  .sc-team .tn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .sc-score{grid-area:sc;min-width:62px}.sc-hawk{font-size:9.5px}
+  .sc-bet{grid-area:bet;flex-direction:column;justify-content:center;gap:3px;min-width:26px}
+  .sc-bell{width:26px;height:26px;font-size:12px;border-radius:8px}}
 .kelly{margin-top:8px;font-size:13px;padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line)}
 .kelly b{color:var(--gold)}
 .kfrac{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:2px 4px;font-size:12px;margin-left:4px}
@@ -750,6 +758,21 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .jump{display:none;position:fixed;right:14px;bottom:18px;z-index:15;padding:11px 16px;border-radius:999px;border:0;cursor:pointer;
   font-weight:900;color:#03261b;background:linear-gradient(90deg,#10c98e,#3ff5bd);box-shadow:0 8px 24px rgba(0,0,0,.45)}
 @media (max-width:1250px){.jump{display:block}}
+.jump .jn{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;margin-left:4px;border-radius:999px;background:#03261b;color:#3ff5bd;font-size:12px}
+/* 🎟 My bets */
+.mb-h{margin:16px 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.mb-card{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:var(--panel2)}
+.mb-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:14px;padding-bottom:6px}
+.mb-part{border-top:1px solid var(--line);padding:7px 0 3px}
+.mb-fx{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;margin-bottom:3px}
+.mb-fx b{margin-right:auto}
+.mb-go{padding:3px 10px;border-radius:8px;border:1px solid rgba(20,227,161,.4);background:rgba(20,227,161,.08);color:var(--accent);font:700 12px inherit;cursor:pointer}
+.mb-leg{display:flex;gap:7px;font-size:13px;padding:1px 0}
+.mb-m{width:12px;flex-shrink:0;color:var(--muted);font-weight:900}.mb-m.won{color:var(--accent)}.mb-m.lost{color:var(--red)}
+.mb-done{display:grid;grid-template-columns:22px minmax(0,1fr) auto auto;gap:8px;align-items:center;font-size:13px;padding:7px 2px;border-bottom:1px solid var(--line)}
+.mb-dfx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mb-done.won b{color:var(--accent)}.mb-done.lost b{color:#ff8a8a}.mb-done.co b{color:var(--gold)}
+.mb-vault{display:block;text-align:center;margin-top:14px;text-decoration:none}
 /* mid-size screens: page buttons show icons only (names on hover), except the open one */
 @media (max-width:1180px) and (min-width:821px){.nav span{display:none}.nav.on span{display:inline}.nav{padding:7px 11px}}
 /* small phones: icon over a small label, so all five pages fit in one row */
@@ -845,7 +868,7 @@ a.nav{text-decoration:none}
   </section>
   <aside class="slipcol"><div class="panel slip" id="slip"></div></aside>
 </main>
-<button class="jump" id="jump" onclick="document.getElementById('slip').scrollIntoView({ behavior: 'smooth' })">🎟 Slip</button>
+<button class="jump" id="jump" onclick="openMyBets()" title="Your bets in the Vault">🎟 My bets</button>
 <div id="toast"></div>
 <div id="goalfeed" aria-live="polite"></div>
 
@@ -898,7 +921,7 @@ const oddsToSlider = (o) => 100 * Math.log(o / 1.5) / Math.log(25 / 1.5);
 
 // True when the slip sits below the match instead of beside it (phones, small windows).
 const narrow = () => window.matchMedia("(max-width: 1250px)").matches;
-function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2200); }
+function toast(msg, ms = 2200) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), ms); }
 // On GitHub Pages there's no server: the same /api calls the local app makes
 // are answered by the HAWK engine running in this page (engine.js).
 async function api(path, body) {
@@ -939,6 +962,7 @@ function fmtKick(iso) {
 
 /* ---------- leagues & fixtures ---------- */
 async function init() {
+  jumpLabel();
   const { leagues } = await api("/api/leagues");
   S.allLeagues = leagues;
   // The scans start with the Top 5 + European cups (each extra league adds
@@ -1505,10 +1529,10 @@ function lineupCard(m, live = null) {
     return `<b>${esc(s === "home" ? m.home : m.away)}</b>: 365Scores has ${esc(c.only365.join(", ") || "—")} · ESPN has ${esc(c.onlyEspn.join(", ") || "—")}`; }).join("<br>");
   const marker = (side, { p, depth, side: s }) => {
     // Horizontal pitch: home attacks left → right, away right → left. On phones
-    // the pitch stands up: home at the bottom, away at the top.
+    // the pitch stands up (turned clockwise): home at the top, away at the bottom.
     // (kept a little inside the lines so names and badges on the wings aren't cut off)
     const hl = side === "home" ? 6 + depth * 0.4 : 94 - depth * 0.4, ht = side === "home" ? 12 + s * 0.74 : 88 - s * 0.74;
-    const vt = side === "home" ? 94 - depth * 0.4 : 6 + depth * 0.4, vl = side === "home" ? 12 + s * 0.76 : 88 - s * 0.76;
+    const vt = side === "home" ? 6 + depth * 0.4 : 94 - depth * 0.4, vl = side === "home" ? 88 - s * 0.76 : 12 + s * 0.76;
     const at = `style="--hl:${hl.toFixed(1)}%;--ht:${ht.toFixed(1)}%;--vl:${vl.toFixed(1)}%;--vt:${vt.toFixed(1)}%"`;
     if (live) {
       // Subbed off: the player who came on takes his spot.
@@ -2004,7 +2028,8 @@ function renderSlip() {
   $("#slip").querySelectorAll("[data-hist]").forEach(b => b.onclick = () => openLegHistory(b.dataset.hist));
   $("#slip").querySelectorAll("[data-lock]").forEach(b => b.onclick = () => { const id = b.dataset.lock;
     S.locked.has(id) ? S.locked.delete(id) : S.locked.add(id); renderSlip(); });
-  $("#jump").textContent = S.slip.length && r && r.fair ? `🎟 Slip · ${odds(r.b365 || r.fair)}` : "🎟 Slip";
+  S.slipOdds = S.slip.length && r && r.fair ? r.b365 || r.fair : null;
+  jumpLabel();
   if ($("#price")) {
     // Remember what you typed, so adding or removing a leg doesn't clear it.
     for (const key of ["price", "boost", "stake"]) $("#" + key).oninput = (e) => { S.chk[key] = e.target.value; verdict(); };
@@ -2162,6 +2187,7 @@ function saveToVault(legs, stake, price, extra = {}) {
     localStorage.setItem("hawk_bankroll", (bankroll - stake).toFixed(2));
     localStorage.setItem("hawk_bets", JSON.stringify(bets));
   } catch { toast("Couldn't save to the Vault's storage."); return false; }
+  jumpLabel();
   return true;
 }
 
@@ -3180,7 +3206,9 @@ function renderScores() {
     <div class="section" style="border-top:0">
       <h3 style="display:flex;align-items:center;gap:10px">⚽ Scores
         <button class="ghost" id="goalToggle" style="width:auto;margin:0 0 0 auto;padding:4px 10px;font-size:12px;text-transform:none;letter-spacing:0"
-          title="A goal pops up for matches you have a HAWK bet on, a lineup alert on, or open in the live view — and as a PC / phone notification while HAWK is open in the background">${goalToggleText()}</button></h3>
+          title="A goal pops up for matches you have a HAWK bet on, a lineup alert on, or open in the live view — and as a PC / phone notification while HAWK is open in the background">${goalToggleText()}</button>
+        <button class="ghost" style="width:auto;margin:0;padding:4px 10px;font-size:12px;text-transform:none;letter-spacing:0" onclick="testNotify()"
+          title="Show a test notification now — or find out what's blocking them">📳 Test</button></h3>
       <div class="leagues" id="scDays" style="flex-wrap:wrap;margin:0 0 10px">${days.map(([d, t]) => `<button class="pill ${d === sc.day ? "on" : ""}" data-day="${d}">${esc(t)}</button>`).join("")}</div>
       <div class="qchips" id="scLeagues">${scoreChips()}</div>
     </div>
@@ -3247,9 +3275,9 @@ function renderScoreList() {
           : `<button class="sc-bell ${isWatched(g.id) ? "on" : ""}" data-bell="${g.id}" title="${isWatched(g.id) ? "Lineup alert on — click to stop" : "Alert me when the lineups are confirmed"}">🔔</button>`;
         return `<div class="sc-row ${g.status === 3 ? "is-live" : ""}" data-sid="${g.id}" title="${g.status === 3 ? "Open the live view" : g.status === 4 ? "Match report" : "Open in the builder"}">
           <div class="sc-state">${state}</div>
-          <div class="sc-team ${g.winner === 1 ? "win" : ""}"><img src="${esc(g.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(g.home)}</div>
+          <div class="sc-team ${g.winner === 1 ? "win" : ""}"><img src="${esc(g.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><span class="tn">${esc(g.home)}</span></div>
           <div class="sc-score">${g.score[0] == null ? "–" : `${sc0} – ${sc1}`}${predLine(g)}</div>
-          <div class="sc-team away ${g.winner === 2 ? "win" : ""}">${esc(g.away)}<img src="${esc(g.awayCrest)}" alt="" onerror="this.style.visibility='hidden'"></div>
+          <div class="sc-team away ${g.winner === 2 ? "win" : ""}"><span class="tn">${esc(g.away)}</span><img src="${esc(g.awayCrest)}" alt="" onerror="this.style.visibility='hidden'"></div>
           <div class="sc-bet">${alert}${bet}</div></div>`;
       }).join("")}`).join("");
 }
@@ -3481,6 +3509,13 @@ function liveHawk(d) {
 }
 // ⚽ Next goal: HAWK's chances (from the goals still expected) beside Unibet's
 // live "Next Goal" prices, and who's likeliest to score it.
+// "Another goal likely (64%) · 50/50 it comes by 85'" — plain words for the head of the box.
+function ngVerdict(n) {
+  const p = n.any, word = p >= 0.75 ? "Another goal very likely" : p >= 0.55 ? "Another goal likely" : p >= 0.45 ? "Another goal: could go either way"
+    : p >= 0.25 ? "Another goal unlikely" : "Another goal very unlikely";
+  const when = n.by ? ` · 50/50 it comes by ${n.by}'` : "";
+  return `<b style="color:${p >= 0.55 ? "var(--accent)" : p >= 0.45 ? "var(--gold)" : "#ff9aa8"}">${word}</b> <span class="muted">(${pct(p)})${when}</span>`;
+}
 function nextGoalBox(d) {
   const n = d.next;
   if (!n) return "";
@@ -3500,7 +3535,7 @@ function nextGoalBox(d) {
     scorers = list.sort((a, b) => b.p - a.p).slice(0, 5);
   }
   return `<div class="ng-box">
-    <div class="ng-head">⚽ Next goal ${n.by ? `<span class="muted">· due by about ${n.by}'</span>` : `<span class="muted">· more likely no more goals</span>`}</div>
+    <div class="ng-head">⚽ Next goal · ${ngVerdict(n)}</div>
     <div class="ng-row"><span class="ng-src">🦅 HAWK</span><div class="bar3 sm">${seg(hawk)}</div></div>
     ${bk ? `<div class="ng-row"><span class="ng-src">${esc(d.nextBook.book)}</span><div class="bar3 sm">${seg(bk)}</div></div>` : ""}
     <div class="bar3-legend"><span>${esc(d.home)}</span><span>No more goals</span><span>${esc(d.away)}</span></div>
@@ -3782,7 +3817,7 @@ function toggleLearning() {
   else renderSlip();
 }
 // A bet settled in the Vault (another tab) may change what HAWK has learned.
-window.addEventListener("storage", (e) => { if (e.key === "hawk_bets") { applyLearning(); renderSlip(); } });
+window.addEventListener("storage", (e) => { if (e.key === "hawk_bets") { applyLearning(); renderSlip(); jumpLabel(); } });
 
 /* ---------- price alerts ---------- */
 // Star a leg that has a Bet365 price and HAWK tells you (sound, title flash,
@@ -4177,14 +4212,27 @@ async function goalAlert(g, side, score) {
 // PC / phone notifications. Through the service worker where there is one
 // (phones only allow it that way); tapping one opens the page it points to.
 async function systemNotify(title, body, { icon, tag, url } = {}) {
-  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  if (!("Notification" in window) || Notification.permission !== "granted") return false;
   const opts = { body, icon: icon || new URL("../icon-192.png", location.href).href, badge: new URL("../icon-192.png", location.href).href,
                  tag, renotify: !!tag, data: { url: url ? new URL(url, location.href).href : location.href } };
+  // Phones (Android Chrome, Brave, Samsung Internet) only show notifications
+  // through the service worker — "new Notification()" is refused there.
   try {
-    const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration("../") : null;
-    if (reg) return await reg.showNotification(title, opts);
+    const reg = "serviceWorker" in navigator
+      ? (await navigator.serviceWorker.getRegistration("../")) || await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(r, 3000))]) : null;
+    if (reg && reg.showNotification) { await reg.showNotification(title, opts); return true; }
   } catch { /* fall back below */ }
-  try { const n = new Notification(title, opts); n.onclick = () => { window.focus(); if (url) openHawkUrl(opts.data.url); n.close(); }; } catch { /* not allowed here */ }
+  try { const n = new Notification(title, opts); n.onclick = () => { window.focus(); if (url) openHawkUrl(opts.data.url); n.close(); }; return true; } catch { return false; }
+}
+// "📳 Test": shows a notification now, or says what's blocking it.
+async function testNotify() {
+  if (!("Notification" in window)) return toast("This browser can't show notifications.");
+  if (Notification.permission === "default") { try { await Notification.requestPermission(); } catch { /* ignored */ } }
+  if (Notification.permission === "denied")
+    return toast("Blocked for HAWK. In Brave: tap the icon left of the address → Site settings → Notifications → Allow. Then tap Test again.", 9000);
+  const ok = await systemNotify("🦅 HAWK test", "Notifications work. Goals, red cards and your bets show like this.", { tag: "hawk-test" });
+  toast(ok ? "Sent — nothing showed? Android: Settings → Apps → Brave → Notifications on. (Brave also needs Notifications allowed in its own Settings → Site settings.)"
+    : "Couldn't show one — reload HAWK and try again.", 9000);
 }
 // Opens a HAWK link (from a notification) in this page without reloading.
 function openHawkUrl(href) {
@@ -4385,6 +4433,59 @@ function modal(html) {
   document.body.appendChild(bg);
 }
 function closeModal() { document.querySelectorAll(".modal-bg").forEach(x => x.remove()); }
+
+/* ---------- 🎟 My bets (the floating button) ---------- */
+// Your Vault tickets without leaving the builder: the ones still running first
+// (🔴 when a match is on — tap for the live view), then the last few settled.
+function vaultBets() { try { return JSON.parse(localStorage.getItem("hawk_bets")) || []; } catch { return []; } }
+function jumpLabel() {
+  const n = vaultBets().filter(b => b.status === "PENDING").length;
+  $("#jump").innerHTML = `🎟 My bets${n ? ` <span class="jn">${n}</span>` : ""}`;
+}
+function openMyBets() {
+  const bets = vaultBets(), pend = bets.filter(b => b.status === "PENDING"), done = bets.filter(b => b.status !== "PENDING").slice(0, 8);
+  const mark = (h) => h.userDone || h.result === "won" ? `<span class="mb-m won">✓</span>` : h.result === "lost" ? `<span class="mb-m lost">✗</span>`
+    : h.result === "void" ? `<span class="mb-m">⊘</span>` : `<span class="mb-m">·</span>`;
+  const when = (l) => {
+    const h = l.hawk, ko = h && Date.parse(h.kickoff);
+    if (!h || !ko) return "";
+    if (h.score) return `<span class="muted">FT ${esc(h.score)}</span>`;
+    const g = ((S.scores && S.scores.data) || []).find(x => String(x.id) === String(h.game));   // the Scores page knows it's over / the clock
+    if (g && g.status === 4) return `<span class="muted">FT ${g.score[0]}–${g.score[1]}</span>`;
+    if (g && g.status === 3) return `<span class="sc-live">● ${esc(g.clock || "Live")} · ${g.score[0]}–${g.score[1]}</span>`;
+    if (ko < Date.now()) return `<span class="sc-live">● Live</span>`;
+    return `<span class="muted">${new Date(ko).toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" })}</span>`;
+  };
+  const part = (l) => {
+    const h = l.hawk, started = h && Date.parse(h.kickoff) < Date.now() && !h.score;
+    const rows = h && h.legs ? h.legs.map(x => `<div class="mb-leg">${mark(x)}${esc(x.label)}</div>`).join("")
+      : String(l.selection || "").split(" & ").map(s => `<div class="mb-leg"><span class="mb-m">·</span>${esc(s)}</div>`).join("");
+    const go = h && h.game ? `<button class="mb-go" data-mbgo="${esc(h.game)}|${esc(h.league || "")}|${started || h.score ? "live" : "pre"}">${started ? "Live view" : h.score ? "Report" : "Open"}</button>` : "";
+    return `<div class="mb-part"><div class="mb-fx"><b>${esc(l.fixture)}</b>${when(l)}${go}</div>${rows}</div>`;
+  };
+  const slipBtn = S.view === "match" && S.slip.length
+    ? `<button class="ghost" data-mbslip style="margin:0 0 12px">🧩 Back to the slip you're building${S.slipOdds ? ` · ${odds(S.slipOdds)}` : ""}</button>` : "";
+  const result = (b) => b.status === "WON" ? ["won", "✅", `+€${(b.potentialReturn - b.stake).toFixed(2)}`]
+    : b.status === "CASHED_OUT" ? ["co", "💰", `${(b.cashOutAmount || 0) - b.stake >= 0 ? "+" : "−"}€${Math.abs((b.cashOutAmount || 0) - b.stake).toFixed(2)}`]
+    : ["lost", "❌", `−€${b.stake.toFixed(2)}`];
+  modal(`<div class="mhead" style="justify-content:space-between"><h2 style="margin:0">🎟 My bets</h2><button class="ghost" data-close style="width:auto;padding:6px 12px">✕</button></div>
+    <div style="margin-top:14px">${slipBtn}
+    <h3 class="mb-h">Still running (${pend.length})</h3>
+    ${pend.length ? pend.map(b => `<div class="mb-card">
+        <div class="mb-top"><span><b>€${b.stake.toFixed(2)}</b> @ <b>${odds(b.odds)}</b></span><span class="muted">returns <b style="color:var(--gold)">€${b.potentialReturn.toFixed(2)}</b></span></div>
+        ${(b.legs || []).map(part).join("")}</div>`).join("")
+      : `<div class="note">Nothing running. Tickets you send to the Vault show here.</div>`}
+    ${done.length ? `<h3 class="mb-h">Last settled</h3>${done.map(b => { const [cls, ic, pl] = result(b);
+        return `<div class="mb-done ${cls}"><span>${ic}</span><span class="mb-dfx">${esc((b.legs || []).map(l => l.fixture).join(" · "))}</span><span class="muted">@ ${odds(b.odds)}</span><b>${pl}</b></div>`; }).join("")}` : ""}
+    <a class="ghost mb-vault" href="../">All bets in the Vault →</a></div>`);
+  const bg = document.querySelector(".modal-bg");
+  bg.addEventListener("click", (e) => {
+    const g = e.target.closest("[data-mbgo]");
+    if (g) { const [id, league, how] = g.dataset.mbgo.split("|"); closeModal();
+      return how === "live" ? goToLive(league, id) : S.allLeagues.includes(league) ? goToMatch(league, id) : openMatch(id); }
+    if (e.target.closest("[data-mbslip]")) { closeModal(); $("#slip").scrollIntoView({ behavior: "smooth" }); }
+  });
+}
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); $("#watchPop").hidden = true; } });
 
 init();

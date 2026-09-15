@@ -156,6 +156,20 @@
             .tilt, .tilt::after, html body button { transition: none !important; }
             html body #bets-container > div, html body #view-history > div, html body #view-builder > div { animation: none; }
         }
+        /* settled tickets folded by day; each ticket a one-line row that opens into its card */
+        .vday { border: 1px solid var(--v-line, #27272a); border-radius: 14px; background: #0f1417; overflow: hidden; }
+        .vday > summary, .vbet > summary { list-style: none; cursor: pointer; }
+        .vday > summary::-webkit-details-marker, .vbet > summary::-webkit-details-marker { display: none; }
+        .vday > summary { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; font-size: 13px; }
+        .vday > summary::before, .vbet > summary::before { content: "▸"; color: #d9b571; transition: transform .15s; display: inline-block; }
+        .vday[open] > summary::before, .vbet[open] > summary::before { transform: rotate(90deg); }
+        .vday-body { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+        .vbet > summary { display: grid; grid-template-columns: 12px 22px minmax(0,1fr) auto auto; gap: 8px; align-items: center;
+            padding: 9px 10px; border-radius: 10px; background: rgba(24,24,27,.6); border: 1px solid #1f1f23; font-size: 12px; }
+        .vbet > summary .fx { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #e4e4e7; }
+        .vbet[open] > summary { border-color: rgba(201,160,92,.35); }
+        .vbet > div { margin-top: 6px; }
+        .vsec { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #71717a; margin: 10px 2px 2px; }
     </style>
     <!-- Icons: new names / ?v= so browsers drop the old cached logo -->
     <link rel="icon" href="hawk-tab.svg" type="image/svg+xml">
@@ -196,6 +210,7 @@
             </nav>
             <div class="vault-actions">
                 <div class="vgroup">
+                    <button onclick="openSync()" class="vbtn" title="Send your bets to your phone or PC with a link"><span class="icon-gold">📲</span> Sync</button>
                     <button onclick="exportData()" class="vbtn" title="Download a backup of your Vault"><span class="icon-gold">💾</span> Export</button>
                     <label class="vbtn" title="Load a backup (replaces your current data)"><span class="icon-gold">📂</span> Import<input type="file" id="import-file" onchange="importData(event)" class="hidden" accept=".json"></label>
                     <button onclick="resetVault()" class="vbtn vicon" title="Reset the Vault (downloads a backup first)"><span class="icon-gold">⚙️</span></button>
@@ -1425,6 +1440,9 @@
             }
 
             container.innerHTML = "";
+            // Tickets still running show in full; settled ones fold into one row each, grouped by day.
+            const pendingN = filtered.filter(b => b.status === 'PENDING').length, days = new Map();
+            if (pendingN && pendingN < filtered.length) container.insertAdjacentHTML('beforeend', `<div class="vsec">Running (${pendingN})</div>`);
             filtered.forEach(bet => {
                 let badge = bet.status === 'PENDING' ? '<span class="bg-sky-500/10 text-sky-400 border border-sky-500/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">PENDING</span>' :
                             bet.status === 'WON' ? '<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">WON</span>' :
@@ -1490,9 +1508,51 @@
                         ${bet.status === 'PENDING' ? `<div class="flex gap-1"><button onclick="settleBet('${bet.id}', 'WON')" class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg font-bold text-[10px]">Won ✓</button><button onclick="settleBet('${bet.id}', 'LOST')" class="bg-red-500/20 text-red-400 px-3 py-1 rounded-lg font-bold text-[10px]">Lost ✗</button><button onclick="openQuickCashOutModal('${bet.id}')" class="bg-[#c9a05c]/20 text-[#d9b571] px-3 py-1 rounded-lg font-bold text-[10px]">Cash Out 💰</button></div>` : ''}
                     </div>
                 `;
-                container.appendChild(card);
+                if (bet.status === 'PENDING') { container.appendChild(card); return; }
+                const when = betDay(bet);
+                if (!days.has(when.key)) days.set(when.key, { ...when, list: [] });
+                const g = days.get(when.key); g.t = Math.max(g.t, when.t); g.list.push({ bet, card });
+            });
+            if (days.size && pendingN) container.insertAdjacentHTML('beforeend', `<div class="vsec">Settled</div>`);
+            const money = (v) => `<b class="${v > 0 ? 'text-emerald-400' : v < 0 ? 'text-red-400' : 'text-zinc-400'}">${v > 0 ? '+' : v < 0 ? '−' : ''}€${Math.abs(v).toFixed(2)}</b>`;
+            [...days.values()].sort((a, b) => b.t - a.t).forEach(g => {
+                const won = g.list.filter(x => x.bet.status === 'WON').length, co = g.list.filter(x => x.bet.status === 'CASHED_OUT').length;
+                const lost = g.list.length - won - co, pl = g.list.reduce((s, x) => s + betProfit(x.bet), 0);
+                const day = document.createElement('details');
+                day.className = 'vday';
+                if (g.today) day.open = true;
+                day.innerHTML = `<summary><b class="text-white">${g.label}</b><span class="text-zinc-500">${g.list.length} ticket${g.list.length === 1 ? '' : 's'}</span>
+                    <span class="text-zinc-400">${won ? `<span class="text-emerald-400">✓ ${won}</span> ` : ''}${lost ? `<span class="text-red-400">✗ ${lost}</span> ` : ''}${co ? `<span class="text-[#d9b571]">💰 ${co}</span>` : ''}</span>
+                    <span style="margin-left:auto">${money(pl)}</span></summary><div class="vday-body"></div>`;
+                const body = day.querySelector('.vday-body');
+                g.list.forEach(({ bet, card }) => {
+                    const row = document.createElement('details');
+                    row.className = 'vbet';
+                    const icon = bet.status === 'WON' ? '✅' : bet.status === 'CASHED_OUT' ? '💰' : '❌';
+                    row.innerHTML = `<summary><span>${icon}</span><span class="fx">${escHtml(bet.legs.map(l => l.fixture).join(' · '))}</span>
+                        <span class="text-zinc-500">@ ${bet.odds.toFixed(2)}</span>${money(betProfit(bet))}</summary>`;
+                    row.appendChild(card);
+                    body.appendChild(row);
+                });
+                container.appendChild(day);
             });
             updateAnalytics();
+        }
+        // The day a ticket belongs to: its (last) match day, or when it was placed.
+        function betDay(bet) {
+            const kos = (bet.legs || []).map(l => l.hawk && Date.parse(l.hawk.kickoff)).filter(Boolean);
+            const placed = /^bet_(\d{12,})/.exec(bet.id || '');
+            const t = kos.length ? Math.max(...kos) : placed ? +placed[1] : Date.parse(bet.settledAt || '') || 0;
+            if (!t) return { key: 'older', label: 'Older', t: 0 };
+            const d = new Date(t), start = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+            const ago = Math.round((start(new Date()) - start(d)) / 864e5);
+            if (ago > 45) return { key: `m${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }), t };
+            return { key: `d${start(d)}`, t, today: ago <= 0,
+                     label: ago === 0 ? 'Today' : ago === 1 ? 'Yesterday' : d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) };
+        }
+        function betProfit(b) {
+            return b.status === 'WON' ? b.potentialReturn - b.stake : b.status === 'CASHED_OUT' ? (b.cashOutAmount || 0) - b.stake
+                : b.status === 'PENDING' ? 0 : -b.stake;
         }
 
         function settleBet(id, outcome) {
@@ -2062,6 +2122,96 @@
             reader.readAsText(file);
         }
 
+        // --- 📲 SYNC: your Vault from PC to phone (or back) with a link ---
+        // Tickets, bankroll and what HAWK learned from your Bet365 prices are packed
+        // into the link itself, after the "#" — browsers never send that part to any
+        // server (GitHub's included). Opening the link on the other device merges it in.
+        const SYNC_LEARN = ['hawk.b365prices', 'hawk.propPrices', 'hawk.notOn365', 'hawk.onBet365'];
+        const b64url = (bytes) => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+                                    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+        const pipe = async (bytes, stream) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+        async function packSync() {
+            const data = { v: 1, at: new Date().toISOString(), bankroll, bets, bankrollLog, learn: {} };
+            for (const k of SYNC_LEARN) { try { const v = JSON.parse(localStorage.getItem(k)); if (v != null) data.learn[k] = v; } catch (e) { /* skip */ } }
+            const raw = new TextEncoder().encode(JSON.stringify(data));
+            return 'CompressionStream' in window ? 'z.' + b64url(await pipe(raw, new CompressionStream('deflate-raw'))) : 'n.' + b64url(raw);
+        }
+        async function unpackSync(s) {
+            const [kind, body] = [s.slice(0, 2), s.slice(2)];
+            let bytes = Uint8Array.from(atob(body.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+            if (kind === 'z.') bytes = await pipe(bytes, new DecompressionStream('deflate-raw'));
+            return JSON.parse(new TextDecoder().decode(bytes));
+        }
+        async function openSync() {
+            let link;
+            try { link = `${location.origin}${location.pathname}#sync=${await packSync()}`; }
+            catch (e) { alert("Couldn't make the link in this browser — use Export instead."); return; }
+            const wrap = document.createElement('div');
+            wrap.className = 'fixed inset-0 z-50 flex items-center justify-center p-4';
+            wrap.style.background = 'rgba(0,0,0,.7)';
+            wrap.innerHTML = `<div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 w-full max-w-md space-y-3">
+                <div class="flex justify-between items-center"><h3 class="text-white font-bold">📲 Send your Vault to your other device</h3><button data-x class="text-zinc-400 px-2 text-lg">✕</button></div>
+                <p class="text-sm text-zinc-300">Open this link on your phone (or PC) and your <b class="text-white">${bets.length} tickets</b>, your <b class="text-white">€${bankroll.toFixed(2)}</b> bankroll and HAWK's Bet365 price learning copy across.</p>
+                <p class="text-xs text-zinc-400">🔒 Everything is inside the link — nothing goes to any server. Keep it to yourself.</p>
+                <div class="flex gap-2">${navigator.share ? '<button data-share class="flex-1 bg-[#c9a05c] hover:bg-[#d9b571] text-black font-bold rounded-xl py-2.5 text-sm">Share…</button>' : ''}
+                    <button data-copy class="flex-1 bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm">Copy link</button></div>
+                <p class="text-[11px] text-zinc-500">Send it to yourself (WhatsApp “Message yourself”, email or notes) and open it in the browser you use HAWK in. The link is a snapshot: after new bets, make a new one. (${Math.max(1, Math.round(link.length / 1024))} KB)</p>
+            </div>`;
+            wrap.onclick = async (e) => {
+                if (e.target === wrap || e.target.closest('[data-x]')) return wrap.remove();
+                const b = e.target.closest('[data-copy],[data-share]');
+                if (!b) return;
+                if (b.hasAttribute('data-share')) { try { await navigator.share({ title: 'My HAWK Vault', url: link }); } catch (err) { /* cancelled */ } return; }
+                try { await navigator.clipboard.writeText(link); b.textContent = 'Copied ✓'; }
+                catch (err) { prompt('Copy this link:', link); }
+            };
+            document.body.appendChild(wrap);
+        }
+        // A newer copy of the same ticket wins: settled beats pending, a later settle beats an earlier one.
+        function syncRank(b) {
+            const known = (b.legs || []).reduce((n, l) => n + ((l.hawk && l.hawk.legs) || []).filter(h => h.result || h.userDone).length, 0);
+            return [b.status !== 'PENDING' ? 1 : 0, Date.parse(b.settledAt || '') || 0, known];
+        }
+        const newer = (a, b) => { const x = syncRank(a), y = syncRank(b); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]; return false; };
+        async function receiveSync() {
+            const m = /^#sync=(.+)$/.exec(location.hash);
+            if (!m) return;
+            history.replaceState(null, '', location.pathname + location.search);
+            let data;
+            try { data = await unpackSync(m[1]); } catch (e) { alert("This sync link is damaged or cut short — make a new one on the other device."); return; }
+            if (!data || !Array.isArray(data.bets)) return;
+            const here = new Map(bets.map(b => [b.id, b]));
+            const add = data.bets.filter(b => b && b.id && !here.has(b.id));
+            const upd = data.bets.filter(b => b && here.has(b.id) && newer(b, here.get(b.id)));
+            const made = new Date(data.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+            if (!add.length && !upd.length && Math.abs((data.bankroll || 0) - bankroll) < 0.005) { alert(`📲 Sync link from ${made}: this device already has everything in it.`); return; }
+            if (!confirm(`📲 Sync link from your other device (made ${made}):\n\n• ${add.length} new ticket${add.length === 1 ? '' : 's'} to add\n• ${upd.length} ticket${upd.length === 1 ? '' : 's'} settled or updated there\n\nTickets already here are kept. Add them?`)) return;
+            add.forEach(b => bets.push(b));
+            upd.forEach(b => { const i = bets.findIndex(x => x.id === b.id); if (i >= 0) bets[i] = b; });
+            const ms = (b) => { const t = /^bet_(\d{12,})/.exec(b.id || ''); return t ? +t[1] : 0; };
+            bets.sort((a, b) => ms(b) - ms(a));
+            // HAWK's price learning: add what the other device learned.
+            for (const [k, v] of Object.entries(data.learn || {})) {
+                try {
+                    const mine = JSON.parse(localStorage.getItem(k));
+                    if (!Array.isArray(v)) continue;
+                    const have = new Set((mine || []).map(x => JSON.stringify(x)));
+                    localStorage.setItem(k, JSON.stringify([...(mine || []), ...v.filter(x => !have.has(JSON.stringify(x)))]));
+                } catch (e) { /* skip this one */ }
+            }
+            if (typeof data.bankroll === 'number' && Math.abs(data.bankroll - bankroll) >= 0.005
+                && confirm(`Bankroll: the other device has €${data.bankroll.toFixed(2)}, this one €${bankroll.toFixed(2)}.\n\nOK = use the other device's (pick this if you bet there last)\nCancel = keep this one's`)) {
+                if (Array.isArray(data.bankrollLog)) bankrollLog = data.bankrollLog;
+                logBankrollEdit(bankroll, data.bankroll, 'Synced from your other device');
+                bankroll = data.bankroll;
+                localStorage.setItem('hawk_bankroll_log', JSON.stringify(bankrollLog));
+            }
+            saveState();
+            renderUI();
+            if (!document.getElementById('view-history').classList.contains('hidden')) renderHistory();
+            alert(`✅ Synced: ${add.length} added, ${upd.length} updated. You now have ${bets.length} tickets and €${bankroll.toFixed(2)}.`);
+        }
+
         // Downloads a backup, then deletes only the Vault's own data (keys starting
         // "hawk_"). The builder's settings and anything else on this site are left alone.
         function resetVault() {
@@ -2334,6 +2484,8 @@
             if (!document.getElementById('view-history').classList.contains('hidden')) { renderTrackRecord(); renderWeekly(); }
         }).catch(() => { /* not built yet */ });
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { /* not over https */ });
+        receiveSync();                            // opened from a 📲 Sync link?
+        window.addEventListener('hashchange', receiveSync);
         setTimeout(autoSettle, 1500);             // settle finished HAWK bets…
         setInterval(autoSettle, 10 * 60 * 1000);  // …and keep checking every 10 minutes
     </script>

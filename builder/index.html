@@ -607,7 +607,14 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .bar3-legend{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:4px;padding:0 4px}
 .srcs b{color:var(--text)}
 /* upset radar */
-.up-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.up-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.up-who{font-size:13.5px;margin:-2px 0 10px;color:var(--muted)}.up-who b{color:var(--text)}
+/* the slip's one-line answer: bet it or skip it */
+.call{margin:10px 14px 4px;padding:11px 14px;border-radius:12px;font-weight:900;font-size:15px;letter-spacing:.02em;border:1px solid}
+.call small{display:block;margin-top:3px;font-weight:600;font-size:12.5px;letter-spacing:0;opacity:.9}
+.call.good{color:var(--accent);background:rgba(20,227,161,.1);border-color:rgba(20,227,161,.4)}
+.call.warn{color:var(--gold);background:rgba(255,209,102,.1);border-color:rgba(255,209,102,.4)}
+.call.bad{color:#ff8a9a;background:rgba(255,93,115,.1);border-color:rgba(255,93,115,.4)}
 .up-level{font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px}
 .up-level.low{background:rgba(20,227,161,.12);color:var(--accent)}
 .up-level.med{background:rgba(255,209,102,.14);color:var(--gold)}
@@ -1596,12 +1603,15 @@ function upsetCard(m) {
   if (!u || m.started) return "";
   const ups = u.signals.filter(s => s.dir === "up"), downs = u.signals.filter(s => s.dir === "down"), infos = u.signals.filter(s => s.dir === "info");
   return `<div class="section upset-card">
-    <div class="up-head"><h3 style="margin:0">⚡ Upset radar</h3><span class="up-level ${UPSET_TONE[u.level]}">${esc(u.label)} upset risk</span></div>
+    <div class="up-head"><h3 style="margin:0">⚡ Upset radar</h3>${u.open
+      ? `<span class="up-level med" title="Neither team is a clear favourite, so either result is no real upset">🤝 Toss-up · no clear favourite</span>`
+      : `<span class="up-level ${UPSET_TONE[u.level]}" title="How likely ${esc(u.favName)} (the favourite) are to slip up">${esc(u.label)} risk · ${esc(u.favName)} could slip up</span>`}</div>
+    <div class="up-who">Favourite: <b>${esc(u.favName)}</b> (${pct(1 - u.favFail)} to win) · Underdog: <b>${esc(u.dogName)}</b> (${pct(u.dogWin)})</div>
     <div class="up-nums">
       <div><div class="k">${esc(u.dogName)} to win</div><div class="v">${pct(u.dogWin)}</div>${u.marketDog != null ? `<div class="muted">bookmakers ${pct(u.marketDog)}</div>` : ""}</div>
       <div><div class="k">${esc(u.favName)} fail to win</div><div class="v">${pct(u.favFail)}</div><div class="muted">draw ${pct(u.draw)} + ${esc(u.dogName)} win</div></div>
     </div>
-    ${u.open ? `<div class="note" style="margin-top:6px">There's no clear favourite here — an "upset" is close to a coin flip either way.</div>` : ""}
+    ${u.open ? `<div class="note" style="margin-top:6px">${esc(u.favName)} are only slight favourites — ${esc(u.favName)} failing to win is more likely than not, so it's no real upset either way.</div>` : ""}
     <div class="up-signals">${ups.map(s => `<div class="sig up"><span>✅</span>${esc(s.text)}</div>`).join("")}${downs.map(s => `<div class="sig down"><span>✖</span>${esc(s.text)}</div>`).join("")}
       ${infos.map(s => `<div class="sig info"><span>⚠️</span>${esc(s.text)}</div>`).join("")}
       ${ups.length || downs.length ? "" : `<div class="note" style="margin:0">Nothing unusual: no rotation, team news, money, chances or form pointing either way.</div>`}</div>
@@ -1731,15 +1741,15 @@ function legVerdict(l, row, n) {
   // Form only counts with enough games (6+), and against what HAWK expects: a 36% scorer
   // who scored in 1 of 4 isn't "bad form"; a 75% leg that landed in 1 of 8 is.
   const formGap = rate != null && l.games >= 6 ? rate - l.p : 0;
-  if (has && pr.price <= HAWK.DEAD_PRICE) return { label: "Swap it", tone: "bad", why: "Bet365 pays next to nothing for it, but it can still lose the bet" };
-  if (formGap < -0.35) return { label: "Swap it", tone: "bad", why: `Only ${l.hits} of his last ${l.games}, far below HAWK's ${pct(l.p)} — the chance leans on this one matchup` };
-  if (ev != null && ev >= 0.02) return { label: "Good price", tone: "good", why: `Bet365 pays more than HAWK thinks it's worth (+${(100 * ev).toFixed(0)}%)` };
-  if (ev != null && ev < -0.15) return { label: "Weak link", tone: "warn", why: "Bet365 pays well under what it's worth" };
-  if (formGap < -0.2 || lift < -0.08) return { label: "Weak link", tone: "warn", why: formGap < -0.2 ? `HAWK gives ${pct(l.p)} but it landed in only ${l.hits} of his last ${l.games} — if this matchup doesn't play out as HAWK expects, it's the leg most likely to fail` : "It works against the legs above, so it lowers the whole builder's chance more than its own % suggests" };
+  if (has && pr.price <= HAWK.DEAD_PRICE) return { label: "🔄 Swap it", tone: "bad", why: "Bet365 pays next to nothing for it, but it can still lose the bet" };
+  if (formGap < -0.35) return { label: "🔄 Swap it", tone: "bad", why: `Only ${l.hits} of his last ${l.games}, far below HAWK's ${pct(l.p)} — the chance leans on this one matchup` };
+  if (ev != null && ev >= 0.02) return { label: "💰 Good price", tone: "good", why: `Bet365 pays more than HAWK thinks it's worth (+${(100 * ev).toFixed(0)}%)` };
+  if (ev != null && ev < -0.15) return { label: "⚠️ Weak leg", tone: "warn", why: "Bet365 pays well under what it's worth" };
+  if (formGap < -0.2 || lift < -0.08) return { label: "⚠️ Weak leg", tone: "warn", why: formGap < -0.2 ? `HAWK gives ${pct(l.p)} but it landed in only ${l.hits} of his last ${l.games} — if this matchup doesn't play out as HAWK expects, it's the leg most likely to fail` : "It works against the legs above, so it lowers the whole builder's chance more than its own % suggests" };
   if (l.p >= 0.65 && (rate == null || l.games < 6 || rate >= 0.6) && lift >= -0.04)
-    return { label: "Solid pick", tone: "good", why: `HAWK gives it ${pct(l.p)}${rate != null && l.games >= 6 ? `, his recent games back it up (${l.hits} of ${l.games})` : ""}${lift > 0.04 ? ", and it goes with the other legs" : ""}` };
-  if (l.p < 0.4) return { label: "Price leg", tone: "", why: "The least likely leg — it's the one that makes the price" };
-  return { label: "OK", tone: "", why: "A normal leg: fair chance, normal builder price" };
+    return { label: "✅ Safe", tone: "good", why: `Likely to land: HAWK gives it ${pct(l.p)}${rate != null && l.games >= 6 ? `, his recent games back it up (${l.hits} of ${l.games})` : ""}${lift > 0.04 ? ", and it goes with the other legs" : ""}` };
+  if (l.p < 0.4) return { label: "🎲 Long shot", tone: "", why: "The least likely leg — it's the one that makes the price" };
+  return { label: "👍 OK", tone: "", why: "A normal leg: fair chance, normal builder price" };
 }
 // The three scorecard tiles: Chance (HAWK's, and with the legs above) ·
 // Bet365 (its price and what it's worth) · Form (the player's last games —
@@ -1981,6 +1991,7 @@ function renderSlip() {
     <div class="ticket">
       <div class="th"><b>BET BUILDER</b><span class="odds" title="${r && r.b365 ? `About what Bet365 will show for this builder. HAWK's fair odds: ${odds(r.fair)}` : "HAWK's fair odds"}">${
         r && r.b365 ? `<small class="muted" style="font-size:11px;font-weight:600;margin-right:6px">Bet365 ≈</small>${odds(r.b365)}` : r && r.fair ? odds(r.fair) : "…"}</span></div>
+      <div id="call">${easyCall(r)}</div>
       <div class="legs">${legRows}</div>
       <div class="sum"><div><div class="k">Chance to land</div><div class="v">${r && r.p ? pct(r.p, 1) : "–"}</div></div>
         <div><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${r && r.fair ? odds(r.fair) : "–"}</div></div></div>
@@ -2111,6 +2122,23 @@ function b365Guess(fair, legs) {
   const at = (kk) => Math.max(1.01, fair * Math.exp(-kk * legs));
   return { mid: at(k), lo: at(k + Math.max(sd, 0.008)), hi: at(Math.max(0, k - Math.max(sd, 0.008))), n, cut: 1 - Math.exp(-k) };
 }
+// The slip's answer in one line: BET IT / CHECK THE PRICE / SKIP IT, and the
+// Bet365 price it needs. Uses the price you typed, or else the one HAWK expects.
+function easyCall(r) {
+  if (!r || !(r.fair > 1) || !r.p) return "";
+  const { price, boost, eff } = checkerInputs();
+  const need = r.fair * 1.02, needQuoted = 1 + (need - 1) / (1 + boost / 100);   // the Bet365 price that makes it worth it
+  const g = r.b365 > 1 ? null : b365Guess(r.fair, S.slip.length), expect = r.b365 > 1 ? r.b365 : g ? g.mid : null;
+  if (eff > 1) {
+    if (eff >= need) return `<div class="call good">✅ BET IT<small>${odds(price)}${boost ? ` + ${boost}% boost` : ""} is worth it — HAWK needs ${odds(needQuoted)} or more.</small></div>`;
+    if (eff >= r.fair) return `<div class="call warn">🤏 JUST OK<small>${odds(price)} is about fair — no real edge. Worth it from ${odds(needQuoted)}.</small></div>`;
+    return `<div class="call bad">❌ SKIP IT<small>${odds(price)} is too low — it needs ${odds(needQuoted)} or more. Tap Build again for another option.</small></div>`;
+  }
+  if (!expect) return `<div class="call warn">👉 BET IT if Bet365 shows ${odds(needQuoted)} or more</div>`;
+  if (expect >= need) return `<div class="call good">✅ BET IT if Bet365 shows ${odds(needQuoted)} or more<small>HAWK expects about ${odds(expect)} there.</small></div>`;
+  if (expect >= need * 0.95) return `<div class="call warn">🤏 CHECK THE PRICE — bet only at ${odds(needQuoted)} or more<small>HAWK expects about ${odds(expect)} — it's close.</small></div>`;
+  return `<div class="call bad">❌ PROBABLY SKIP — needs ${odds(needQuoted)}, Bet365 should pay about ${odds(expect)}<small>Tap Build again for another option, or try 💰 Value first.</small></div>`;
+}
 function guessLine(r) {
   if (r && r.b365 > 1) {
     // Bet365's own leg prices (and Unibet's for scorer / assist / shots on target) multiplied, as Bet365 builds it.
@@ -2196,6 +2224,7 @@ function verdict() {
   const { price, boost, stake, eff } = checkerInputs();
   // With a boost, the bookmaker's quoted price only has to reach this to be fair.
   const needed = r && r.fair ? 1 + (r.fair - 1) / (1 + boost / 100) : null;
+  if ($("#call")) $("#call").innerHTML = easyCall(r);
   if (!r || !r.p || !(price > 1)) {
     out.innerHTML = r && r.fair ? `<div class="note">Enter the price your bookmaker offers for this exact builder. Break-even is
       <b>${odds(needed)}</b>${boost ? ` with your ${boost}% boost (${odds(r.fair)} without)` : ""}; aim for ${odds(needed * 1.05)}+.</div>` : "";
@@ -2203,7 +2232,7 @@ function verdict() {
   }
   const ev = r.p * eff - 1;
   const good = ev > 0;
-  out.innerHTML = `<div class="verdict ${good ? "good" : "bad"}">${good ? "✅ VALUE" : "❌ OVERPRICED"} ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}%
+  out.innerHTML = `<div class="verdict ${good ? "good" : "bad"}">${ev >= 0.02 ? "✅ BET IT" : good ? "🤏 JUST OK" : "❌ SKIP IT"} · ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}%
     ${boost ? `<small>With your ${boost}% boost, ${odds(price)} pays like <b>${odds(eff)}</b>.</small>` : ""}
     <small>That price implies a ${pct(1 / eff, 1)} chance — HAWK says ${pct(r.p, 1)}.</small>
     <small>${good ? `Expected profit ≈ €${(ev * stake).toFixed(2)} on €${stake.toFixed(2)} (wins ${pct(r.p, 1)} of the time, pays €${(eff * stake).toFixed(2)}).`
@@ -2887,11 +2916,11 @@ function partRow(pt, actions) {
 // One word on a match in the acca, as on the slip's legs.
 function partVerdict(pt, price) {
   const ev = price ? price * pt.p - 1 : null, single = pt.legs.length === 1;
-  if (ev != null && ev >= 0.02) return { label: "Good price", tone: "good", why: `Bet365 pays more than HAWK thinks it's worth (+${(100 * ev).toFixed(0)}%)` };
-  if (ev != null && ev < -0.12) return { label: "Weak link", tone: "warn", why: "Bet365 pays well under what it's worth — swap it for another leg from this match" };
-  if (pt.p >= (single ? 0.7 : 0.5)) return { label: "Solid pick", tone: "good", why: single ? "Likely, at a normal price" : "A likely builder for this match" };
-  if (pt.p < (single ? 0.4 : 0.25)) return { label: "Price leg", tone: "", why: "One of the less likely parts — it's what makes the acca's price" };
-  return { label: "OK", tone: "", why: "A normal part: fair chance, normal price" };
+  if (ev != null && ev >= 0.02) return { label: "💰 Good price", tone: "good", why: `Bet365 pays more than HAWK thinks it's worth (+${(100 * ev).toFixed(0)}%)` };
+  if (ev != null && ev < -0.12) return { label: "⚠️ Weak leg", tone: "warn", why: "Bet365 pays well under what it's worth — swap it for another leg from this match" };
+  if (pt.p >= (single ? 0.7 : 0.5)) return { label: "✅ Safe", tone: "good", why: single ? "Likely, at a normal price" : "A likely builder for this match" };
+  if (pt.p < (single ? 0.4 : 0.25)) return { label: "🎲 Long shot", tone: "", why: "One of the less likely parts — it's what makes the acca's price" };
+  return { label: "👍 OK", tone: "", why: "A normal part: fair chance, normal price" };
 }
 // The short why for a match in the acca.
 function whyPart(pt, price) {
@@ -2976,7 +3005,7 @@ function accaVerdict() {
   const ev = a.p * a.eff - 1, good = ev > 0;
   // The boost that would make this price fair (Bet365 runs acca boosts on 3+ legs).
   const boostNeeded = a.price > 1 && a.fair > a.price ? 100 * ((a.fair - 1) / (a.price - 1) - 1) : 0;
-  out.innerHTML = `<div class="verdict ${good ? "good" : "bad"}">${good ? "✅ VALUE" : "❌ OVERPRICED"} ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}%
+  out.innerHTML = `<div class="verdict ${good ? "good" : "bad"}">${ev >= 0.02 ? "✅ BET IT" : good ? "🤏 JUST OK" : "❌ SKIP IT"} · ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}%
     ${!a.typed ? `<small>Using Bet365's price: ${a.legs} singles multiplied = ${odds(a.price)}.</small>` : ""}
     ${a.boost ? `<small>With your ${a.boost}% boost, ${odds(a.price)} pays like <b>${odds(a.eff)}</b>.</small>` : ""}
     <small>HAWK: lands ${pct(a.p, a.p < 0.1 ? 2 : 1)} of the time — about 1 in ${Math.round(1 / a.p)}. Pays €${(a.eff * a.stake).toFixed(2)} on €${a.stake.toFixed(2)}.</small>

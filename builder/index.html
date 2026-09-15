@@ -797,6 +797,18 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .mb-dfx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mb-done.won b{color:var(--accent)}.mb-done.lost b{color:#ff8a8a}.mb-done.co b{color:var(--gold)}
 .mb-vault{display:block;text-align:center;margin-top:14px;text-decoration:none}
+/* The builder column on other pages (Scores, Radar…) on a PC: ✕ hides it there, 🧩 Builder brings it back. Always shown on the Builder page. */
+.slip-bar,.slip-back{display:none}
+@media (min-width:821px){
+  body:not([data-view="match"]) .slip-bar{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px;padding:0 4px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .slip-bar button{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;font-size:14px}
+  .slip-bar button:hover{color:var(--text);border-color:#3a4a55}
+  body.slip-away:not([data-view="match"]) .slipcol{display:none}
+  body.slip-away:not([data-view="match"]) .slip-back{display:block;position:fixed;right:0;top:45%;z-index:14;padding:12px 8px;border-radius:12px 0 0 12px;border:1px solid #294640;border-right:0;
+    background:linear-gradient(180deg,#1d2b30,#152024);color:var(--accent);font-weight:800;font-size:12px;cursor:pointer;writing-mode:vertical-rl;box-shadow:-8px 0 20px -8px rgba(0,0,0,.7)}
+  body.drawer-open .slip-back{right:390px}
+}
+@media (min-width:1251px){body.slip-away:not([data-view="match"]) main.grid{grid-template-columns:290px minmax(0,1fr)}}
 /* 🎟 My bets drawer (wide screens): swings in from the right and stays open beside the builder */
 .bdrawer{display:none}
 body.drawer-open .bdrawer{display:block;position:fixed;right:0;bottom:0;width:390px;z-index:20;overflow:auto;padding:16px 16px 22px;
@@ -904,8 +916,9 @@ a.nav{text-decoration:none}
       HAWK simulates the match thousands of times — goals, shots, shots on target, corners and cards, player by player —
       then builds you a bet builder at the odds you want.</div>
   </section>
-  <aside class="slipcol"><div class="panel slip" id="slip"></div></aside>
+  <aside class="slipcol"><div class="slip-bar"><span>🧩 Your builder</span><button onclick="toggleSlipAway(true)" title="Hide the builder on this page (it's always there on the Builder page)">✕</button></div><div class="panel slip" id="slip"></div></aside>
 </main>
+<button class="slip-back" onclick="toggleSlipAway(false)" title="Show your builder beside this page">🧩 Builder</button>
 <button class="jump" id="jump" onclick="openMyBets()" title="Your bets in the Vault">🎟 My bets</button>
 <div id="toast"></div>
 <div id="goalfeed" aria-live="polite"></div>
@@ -999,7 +1012,9 @@ function fmtKick(iso) {
 }
 
 /* ---------- leagues & fixtures ---------- */
+function toggleSlipAway(away) { document.body.classList.toggle("slip-away", away); savePref("hawk.slipAway", away); }
 async function init() {
+  document.body.classList.toggle("slip-away", loadPref("hawk.slipAway", false));
   jumpLabel();
   const { leagues } = await api("/api/leagues");
   S.allLeagues = leagues;

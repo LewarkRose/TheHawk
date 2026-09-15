@@ -2410,7 +2410,15 @@
   const LEAGUE_OF = Object.fromEntries(Object.entries(COMPETITIONS).map(([name, cid]) => [cid, name]));
   async function scores(day) {   // day = "YYYY-MM-DD" (your local date)
     const [y, m, d] = String(day).split("-"), date = `${d}/${m}/${y}`;
-    const res = await s365("games/allscores", { competitions: Object.values(COMPETITIONS).join(","), startDate: date, endDate: date }, 10 * 1000);
+    // Now and then 365Scores answers with an empty list (a hiccup, not a day without
+    // games): that reply isn't kept, and it's asked again twice before being believed.
+    const params = { competitions: Object.values(COMPETITIONS).join(","), startDate: date, endDate: date };
+    let res = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt) { cache.delete(`${S365}/games/allscores/?${new URLSearchParams({ ...S365_PARAMS, ...params })}`); await sleep(700 * attempt); }
+      res = await s365("games/allscores", params, 10 * 1000);
+      if (res && (res.games || []).length) break;
+    }
     if (!res) throw new Error("365Scores didn't return scores — try again in a moment");
     const score = (c, g) => (g.statusGroup === 2 || !(c.score >= 0) ? null : Math.trunc(c.score));
     const qualifier = (g) => CUPS.has(LEAGUE_OF[g.competitionId]) && /qualif|prelim/i.test(g.stageName || "");

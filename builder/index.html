@@ -3325,7 +3325,11 @@ document.addEventListener("visibilitychange", () => {
 });
 async function loadScores() {
   const sc = S.scores, day = sc.day;
-  try { const data = await api(`/api/scores?day=${day}`); if (sc.day === day) { sc.data = data; sc.error = null; } }
+  try {
+    const data = await api(`/api/scores?day=${day}`);
+    // Games don't vanish: an empty answer when this day had games is a 365Scores hiccup — keep what's on screen.
+    if (sc.day === day && !(data.length === 0 && sc.data && sc.data.length && sc.dataDay === day)) { sc.data = data; sc.dataDay = day; sc.error = null; }
+  }
   catch (err) { sc.error = err.message; }
   if (S.view === "scores" && sc.day === day) renderScoreList();
 }

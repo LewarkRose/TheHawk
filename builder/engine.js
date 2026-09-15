@@ -1213,8 +1213,11 @@
   // how far off that has been on the builder prices you've typed (aim.c).
   // With aim on, auto-build builds to this price instead of HAWK's fair odds,
   // so a 3.25 target shows about 3.25 on Bet365.
+  // aim.cl: Bet365's extra builder cut per leg (it grows with every leg you add),
+  // in logs; aim.c: any cut on top of that for the whole builder.
   let aim = null;
-  function setAim(a) { aim = a && typeof a === "object" ? { c: Number.isFinite(+a.c) ? +a.c : 0 } : null; }
+  function setAim(a) { aim = a && typeof a === "object" ? { c: Number.isFinite(+a.c) ? +a.c : 0, cl: Number.isFinite(+a.cl) ? +a.cl : 0 } : null; }
+  const aimOf = (n) => (aim ? Math.exp(aim.c + aim.cl * n) : 1);
   const UNPRICED_CUT = 0.05;   // a leg nobody prices: about 5% under HAWK's fair odds
   const hasPrice = (leg) => leg.bookPrice > 1 || (leg.refPrice > 1 && !refOff(leg));
   const legB365 = (leg) => (leg.bookPrice > 1 ? leg.bookPrice : propEstimate(leg) || Math.max(1.01, Math.exp(-UNPRICED_CUT) / leg.p));
@@ -1224,7 +1227,7 @@
     for (const id of ids) { const l = legs[id]; prod *= legB365(l); pp *= l.p * (l.adj || 1); }
     return prod * Math.min(1.5, Math.max(0.3, pp / joint));
   }
-  const b365Of = (legs, ids, joint) => { const r = b365Raw(legs, ids, joint); return r && r * Math.exp(aim ? aim.c : 0); };
+  const b365Of = (legs, ids, joint) => { const r = b365Raw(legs, ids, joint); return r && r * aimOf(ids.length); };
   // What auto-build compares with your target.
   const priceOf = (legs, ids, joint) => (aim ? b365Of(legs, ids, joint) || 0 : joint > 0 ? 1 / joint : 0);
 
@@ -1329,7 +1332,7 @@
     }
     const p = Math.min(1, mean(m) * adj, ...chosen.map((id) => legs[id].p));
     const raw = b365Raw(legs, chosen, p);
-    return { p, fair: p > 0 ? 1 / p : null, legs: rows, b365: raw && raw * Math.exp(aim ? aim.c : 0), b365raw: raw, price: priceOf(legs, chosen, p) || null,
+    return { p, fair: p > 0 ? 1 / p : null, legs: rows, b365: raw && raw * aimOf(chosen.length), b365raw: raw, price: priceOf(legs, chosen, p) || null,
              guessed: chosen.filter((id) => !hasPrice(legs[id])).length };
   }
   function pruneImplied(legs, chosen, keep, n) {

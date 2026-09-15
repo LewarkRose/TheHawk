@@ -13,6 +13,11 @@
 // HAWK sends the list of matches to follow to this Worker's /follow address;
 // only requests carrying your topic are accepted.
 
+// Can't find "Variables and Secrets" in Cloudflare? Put your ntfy topic between
+// the quotes instead (like "hawk-abc123") and press Deploy.
+const MY_TOPIC = "";
+const topicOf = (env) => env.TOPIC || MY_TOPIC;
+
 const S365 = "https://webws.365scores.com/web";
 const S365_PARAMS = { appTypeId: 5, langId: 1, timezoneName: "Europe/London", userCountryId: -1 };
 const SITE = "https://lewarkrose.github.io", HAWK = `${SITE}/TheHawk/builder/`;
@@ -28,11 +33,11 @@ export default {
                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type" };
     const reply = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { ...cors, "Content-Type": "application/json" } });
     if (req.method === "OPTIONS") return new Response(null, { headers: cors });
-    if (req.method === "GET") return reply({ hawk: "alerts", topic: !!env.TOPIC, db: !!env.DB });
-    if (!env.TOPIC || !env.DB) return reply({ error: "Not set up yet: add the TOPIC variable and the DB (D1) binding." }, 500);
+    if (req.method === "GET") return reply({ hawk: "alerts", topic: !!topicOf(env), db: !!env.DB });
+    if (!topicOf(env) || !env.DB) return reply({ error: "Not set up yet: add the TOPIC variable and the DB (D1) binding." }, 500);
     let body;
     try { body = await req.json(); } catch { return reply({ error: "bad request" }, 400); }
-    if (!body || body.topic !== env.TOPIC) return reply({ error: "That topic doesn't match this Worker's TOPIC." }, 403);
+    if (!body || body.topic !== topicOf(env)) return reply({ error: "That topic doesn't match this Worker's TOPIC." }, 403);
     await initDb(env);
     const path = new URL(req.url).pathname;
     if (path === "/test") {
@@ -73,7 +78,7 @@ async function s365(path, params) {
 async function notify(env, a) {
   try {
     const r = await fetch(NTFY, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic: env.TOPIC, title: a.title, message: a.message || " ", priority: a.priority || 3, click: a.click || HAWK }) });
+      body: JSON.stringify({ topic: topicOf(env), title: a.title, message: a.message || " ", priority: a.priority || 3, click: a.click || HAWK }) });
     return r.ok;
   } catch { return false; }
 }
@@ -82,7 +87,7 @@ async function notify(env, a) {
 // Every minute
 // ---------------------------------------------------------------------------
 async function run(env) {
-  if (!env.TOPIC || !env.DB) return;
+  if (!topicOf(env) || !env.DB) return;
   await initDb(env);
   const now = Date.now();
   // What to follow: every device's latest list (a device that hasn't sent one in 5 days is dropped).

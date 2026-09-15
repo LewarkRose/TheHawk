@@ -4332,7 +4332,7 @@ function alertCard({ tone = "good", icon, word, g, clock, body, bet }) {
   card.innerHTML = `
     <button class="gx" title="Close">✕</button>
     <div class="g-top"><span class="g-ball">${icon}</span><span class="g-word">${esc(word)}</span><span class="g-min">${esc(clock || g.clock || "")}</span></div>
-    <div class="g-score"><span class="g-team">${crest("home")}${esc(g.home)}</span><b>${g.score[0] ?? 0}<i>–</i>${g.score[1] ?? 0}</b><span class="g-team away">${esc(g.away)}${crest("away")}</span></div>
+    <div class="g-score"><span class="g-team">${crest("home")}${esc(g.home)}</span><b>${g.score[0] == null ? "<i>·</i>" : `${g.score[0]}<i>–</i>${g.score[1]}`}</b><span class="g-team away">${esc(g.away)}${crest("away")}</span></div>
     <div class="g-who">${body}</div>
     ${bet && bet.p != null ? `<div class="g-bet">🎟 Your bet: <b>${pct(bet.p, bet.p < 0.1 ? 1 : 0)}</b> to land now${bet.ret ? ` · worth ≈ €${(bet.p * bet.ret).toFixed(2)}` : ""}</div>` : ""}
     <div class="g-bar"><i></i></div>`;
@@ -4346,7 +4346,7 @@ function alertCard({ tone = "good", icon, word, g, clock, body, bet }) {
   flashTitle(`${icon} ${word}`);
   if (document.hidden || !document.hasFocus()) {
     const tmp = document.createElement("div"); tmp.innerHTML = body;
-    systemNotify(`${icon} ${word} · ${g.home} ${g.score[0] ?? 0}–${g.score[1] ?? 0} ${g.away}`,
+    systemNotify(`${icon} ${word} · ${g.home} ${g.score[0] == null ? "v" : `${g.score[0]}–${g.score[1]}`} ${g.away}`,
                  [tmp.textContent, bet && bet.p != null ? `🎟 Your bet: ${pct(bet.p)} to land now` : ""].filter(Boolean).join("\n"),
                  { tag: `${word}-${g.id}`, url: `?view=live&id=${g.id}&league=${encodeURIComponent(g.league)}` });
   }
@@ -4360,10 +4360,17 @@ window.addEventListener("storage", (e) => {
     const old = before.find(x => x.id === b.id);
     if (!old || old.status !== "PENDING" || (b.status !== "WON" && b.status !== "LOST") || !firstTime(`settled|${b.id}`)) continue;
     const l = (b.legs || []).find(x => x.hawk) || {}, h = l.hawk || {};
-    const g = { id: h.game, league: h.league, home: h.home || l.fixture || "", away: h.away || "", homeCrest: "", awayCrest: "", status: 4,
-                score: (h.score || "").split("-").map(Number).concat([null, null]).slice(0, 2), clock: "FT" };
-    alertCard(b.status === "WON" ? { tone: "good", icon: "🎉", word: "BET WON", g, body: `Returns <b>€${(+b.potentialReturn).toFixed(2)}</b> <span>· booked in your Vault</span>` }
-                                 : { tone: "bad", icon: "❌", word: "BET LOST", g, body: `€${(+b.stake).toFixed(2)} stake <span>· booked in your Vault</span>` });
+    (async () => {
+      // The final score and crests: from the bet if the Vault saved them, else from Scores, else from 365Scores.
+      let score = /^\d+-\d+$/.test(h.score || "") ? h.score.split("-").map(Number) : null;
+      const sg = [...((S.scores && S.scores.data) || []), ...(goalState.games || [])].find(x => String(x.id) === String(h.game));
+      if (!score && sg && sg.status === 4 && sg.score[0] != null) score = sg.score;
+      if (!score && h.game && window.HawkSettle) { try { const f = await HawkSettle.fetchMatchFacts(h.game); if (f && f.ft) score = f.ft; } catch { /* no score then */ } }
+      const g = { id: h.game, league: h.league, home: h.home || l.fixture || "", away: h.away || "", homeCrest: (sg && sg.homeCrest) || "", awayCrest: (sg && sg.awayCrest) || "",
+                  status: 4, score: score || [null, null], clock: "FT" };
+      alertCard(b.status === "WON" ? { tone: "good", icon: "🎉", word: "BET WON", g, body: `Returns <b>€${(+b.potentialReturn).toFixed(2)}</b> <span>· booked in your Vault</span>` }
+                                   : { tone: "bad", icon: "❌", word: "BET LOST", g, body: `€${(+b.stake).toFixed(2)} stake <span>· booked in your Vault</span>` });
+    })();
   }
 });
 async function goalAlert(g, side, score, fast = false) {

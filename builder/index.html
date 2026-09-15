@@ -893,7 +893,7 @@ function foldFixtures(fold) {
 function loadPref(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } }
 function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
-            target: 3.25, style: "Balanced", focus: "Mix", maxLegs: 10, favourite: true, result: null, tab: "players", q: "",
+            target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), favourite: true, result: null, tab: "players", q: "",
             chk: { price: "", boost: "", stake: "5" }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
@@ -1013,9 +1013,16 @@ async function init() {
   const last = loadPref("hawk.league", leagues[0]);
   await selectLeague(leagues.includes(last) ? last : leagues[0]);
   checkLineups();
-  setInterval(checkLineups, 120000);
-  setInterval(checkGoals, GOALS_MS); setTimeout(checkGoals, 4000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkGoals(); });
+  // Goals every 12 s, lineups every minute. The beat comes from a tiny Web Worker:
+  // browsers slow a background tab's own timers to once a minute, but not a
+  // worker's, so alerts stay quick while HAWK sits in another tab.
+  let beat = 0;
+  const tick = () => { checkGoals(); if (++beat % 5 === 0) checkLineups(); if (beat % 25 === 0) linkVaultBets(); };
+  linkVaultBets();
+  try { new Worker(URL.createObjectURL(new Blob([`setInterval(() => postMessage(0), ${GOALS_MS})`], { type: "text/javascript" }))).onmessage = tick; }
+  catch { setInterval(tick, GOALS_MS); }
+  setTimeout(checkGoals, 4000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { checkGoals(); checkLineups(); } });
   openFromUrl();
 }
 // "Open in HAWK" from a Vault ticket: builder/?match=ID&league=L&legs=a,b
@@ -1582,7 +1589,7 @@ function lineupCard(m, live = null) {
         <rect x="22" y="1" width="56" height="16"/><rect x="38" y="1" width="24" height="6"/><rect x="22" y="143" width="56" height="16"/><rect x="38" y="153" width="24" height="6"/></svg>
       ${["home", "away"].map(side => pitchSpots(m.players[side] || []).map(spot => marker(side, spot)).join("")).join("")}
     </div>
-    <div class="lu-legend">${live ? "⚽ goal · 🅰️ assist · 🟨 🟥 cards · ↑ came on · ↓ went off · 🎟 in your bet — updates every 30 seconds"
+    <div class="lu-legend">${live ? "⚽ goal · 🅰️ assist · 🟨 🟥 cards · ↑ came on · ↓ went off · 🎟 in your bet — updates every 15 seconds"
       : "⚽ chance to score · 🎯 1+ shot on target · 🧤 2+ saves · 🟨 30%+ to be booked · ❓ doubtful · 🆕 not in the team's last 5 games — tap any player for his record and legs"}</div>
     <div class="lu-teams">${team("home")}${team("away")}</div>
   </div>`;
@@ -2027,7 +2034,7 @@ function renderSlip() {
     S.ep = e.target.checked; savePref("hawk.ep", S.ep); HAWK.setEarlyPayout(S.ep);
     if (S.match) openMatch(S.match.id, true);   // re-run the match with (or without) it
   };
-  $("#mx").onchange = (e) => { S.maxLegs = +e.target.value; };
+  $("#mx").onchange = (e) => { S.maxLegs = +e.target.value; savePref("hawk.maxLegs", S.maxLegs); };
   $("#go").onclick = build;
   $("#slip").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => removeLeg(b.dataset.rm));
   $("#slip").querySelectorAll("[data-swap]").forEach(b => b.onclick = () => swapLeg(b.dataset.swap));
@@ -3403,8 +3410,8 @@ async function showReport(id) {
 /* ---------- live (in-play) ---------- */
 // For a match in progress: score, clock and live stats, HAWK's live chances,
 // and every Bet365 in-play price against them (value first, with a stake).
-// Refreshes every 30 seconds while it's on screen.
-const INPLAY_MS = 30 * 1000;
+// Refreshes every 15 seconds while it's on screen.
+const INPLAY_MS = 15 * 1000;
 async function showInPlay(id) {
   S.view = "inplay";
   if (!S.inplay || S.inplay.id !== String(id)) S.inplay = { id: String(id), data: null, timer: null };
@@ -3493,7 +3500,7 @@ function cashOutSection() {
       <div class="co-offer"><label>Bet365 cash-out offer (€)</label><input inputmode="decimal" data-offer="${esc(t.id)}" value="${esc(S.inplay.offers[t.id] || "")}" placeholder="e.g. 4.20"></div>
       <div data-verdict="${esc(t.id)}">${verdict}</div></div>`;
   }).join("")}
-    <div class="note">Only the goal legs are linked to each other; everything else is treated as independent, so take the % as a guide. Chances update every 30 seconds.</div></div>`;
+    <div class="note">Only the goal legs are linked to each other; everything else is treated as independent, so take the % as a guide. Chances update every 15 seconds.</div></div>`;
 }
 function bindCashOut() {
   document.querySelectorAll("[data-done]").forEach(b => b.onclick = async () => {
@@ -3614,7 +3621,7 @@ function renderInPlay() {
       <div class="side"><img src="${esc(d.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(d.home)}</div>${d.reds && d.reds[0] ? `<div>${"🟥".repeat(d.reds[0])}</div>` : ""}${scorers("home")}</div>
       <div class="mid">${d.live ? `<div class="ip-score">${d.score[0]} – ${d.score[1]}</div><div class="ip-clock">🔴 ${esc(d.clock || "")} ${esc(d.statusText || "")}</div>`
         : `<div class="x">VS</div><div class="ko">${esc(d.statusText || "")}</div>`}
-        <div class="ko" style="margin-top:6px">${d.checked ? `checked ${new Date(d.checked).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · every 30s` : ""}</div>
+        <div class="ko" style="margin-top:6px">${d.checked ? `checked ${new Date(d.checked).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · every 15s` : ""}</div>
         ${prematch}</div>
       <div class="side"><img src="${esc(d.awayCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(d.away)}</div>${d.reds && d.reds[1] ? `<div>${"🟥".repeat(d.reds[1])}</div>` : ""}${scorers("away")}</div>
     </div></div>`;
@@ -3662,7 +3669,7 @@ function renderInPlay() {
       ${statRow("Fouls", "Fouls")}${statRow("Yellow Cards", "Yellow cards")}${statRow("Offsides", "Offsides")}${statRow("Goalkeeper Saves", "Saves")}
       ${!Object.keys(st).length ? `<div class="note">${tab === "all" ? "No live stats yet." : tab === "h2" && /1st/i.test(d.statusText || "") ? "The 2nd half hasn't started yet." : "Loading…"}</div>` : ""}</div>
     <div class="section"><h3>💰 Live value at Bet365</h3>
-      ${value.length ? headRow + value.map(row).join("") : `<div class="note">Nothing at Bet365 beats HAWK's live chances by 2%+ right now. That's normal — in-play prices are sharp. Checking again every 30 seconds.</div>`}
+      ${value.length ? headRow + value.map(row).join("") : `<div class="note">Nothing at Bet365 beats HAWK's live chances by 2%+ right now. That's normal — in-play prices are sharp. Checking again every 15 seconds.</div>`}
     </div>
     <div class="section"><h3>All live prices</h3>${rest.length ? headRow + rest.map(row).join("") : '<div class="note">Bet365 has no live prices for this match right now (often suspended just after a goal or a chance).</div>'}
       <div class="note">Stake = ${KELLY_FRACS.find(([f]) => f === S.kellyFrac)[1]} Kelly on your Vault bankroll, max 5%. In-play prices change every few seconds and get suspended after chances, so check the price is still there.
@@ -3860,7 +3867,7 @@ function toggleLearning() {
   else renderSlip();
 }
 // A bet settled in the Vault (another tab) may change what HAWK has learned.
-window.addEventListener("storage", (e) => { if (e.key === "hawk_bets") { applyLearning(); renderSlip(); jumpLabel(); } });
+window.addEventListener("storage", (e) => { if (e.key === "hawk_bets") { applyLearning(); renderSlip(); jumpLabel(); linkVaultBets(); } });
 
 /* ---------- price alerts ---------- */
 // Star a leg that has a Bet365 price and HAWK tells you (sound, title flash,
@@ -4015,9 +4022,9 @@ async function lineupsIn(w, source) {
 /* ---------- goal alerts ---------- */
 // A goal pops up bottom-right (top on a phone) for the matches you follow: ones
 // you have a HAWK bet on, a lineup alert on, or the live view open. It says who
-// scored and what the goal did to your bet. Checked every 30 s from the same
+// scored and what the goal did to your bet. Checked every 12 s from the same
 // scores feed as the Scores page; a goal taken off (VAR) shows too.
-const GOALS_MS = 30 * 1000, GOAL_SHOW_MS = 15000;
+const GOALS_MS = 12 * 1000, GOAL_SHOW_MS = 15000;
 const goalState = { last: {}, busy: false, on: loadPref("hawk.goalAlerts", true) };
 // 🔔 on a live match (live view, Scores): goal and red-card alerts for it,
 // even after you leave its page. A match you have a bet on is always followed.
@@ -4494,6 +4501,47 @@ function closeModal() { document.querySelectorAll(".modal-bg").forEach(x => x.re
 // Your Vault tickets without leaving the builder: the ones still running first
 // (🔴 when a match is on — tap for the live view), then the last few settled.
 function vaultBets() { try { return JSON.parse(localStorage.getItem("hawk_bets")) || []; } catch { return []; } }
+// Bets you typed into the Vault yourself (not sent from here) have just the
+// fixture's name and the selections as text. HAWK finds the match (yesterday,
+// today or tomorrow) and reads the selections it understands, so the bet shows
+// on Scores (🎟) and in the live view, gets goal alerts, and the Vault settles
+// it. A selection HAWK can't read is left for you to settle ("no result data").
+let linking = false;
+async function linkVaultBets() {
+  if (linking) return;
+  const open = (bets) => bets.filter(b => b.status === "PENDING" && (b.legs || []).some(l => !l.hawk && l.fixture));
+  if (!open(vaultBets()).length) return;
+  linking = true;
+  try {
+    let games = [];
+    for (const k of [-1, 0, 1]) { const d = new Date(); d.setDate(d.getDate() + k); try { games = games.concat(await HAWK.scores(localDay(d))); } catch { /* try later */ } }
+    const found = {};
+    for (const b of open(vaultBets())) for (const l of b.legs) {
+      if (l.hawk || !l.fixture) continue;
+      const [h, a] = String(l.fixture).split(/\s+(?:vs?\.?|-)\s+/i);
+      if (!h || !a) continue;
+      const best = games.map(g => ({ g, s: HAWK.nameSimilarity(h, g.home) + HAWK.nameSimilarity(a, g.away) })).sort((x, y) => y.s - x.s)[0];
+      if (!best || best.s < 1.2) continue;
+      const g = best.g, ev = await HAWK.gameEvents(g.id).catch(() => null);
+      const players = ev && ev.players ? ev.players : { home: [], away: [] }, haveXI = players.home.length + players.away.length > 0;
+      const parts = String(l.selection || "").split(/\s*&\s*/).filter(Boolean);
+      // Player selections need the lineups: wait for them (they're out about an hour before kick-off).
+      if (!haveXI && parts.some(HAWK.isPlayerText)) continue;
+      const legs = parts.map(t => HAWK.readLeg(t, { home: g.home, away: g.away, players }) || { id: `text:${t}`, label: t, market: "", player: null, side: null });
+      found[`${b.id}|${l.fixture}`] = { game: String(g.id), league: g.league, home: g.home, away: g.away, kickoff: g.kickoff, linked: true, legs };
+    }
+    if (!Object.keys(found).length) return;
+    // Save into the freshest copy of your bets (the Vault may have changed them meanwhile).
+    const bets = vaultBets();
+    for (const b of bets) for (const l of b.legs || []) { const f = found[`${b.id}|${l.fixture}`]; if (f && !l.hawk) l.hawk = f; }
+    try { localStorage.setItem("hawk_bets", JSON.stringify(bets)); } catch { return; }
+    const n = Object.keys(found).length;
+    toast(`🔗 Linked ${n} bet${n > 1 ? "s" : ""} from your Vault to ${n > 1 ? "their matches" : "its match"}`);
+    jumpLabel();
+    if (S.view === "scores") renderScoreList();
+    if (S.view === "inplay" && S.inplay) refreshInPlay();
+  } finally { linking = false; }
+}
 function jumpLabel() {
   const n = vaultBets().filter(b => b.status === "PENDING").length;
   $("#jump").innerHTML = `🎟 My bets${n ? ` <span class="jn">${n}</span>` : ""}`;

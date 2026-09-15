@@ -1206,6 +1206,56 @@
   }
   const adjOf = (legs, ids) => ids.reduce((s, id) => s * ((legs[id] && legs[id].adj) || 1), 1);
 
+  // A selection typed as text (a bet you entered in the Vault yourself, e.g.
+  // "Gyokeres Over 1.5 Shots on Target") → a HAWK leg the Vault can settle, or
+  // null when HAWK can't read it. ctx = {home, away, players: {home: [{name}], away}}.
+  const TEXT_PLAYER = [[/ to score or (?:give an )?assist$/i, "soa", "Score or Assist"], [/ to score(?: anytime| at any time)?$/i, "score", "To Score at Any Time"],
+    [/ to (?:give an )?assist$/i, "assist", "Player to Assist"], [/ to be (?:booked|carded|shown a card)$/i, "booked", "Player to be Booked"]];
+  const TEXT_COUNT = { "shots on target": ["sot", "Player Shots on Target"], shots: ["shots", "Player Shots"], tackles: ["tackles", "Player Tackles"],
+    fouls: ["fouls", "Player Fouls Committed"], "fouls committed": ["fouls", "Player Fouls Committed"], "fouls won": ["fouled", "Player Fouls Won"],
+    saves: ["saves", "Goalkeeper Saves"], offsides: ["offsides", "Player Offsides"] };
+  function readLeg(text, ctx) {
+    const t = String(text || "").replace(/\s*\([^)]*\)\s*$/, "").replace(/\s+/g, " ").trim();   // "Over 3.5 Goals (4+)" → "Over 3.5 Goals"
+    const side = (name) => {
+      const n = String(name || "").trim();
+      if (/^home(?: team)?$/i.test(n)) return "home";
+      if (/^away(?: team)?$/i.test(n)) return "away";
+      const h = nameSimilarity(n, ctx.home), a = nameSimilarity(n, ctx.away);
+      return Math.max(h, a) >= 0.6 ? (h >= a ? "home" : "away") : null;
+    };
+    const ou = (s) => (/^o/i.test(s) ? "o" : "u");
+    // Bet365's whole-number lines ("Over 4 corners" = 5+, "Under 6 cards" = 5 or fewer) as HAWK's .5 lines.
+    const val = (o, v) => { const x = parseFloat(v); return Number.isInteger(x) ? (o === "o" ? x + 0.5 : x - 0.5) : x; };
+    const leg = (id, market, extra = {}) => ({ id, label: String(text).trim(), market, player: null, side: null, ...extra });
+    const findP = (who) => { for (const s of ["home", "away"]) { const p = ((ctx.players || {})[s] || []).find((x) => samePlayer(who, x.name)); if (p) return { side: s, name: p.name }; } return null; };
+    let m;
+    if (/^(?:result:\s*)?draw$/i.test(t)) return leg("res:draw", "Full Time Result");
+    if ((m = /^(?:result:\s*)?(.+?) to win by (\d)\+(?: goals?)?$/i.exec(t)) && side(m[1])) return leg(`ah:${side(m[1])}:-${+m[2] - 0.5}`, "Handicap");
+    if ((m = /^(home|away) win$/i.exec(t) || /^result:\s*(.+)$/i.exec(t) || /^(.+?) to win$/i.exec(t)) && side(m[1])) return leg(`res:${side(m[1])}`, "Full Time Result");
+    if ((m = /^double chance:?\s*(.+?)\s*\/\s*draw$/i.exec(t) || /^double chance:?\s*draw\s*\/\s*(.+)$/i.exec(t) || /^(.+?) or draw$/i.exec(t)) && side(m[1])) return leg(`dc:${side(m[1])}`, "Double Chance");
+    if ((m = /^both teams to score\s*[-:]?\s*(yes|no)?$/i.exec(t))) return leg(`btts:${(m[1] || "yes").toLowerCase()}`, "Both Teams to Score");
+    if ((m = /^(over|under) ([\d.]+) (?:match |total )?(goals|shots on target|corners|cards)$/i.exec(t))) {
+      const o = ou(m[1]), k = { goals: ["goals", "Total Goals"], "shots on target": ["sot", "Match Shots on Target"], corners: ["corners", "Corners"], cards: ["cards", "Total Cards"] }[m[3].toLowerCase()];
+      return leg(`${k[0]}:${o}${val(o, m[2])}`, k[1]);
+    }
+    if ((m = /^(.+?) (over|under) ([\d.]+) (goals|corners|cards)$/i.exec(t)) && side(m[1]) && !findP(m[1])) {
+      const s = side(m[1]), o = ou(m[2]), v = val(o, m[3]), kind = m[4].toLowerCase();
+      if (kind === "goals") return o === "o" ? leg(`team:${s}:o${v}`, "Team Goals") : null;
+      return leg(`t${kind}:${s}:${o}${v}`, kind === "corners" ? "Team Corners" : "Team Cards");
+    }
+    for (const [re, stat, market] of TEXT_PLAYER) {
+      const i = t.search(re);
+      if (i > 0) { const p = findP(t.slice(0, i).trim()); return p ? leg(`p:${p.side}:0:${stat}`, market, { player: p.name, side: p.side }) : null; }
+    }
+    if ((m = /^(.+?):? (?:over ([\d.]+)|(\d+)\+) (shots on target|shots|tackles|fouls committed|fouls won|fouls|saves|offsides)$/i.exec(t))) {
+      const p = findP(m[1]), k = m[2] != null ? Math.floor(parseFloat(m[2])) + 1 : +m[3], st = TEXT_COUNT[m[4].toLowerCase()];
+      return p && k >= 1 ? leg(`p:${p.side}:0:${st[0]}${k}`, st[1], { player: p.name, side: p.side }) : null;
+    }
+    return null;
+  }
+  // Does this text look like a player leg (so HAWK should wait for the lineups before reading it)?
+  const isPlayerText = (text) => TEXT_PLAYER.some(([re]) => re.test(String(text).trim())) || / (?:over [\d.]+|\d+\+) (?:shots|tackles|fouls|saves|offsides)/i.test(String(text));
+
   // Bet365's likely price for a builder: each leg at Bet365's own price (match
   // legs), Unibet's turned into Bet365's (scorer, assist, shots on target) or
   // HAWK's estimate, multiplied together and corrected for legs that go
@@ -1310,7 +1360,7 @@
     return Math.max(1.01, Math.round(100 / q) / 100);
   }
   // A leg Bet365 pays this little for adds nothing to the builder's price but can still lose it.
-  const DEAD_PRICE = 1.03;
+  const DEAD_PRICE = 1.03, FILLER_PRICE = 1.10;
   const valueScore = (leg) => {
     const est = leg.bookPrice > 1 ? null : propEstimate(leg);
     return (leg.bookPrice > 1 ? leg.bookPrice * leg.p - 1 : est ? est * leg.p - 1 : UNPRICED_EDGE) + (leg.agree === true ? 0.015 : leg.agree === false ? -0.015 : 0);
@@ -1366,6 +1416,11 @@
       let want = nPlayers < minPlayers || nMatch >= maxMatch ? "player" : null;
       if (focus === "Match") want = "match";
       let best = null, bestScore = null;
+      // With only a few legs left, each one has to move the price enough to still
+      // reach the target (a 4-leg cap at 8.00 needs about ×1.7 a leg), so the
+      // safest legs that keep the target in reach come first — not simply the safest.
+      const slotsLeft = Math.max(1, maxLegs - chosen.length), priceNow = chosen.length ? priceOf(legs, chosen, pNow) || 1 : 1;
+      const needStep = Math.log(Math.max(1.0001, target / priceNow)) / slotsLeft;
       // Legs with a known price first (Bet365's own, or Unibet's): they're the
       // ones you'll find on Bet365 at about the price HAWK expects. Then at most
       // ONE guessed leg (tackles, fouls, saves…) — one you've found on Bet365
@@ -1380,15 +1435,21 @@
           if (chosen.includes(leg.id) || banned.has(leg.id) || groups.has(leg.group) || leg.low_data || (leg.extra && !extras)) continue;
           if (!hasPrice(leg) && !allowed(leg)) continue;
           if (want && leg.kind !== want) continue;
-          if (leg.kind === "player") { const est = propEstimate(leg); if (est && est <= DEAD_PRICE) continue; }   // Bet365 pays ~nothing for it
+          // Filler: a leg Bet365 pays 1.10 or less for (1+ tackles, 1+ shots, 2+ saves…) barely moves the
+          // price but can still lose the bet — auto-build leaves it out (you can still add it yourself).
+          if (legB365(leg) <= FILLER_PRICE) continue;
+          // Team Over 0.5 / 1.5 cards: land far less often than they look (graded: HAWK said 54%, 42% landed).
+          if (/^tcards:(home|away):o/.test(leg.id)) continue;
           const k = playerKey(leg);
           if (k && (perPlayer[k] || 0) >= MAX_LEGS_PER_PLAYER) continue;
           let c = 0; const a = leg.arr;
           for (let s = 0; s < n; s++) c += m[s] & a[s];
           const joint = (c / n) * adjNow * (leg.adj || 1), cond = joint / pNow;
           if (cond < lo || cond > hi) continue;
-          const reaches = joint > 0 && priceOf(legs, [...chosen, leg.id], joint) >= target, t = trust[leg.market] || 1;
-          const score = picks === "value" ? [reaches ? 1 : 0, valueScore(leg) - (1 - t), cond] : [reaches ? 1 : 0, (reaches ? joint : cond) * t];
+          const pr = joint > 0 ? priceOf(legs, [...chosen, leg.id], joint) : 0, reaches = pr >= target, t = trust[leg.market] || 1;
+          const step = pr > 0 ? Math.log(pr / priceNow) : 0, keepsReach = step >= needStep * 0.98;
+          const score = picks === "value" ? [reaches ? 1 : 0, valueScore(leg) - (1 - t), cond]
+            : reaches ? [2, joint * t] : keepsReach ? [1, cond * t] : [0, step];
           if (!bestScore || isBetter(score, bestScore)) { best = leg.id; bestScore = score; }
         }
         if (best) break;
@@ -2426,7 +2487,7 @@
   }
 
   global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, refOff, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
-                  scores, matchReport, ticketLive, gameEvents, halfStats,
+                  scores, matchReport, ticketLive, gameEvents, halfStats, readLeg, isPlayerText, nameSimilarity,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   startRadar, radarStatus: () => jobStatus(radarJob), stopRadar: () => { radarJob.stop = true; return jobStatus(radarJob); },

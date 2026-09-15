@@ -169,6 +169,10 @@
         .vbet > summary .fx { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #e4e4e7; }
         .vbet[open] > summary { border-color: rgba(201,160,92,.35); }
         .vbet > div { margin-top: 6px; }
+        .tr-fold > summary { list-style: none; cursor: pointer; }
+        .tr-fold > summary::-webkit-details-marker { display: none; }
+        .tr-fold .tr-hide, .tr-fold[open] .tr-show { display: none; }
+        .tr-fold[open] .tr-hide { display: inline; }
         .vsec { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #71717a; margin: 10px 2px 2px; }
     </style>
     <!-- Icons: new names / ?v= so browsers drop the old cached logo -->
@@ -450,11 +454,13 @@
                 <div id="beat-bet365-container" class="pt-1"></div>
             </div>
 
-            <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
-                <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🎯</span> HAWK Track Record</h3>
+            <!-- One line (do HAWK's chances come true?); tap for the full record -->
+            <details class="tr-fold bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
+                <summary class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🎯</span><span id="track-record-line" class="min-w-0">HAWK Track Record</span>
+                    <span class="text-[11px] text-[#d9b571] font-semibold ml-auto shrink-0"><span class="tr-show">details ▸</span><span class="tr-hide">hide ▾</span></span></summary>
                 <p class="text-[10px] text-zinc-500">Bets sent from the HAWK builder settle themselves after the match. This checks whether HAWK's chances come true — its 70% legs should land about 70% of the time. HAWK also grades its own predictions on every match. 🧠 Once a market has 30+ graded legs, the builder corrects that market's chances by what actually happened.</p>
                 <div id="track-record-container" class="space-y-2 pt-1"></div>
-            </div>
+            </details>
 
             <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
                 <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🌍</span> Performance by League</h3>
@@ -1901,6 +1907,18 @@
                 ${tickets.length ? `<div class="text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 mt-2">Tickets: HAWK expected
                     <b>${expWins.toFixed(1)}</b> of your ${tickets.length} settled HAWK tickets to win — <b class="${wins >= expWins ? 'text-emerald-400' : 'text-red-400'}">${wins}</b> did.</div>` : ''}`;
             el.innerHTML = gradedBlock() + `<div class="text-xs font-bold text-white pt-4">🎟 Your HAWK bets</div>` + yours;
+            const line = document.getElementById('track-record-line');
+            if (line) line.innerHTML = trackLine();
+        }
+        // The folded one-liner: across every graded match, how far HAWK's chances
+        // were from what landed (the worst chance band with 50+ legs).
+        function trackLine() {
+            const g = gradedAll, bands = g && g.bands ? g.bands.filter(b => b.n >= 50) : [];
+            if (!bands.length) return `HAWK Track Record <span class="text-zinc-500 font-normal">· first results soon</span>`;
+            const gap = Math.max(...bands.map(b => Math.abs(b.won / b.n - b.p / b.n))), pts = Math.max(1, Math.round(100 * gap));
+            return gap <= 0.05
+                ? `HAWK's chances come true <span class="text-zinc-400 font-normal">· ${g.legs.toLocaleString()} legs checked, within ${pts}% <span class="text-emerald-400">✓</span></span>`
+                : `HAWK's chances: off by up to ${pts}% <span class="text-zinc-400 font-normal">· ${g.legs.toLocaleString()} legs checked — the builder corrects for it</span>`;
         }
         // One "HAWK said X% · landed Y%" row; the white mark on the bar is what HAWK said.
         function calRow(label, n, said, got) {

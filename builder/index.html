@@ -797,6 +797,19 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .mb-dfx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mb-done.won b{color:var(--accent)}.mb-done.lost b{color:#ff8a8a}.mb-done.co b{color:var(--gold)}
 .mb-vault{display:block;text-align:center;margin-top:14px;text-decoration:none}
+/* 🎟 My bets drawer (wide screens): swings in from the right and stays open beside the builder */
+.bdrawer{display:none}
+body.drawer-open .bdrawer{display:block;position:fixed;right:0;bottom:0;width:390px;z-index:20;overflow:auto;padding:16px 16px 22px;
+  background:linear-gradient(180deg,#18242a,#12191d);border-left:1px solid var(--line);box-shadow:-24px 0 48px -20px rgba(0,0,0,.8)}
+.bdrawer.anim{transform-origin:100% 50%;animation:bdIn .55s cubic-bezier(.2,.8,.2,1) both}
+@keyframes bdIn{from{opacity:0;transform:perspective(1400px) rotateY(-32deg) translateX(70px)}to{opacity:1;transform:none}}
+.bdrawer .mb-card{position:relative;background:linear-gradient(180deg,#223038,#19242a);border-color:#2c3c45;
+  box-shadow:0 14px 26px -16px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.06)}
+.bdrawer.anim .mb-card{animation:tkIn .5s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(.15s + var(--i, 0) * 80ms)}
+@keyframes tkIn{from{opacity:0;transform:perspective(900px) rotateX(-40deg) translateY(-14px)}to{opacity:1;transform:none}}
+@media (min-width:1700px){body.drawer-open main.grid{padding-right:412px}}
+.nav.betsnav.on{color:var(--gold);border-color:rgba(255,209,102,.45)}
+@media (prefers-reduced-motion:reduce){.bdrawer.anim,.bdrawer.anim .mb-card{animation:none}}
 /* mid-size screens: page buttons show icons only (names on hover), except the open one */
 @media (max-width:1180px) and (min-width:821px){.nav span{display:none}.nav.on span{display:inline}.nav{padding:7px 11px}}
 /* small phones: icon over a small label, so all five pages fit in one row */
@@ -1034,7 +1047,8 @@ async function init() {
   // browsers slow a background tab's own timers to once a minute, but not a
   // worker's, so alerts stay quick while HAWK sits in another tab.
   let beat = 0;
-  const tick = () => { checkGoals(); if (++beat % 5 === 0) checkLineups(); if (beat % 25 === 0) linkVaultBets(); };
+  const tick = () => { checkGoals(); renderDrawer(); if (++beat % 5 === 0) checkLineups(); if (beat % 25 === 0) linkVaultBets(); };
+  if (loadPref("hawk.drawer", false) && WIDE()) toggleDrawer(true);
   linkVaultBets();
   try { new Worker(URL.createObjectURL(new Blob([`setInterval(() => postMessage(0), ${GOALS_MS})`], { type: "text/javascript" }))).onmessage = tick; }
   catch { setInterval(tick, GOALS_MS); }
@@ -4608,8 +4622,12 @@ function jumpLabel() {
   const n = vaultBets().filter(b => b.status === "PENDING").length;
   $("#jump").innerHTML = `🎟 My bets${n ? ` <span class="jn">${n}</span>` : ""}`;
   const nb = $("#navBetsN"); if (nb) { nb.textContent = n; nb.hidden = !n; }   // the same button in the page menu (PC)
+  if (typeof renderDrawer === "function") renderDrawer();
 }
-function openMyBets() {
+// 🎟 My bets: a popup on phones and tablets; on a wide screen a drawer on the
+// right that stays open beside the builder (it swings in, and its tickets lean
+// towards the mouse like the slip's cards).
+function myBetsHTML(drawer = false) {
   const bets = vaultBets(), pend = bets.filter(b => b.status === "PENDING"), done = bets.filter(b => b.status !== "PENDING").slice(0, 8);
   const mark = (h) => h.userDone || h.result === "won" ? `<span class="mb-m won">✓</span>` : h.result === "lost" ? `<span class="mb-m lost">✗</span>`
     : h.result === "void" ? `<span class="mb-m">⊘</span>` : `<span class="mb-m">·</span>`;
@@ -4635,23 +4653,52 @@ function openMyBets() {
   const result = (b) => b.status === "WON" ? ["won", "✅", `+€${(b.potentialReturn - b.stake).toFixed(2)}`]
     : b.status === "CASHED_OUT" ? ["co", "💰", `${(b.cashOutAmount || 0) - b.stake >= 0 ? "+" : "−"}€${Math.abs((b.cashOutAmount || 0) - b.stake).toFixed(2)}`]
     : ["lost", "❌", `−€${b.stake.toFixed(2)}`];
-  modal(`<div class="mhead" style="justify-content:space-between"><h2 style="margin:0">🎟 My bets</h2><button class="ghost" data-close style="width:auto;padding:6px 12px">✕</button></div>
+  return `<div class="mhead" style="justify-content:space-between"><h2 style="margin:0">🎟 My bets</h2><button class="ghost" ${drawer ? "data-drclose" : "data-close"} style="width:auto;padding:6px 12px" title="Close">✕</button></div>
     <div style="margin-top:14px">${slipBtn}
     <h3 class="mb-h">Still running (${pend.length})</h3>
-    ${pend.length ? pend.map(b => `<div class="mb-card">
+    ${pend.length ? pend.map((b, i) => `<div class="mb-card tilt3d" style="--i:${i}">
         <div class="mb-top"><span><b>€${b.stake.toFixed(2)}</b> @ <b>${odds(b.odds)}</b></span><span class="muted">returns <b style="color:var(--gold)">€${b.potentialReturn.toFixed(2)}</b></span></div>
         ${(b.legs || []).map(part).join("")}</div>`).join("")
       : `<div class="note">Nothing running. Tickets you send to the Vault show here.</div>`}
     ${done.length ? `<h3 class="mb-h">Last settled</h3>${done.map(b => { const [cls, ic, pl] = result(b);
         return `<div class="mb-done ${cls}"><span>${ic}</span><span class="mb-dfx">${esc((b.legs || []).map(l => l.fixture).join(" · "))}</span><span class="muted">@ ${odds(b.odds)}</span><b>${pl}</b></div>`; }).join("")}` : ""}
-    <a class="ghost mb-vault" href="../">All bets in the Vault →</a></div>`);
-  const bg = document.querySelector(".modal-bg");
-  bg.addEventListener("click", (e) => {
-    const g = e.target.closest("[data-mbgo]");
-    if (g) { const [id, league, how] = g.dataset.mbgo.split("|"); closeModal();
-      return how === "live" ? goToLive(league, id) : S.allLeagues.includes(league) ? goToMatch(league, id) : openMatch(id); }
-    if (e.target.closest("[data-mbslip]")) { closeModal(); $("#slip").scrollIntoView({ behavior: "smooth" }); }
-  });
+    <a class="ghost mb-vault" href="../">All bets in the Vault →</a></div>`;
+}
+// Clicks inside the popup or the drawer: open a match, back to the slip.
+function myBetsClick(e, close) {
+  const g = e.target.closest("[data-mbgo]");
+  if (g) { const [id, league, how] = g.dataset.mbgo.split("|"); close();
+    return how === "live" ? goToLive(league, id) : S.allLeagues.includes(league) ? goToMatch(league, id) : openMatch(id); }
+  if (e.target.closest("[data-mbslip]")) { close(); $("#slip").scrollIntoView({ behavior: "smooth" }); }
+}
+const WIDE = () => matchMedia("(min-width:1251px)").matches;
+function openMyBets() {
+  if (WIDE()) return toggleDrawer();
+  modal(myBetsHTML(false));
+  document.querySelector(".modal-bg").addEventListener("click", (e) => myBetsClick(e, closeModal));
+}
+function toggleDrawer(open = !document.body.classList.contains("drawer-open")) {
+  let dr = $("#betsDrawer");
+  if (!dr) {
+    dr = document.createElement("aside");
+    dr.id = "betsDrawer"; dr.className = "bdrawer";
+    dr.addEventListener("click", (e) => { if (e.target.closest("[data-drclose]")) return toggleDrawer(false); myBetsClick(e, () => {}); });
+    document.body.appendChild(dr);
+  }
+  document.body.classList.toggle("drawer-open", open);
+  if ($("#navBets")) $("#navBets").classList.toggle("on", open);
+  savePref("hawk.drawer", open);
+  if (open) {
+    dr.style.top = Math.round($(".top").getBoundingClientRect().bottom) + "px";
+    dr.classList.add("anim"); setTimeout(() => dr.classList.remove("anim"), 1200);   // the swing-in plays once, not on every refresh
+    renderDrawer();
+  }
+}
+function renderDrawer() {
+  const dr = $("#betsDrawer");
+  if (!dr || !document.body.classList.contains("drawer-open")) return;
+  if (!WIDE()) return toggleDrawer(false);
+  dr.innerHTML = myBetsHTML(true);
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); $("#watchPop").hidden = true; } });
 

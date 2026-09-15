@@ -10,6 +10,8 @@
 //   • a D1 database bound as DB (it keeps what's already been sent)
 //   • a variable TOPIC = your ntfy topic (HAWK makes one for you)
 //   • a Cron Trigger: * * * * *   (every minute)
+//   • if ntfy turns the Worker away (too many requests from Cloudflare's shared
+//     addresses): a secret NTFY_TOKEN = an access token from a free ntfy.sh account
 // HAWK sends the list of matches to follow to this Worker's /follow address;
 // only requests carrying your topic are accepted.
 
@@ -42,7 +44,7 @@ export default {
     const path = new URL(req.url).pathname;
     if (path === "/test") {
       const ok = await notify(env, { title: "🦅 HAWK alerts connected", message: "Goals, red cards and your bets will come here — even with the screen off.", tags: ["white_check_mark"] });
-      return reply({ ok });
+      return reply({ ok, ntfy: notify.last || null, token: !!env.NTFY_TOKEN });
     }
     if (path === "/follow") {
       const data = JSON.stringify({ games: (body.games || []).slice(0, 40), bets: (body.bets || []).slice(0, 40) });
@@ -75,12 +77,18 @@ async function s365(path, params) {
   return null;
 }
 
+// ntfy.sh limits how much each internet address can send, and Cloudflare Workers
+// share addresses — with a free ntfy.sh account, its access token (a secret
+// NTFY_TOKEN on this Worker) makes the limit yours alone.
 async function notify(env, a) {
   try {
-    const r = await fetch(NTFY, { method: "POST", headers: { "Content-Type": "application/json" },
+    const headers = { "Content-Type": "application/json" };
+    if (env.NTFY_TOKEN) headers.Authorization = `Bearer ${env.NTFY_TOKEN}`;
+    const r = await fetch(NTFY, { method: "POST", headers,
       body: JSON.stringify({ topic: topicOf(env), title: a.title, message: a.message || " ", priority: a.priority || 3, click: a.click || HAWK }) });
+    notify.last = r.ok ? null : `ntfy answered ${r.status}: ${(await r.text().catch(() => "")).slice(0, 160)}`;
     return r.ok;
-  } catch { return false; }
+  } catch (e) { notify.last = `couldn't reach ntfy: ${e && e.message}`; return false; }
 }
 
 // ---------------------------------------------------------------------------

@@ -4357,7 +4357,9 @@ function openPushSetup() {
         if (!r.ok) return msg(`❌ ${esc(j.error || `The worker answered ${r.status}`)}`);
         savePref(PUSH_KEY, { topic: t, worker, device: (pushCfg() || {}).device || pushDevice() });
         pushFollows(true);
-        msg(j.ok ? "✅ Connected — a test alert is on its way to ntfy. HAWK now keeps the worker up to date with your bets." : "⚠️ Connected, but ntfy didn't take the test — try again in a minute.");
+        msg(j.ok ? "✅ Connected — a test alert is on its way to ntfy. HAWK now keeps the worker up to date with your bets."
+          : `⚠️ Connected, but ntfy didn't take the test${j.ntfy ? ` — <b>${esc(j.ntfy)}</b>` : " — try again in a minute"}.${
+            /\b(429|403)\b/.test(j.ntfy || "") && !j.token ? " ntfy is limiting Cloudflare's shared address: make a free ntfy.sh account, create an access token, and add it to the worker as a secret named NTFY_TOKEN." : ""}`);
         if (S.view === "scores") renderScores();
       } catch { msg("❌ Couldn't reach the worker — check the address, and that you pressed Deploy."); }
     }

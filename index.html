@@ -2173,10 +2173,22 @@
                 <p class="text-xs text-zinc-400">🔒 Everything is inside the link — nothing goes to any server. Keep it to yourself.</p>
                 <div class="flex gap-2">${navigator.share ? '<button data-share class="flex-1 bg-[#c9a05c] hover:bg-[#d9b571] text-black font-bold rounded-xl py-2.5 text-sm">Share…</button>' : ''}
                     <button data-copy class="flex-1 bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm">Copy link</button></div>
-                <p class="text-[11px] text-zinc-500">Send it to yourself (WhatsApp “Message yourself”, email or notes) and open it in the browser you use HAWK in. The link is a snapshot: after new bets, make a new one. (${Math.max(1, Math.round(link.length / 1024))} KB)</p>
+                <p class="text-[11px] text-zinc-500">Send it to yourself (WhatsApp “Message yourself”, email or notes). The link is a snapshot: after new bets, make a new one. (${Math.max(1, Math.round(link.length / 1024))} KB)</p>
+                <div class="border-t border-zinc-800 pt-3 space-y-2">
+                    <div class="text-white text-sm font-bold">📥 Got a link from your other device?</div>
+                    <p class="text-[11px] text-zinc-400">If tapping it opened the wrong browser (not the one you use HAWK in): long-press the link → <b class="text-zinc-200">Copy</b>, then paste it here.</p>
+                    <textarea data-in rows="2" placeholder="Paste the sync link here" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white" style="font-size:16px"></textarea>
+                    <div class="flex gap-2">${navigator.clipboard && navigator.clipboard.readText ? '<button data-clip class="flex-1 bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm">📋 Paste</button>' : ''}
+                        <button data-add class="flex-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold rounded-xl py-2.5 text-sm">Add to this Vault</button></div>
+                </div>
             </div>`;
             wrap.onclick = async (e) => {
                 if (e.target === wrap || e.target.closest('[data-x]')) return wrap.remove();
+                if (e.target.closest('[data-clip]')) {
+                    try { wrap.querySelector('[data-in]').value = await navigator.clipboard.readText(); } catch (err) { alert('Long-press the box and tap Paste instead.'); }
+                    return;
+                }
+                if (e.target.closest('[data-add]')) { if (await pasteSync(wrap.querySelector('[data-in]').value)) wrap.remove(); return; }
                 const b = e.target.closest('[data-copy],[data-share]');
                 if (!b) return;
                 if (b.hasAttribute('data-share')) { try { await navigator.share({ title: 'My HAWK Vault', url: link }); } catch (err) { /* cancelled */ } return; }
@@ -2195,8 +2207,19 @@
             const m = /^#sync=(.+)$/.exec(location.hash);
             if (!m) return;
             history.replaceState(null, '', location.pathname + location.search);
+            await applySync(m[1]);
+        }
+        // A link pasted into the Sync box (when the link opened in another browser,
+        // e.g. Samsung Internet or Chrome instead of Brave, where HAWK's data is).
+        async function pasteSync(text) {
+            const t = String(text || '').replace(/\s+/g, ''), m = /#sync=([zn]\.[A-Za-z0-9_-]+)/.exec(t) || /^([zn]\.[A-Za-z0-9_-]+)$/.exec(t);
+            if (!m) { alert("That isn't a HAWK sync link. On the other device tap 📲 Sync → Copy link, then paste it here."); return false; }
+            await applySync(m[1]);
+            return true;
+        }
+        async function applySync(code) {
             let data;
-            try { data = await unpackSync(m[1]); } catch (e) { alert("This sync link is damaged or cut short — make a new one on the other device."); return; }
+            try { data = await unpackSync(code); } catch (e) { alert("This sync link is damaged or cut short — make a new one on the other device."); return; }
             if (!data || !Array.isArray(data.bets)) return;
             const here = new Map(bets.map(b => [b.id, b]));
             const add = data.bets.filter(b => b && b.id && !here.has(b.id));

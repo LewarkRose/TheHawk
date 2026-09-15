@@ -1092,6 +1092,18 @@
     resLeg("home", home, hg, ag);
     add("res:draw", "Result: Draw", "Full Time Result", "result", mask(n, (s) => hg[s] === ag[s]));
     resLeg("away", away, ag, hg);
+    // To Qualify (knockout ties, one-off or second leg): who goes through, extra time
+    // and penalties included — Bet365's cup market. After 90 minutes level on
+    // aggregate, extra time/penalties are split by etShare.
+    // (not in a first leg: the tie isn't decided in that game)
+    const legNum = an.detail && an.detail.legNum;
+    if (legNum >= 2 || (an.cons["39|"] && legNum !== 1)) {
+      const [ah, aa] = preAgg(an.detail, home), pH = mean(mask(n, (s) => hg[s] > ag[s])), pA = mean(mask(n, (s) => ag[s] > hg[s]));
+      const share = etShare(pH, pA), coin = (s) => ((s * 2654435761) % 1000) / 1000 < share;
+      const homeThrough = mask(n, (s) => ah + hg[s] > aa + ag[s] || (ah + hg[s] === aa + ag[s] && coin(s)));
+      add("qual:home", `${home} to Qualify`, "To Qualify", "qualify", homeThrough, { note: "extra time and penalties count" });
+      add("qual:away", `${away} to Qualify`, "To Qualify", "qualify", mask(n, (s) => !homeThrough[s]), { note: "extra time and penalties count" });
+    }
     add("dc:home", `${home} or Draw`, "Double Chance", "result", mask(n, (s) => hg[s] >= ag[s]));
     add("dc:away", `${away} or Draw`, "Double Chance", "result", mask(n, (s) => ag[s] >= hg[s]));
     for (const line of [1.5, 2.5, 3.5, 4.5]) {
@@ -1265,6 +1277,7 @@
     const findP = (who) => { for (const s of ["home", "away"]) { const p = ((ctx.players || {})[s] || []).find((x) => samePlayer(who, x.name)); if (p) return { side: s, name: p.name }; } return null; };
     let m;
     if (/^(?:result:\s*)?draw$/i.test(t)) return leg("res:draw", "Full Time Result");
+    if ((m = /^(.+?) to qualify$/i.exec(t)) && side(m[1])) return leg(`qual:${side(m[1])}`, "To Qualify");
     if ((m = /^(?:result:\s*)?(.+?) to win by (\d)\+(?: goals?)?$/i.exec(t)) && side(m[1])) return leg(`ah:${side(m[1])}:-${+m[2] - 0.5}`, "Handicap");
     if ((m = /^(home|away) win$/i.exec(t) || /^result:\s*(.+)$/i.exec(t) || /^(.+?) to win$/i.exec(t)) && side(m[1])) return leg(`res:${side(m[1])}`, "Full Time Result");
     if ((m = /^double chance:?\s*(.+?)\s*\/\s*draw$/i.exec(t) || /^double chance:?\s*draw\s*\/\s*(.+)$/i.exec(t) || /^(.+?) or draw$/i.exec(t)) && side(m[1])) return leg(`dc:${side(m[1])}`, "Double Chance");
@@ -1316,7 +1329,7 @@
   // What auto-build compares with your target.
   const priceOf = (legs, ids, joint) => (aim ? b365Of(legs, ids, joint) || 0 : joint > 0 ? 1 / joint : 0);
 
-  const FIXED_BOOK_LINES = { "res:home": [1, "", "1"], "res:draw": [1, "", "X"], "res:away": [1, "", "2"], "dc:home": [14, "", "1X"],
+  const FIXED_BOOK_LINES = { "qual:home": [39, "", "1"], "qual:away": [39, "", "2"], "res:home": [1, "", "1"], "res:draw": [1, "", "X"], "res:away": [1, "", "2"], "dc:home": [14, "", "1X"],
     "dc:away": [14, "", "X2"], "btts:yes": [12, "", "Yes"], "btts:no": [12, "", "No"], "cs:home": [144, "", "Yes"], "cs:away": [145, "", "Yes"],
     "h1res:home": [5, "", "1"], "h1res:draw": [5, "", "X"], "h1res:away": [5, "", "2"],
     "h2res:home": [6, "", "1"], "h2res:draw": [6, "", "X"], "h2res:away": [6, "", "2"],
@@ -1630,6 +1643,13 @@
     } else if (CUPS.has(an.league) || /cup|pokal|coppa|copa|coupe/i.test(an.league)) {
       add("up", 0.5, `It's a cup tie — favourites often rotate. Check ${name[fav]}'s lineup when it's out.`);
     }
+    // 6b. The second leg of a two-legged tie: who needs what changes how both sides play.
+    const tie = tieInfo(an);
+    if (tie && tie.leg === 2 && tie.agg) {
+      const [ah, aa] = tie.agg, lead = ah > aa ? "home" : aa > ah ? "away" : null, by = Math.abs(ah - aa);
+      if (lead) add("info", 0, `2nd leg: ${name[lead]} lead ${Math.max(ah, aa)}–${Math.min(ah, aa)} on aggregate, so ${by >= 2 ? `they go through even losing by ${by - 1}` : "a draw is enough for them"} and ${name[lead === "home" ? "away" : "home"]} must attack${by >= 2 ? ` — they need to win by ${by + 1} to go through in 90 minutes` : ""}. Expect ${name[lead]} to sit deeper; the bookmakers' prices already allow for it.`);
+      else add("info", 0, `2nd leg: level on aggregate (${ah}–${aa}) — whoever wins goes through; a draw means extra time.`);
+    }
     // 7. Tiredness: days since each side's last game (from their players' match logs).
     const lastGame = (side) => Math.max(0, ...playerRows(an.players[side === "home" ? 0 : 1]).flatMap((p) => p.matches.slice(0, 1).map((x) => x.ts || 0)));
     const kick = an.kickoff ? an.kickoff.getTime() / 1000 : Date.now() / 1000;
@@ -1647,6 +1667,35 @@
              marketDog: mk ? mk[dog] : null, open: ref[fav] < 0.42, level, label: UPSET_LEVELS[level], net, signals };
   }
 
+  // Two-legged ties in any competition (European cups, Libertadores, domestic
+  // cups, qualifiers): which leg, the aggregate before this game, the first leg's
+  // score — and the bookmakers' "To Qualify" (365Scores line type 39, which
+  // counts extra time and penalties).
+  // Goals each side takes into this game: the first leg's score (0-0 for a one-off tie).
+  function preAgg(g, home) {
+    if (!(g && g.legNum >= 2)) return [0, 0];
+    const r = (g.relatedGames || []).find((x) => x.legNum === 1 && x.statusGroup === 4);
+    if (!r) return [0, 0];
+    const sc = [Math.trunc(r.homeCompetitor.score) || 0, Math.trunc(r.awayCompetitor.score) || 0];
+    return nameSimilarity(r.homeCompetitor.name, home) >= nameSimilarity(r.awayCompetitor.name, home) ? sc : [sc[1], sc[0]];
+  }
+  // A level tie after 90 minutes goes to extra time and penalties: the better
+  // side wins it a bit more often than not (a coin flip pulled towards their 90-minute edge).
+  const etShare = (pH, pA) => 0.5 + ((pH / Math.max(pH + pA, 1e-9)) - 0.5) * 0.6;
+  function tieInfo(an) {
+    const g = an.detail || {}, hc = g.homeCompetitor || {}, ac = g.awayCompetitor || {};
+    if (g.legNum === 1) return { leg: 1, stage: g.stageName || null };
+    if (!(g.legNum >= 2)) return null;
+    const r = (g.relatedGames || []).find((x) => x.legNum === 1 && x.statusGroup === 4);
+    const first = r ? { home: r.homeCompetitor.name, away: r.awayCompetitor.name, score: [Math.trunc(r.homeCompetitor.score) || 0, Math.trunc(r.awayCompetitor.score) || 0] } : null;
+    // The aggregate before kick-off (365Scores' own, or the first leg's score for each club).
+    let agg = hc.aggregatedScore != null && ac.aggregatedScore != null ? [Math.trunc(hc.aggregatedScore), Math.trunc(ac.aggregatedScore)] : null;
+    if (first && (!agg || an.inPlay)) agg = nameSimilarity(first.home, an.home) >= nameSimilarity(first.home, an.away) ? first.score : [first.score[1], first.score[0]];
+    const q = an.cons["39|"], b = an.quotes.find((x) => x.type === 39 && x.book === PRICE_BOOK);
+    return { leg: 2, stage: g.stageName || null, agg, first,
+             qualify: q && q.probs["1"] != null && q.probs["2"] != null ? { home: q.probs["1"], away: q.probs["2"] } : null,
+             qualifyPrice: b ? { home: b.prices["1"] || null, away: b.prices["2"] || null } : null };
+  }
   function matchJSON(an, sim, squads, legs) {
     const M = an.M;
     const grid = [0, 1, 2, 3, 4].map((i) => [0, 1, 2, 3, 4].map((j) => sumCells(M, (a, b) => (i < 4 ? a === i : a >= 4) && (j < 4 ? b === j : b >= 4))));
@@ -1682,7 +1731,7 @@
         recent_starts: p.recent_starts, field: p.field, num: p.num, short: p.short, teamMins: p.teamMins }))])),
       warnings: an.warnings, value: { book: PRICE_BOOK, legs: value }, sims: sim.n, missing: an.missing || { home: [], away: [] },
       movers: an.inPlay ? [] : moverRows(an, sim.exp).slice(0, 8),
-      upset: upsetRadar(an, M, squads, sim.exp),
+      upset: upsetRadar(an, M, squads, sim.exp), tie: tieInfo(an),
     };
   }
   function entryFor(id) {
@@ -2306,6 +2355,11 @@
         row.p = sumCells(M, t);
         if (row.p > 0.9999) { row.state = "won"; row.p = 1; } else if (row.p < 1e-4) { row.state = "lost"; row.p = 0; }
         row.note = `score ${sh}-${sa}`;
+      } else if ((m = /^qual:(home|away)$/.exec(id2))) {
+        const [ah, aa] = preAgg(game, hc.name), pH = sumCells(M, (i, j) => i > j), pA = sumCells(M, (i, j) => j > i), share = etShare(pH, pA);
+        const pHome = sumCells(M, (i, j) => ah + i > aa + j) + share * sumCells(M, (i, j) => ah + i === aa + j);
+        row.p = m[1] === "home" ? pHome : 1 - pHome;
+        row.note = `score ${sh}-${sa}${ah || aa ? ` · aggregate ${ah + sh}-${aa + sa}` : ""} · extra time and penalties count`;
       } else if ((m = /^first:(home|away)$/.exec(id2))) {
         if (goals.length) { const won = (goals[0].competitorId === hc.id) === (m[1] === "home"); row.state = won ? "won" : "lost"; row.p = won ? 1 : 0; }
         else row.p = ((m[1] === "home" ? rh : ra) / Math.max(rh + ra, 1e-9)) * (1 - Math.exp(-(rh + ra)));

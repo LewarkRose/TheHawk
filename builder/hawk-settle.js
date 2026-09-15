@@ -97,12 +97,14 @@
       ht: ht ? [ht.homeCompetitorScore, ht.awayCompetitorScore] : null,
       first: goals.length ? (goals[0].competitorId === homeId ? "home" : "away") : null,
       corners: pair("Corners"), sot: pair("Shots On Target"), cards, players, closing, replacedBy,
+      // who went through (To Qualify legs: extra time and penalties included)
+      qualified: game.homeCompetitor.isQualified ? "home" : game.awayCompetitor.isQualified ? "away" : null,
     });
   }
 
   // The Bet365 line a HAWK leg is on: [365Scores line type, value, option]
   // (same mapping as engine.js; handicap values are the home side's).
-  const FIXED_BOOK_LINES = { "res:home": [1, "", "1"], "res:draw": [1, "", "X"], "res:away": [1, "", "2"], "dc:home": [14, "", "1X"],
+  const FIXED_BOOK_LINES = { "qual:home": [39, "", "1"], "qual:away": [39, "", "2"], "res:home": [1, "", "1"], "res:draw": [1, "", "X"], "res:away": [1, "", "2"], "dc:home": [14, "", "1X"],
     "dc:away": [14, "", "X2"], "btts:yes": [12, "", "Yes"], "btts:no": [12, "", "No"], "cs:home": [144, "", "Yes"], "cs:away": [145, "", "Yes"],
     "h1res:home": [5, "", "1"], "h1res:draw": [5, "", "X"], "h1res:away": [5, "", "2"], "first:home": [7, "", "Home"], "first:away": [7, "", "Away"] };
   const LINE_TYPES = { goals: 3, corners: 137, cards: 141, h1goals: 9, sot: 139 };
@@ -176,6 +178,7 @@
       }
       return W(v >= need);
     }
+    if ((m = /^qual:(home|away)$/.exec(id))) return f.qualified ? W(f.qualified === m[1]) : "unknown";
     if ((m = /^res:(home|away)$/.exec(id)) && opts.earlyPayout && f.twoUp && f.twoUp[m[1]]) return "won";
     if ((m = /^res:(home|draw|away)$/.exec(id))) return W(m[1] === "home" ? H > A : m[1] === "away" ? A > H : H === A);
     if ((m = /^dc:(home|away)$/.exec(id))) return W(m[1] === "home" ? H >= A : A >= H);

@@ -253,6 +253,9 @@ img{max-width:100%}
 .co-offer input{width:120px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:#12181c;font-size:16px;font-weight:700}
 .badge.soon{background:rgba(255,209,102,.14);color:var(--gold)}
 .kick-cd{margin-top:6px;font-size:13px;color:var(--gold);font-weight:600}
+.tie{margin:8px auto 2px;max-width:440px;padding:8px 12px;border-radius:12px;border:1px solid rgba(255,209,102,.35);background:rgba(255,209,102,.07);font-size:12.5px;line-height:1.45}
+.tie b{color:var(--gold)}.tie small{display:block;margin-top:3px;font-size:12px;color:var(--text)}.tie small.muted{color:var(--muted)}
+.ip-agg{margin-top:4px;font-size:13px;color:var(--gold)}.ip-agg b{font-weight:900}
 .kick-cd b{font-weight:900}
 .sc-team{display:flex;align-items:center;gap:8px;font-weight:600;min-width:0}
 .sc-team.away{justify-content:flex-end;text-align:right}
@@ -1269,7 +1272,7 @@ function renderMatch() {
       <div class="vs">
         <div class="side"><img src="${esc(m.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(m.home)}</div>
           <div class="muted">${esc(tbl("home"))}${m.form.home ? " · " + esc(m.form.home) : ""}</div>${chip("home")}</div>
-        <div class="mid"><div class="x">VS</div><div class="ko">${esc(fmtKick(m.kickoff))}</div><div class="kick-cd" id="kickCountdown"></div>
+        <div class="mid"><div class="x">VS</div><div class="ko">${esc(fmtKick(m.kickoff))}</div><div class="kick-cd" id="kickCountdown"></div>${tieBanner(m)}
           ${m.started ? '<div class="chips"><span class="badge live">STARTED — pre-match model</span></div>' : ""}
           ${m.referee && m.referee.name ? `<div class="ko" style="margin-top:6px">Ref: ${esc(m.referee.name)}${m.referee.avg ? ` · ${m.referee.avg.toFixed(2)} cards/g` : ""}</div>` : ""}
           <button class="ghost" style="width:auto;padding:5px 10px;margin-top:8px" onclick="openMatch('${m.id}', true)" title="Re-run everything: odds, lineups and the simulation">↻ Refresh</button>
@@ -1688,6 +1691,28 @@ function lineupCard(m, live = null) {
 })();
 // Whole percentages that add up to exactly 100 (largest remainder), so three
 // rounded chances never show 101%.
+// Two-legged ties: the aggregate, the first leg, what the trailing side needs,
+// and the bookmakers' "To Qualify" (extra time and penalties count there — HAWK's
+// Result legs, like Bet365's, are 90 minutes only).
+function tieBanner(m) {
+  const t = m.tie;
+  if (!t) return "";
+  if (t.leg === 1) return `<div class="tie"><b>🏆 ${esc(t.stage || "Cup tie")} · 1st leg</b><small>The tie is decided over two games — some teams play it safe away from home.</small></div>`;
+  const [ah, aa] = t.agg || [0, 0], diff = Math.abs(ah - aa);
+  const lead = ah > aa ? m.home : aa > ah ? m.away : null, trail = ah > aa ? m.away : aa > ah ? m.home : null;
+  const first = t.first ? `1st leg: ${esc(t.first.home)} ${t.first.score[0]}–${t.first.score[1]} ${esc(t.first.away)}` : "";
+  const need = trail ? `${esc(trail)} need ${diff + 1} goals more than ${esc(lead)} to win it in 90 minutes (${diff} for extra time)` : "Whoever wins goes through — a draw means extra time";
+  const q = t.qualify ? `To qualify: ${esc(m.home)} <b>${pct(t.qualify.home)}</b>${t.qualifyPrice && t.qualifyPrice.home ? ` (Bet365 ${odds(t.qualifyPrice.home)})` : ""} · ${esc(m.away)} <b>${pct(t.qualify.away)}</b>${t.qualifyPrice && t.qualifyPrice.away ? ` (Bet365 ${odds(t.qualifyPrice.away)})` : ""}` : "";
+  return `<div class="tie"><b>🏆 ${esc(t.stage || "Cup tie")} · 2nd leg · ${lead ? `${esc(lead)} lead ${Math.max(ah, aa)}–${Math.min(ah, aa)} on aggregate` : `level ${ah}–${aa} on aggregate`}</b>
+    <small>${[first, need].filter(Boolean).join(" · ")}</small>${q ? `<small>${q}</small>` : ""}<small class="muted">Result legs count 90 minutes only, not extra time or penalties.</small></div>`;
+}
+// In play: the aggregate right now (before this game + the score).
+function liveAgg(d) {
+  const t = S.inplay && S.inplay.m && String(S.inplay.m.id) === String(S.inplay.id) && S.inplay.m.tie;
+  if (!t || t.leg !== 2 || !t.agg) return "";
+  const h = t.agg[0] + (d.score[0] || 0), a = t.agg[1] + (d.score[1] || 0);
+  return `<div class="ip-agg">Aggregate <b>${h}–${a}</b>${h === a ? " · extra time if it stays" : ` · ${esc(h > a ? d.home : d.away)} going through`}</div>`;
+}
 function pct100(ps) {
   const total = ps.reduce((s, p) => s + p, 0) || 1, raw = ps.map(p => (100 * p) / total), out = raw.map(Math.floor);
   const order = raw.map((v, i) => [v - Math.floor(v), i]).sort((a, b) => b[0] - a[0]);
@@ -3718,7 +3743,7 @@ function renderInPlay() {
   const bell = `<button class="ip-bell ${fol.on ? "on" : ""}" data-follow="${esc(ip.id)}" title="${fol.bet ? "You have a bet on this match, so its goal and red-card alerts are on" : fol.on ? "Goal and red-card alerts on for this match — tap to stop" : "Get goal and red-card alerts for this match, even when you leave this page"}">${fol.on ? "🔔" : "🔕"}<span>${fol.on ? "Alerts on" : "Alerts off"}</span></button>`;
   const head = `<div class="hero">${d.live ? bell : ""}<div class="vs">
       <div class="side"><img src="${esc(d.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(d.home)}</div>${d.reds && d.reds[0] ? `<div>${"🟥".repeat(d.reds[0])}</div>` : ""}${scorers("home")}</div>
-      <div class="mid">${d.live ? `<div class="ip-score">${d.score[0]} – ${d.score[1]}</div><div class="ip-clock">🔴 ${esc(d.clock || "")} ${esc(d.statusText || "")}</div>`
+      <div class="mid">${d.live ? `<div class="ip-score">${d.score[0]} – ${d.score[1]}</div><div class="ip-clock">🔴 ${esc(d.clock || "")} ${esc(d.statusText || "")}</div>${liveAgg(d)}`
         : `<div class="x">VS</div><div class="ko">${esc(d.statusText || "")}</div>`}
         <div class="ko" style="margin-top:6px">${d.checked ? `checked ${new Date(d.checked).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · every 15s` : ""}</div>
         ${prematch}</div>

@@ -971,6 +971,7 @@ function fmtKick(iso) {
 /* ---------- leagues & fixtures ---------- */
 async function init() {
   jumpLabel();
+  pushFollows();
   const { leagues } = await api("/api/leagues");
   S.allLeagues = leagues;
   // The scans start with the Top 5 + European cups (each extra league adds
@@ -2225,6 +2226,7 @@ function saveToVault(legs, stake, price, extra = {}) {
     localStorage.setItem("hawk_bets", JSON.stringify(bets));
   } catch { toast("Couldn't save to the Vault's storage."); return false; }
   jumpLabel();
+  pushFollows();
   return true;
 }
 
@@ -3246,7 +3248,9 @@ function renderScores() {
         <button class="ghost" id="goalToggle" style="width:auto;margin:0 0 0 auto;padding:4px 10px;font-size:12px;text-transform:none;letter-spacing:0"
           title="A goal pops up for matches you have a HAWK bet on, a lineup alert on, or open in the live view — and as a PC / phone notification while HAWK is open in the background">${goalToggleText()}</button>
         <button class="ghost" style="width:auto;margin:0;padding:4px 10px;font-size:12px;text-transform:none;letter-spacing:0" onclick="testNotify()"
-          title="Show a test notification now — or find out what's blocking them">📳 Test</button></h3>
+          title="Show a test notification now — or find out what's blocking them">📳 Test</button>
+        <button class="ghost" style="width:auto;margin:0;padding:4px 10px;font-size:12px;text-transform:none;letter-spacing:0" onclick="openPushSetup()"
+          title="Alerts on your phone even with the screen off (ntfy app + a free Cloudflare Worker)">📲 Screen-off${pushCfg() && pushCfg().worker ? " ✓" : ""}</button></h3>
       <div class="leagues" id="scDays" style="flex-wrap:wrap;margin:0 0 10px">${days.map(([d, t]) => `<button class="pill ${d === sc.day ? "on" : ""}" data-day="${d}">${esc(t)}</button>`).join("")}</div>
       <div class="qchips" id="scLeagues">${scoreChips()}</div>
     </div>
@@ -3502,6 +3506,7 @@ function bindCashOut() {
     if (!h.userDone) delete h.userDone;
     try { localStorage.setItem("hawk_bets", JSON.stringify(bets)); } catch { return toast("Couldn't save to the Vault's storage."); }
     toast(h.userDone ? `✓ ${h.label}: marked done` : `${h.label}: HAWK follows it again`);
+    pushFollows();
     b.disabled = true;
     try { S.inplay.mine = await myLiveTickets(S.inplay.id); } catch { /* next refresh */ }
     if (S.view === "inplay") renderInPlay();
@@ -3855,7 +3860,7 @@ function toggleLearning() {
   else renderSlip();
 }
 // A bet settled in the Vault (another tab) may change what HAWK has learned.
-window.addEventListener("storage", (e) => { if (e.key === "hawk_bets") { applyLearning(); renderSlip(); jumpLabel(); } });
+window.addEventListener("storage", (e) => { if (e.key === "hawk_bets") { applyLearning(); renderSlip(); jumpLabel(); pushFollows(); } });
 
 /* ---------- price alerts ---------- */
 // Star a leg that has a Bet365 price and HAWK tells you (sound, title flash,
@@ -3925,7 +3930,7 @@ async function trackPrices() {
 /* ---------- lineup alerts ---------- */
 const WATCH_KEY = "hawk.lineupWatch";
 function loadWatch() { try { return JSON.parse(localStorage.getItem(WATCH_KEY)) || []; } catch { return []; } }
-function saveWatch() { try { localStorage.setItem(WATCH_KEY, JSON.stringify(S.watch)); } catch {} }
+function saveWatch() { try { localStorage.setItem(WATCH_KEY, JSON.stringify(S.watch)); } catch {} pushFollows(); }
 function isWatched(id) { return S.watch.some(w => String(w.id) === String(id)); }
 function renderWatch() {
   const btn = $("#watchBtn"), pop = $("#watchPop"), n = S.watch.length + S.alerts.length;
@@ -4032,6 +4037,7 @@ async function toggleFollow(id) {
     toast("🔔 Alerts on: goals and red cards for this match" + ("Notification" in window && Notification.permission === "granted" ? ", on your screen too" : ""));
   }
   savePref("hawk.goalFollow", follow);
+  pushFollows();
   if (S.view === "inplay") renderInPlay(); else if (S.view === "scores") renderScoreList();
 }
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-follow]"); if (b) { e.stopPropagation(); toggleFollow(b.dataset.follow); } }, true);
@@ -4261,6 +4267,100 @@ async function systemNotify(title, body, { icon, tag, url } = {}) {
     if (reg && reg.showNotification) { await reg.showNotification(title, opts); return true; }
   } catch { /* fall back below */ }
   try { const n = new Notification(title, opts); n.onclick = () => { window.focus(); if (url) openHawkUrl(opts.data.url); n.close(); }; return true; } catch { return false; }
+}
+/* ---------- 📲 Screen-off alerts (ntfy app + a Cloudflare Worker) ---------- */
+// With the screen off the phone pauses web pages, so HAWK can't check scores.
+// A small Cloudflare Worker (alerts/worker.js, free) checks your matches every
+// minute and sends goals, red cards, legs landing and results through the ntfy
+// app instead. HAWK tells it what to follow: your pending HAWK bets, 🔔 matches
+// and lineup alerts — each device sends its own list.
+const PUSH_KEY = "hawk.push", NTFY_APP = "https://play.google.com/store/apps/details?id=io.heckel.ntfy";
+function pushCfg() { return loadPref(PUSH_KEY, null); }
+function newTopic() { const a = new Uint32Array(3); crypto.getRandomValues(a); return "hawk-" + [...a].map(x => x.toString(36)).join("").slice(0, 16); }
+function pushDevice() { return (/android|iphone|ipad/i.test(navigator.userAgent) ? "phone-" : "pc-") + Math.random().toString(36).slice(2, 8); }
+function followPayload() {
+  const games = [], bets = [];
+  for (const w of S.watch || []) games.push({ id: String(w.id), league: w.league || "", lineup: true });
+  for (const [id, at] of Object.entries(loadPref("hawk.goalFollow", {}))) if (Date.now() - Date.parse(at) < 3 * 3600e3) games.push({ id: String(id), league: "" });
+  for (const b of vaultBets()) {
+    if (b.status !== "PENDING") continue;
+    const parts = (b.legs || []).filter(l => l.hawk && l.hawk.game).map(l => ({ game: String(l.hawk.game), league: l.hawk.league || l.league || "",
+      legs: (l.hawk.legs || []).map(h => ({ id: h.id, label: h.label, player: h.player || null, ...(h.userDone ? { userDone: true } : {}) })) }));
+    if (parts.length) bets.push({ id: b.id, stake: b.stake, odds: b.odds, ret: b.potentialReturn, parts, other: (b.legs || []).filter(l => !(l.hawk && l.hawk.game)).length });
+  }
+  return { games, bets };
+}
+// Tells the Worker what to follow (when it changes, and every few hours so it doesn't forget this device).
+let pushTimer = null;
+function pushFollows(force = false) {
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(async () => {
+    const c = pushCfg();
+    if (!c || !c.worker || !c.topic) return;
+    const body = JSON.stringify({ topic: c.topic, device: c.device, ...followPayload() });
+    if (!force && body === localStorage.getItem("hawk.pushSig") && Date.now() - (+localStorage.getItem("hawk.pushAt") || 0) < 6 * 3600e3) return;
+    try {
+      const r = await fetch(c.worker.replace(/\/+$/, "") + "/follow", { method: "POST", headers: { "Content-Type": "application/json" }, body });
+      if (r.ok) { localStorage.setItem("hawk.pushSig", body); localStorage.setItem("hawk.pushAt", String(Date.now())); }
+    } catch { /* offline: next time */ }
+  }, 1500);
+}
+setInterval(() => pushFollows(), 30 * 60e3);
+function openPushSetup() {
+  const c = pushCfg() || {}, topic = c.topic || newTopic();
+  if (!c.topic) savePref(PUSH_KEY, { ...c, topic, device: c.device || pushDevice() });   // the same topic every time you open this
+  const step = (n, html) => `<div style="display:flex;gap:10px;margin:0 0 12px"><b style="flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#03261b;display:grid;place-items:center;font-size:13px">${n}</b><div style="min-width:0;line-height:1.55">${html}</div></div>`;
+  modal(`<div class="mhead" style="justify-content:space-between"><h2 style="margin:0">📲 Screen-off alerts</h2><button class="ghost" data-close style="width:auto;padding:6px 12px">✕</button></div>
+    <p class="muted" style="margin:8px 0 14px">Goals, red cards, your legs landing and your bet's result on your phone — even with the screen off. One-time setup, about 15 minutes (easiest on the PC).</p>
+    ${c.worker ? `<div class="call good" style="margin:0 0 14px">✅ Connected<small>${esc(c.worker)} · topic ${esc(c.topic)}</small></div>` : ""}
+    <h3 class="mb-h">On your phone</h3>
+    ${step(1, `Install <a href="${NTFY_APP}" target="_blank" rel="noopener">ntfy</a> (free, no account).`)}
+    ${step(2, `In ntfy tap <b>＋</b> and subscribe to this topic (leave the server as ntfy.sh):
+      <div style="display:flex;gap:6px;margin-top:6px"><input id="pushTopic" value="${esc(topic)}" style="flex:1;min-width:0;font-size:16px"><button class="ghost" data-pcopy style="width:auto;padding:6px 12px">Copy</button></div>
+      <button class="ghost" data-ptry style="margin-top:6px">📨 Send a test to ntfy now</button>
+      <div class="muted" style="font-size:12px;margin-top:4px">Keep the topic to yourself — anyone with it can read your alerts. Use the same one on your PC and phone.</div>`)}
+    <h3 class="mb-h">On Cloudflare (free) — the part that checks every minute</h3>
+    ${step(3, `Make a free account at <a href="https://dash.cloudflare.com/sign-up" target="_blank" rel="noopener">dash.cloudflare.com</a> (you do this yourself).`)}
+    ${step(4, `<b>Workers &amp; Pages → Create → Worker</b>, name it <b>hawk-alerts</b>, Deploy. Then <b>Edit code</b>: delete what's there, paste HAWK's code, <b>Deploy</b>.
+      <button class="ghost" data-pcode style="margin-top:6px">📋 Copy HAWK's Worker code</button>`)}
+    ${step(5, `<b>Storage &amp; Databases → D1 → Create</b> a database called <b>hawk</b>.`)}
+    ${step(6, `Back in the worker → <b>Settings</b>:<br>• <b>Bindings → Add → D1 database</b>: variable name <b>DB</b>, database <b>hawk</b><br>
+      • <b>Variables and Secrets → Add</b>: name <b>TOPIC</b>, value = your topic above<br>• <b>Trigger events → Add → Cron Triggers</b>: every minute (<code>* * * * *</code>)`)}
+    ${step(7, `Copy the worker's address (like <i>https://hawk-alerts.yourname.workers.dev</i>) and paste it here:
+      <div style="display:flex;gap:6px;margin-top:6px"><input id="pushWorker" value="${esc(c.worker || "")}" placeholder="https://hawk-alerts….workers.dev" style="flex:1;min-width:0;font-size:16px"></div>
+      <button class="build" data-pgo style="margin-top:8px">🔗 Connect &amp; send a test</button>
+      <div id="pushMsg" class="muted" style="font-size:13px;margin-top:6px"></div>`)}
+    <div class="note" style="margin:4px 0 0">After that, HAWK tells the worker about your bets, 🔔 matches and lineup alerts by itself. On your other device, open this screen and paste the same topic and address.</div>`);
+  const bg = document.querySelector(".modal-bg"), msg = (t) => { const el = bg.querySelector("#pushMsg"); if (el) el.innerHTML = t; };
+  const topicNow = () => bg.querySelector("#pushTopic").value.trim();
+  // Pasted the topic from your other device: keep it.
+  bg.querySelector("#pushTopic").addEventListener("change", () => { if (/^[A-Za-z0-9_-]{6,64}$/.test(topicNow())) savePref(PUSH_KEY, { ...(pushCfg() || {}), topic: topicNow() }); });
+  bg.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-pcopy]")) { try { await navigator.clipboard.writeText(topicNow()); toast("Topic copied"); } catch { toast("Long-press the box to copy it"); } }
+    if (e.target.closest("[data-ptry]")) {
+      if (!/^[A-Za-z0-9_-]{6,64}$/.test(topicNow())) return toast("That topic isn't valid — letters, numbers, - and _ only.");
+      try { const r = await fetch("https://ntfy.sh/" + encodeURIComponent(topicNow()), { method: "POST", body: "🦅 HAWK here — ntfy works. Now set up Cloudflare (steps 3–7)." });
+            toast(r.ok ? "Sent — did it pop up in ntfy?" : "ntfy didn't take it — try again in a minute.", 5000); } catch { toast("Couldn't reach ntfy — check your connection."); }
+    }
+    if (e.target.closest("[data-pcode]")) {
+      try { const code = await (await fetch("../alerts/worker.js", { cache: "no-store" })).text(); await navigator.clipboard.writeText(code); toast("✅ Worker code copied — paste it into Cloudflare's editor", 4000); }
+      catch { window.open("../alerts/worker.js", "_blank"); toast("Opened the code — select all and copy it."); }
+    }
+    if (e.target.closest("[data-pgo]")) {
+      const worker = bg.querySelector("#pushWorker").value.trim().replace(/\/+$/, ""), t = topicNow();
+      if (!/^https:\/\/[^\s/]+\.workers\.dev$|^https:\/\/[^\s/]+$/.test(worker)) return msg("Paste the worker's address, starting with https://");
+      msg("Connecting…");
+      try {
+        const r = await fetch(worker + "/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: t }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) return msg(`❌ ${esc(j.error || `The worker answered ${r.status}`)}`);
+        savePref(PUSH_KEY, { topic: t, worker, device: (pushCfg() || {}).device || pushDevice() });
+        pushFollows(true);
+        msg(j.ok ? "✅ Connected — a test alert is on its way to ntfy. HAWK now keeps the worker up to date with your bets." : "⚠️ Connected, but ntfy didn't take the test — try again in a minute.");
+        if (S.view === "scores") renderScores();
+      } catch { msg("❌ Couldn't reach the worker — check the address, and that you pressed Deploy."); }
+    }
+  });
 }
 // "📳 Test": shows a notification now, or says what's blocking it.
 async function testNotify() {

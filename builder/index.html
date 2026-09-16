@@ -582,6 +582,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .lchip.pl{border-color:rgba(74,168,255,.45)}
 .vline{font-size:12px;color:var(--accent);margin-top:6px}
 .bigodds{font-size:24px;font-weight:900;color:var(--gold)}
+.sprice{display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:12px;color:var(--muted);margin:4px 0;cursor:text}
+.sprice input{width:78px;padding:6px 8px;font-size:16px;font-weight:800;text-align:center;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text)}
+.sverdict{margin:2px 0 4px}
 /* player deep-dive */
 .modal-bg{position:fixed;inset:0;background:rgba(3,6,8,.7);display:grid;place-items:center;z-index:30;animation:fade .15s}
 @keyframes fade{from{opacity:0}}
@@ -882,7 +885,8 @@ a.nav{text-decoration:none}
   .chart{gap:4px}
   .hits{grid-template-columns:repeat(2,1fr)}
   .scard{grid-template-columns:1fr}
-  .scard > div:last-child{text-align:left;display:flex;align-items:center;gap:12px}
+  .scard > div:last-child{text-align:left;display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
+  .scard .sprice{justify-content:flex-start}
 }
 </style>
 </head>
@@ -963,7 +967,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },
-            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", confirmed: loadPref("hawk.scanConfirmed", false), data: null, timer: null },
+            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", confirmed: loadPref("hawk.scanConfirmed", false), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
             radar: { leagues: null, hours: "today", min: 1, data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null,
                      tab: "value", minMove: 0.1 },
@@ -2710,9 +2714,24 @@ function renderScan() {
   bindLeaguePicker("scanLeagues", sc.leagues, "hawk.scanLeagues");
   $("#hrs").onchange = (e) => { sc.hours = windowValue(e.target.value); };
   $("#srt").onchange = (e) => { sc.sort = e.target.value; updateScan(); };
+  $("#scanRes").oninput = (e) => {
+    const i = e.target.closest("[data-price]"); if (!i) return;
+    const r = (S.scan.data.results || []).find(x => String(x.id) === i.dataset.price); if (!r) return;
+    const v = parseFloat(i.value.replace(",", "."));
+    if (v > 1) S.scan.prices[scanKey(r)] = v; else delete S.scan.prices[scanKey(r)];
+    const box = i.closest(".scard").querySelector(".sverdict"); if (box) box.innerHTML = scanVerdict(r);
+  };
+  $("#scanRes").onchange = (e) => {
+    const i = e.target.closest("[data-price]"); if (!i) return;
+    const keys = Object.keys(S.scan.prices); keys.slice(0, Math.max(0, keys.length - 200)).forEach(k => delete S.scan.prices[k]);
+    savePref("hawk.scanPrices", S.scan.prices);
+    const r = (S.scan.data.results || []).find(x => String(x.id) === i.dataset.price);
+    if (r && S.scan.prices[scanKey(r)]) { learnScanPrice(r, S.scan.prices[scanKey(r)]); updateScan(); }
+  };
   $("#scanConf").onchange = (e) => { sc.confirmed = e.target.checked; savePref("hawk.scanConfirmed", sc.confirmed); updateScan(); };
   $("#scanGo").onclick = toggleScan;
   $("#scanRes").onclick = (e) => {
+    if (e.target.closest(".sprice")) return;
     const a = e.target.closest("[data-acca]"); if (a) return addScanToAcca(a.dataset.acca);
     const c = e.target.closest("[data-open]"); if (c) openFromScan(c.dataset.open);
   };
@@ -2721,12 +2740,14 @@ function renderScan() {
 function updateScan() {
   if (S.view !== "scan" || !$("#scanRes")) return;
   const d = S.scan.data || { running: false, total: 0, done: 0, errors: 0, results: [] };
+  const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest("#scanRes [data-price]");
   $("#scanGo").textContent = d.running ? "■ STOP" : (d.results.length ? "⚡ SCAN AGAIN" : "⚡ SCAN");
   $("#scanProg").innerHTML = d.running || d.total ? `<div class="prog"><span style="width:${d.total ? 100 * d.done / d.total : 3}%"></span></div>
     <div class="note">${d.running ? `Scanning… ${d.done} of ${d.total || "?"} fixtures` : `Scanned ${d.done} fixture${d.done === 1 ? "" : "s"}`}${
       d.errors ? ` · ${d.errors} skipped (no odds or data yet)` : ""}</div>` : "";
+  if (typing) return;
   const sorters = {
-    worth: (a, b) => (b.worth || 0) - (a.worth || 0) || (b.p || 0) - (a.p || 0),
+    worth: (a, b) => scanWorth(b) - scanWorth(a) || (b.p || 0) - (a.p || 0),
     legs: (a, b) => a.legs.length - b.legs.length || (a.kickoff || "").localeCompare(b.kickoff || ""),
     kickoff: (a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""),
     value: (a, b) => b.value.length - a.value.length || ((b.value[0] || {}).edge || 0) - ((a.value[0] || {}).edge || 0),
@@ -2737,14 +2758,15 @@ function updateScan() {
   const shown = S.scan.confirmed ? open.filter(r => r.confirmed) : open, hidden = open.length - shown.length;
   const betNote = betOn.size ? `<div class="note" style="margin:0 0 10px">🎟 ${betOn.size} match${betOn.size > 1 ? "es" : ""} you've already bet on ${betOn.size > 1 ? "are" : "is"} hidden.</div>` : "";
   const res = [...shown].sort(sorters[S.scan.sort] || sorters.worth);
-  const good = shown.filter(r => r.worth >= 1.02).length, fair = shown.filter(r => r.worth >= 0.95 && r.worth < 1.02).length;
+  const typedIn = shown.filter(r => S.scan.prices[scanKey(r)]), good = typedIn.filter(r => scanWorth(r) >= 1.02).length;
+  const fair = typedIn.filter(r => scanWorth(r) >= 0.95 && scanWorth(r) < 1.02).length, likely = shown.filter(r => !S.scan.prices[scanKey(r)] && r.worth >= 0.95).length;
   if (!res.length && hidden) {
     $("#scanRes").innerHTML = betNote + `<div class="note">No match with confirmed lineups yet (${hidden} still predicted). Lineups come out about an hour before kick-off — ⚡ Scan again then, or untick <b>Lineups confirmed only</b>.</div>`;
     return;
   }
-  $("#scanRes").innerHTML = betNote + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${good ? `✅ ${good} worth-it builder${good > 1 ? "s" : ""}` : ""}${good && fair ? " · " : ""}${fair ? `🤏 ${fair} fair-priced` : ""}${!good && !fair ? "No good builders yet" : ""}<small>${good || fair
-      ? "Best value at the top. Open one, build it on Bet365 and type its price to confirm. A Bet365 boost turns a fair-priced one into ✅."
-      : d.running ? "Still scanning…" : "Bet365's builder prices are tight right now — try a lower target, another time window, or come back nearer kick-off."}</small></div>` : "") + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
+  $("#scanRes").innerHTML = betNote + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${[good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`, likely && `👀 ${likely} worth checking`].filter(Boolean).join(" · ") || "Nothing worth checking yet"}<small>${
+      "HAWK can't see Bet365's prices, so it tells you the price each builder needs. Build one on Bet365, type its price in the box and HAWK tells you straight away. 👀 ones are the likeliest to be ✅ — start at the top."}${
+      !good && !fair && !likely && !d.running ? " Nothing looks close right now — try a lower target or fewer legs." : ""}</small></div>` : "") + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
     ? "Results appear here as each match is analysed…"
     : d.total === 0 && d.params ? "No fixtures kick off in that window — try a longer one."
     : betOn.size && !open.length ? "Nothing new — you've already bet on every match scanned."
@@ -2763,8 +2785,32 @@ function alreadyBet(results) {
   }
   return new Set(results.filter(r => ids.has(String(r.id)) || names.some(([h, a]) => same(h, r.home) && same(a, r.away))).map(r => String(r.id)));
 }
+// Best builders price box. HAWK can't see Bet365's prices, so each card shows the price the
+// builder needs; you type Bet365's real price and the card turns ✅ / 🤏 / ❌.
+const scanKey = (r) => `${r.id}|${r.legs.map(l => l.id).sort().join(",")}`;
+const scanNeed = (r) => ({ fair: r.fair / (r.check || 1), need: r.fair / (r.check || 1) * 1.02 });
+// Worth per €1: your typed price if you gave one, else HAWK's guess of Bet365's price.
+const scanWorth = (r) => { const x = S.scan.prices[scanKey(r)]; return x ? r.p * (r.check || 1) * x : (r.worth || 0) * 0.999; };
+function scanVerdict(r) {
+  const { fair, need } = scanNeed(r), x = S.scan.prices[scanKey(r)];
+  if (x > 1) return x >= need ? `<div class="badge ok">✅ BET IT</div><div class="muted" style="font-size:12px">${odds(x)} beats ${odds(need)}</div>`
+    : x >= fair * 0.95 ? `<div class="badge ok">🤏 FAIR PRICE</div><div class="muted" style="font-size:12px">OK if you like it · ✅ from ${odds(need)}</div>`
+    : `<div class="badge warn">❌ SKIP IT</div><div class="muted" style="font-size:12px">${odds(x)} is under ${odds(need)}</div>`;
+  const guess = r.worth >= 1.02 ? "👀 likely ✅" : r.worth >= 0.95 ? "👀 could be 🤏" : "probably under";
+  return `<div class="muted" style="font-size:12px">HAWK's guess ≈ ${odds(r.b365 || r.fair)} · ${guess}</div>`;
+}
+// A price typed on a card teaches HAWK Bet365's builder cut, the same as the slip's price box.
+function learnScanPrice(r, price) {
+  const key = scanKey(r), list = loadPref("hawk.b365prices", []).filter(x => x.key !== key);
+  const detail = r.legs.map(l => ({ k: HAWK.propKey(l), p: +(+l.p).toFixed(4), b: l.bookPrice || null, u: l.refPrice || null }));
+  list.push({ key, fair: +r.fair.toFixed(3), joint: +r.p.toFixed(5), price, legs: r.legs.length, detail, model: r.b365raw || null, t: Date.now() });
+  savePref("hawk.b365prices", list.slice(-B365_KEEP));
+  applyPropBook();
+  applyAim();
+}
 function scanCard(r, params) {
   const short = params && (r.b365 || r.fair) < params.target * 0.97;
+  const typed = S.scan.prices[scanKey(r)];
   return `<div class="scard" data-open="${esc(r.id)}">
     <div><div class="teams"><img src="${esc(r.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(r.home)}
         <span class="muted" style="font-weight:500">vs</span><img src="${esc(r.awayCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(r.away)}</div>
@@ -2772,9 +2818,12 @@ function scanCard(r, params) {
         <span class="badge ${r.confirmed ? "ok" : "warn"}">${r.confirmed ? "Lineups confirmed" : "Lineups predicted"}</span></div>
       <div>${r.legs.map(l => `<span class="lchip ${l.kind === "player" ? "pl" : ""}">${esc(l.label)}</span>`).join("")}</div>
       ${r.value.length ? `<div class="vline">Bet365 value: ${r.value.map(v => `${esc(v.label)} @ ${odds(v.price)} (+${(100 * v.edge).toFixed(1)}%)`).join(" · ")}</div>` : ""}</div>
-    <div style="text-align:right">${r.worth >= 1.02 ? `<div class="badge ok" style="margin-bottom:4px">✅ Worth it</div>` : r.worth >= 0.95 ? `<div class="badge ok" style="margin-bottom:4px">🤏 Fair price</div>` : `<div class="badge warn" style="margin-bottom:4px">Bet365 underpays</div>`}
-      <div class="bigodds">${odds(r.b365 || r.fair)}</div>
-      <div class="muted" style="font-size:12px">Bet365 ≈ · fair ${odds(r.fair)}<br>${r.legs.length} legs · lands ${pct(r.p, 0)}${r.worth ? ` · value ${r.worth >= 1 ? "+" : ""}${(100 * (r.worth - 1)).toFixed(0)}%` : ""}${short ? "<br>short of target" : ""}</div>
+    <div style="text-align:right">
+      <div class="muted" style="font-size:12px">Bet it at</div>
+      <div class="bigodds">${odds(scanNeed(r).need)}+</div>
+      <label class="sprice">Bet365 price <input data-price="${esc(r.id)}" inputmode="decimal" placeholder="e.g. ${odds(r.b365 || r.fair)}" value="${typed ? typed : ""}"></label>
+      <div class="sverdict">${scanVerdict(r)}</div>
+      <div class="muted" style="font-size:12px">${r.legs.length} legs · lands ${pct(r.p, 0)}${short ? " · short of target" : ""}</div>
       <button class="ghost" style="width:auto;padding:6px 12px">Open ›</button>
       <button class="ghost" style="width:auto;padding:6px 12px" data-acca="${esc(r.id)}" title="Put this builder on your acca">${
         S.acca.some(pt => pt.id === String(r.id)) ? "✓ In acca" : "➕ Acca"}</button></div></div>`;

@@ -1914,7 +1914,7 @@
     runFixtureJob(scan, (league, f, json, e) => {
       // The best ticket for this match (worth betting at Bet365 first), from a quicker search than the builder's.
       const t = searchOptions(e, { ...params, favourite: true, known: params.known || [] }, 1, 1)[0];
-      scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair, b365: t.b365 || null, worth: +worthOf(t).toFixed(3), guessed: t.guessed || 0,
+      scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair, b365: t.b365 || null, b365raw: t.b365raw || null, check: t.check || 1, worth: +worthOf(t).toFixed(3), guessed: t.guessed || 0,
         legs: t.legs.map((r) => legSummary(e, json, r.id)),
         value: json.value.legs.slice(0, 4).map((v) => ({ label: v.label, price: v.price, edge: v.edge })) });
     });

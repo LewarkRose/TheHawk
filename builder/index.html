@@ -963,7 +963,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },
-            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "legs", data: null, timer: null },
+            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", data: null, timer: null },
             radar: { leagues: null, hours: "today", min: 1, data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null,
                      tab: "value", minMove: 0.1 },
@@ -2192,7 +2192,7 @@ function renderSlip() {
       ? `🔄 BUILD AGAIN — option ${(S.options.at + 1) % S.options.list.length + 1} of ${S.options.list.length}` : "⚡ BUILD MY BET BUILDER"}</button>
     ${S.slip.length ? `
     ${sameOptions() && S.options.list.length > 1 ? `<div class="optbar" id="optbar"><span class="muted">Options</span>${S.options.list.map((o, i) =>
-      `<button class="${i === S.options.at ? "on" : ""}" data-opt="${i}" title="${o.legs.length} legs · ${pct(o.p, 1)} to land · Bet365 ≈ ${odds(o.b365 || o.fair)} · fair ${odds(o.fair)}${o.guessed ? ` · ${o.guessed} guessed price${o.guessed > 1 ? "s" : ""}` : " · all priced"}">${i + 1}<small>${o.legs.length} legs · ${odds(o.b365 || o.fair)}${o.guessed ? "" : " ✓"}</small></button>`).join("")}</div>` : ""}
+      `<button class="${i === S.options.at ? "on" : ""}" data-opt="${i}" title="${o.legs.length} legs · ${pct(o.p, 1)} to land · Bet365 ≈ ${odds(o.b365 || o.fair)} · fair ${odds(o.fair)}${o.guessed ? ` · ${o.guessed} guessed price${o.guessed > 1 ? "s" : ""}` : " · all priced"}${o.worth >= 1.02 ? " · worth it at Bet365" : ""}">${o.worth >= 1.02 ? "✅ " : o.worth >= 0.95 ? "🤏 " : ""}${i + 1}<small>${o.legs.length} legs · ${odds(o.b365 || o.fair)}${o.guessed ? "" : " ✓"}</small></button>`).join("")}</div>` : ""}
     <div class="ticket">
       <div class="th"><b>BET BUILDER</b><span class="odds" title="${r && r.b365 ? `About what Bet365 will show for this builder. HAWK's fair odds: ${odds(r.fair)}` : "HAWK's fair odds"}">${
         r && r.b365 ? `<small class="muted" style="font-size:11px;font-weight:600;margin-right:6px">Bet365 ≈</small>${odds(r.b365)}` : r && r.fair ? odds(r.fair) : "…"}</span></div>
@@ -2333,21 +2333,24 @@ function b365Guess(fair, legs) {
   const at = (kk) => Math.max(1.01, fair * Math.exp(-kk * legs));
   return { mid: at(k), lo: at(k + Math.max(sd, 0.008)), hi: at(Math.max(0, k - Math.max(sd, 0.008))), n, cut: 1 - Math.exp(-k) };
 }
-// The slip's answer in one line: BET IT / CHECK THE PRICE / SKIP IT, and the
+// The slip's answer in one line: BET IT / FAIR PRICE / SKIP IT, and the
 // Bet365 price it needs. Uses the price you typed, or else the one HAWK expects.
 function easyCall(r) {
   if (!r || !(r.fair > 1) || !r.p) return "";
   const { price, boost, eff } = checkerInputs();
-  const need = r.fair * 1.02, needQuoted = 1 + (need - 1) / (1 + boost / 100);   // the Bet365 price that makes it worth it
+  // The price it's really worth: HAWK's fair, raised where HAWK rates a leg well above the bookies' price.
+  const fair = r.fair / (r.check || 1), need = fair * 1.02, needQuoted = 1 + (need - 1) / (1 + boost / 100);   // the Bet365 price that makes it worth it
   // How risky, in plain words: how often it lands.
   const in10 = Math.round(r.p * 10), risk = `<small class="risk">${r.p >= 0.6 ? `🙂 Likely — lands about ${in10} in 10`
     : r.p >= 0.4 ? `🪙 Coin flip — lands about ${in10} in 10` : r.p >= 0.2 ? `🎲 Risky — lands about ${Math.max(2, in10)} in 10, loses the rest`
     : `🎯 Long shot — lands about 1 in ${Math.round(1 / r.p)}`}</small>`;
   const call = (tone, head, sub) => `<div class="call ${tone}">${head}${sub ? `<small>${sub}</small>` : ""}${risk}</div>`;
+  // The Bet365 boost that would make a price worth it (a winnings boost multiplies the profit part).
+  const boostFor = (x) => x > 1 && need > x ? Math.ceil(((need - 1) / (x - 1) - 1) * 100) : 0;
   if (eff > 1) {
     if (eff >= need) return call("good", "✅ BET IT", `${odds(price)}${boost ? ` + ${boost}% boost` : ""} is worth it — HAWK needs ${odds(needQuoted)} or more.`);
-    if (eff >= r.fair) return call("warn", "🤏 JUST OK", `${odds(price)} is about fair — no real edge. Worth it from ${odds(needQuoted)}.`);
-    return call("bad", "❌ SKIP IT", `${odds(price)} is too low — it needs ${odds(needQuoted)} or more. Tap Build again for another option.`);
+    if (eff >= fair * 0.95) return call("warn", "🤏 FAIR PRICE", `${odds(price)} is close to what it's worth (${odds(fair)}) — Bet365's cut is small. Fine to bet if you like it${boostFor(eff) ? `; a ${boostFor(eff)}%+ boost makes it ✅` : ""}.`);
+    return call("bad", "❌ SKIP IT", `${odds(price)} is too low — it needs ${odds(needQuoted)} or more${boostFor(eff) && boostFor(eff) <= 50 ? ` (or a ${boostFor(eff)}% boost)` : ""}. Tap Build again for another option.`);
   }
   // A leg price that says HAWK's chance pays nearly double is a data mix-up, not a bargain: don't build a "bet it" on it.
   const odd = S.slip.map(id => S.legs[id]).find(l => { const pr = l && legPrice(l); return pr && pr.price && pr.price * l.p > 1.8; });
@@ -2355,8 +2358,9 @@ function easyCall(r) {
   const g = r.b365 > 1 ? null : b365Guess(r.fair, S.slip.length), expect = r.b365 > 1 ? r.b365 : g ? g.mid : null;
   if (!expect) return call("warn", `👉 BET IT if Bet365 shows ${odds(needQuoted)} or more`);
   if (expect >= need) return call("good", `✅ BET IT if Bet365 shows ${odds(needQuoted)} or more`, `HAWK expects about ${odds(expect)} there.`);
-  if (expect >= need * 0.95) return call("warn", `🤏 CHECK THE PRICE — bet only at ${odds(needQuoted)} or more`, `HAWK expects about ${odds(expect)} — it's close.`);
-  return call("bad", `❌ PROBABLY SKIP — needs ${odds(needQuoted)}, Bet365 should pay about ${odds(expect)}`, "Tap Build again for another option, or try 💰 Value first.");
+  if (expect >= fair * 0.95) return call("warn", `🤏 FAIR PRICE — bet at ${odds(1 + (fair * 0.95 - 1) / (1 + boost / 100))} or more`, `HAWK expects about ${odds(expect)}, close to what it's worth (${odds(fair)}). ✅ from ${odds(needQuoted)}${boostFor(expect) ? `, or with a ${boostFor(expect)}%+ boost` : ""}.`);
+  return call("bad", `❌ PROBABLY SKIP — needs ${odds(needQuoted)}, Bet365 should pay about ${odds(expect)}`,
+    `No worth-it builder here? <a href="#" onclick="event.preventDefault();showScan()" style="color:inherit;text-decoration:underline">⚡ Best builders</a> lists the matches that have one.`);
 }
 function guessLine(r) {
   if (r && r.b365 > 1) {
@@ -2521,8 +2525,9 @@ async function build() {
     S.slip = S.result.legs.map(l => l.id);
     // Keep the build's settings signature valid: the new slip's locks are the same ones.
     if (!S.slip.length) toast("No legs fit this style — try another style or target.");
-    else if (S.result.fair < S.target * 0.97) toast(`Best found: ${odds(S.result.fair)} — raise max legs or change style to go higher.`);
-    else if (options.length > 1) toast(`${options.length} options found — press Build again for the next.`);
+    else if (S.result.worth >= 1.02) { const n = options.filter(o => o.worth >= 1.02).length; toast(`✅ ${n} worth-it builder${n > 1 ? "s" : ""} found${options.length > 1 ? " — press Build again for the next" : ""}`, 4000); }
+    else if (S.result.worth >= 0.95) toast("🤏 Best here is a fair price (Bet365's cut is small) — ⚡ Best builders shows the best across all matches.", 5000);
+    else toast("Bet365 underpays every builder in this match — ⚡ Best builders shows the best across all matches.", 6000);
   } catch (err) { toast(err.message); }
   renderSlip(); refreshTab();
   if (narrow() && S.slip.length) $("#slip").scrollIntoView({ behavior: "smooth" });
@@ -2686,13 +2691,13 @@ function renderScan() {
       <h3>⚡ Best builders</h3>
       <div class="note" style="margin-top:0">HAWK builds a ticket for every fixture with your slip settings —
         target <b style="color:var(--gold)">${S.target.toFixed(2)}</b> · ${esc(STYLES[S.style].label)} · ${esc(FOCUS_LABELS[S.focus])} · max ${S.maxLegs} legs.
-        At the same target every ticket has the same chance to land, so the best are the ones needing the <b>fewest legs</b>
-        (each leg adds bookmaker margin). Green lines are match legs where Bet365's price beats HAWK's fair odds.</div>
+        For every match HAWK tries many tickets and keeps the best one — <b>✅ worth it at Bet365</b> first (Bet365's likely price
+        beats what the ticket is worth), best value at the top. Open one, build it on Bet365 and type its price to confirm.</div>
       ${leaguePicker("scanLeagues", sc.leagues)}
       <div class="opts" style="justify-content:flex-start;gap:16px;flex-wrap:wrap">
         <label>Kick-off <select id="hrs">${KICKOFF_WINDOWS.filter(([h]) => h !== 72).map(([h, t]) =>
           `<option value="${h}" ${h === sc.hours ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-        <label>Sort by <select id="srt">${[["legs", "Fewest legs"], ["kickoff", "Kick-off time"], ["value", "Bet365 value"]].map(([k, t]) =>
+        <label>Sort by <select id="srt">${[["worth", "Worth it at Bet365"], ["legs", "Fewest legs"], ["kickoff", "Kick-off time"], ["value", "Single legs with value"]].map(([k, t]) =>
           `<option value="${k}" ${k === sc.sort ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <button class="build" id="scanGo" style="width:auto;margin:0 0 0 auto;padding:10px 20px"></button>
       </div>
@@ -2717,18 +2722,22 @@ function updateScan() {
     <div class="note">${d.running ? `Scanning… ${d.done} of ${d.total || "?"} fixtures` : `Scanned ${d.done} fixture${d.done === 1 ? "" : "s"}`}${
       d.errors ? ` · ${d.errors} skipped (no odds or data yet)` : ""}</div>` : "";
   const sorters = {
+    worth: (a, b) => (b.worth || 0) - (a.worth || 0) || (b.p || 0) - (a.p || 0),
     legs: (a, b) => a.legs.length - b.legs.length || (a.kickoff || "").localeCompare(b.kickoff || ""),
     kickoff: (a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""),
     value: (a, b) => b.value.length - a.value.length || ((b.value[0] || {}).edge || 0) - ((a.value[0] || {}).edge || 0),
   };
-  const res = [...d.results].sort(sorters[S.scan.sort]);
-  $("#scanRes").innerHTML = res.length ? res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
+  const res = [...d.results].sort(sorters[S.scan.sort] || sorters.worth);
+  const good = d.results.filter(r => r.worth >= 1.02).length, fair = d.results.filter(r => r.worth >= 0.95 && r.worth < 1.02).length;
+  $("#scanRes").innerHTML = res.length ? (d.results.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${good ? `✅ ${good} worth-it builder${good > 1 ? "s" : ""}` : ""}${good && fair ? " · " : ""}${fair ? `🤏 ${fair} fair-priced` : ""}${!good && !fair ? "No good builders yet" : ""}<small>${good || fair
+      ? "Best value at the top. Open one, build it on Bet365 and type its price to confirm. A Bet365 boost turns a fair-priced one into ✅."
+      : d.running ? "Still scanning…" : "Bet365's builder prices are tight right now — try a lower target, another time window, or come back nearer kick-off."}</small></div>` : "") + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
     ? "Results appear here as each match is analysed…"
     : d.total === 0 && d.params ? "No fixtures kick off in that window — try a longer one."
     : "Pick leagues and a time window, then hit Scan. It takes a few seconds per match."}</div>`;
 }
 function scanCard(r, params) {
-  const short = params && r.fair && r.fair < params.target * 0.97;
+  const short = params && (r.b365 || r.fair) < params.target * 0.97;
   return `<div class="scard" data-open="${esc(r.id)}">
     <div><div class="teams"><img src="${esc(r.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(r.home)}
         <span class="muted" style="font-weight:500">vs</span><img src="${esc(r.awayCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(r.away)}</div>
@@ -2736,8 +2745,9 @@ function scanCard(r, params) {
         <span class="badge ${r.confirmed ? "ok" : "warn"}">${r.confirmed ? "Lineups confirmed" : "Lineups predicted"}</span></div>
       <div>${r.legs.map(l => `<span class="lchip ${l.kind === "player" ? "pl" : ""}">${esc(l.label)}</span>`).join("")}</div>
       ${r.value.length ? `<div class="vline">Bet365 value: ${r.value.map(v => `${esc(v.label)} @ ${odds(v.price)} (+${(100 * v.edge).toFixed(1)}%)`).join(" · ")}</div>` : ""}</div>
-    <div style="text-align:right"><div class="bigodds">${odds(r.fair)}</div>
-      <div class="muted" style="font-size:12px">${r.legs.length} legs · ${pct(r.p, 1)}${short ? "<br>short of target" : ""}</div>
+    <div style="text-align:right">${r.worth >= 1.02 ? `<div class="badge ok" style="margin-bottom:4px">✅ Worth it</div>` : r.worth >= 0.95 ? `<div class="badge ok" style="margin-bottom:4px">🤏 Fair price</div>` : `<div class="badge warn" style="margin-bottom:4px">Bet365 underpays</div>`}
+      <div class="bigodds">${odds(r.b365 || r.fair)}</div>
+      <div class="muted" style="font-size:12px">Bet365 ≈ · fair ${odds(r.fair)}<br>${r.legs.length} legs · lands ${pct(r.p, 0)}${r.worth ? ` · value ${r.worth >= 1 ? "+" : ""}${(100 * (r.worth - 1)).toFixed(0)}%` : ""}${short ? "<br>short of target" : ""}</div>
       <button class="ghost" style="width:auto;padding:6px 12px">Open ›</button>
       <button class="ghost" style="width:auto;padding:6px 12px" data-acca="${esc(r.id)}" title="Put this builder on your acca">${
         S.acca.some(pt => pt.id === String(r.id)) ? "✓ In acca" : "➕ Acca"}</button></div></div>`;

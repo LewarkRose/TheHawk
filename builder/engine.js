@@ -1451,8 +1451,11 @@
     }
     const p = Math.min(1, mean(m) * adj, ...chosen.map((id) => legs[id].p));
     const raw = b365Raw(legs, chosen, p);
+    // Market check: how much of p stays if each leg counts as at most 12% likelier than its bookie price says.
+    const check = chosen.reduce((k, id) => { const l = legs[id], ref = l.refPrice || l.bookPrice;
+      return ref > 1 && l.p ? k * Math.min(1, 1.12 / ref / l.p) : k; }, 1);
     return { p, fair: p > 0 ? 1 / p : null, legs: rows, b365: raw && raw * aimOf(chosen.length), b365raw: raw, price: priceOf(legs, chosen, p) || null,
-             guessed: chosen.filter((id) => !hasPrice(legs[id])).length };
+             guessed: chosen.filter((id) => !hasPrice(legs[id])).length, check };
   }
   function pruneImplied(legs, chosen, keep, n) {
     for (const id of chosen.slice()) {
@@ -1777,36 +1780,59 @@
   // of its legs (or all of them) left out, and so on, keeping only tickets
   // that still reach the target. They're picked to differ from each other as
   // much as possible, best first (fewest legs = least bookmaker margin).
-  function buildOptions(body, count = 5) {
-    const e = entryFor(body.id), target = +body.target || 3, locked = body.locked || [];
-    const known = new Set(body.known || []);
-    const run = (banned) => autoBuild(e.legs, target, body.style, +body.maxLegs || 10, locked, banned, body.favourite !== false,
-                                      body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely", known);
-    const base = new Set(body.banned || []), key = (t) => t.legs.map((l) => l.id).sort().join("|");
-    const first = run(base);
-    if (!first.legs.length) return { options: [first] };
-    const at = (t) => t.price || t.fair;   // Bet365's likely price with aim on, else HAWK's fair odds
-    const reaches = (t) => t.legs.length && at(t) >= target * 0.97;
+  // What a ticket is worth at Bet365: its chance × the price HAWK expects Bet365
+  // to show. 1.02+ is "✅ worth it", 0.95+ a "🤏 fair price" (small cut), lower is underpaid.
+  // A leg HAWK rates far likelier than the bookies' price says only counts as up to
+  // 12% over the price's chance, so "worth it" never rests on HAWK out-guessing the market alone.
+  // (evaluate() stores it as `check`.)
+  const worthOf = (t) => { const x = t.b365 || t.price || null; return x && t.p ? t.p * x * (t.check || 1) : 0; };
+  // Tickets for one match, the ones worth betting at Bet365 first. HAWK tries the
+  // likeliest legs AND the best-value legs, in your style and the two next to it,
+  // then swaps out each leg in turn — many different tickets — and ranks them:
+  // worth it at Bet365 first (most value, then likeliest), then the nearest misses.
+  // Tickets far from your target price are left out.
+  function searchOptions(e, params, count = 5, depth = 2) {
+    const target = +params.target || 3, locked = params.locked || [], known = new Set(params.known || []);
+    const base = new Set(params.banned || []), key = (t) => t.legs.map((l) => l.id).sort().join("|");
+    const styles = [...new Set([STYLES[params.style] ? params.style : "Balanced", "Balanced", params.style === "Punchy" ? "Balanced" : "Banker"])];
+    const at = (t) => t.b365 || t.price || t.fair;
+    const near = (t) => t.legs.length && at(t) >= target * 0.9 && at(t) <= target * 1.6;
     const free = (t) => t.legs.map((l) => l.id).filter((id) => !locked.includes(id) && e.legs[id].group !== "result");
-    const found = new Map([[key(first), first]]);
-    const tryBan = (ids) => { const t = run(new Set([...base, ...ids])); if (reaches(t) && !found.has(key(t))) found.set(key(t), t); return t; };
-    for (const id of free(first)) tryBan([id]);
-    const fresh = tryBan(free(first));                      // a ticket with none of the first one's legs
-    for (const id of free(fresh)) tryBan([...free(first), id]);
-    // Best first: the likeliest ticket at your price (same price, higher chance =
-    // better), close to the target, with few guessed prices — then as different as
-    // possible from the ones already chosen. (It used to put the fewest legs first,
-    // which ranked a 3-leg ticket with a long-shot scorer above a likelier 4-leg one.)
-    const quality = (t) => -Math.log(Math.max(t.p || 0, 1e-6)) + 0.6 * Math.abs(Math.log(at(t) / target)) + 0.25 * (t.guessed || 0) + 0.03 * t.legs.length;
-    const pool = [...found.values()].slice(1).sort((a, b) => quality(a) - quality(b));
-    const chosen = [first];
-    while (chosen.length < count && pool.length) {
-      const overlap = (t) => Math.max(...chosen.map((c) => t.legs.filter((l) => c.legs.some((x) => x.id === l.id)).length / t.legs.length));
-      let bestI = 0, bestV = Infinity;
-      pool.forEach((t, i) => { const v = quality(t) + 0.8 * overlap(t); if (v < bestV) { bestV = v; bestI = i; } });
-      chosen.push(pool.splice(bestI, 1)[0]);
+    const found = new Map();
+    const run = (style, picks, banned) => {
+      const t = autoBuild(e.legs, target, style, +params.maxLegs || 10, locked, banned, params.favourite !== false, params.focus || "Mix", !!params.extras, picks, known);
+      if (t.legs.length && !found.has(key(t))) found.set(key(t), t);
+      return t;
+    };
+    for (const style of styles) for (const picks of ["value", "likely"]) {
+      const first = run(style, picks, base);
+      if (depth < 1 || !first.legs.length) continue;
+      for (const id of free(first)) {
+        const t = run(style, picks, new Set([...base, id]));
+        if (depth >= 2) for (const id2 of free(t).filter((x) => x !== id).slice(0, 2)) run(style, picks, new Set([...base, id, id2]));
+      }
     }
-    return { options: chosen.sort((a, b) => quality(a) - quality(b)) };
+    let pool = [...found.values()];
+    if (!pool.length) return [run(styles[0], params.picks === "value" ? "value" : "likely", base)];
+    const close = pool.filter(near);
+    if (close.length) pool = close;
+    // Score: value at Bet365 counts most, then the chance to land, then few guessed prices and a price close to the target.
+    const score = (t) => { const w = worthOf(t);
+      return (w >= 1.02 ? 10 : 0) + w * 3 + (t.p || 0) - 0.08 * (t.guessed || 0) - 0.15 * Math.abs(Math.log(at(t) / target)); };
+    pool.sort((x, y) => score(y) - score(x));
+    const chosen = [];
+    for (const t of pool) {
+      if (chosen.length >= count) break;
+      // as different as possible from the ones already chosen
+      if (chosen.some((c) => t.legs.filter((l) => c.legs.some((x) => x.id === l.id)).length >= Math.max(2, t.legs.length - 1))) continue;
+      chosen.push(t);
+    }
+    for (const t of pool) { if (chosen.length >= count) break; if (!chosen.includes(t)) chosen.push(t); }
+    return chosen.map((t) => ({ ...t, worth: +worthOf(t).toFixed(3) }));
+  }
+  function buildOptions(body, count = 5) {
+    const e = entryFor(body.id);
+    return { options: searchOptions(e, body, count, 2) };
   }
 
   // Head to head: the last 5 finished meetings of the two clubs (any
@@ -1886,8 +1912,10 @@
                      maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12), extras: !!body.extras, picks: body.picks === "value" ? "value" : "likely" };
     Object.assign(scan, newJob(), { running: true, params });
     runFixtureJob(scan, (league, f, json, e) => {
-      const t = autoBuild(e.legs, params.target, params.style, params.maxLegs, [], new Set(), true, params.focus, params.extras, params.picks);
-      scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair, legs: t.legs.map((r) => legSummary(e, json, r.id)),
+      // The best ticket for this match (worth betting at Bet365 first), from a quicker search than the builder's.
+      const t = searchOptions(e, { ...params, favourite: true, known: params.known || [] }, 1, 1)[0];
+      scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair, b365: t.b365 || null, worth: +worthOf(t).toFixed(3), guessed: t.guessed || 0,
+        legs: t.legs.map((r) => legSummary(e, json, r.id)),
         value: json.value.legs.slice(0, 4).map((v) => ({ label: v.label, price: v.price, edge: v.edge })) });
     });
     return jobStatus(scan);

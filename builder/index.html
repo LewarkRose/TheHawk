@@ -3813,34 +3813,47 @@ function htTipLabel(r, d) {
   const m = /^(Over|Under) ([\d.]+) Goals/.exec(r.label), now = (d.score[0] || 0) + (d.score[1] || 0);
   if (!m) return r.label;
   const need = Math.floor(+m[2]) + 1 - now;
-  return `${r.label} — ${m[1] === "Over" ? `${need} more goal${need > 1 ? "s" : ""} in the 2nd half` : `no more than ${Math.max(0, Math.ceil(+m[2]) - 1 - now)} more`}`;
+  return `${r.label} — ${m[1] === "Over" ? `${need} more goal${need > 1 ? "s" : ""}${isHalfTime(d) ? " in the 2nd half" : ""}` : `no more than ${Math.max(0, Math.ceil(+m[2]) - 1 - now)} more`}`;
 }
+// Checked all match long, not just once: every live match in HAWK's competitions,
+// every 30 s at half-time and every 2 minutes while the ball's rolling (from the
+// 20th minute — early prices say little). A tip pops up the first time it shows,
+// at most one pop-up per match every 10 minutes, so it doesn't nag.
 let htBusy = false;
+const liveCheck = {};   // game id -> { at: last check, popped: last pop-up }
 async function htScan() {
   if (htBusy || !goalState.on) return;
   htBusy = true;
   try {
-    const list = await HAWK.scores(localDay(new Date()));
-    for (const g of list.filter(g => g.status === 3 && isHalfTime(g) && !alertSeen.has(`htt|${g.id}`))) {
+    const list = await HAWK.scores(localDay(new Date())), now = Date.now();
+    const due = list.filter(g => g.status === 3).filter(g => {
+      const ht = isHalfTime(g), min = parseInt(g.clock, 10) || 0, c = liveCheck[g.id] || {};
+      return (ht || min >= 20) && now - (c.at || 0) >= (ht ? 25e3 : 115e3);
+    });
+    for (const g of due) {
+      const c = liveCheck[g.id] ||= {};
+      c.at = Date.now();
       let d;
       try { d = await HAWK.liveMatch(g.id); } catch { continue; }
       if (!d || !d.live) continue;
-      firstTime(`htt|${g.id}`);
       const tips = htTips(d);
-      S.ht[g.id] = { at: Date.now(), tips: tips.map(t => ({ ...t, text: htTipLabel(t, d) })) };
+      S.ht[g.id] = { at: Date.now(), ht: isHalfTime(d), tips: tips.map(t => ({ ...t, text: htTipLabel(t, d) })) };
       if (S.view === "scores") renderScoreList();
-      if (!tips.length) continue;
-      const t = tips[0];
-      alertCard({ tone: "warn", icon: "⏸", word: "HALF-TIME TIP", g, clock: "HT",
+      const t = tips.find(t => !alertSeen.has(`tip|${g.id}|${t.label}`));
+      if (!t || Date.now() - (c.popped || 0) < 10 * 60e3) continue;
+      firstTime(`tip|${g.id}|${t.label}`); c.popped = Date.now();
+      const ht = isHalfTime(d);
+      alertCard({ tone: "warn", icon: ht ? "⏸" : "👀", word: ht ? "HALF-TIME TIP" : "LIVE TIP", g, clock: ht ? "HT" : g.clock,
                   body: `👀 ${esc(htTipLabel(t, d))} <span>· bet at ${odds(t.fair * 1.02)}+ · Bet365 ≈ ${odds(t.price)} · lands ${pct(t.p, 0)}</span>` });
     }
-  } catch (e) { console.warn("[hawk] half-time check:", e.message); }
+  } catch (e) { console.warn("[hawk] live check:", e.message); }
   finally { htBusy = false; }
 }
-// The half-time card in the live view (only while it's half-time).
+// The live check card in the live view: at half-time with the 1st-half stats, during
+// play once there's a tip (it refreshes every 15 s with the page).
 function htSection(d) {
-  if (!isHalfTime(d)) return "";
-  const tips = htTips(d);
+  const ht = isHalfTime(d), tips = htTips(d);
+  if (!ht && !tips.length) return "";
   S.inplay.htPrices ||= {};
   const card = (r) => {
     const key = r.label, need = r.fair * 1.02;
@@ -3850,10 +3863,10 @@ function htSection(d) {
         <label class="sprice">Bet365 price <input data-htprice="${esc(key)}" inputmode="decimal" placeholder="${odds(r.price)}" value="${esc(S.inplay.htPrices[key] || "")}"></label>
         <div class="sverdict" data-htverdict="${esc(key)}">${htVerdict(r)}</div></div></div>`;
   };
-  return `<div class="section"><h3>⏸ Half-time check</h3>
-    <div class="note" style="margin-top:0">1st half: ${esc(htStatsLine(d) || "no stats yet")}</div>
-    ${tips.length ? tips.map(card).join("") : `<div class="note">Nothing worth betting at half-time — Bet365's live prices are in line with HAWK's read of this match.</div>`}
-    <div class="note">Prices move fast and get suspended when the 2nd half starts. Only bet if the price you see is at or above "Bet it at".</div></div>`;
+  return `<div class="section"><h3>${ht ? "⏸ Half-time check" : "👀 Live check"}</h3>
+    ${ht ? `<div class="note" style="margin-top:0">1st half: ${esc(htStatsLine(d) || "no stats yet")}</div>` : ""}
+    ${tips.length ? tips.map(card).join("") : `<div class="note">Nothing worth betting right now — Bet365's live prices are in line with HAWK's read. HAWK keeps checking every 15 seconds while this page is open, and every 2 minutes in the background (30 s at half-time).</div>`}
+    <div class="note">Prices move fast and get suspended after chances and goals. Only bet if the price you see is at or above "Bet it at".</div></div>`;
 }
 function htVerdict(r) {
   const x = parseFloat(String((S.inplay.htPrices || {})[r.label] || "").replace(",", ".")), need = r.fair * 1.02;
@@ -3863,12 +3876,12 @@ function htVerdict(r) {
     : `<div class="badge warn">❌ SKIP IT</div><div class="muted" style="font-size:12px">${odds(x)} is under ${odds(need)}</div>`;
 }
 
-// Live page: the half-time tips HAWK found in the last 20 minutes (tap one for its half-time card).
+// Live page: the tips from HAWK's latest check of each live match (tap one for its live card).
 function htStrip(games) {
-  const rows = Object.entries(S.ht).filter(([, h]) => h.tips.length && Date.now() - h.at < 20 * 60e3)
+  const rows = Object.entries(S.ht).filter(([, h]) => h.tips.length && Date.now() - h.at < 5 * 60e3)
     .map(([id, h]) => [games.find(g => String(g.id) === String(id)), h]).filter(([g]) => g && g.status === 3);
   if (!rows.length) return "";
-  return `<div class="co-card" style="margin:0 0 12px"><b>⏸ Half-time tips</b>${rows.map(([g, h]) => `<div class="sc-ht" data-htgo="${esc(g.id)}|${esc(g.league)}">
+  return `<div class="co-card" style="margin:0 0 12px"><b>👀 Live tips right now</b>${rows.map(([g, h]) => `<div class="sc-ht" data-htgo="${esc(g.id)}|${esc(g.league)}">
       <span>${esc(g.home)} ${g.score[0]}–${g.score[1]} ${esc(g.away)}</span><span class="muted">👀 ${esc(h.tips[0].text || h.tips[0].label)} · bet at ${odds(h.tips[0].fair * 1.02)}+</span></div>`).join("")}</div>`;
 }
 document.addEventListener("click", (e) => { const t = e.target.closest("[data-htgo]"); if (t) { const [id, lg] = t.dataset.htgo.split("|"); goToLive(lg, id); } });

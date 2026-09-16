@@ -963,7 +963,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },
-            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", data: null, timer: null },
+            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", confirmed: loadPref("hawk.scanConfirmed", false), data: null, timer: null },
             radar: { leagues: null, hours: "today", min: 1, data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null,
                      tab: "value", minMove: 0.1 },
@@ -2701,6 +2701,7 @@ function renderScan() {
           `<option value="${h}" ${h === sc.hours ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label>Sort by <select id="srt">${[["worth", "Worth it at Bet365"], ["legs", "Fewest legs"], ["kickoff", "Kick-off time"], ["value", "Single legs with value"]].map(([k, t]) =>
           `<option value="${k}" ${k === sc.sort ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="scanConf" ${sc.confirmed ? "checked" : ""}> Lineups confirmed only</label>
         <button class="build" id="scanGo" style="width:auto;margin:0 0 0 auto;padding:10px 20px"></button>
       </div>
       <div id="scanProg"></div>
@@ -2709,6 +2710,7 @@ function renderScan() {
   bindLeaguePicker("scanLeagues", sc.leagues, "hawk.scanLeagues");
   $("#hrs").onchange = (e) => { sc.hours = windowValue(e.target.value); };
   $("#srt").onchange = (e) => { sc.sort = e.target.value; updateScan(); };
+  $("#scanConf").onchange = (e) => { sc.confirmed = e.target.checked; savePref("hawk.scanConfirmed", sc.confirmed); updateScan(); };
   $("#scanGo").onclick = toggleScan;
   $("#scanRes").onclick = (e) => {
     const a = e.target.closest("[data-acca]"); if (a) return addScanToAcca(a.dataset.acca);
@@ -2729,9 +2731,15 @@ function updateScan() {
     kickoff: (a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""),
     value: (a, b) => b.value.length - a.value.length || ((b.value[0] || {}).edge || 0) - ((a.value[0] || {}).edge || 0),
   };
-  const res = [...d.results].sort(sorters[S.scan.sort] || sorters.worth);
-  const good = d.results.filter(r => r.worth >= 1.02).length, fair = d.results.filter(r => r.worth >= 0.95 && r.worth < 1.02).length;
-  $("#scanRes").innerHTML = res.length ? (d.results.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${good ? `✅ ${good} worth-it builder${good > 1 ? "s" : ""}` : ""}${good && fair ? " · " : ""}${fair ? `🤏 ${fair} fair-priced` : ""}${!good && !fair ? "No good builders yet" : ""}<small>${good || fair
+  // Lineups confirmed only: hides matches whose teams weren't out when they were scanned (they come out about an hour before kick-off).
+  const shown = S.scan.confirmed ? d.results.filter(r => r.confirmed) : d.results, hidden = d.results.length - shown.length;
+  const res = [...shown].sort(sorters[S.scan.sort] || sorters.worth);
+  const good = shown.filter(r => r.worth >= 1.02).length, fair = shown.filter(r => r.worth >= 0.95 && r.worth < 1.02).length;
+  if (!res.length && hidden) {
+    $("#scanRes").innerHTML = `<div class="note">No match with confirmed lineups yet (${hidden} still predicted). Lineups come out about an hour before kick-off — ⚡ Scan again then, or untick <b>Lineups confirmed only</b>.</div>`;
+    return;
+  }
+  $("#scanRes").innerHTML = res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${good ? `✅ ${good} worth-it builder${good > 1 ? "s" : ""}` : ""}${good && fair ? " · " : ""}${fair ? `🤏 ${fair} fair-priced` : ""}${!good && !fair ? "No good builders yet" : ""}<small>${good || fair
       ? "Best value at the top. Open one, build it on Bet365 and type its price to confirm. A Bet365 boost turns a fair-priced one into ✅."
       : d.running ? "Still scanning…" : "Bet365's builder prices are tight right now — try a lower target, another time window, or come back nearer kick-off."}</small></div>` : "") + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
     ? "Results appear here as each match is analysed…"

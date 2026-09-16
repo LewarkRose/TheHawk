@@ -1513,9 +1513,8 @@
           // Filler: a leg Bet365 pays 1.10 or less for (1+ tackles, 1+ shots, 2+ saves…) barely moves the
           // price but can still lose the bet — auto-build leaves it out (you can still add it yourself).
           if (legB365(leg) <= FILLER_PRICE) continue;
-          // Cards legs: land far less often than they look (graded team Over: HAWK said 54%, 42% landed; the
-          // user's bets: 2 of 7 card legs landed, sinking 5 of 10 losses) — auto-build leaves them all out.
-          if (/^t?cards:/.test(leg.id)) continue;
+          // Team Over 0.5 / 1.5 cards: land far less often than they look (graded: HAWK said 54%, 42% landed).
+          if (/^tcards:(home|away):o/.test(leg.id)) continue;
           const k = playerKey(leg);
           if (k && (perPlayer[k] || 0) >= MAX_LEGS_PER_PLAYER) continue;
           let c = 0; const a = leg.arr;

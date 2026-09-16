@@ -229,6 +229,21 @@
     for (const t of (d && d.standings) || []) for (const r of t.rows || []) if (r.competitor) rows[r.competitor.id] = r;
     return rows;
   }
+  // Full league tables (365Scores), for the live table view: every table of the
+  // competition (groups too), where each place leads (Champions League,
+  // relegation…), and each club's next match — so a game being played right now
+  // can be added to the table as it stands.
+  async function tables(league) {
+    const d = await s365("standings", { competitions: COMPETITIONS[league] }, 60 * 1000);
+    if (!d) throw new Error("365Scores didn't return the table — try again in a moment");
+    return (d.standings || []).filter((t) => (t.rows || []).length).map((t) => ({
+      name: t.displayName || null,
+      dest: Object.fromEntries((t.destinations || []).map((x) => [x.num, { name: x.name, color: x.color }])),
+      rows: t.rows.filter((r) => r.competitor).map((r) => ({
+        id: String(r.competitor.id), name: r.competitor.name, crest: crest(r.competitor), pos: r.position,
+        p: r.gamePlayed || 0, w: r.gamesWon || 0, d: r.gamesEven || 0, l: r.gamesLost || 0, gf: r.for || 0, ga: r.against || 0,
+        pts: Math.round(r.points || 0), dest: r.destinationNum || null, next: r.nextMatch ? String(r.nextMatch.id) : null })) }));
+  }
   async function form(competitorId, games = 6) {
     const d = await s365("games/results", { competitors: competitorId }, 30 * 60 * 1000);
     if (!d) return null;
@@ -2614,7 +2629,7 @@
   }
 
   global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, refOff, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
-                  scores, matchReport, ticketLive, gameEvents, halfStats, readLeg, isPlayerText, nameSimilarity, kambiLive,
+                  scores, matchReport, ticketLive, gameEvents, halfStats, readLeg, isPlayerText, nameSimilarity, kambiLive, tables,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   startRadar, radarStatus: () => jobStatus(radarJob), stopRadar: () => { radarJob.stop = true; return jobStatus(radarJob); },

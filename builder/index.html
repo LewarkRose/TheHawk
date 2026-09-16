@@ -253,6 +253,24 @@ img{max-width:100%}
 .co-offer input{width:120px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:#12181c;font-size:16px;font-weight:700}
 .badge.soon{background:rgba(255,209,102,.14);color:var(--gold)}
 .kick-cd{margin-top:6px;font-size:13px;color:var(--gold);font-weight:600}
+.sc-tbl{margin-left:auto;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font:700 11.5px inherit;cursor:pointer;text-transform:none;letter-spacing:0}
+.sc-tbl:hover{color:var(--accent);border-color:rgba(20,227,161,.45)}
+.tbl-open{width:auto!important;padding:4px 10px!important;margin-top:8px;font-size:12px}
+.ltable table{width:100%;border-collapse:collapse;font-size:13.5px}
+.ltable th{font-size:11px;color:var(--muted);font-weight:700;padding:6px 4px;text-align:center;border-bottom:1px solid var(--line)}
+.ltable td{padding:6px 4px;text-align:center;border-bottom:1px solid rgba(255,255,255,.04)}
+.ltable td.tn{text-align:left;min-width:150px}
+.ltable .tnw{display:flex;align-items:center;gap:7px;min-width:0}
+.ltable .tnw img{width:18px;height:18px;flex-shrink:0}.ltable .tnw span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}
+.ltable td.tp{white-space:nowrap;position:relative;font-weight:700;color:var(--muted)}
+.ltable td.tpts{font-weight:900;color:var(--text)}
+.ltable tr.hl td{background:rgba(255,209,102,.1)}.ltable tr.hl td.tn span{color:var(--gold);font-weight:800}
+.ltable .tdst{display:inline-block;width:4px;height:14px;border-radius:2px;margin-right:5px;vertical-align:-2px}
+.ltable .up{color:var(--accent);font-size:9px;margin-left:3px}.ltable .dn{color:var(--red);font-size:9px;margin-left:3px}
+.ltable .tl{font-style:normal;font-size:11.5px;font-weight:800;padding:1px 6px;border-radius:6px;white-space:nowrap;background:var(--panel2)}
+.ltable .tl.w{color:var(--accent)}.ltable .tl.l{color:#ff8a9a}.ltable .tl.d{color:var(--gold)}.ltable .tl small{font-weight:600;color:var(--muted)}
+.ltable .tleg{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 4px;font-size:11.5px;color:var(--muted)}
+@media (max-width:560px){.ltable .tw{display:none}.ltable table{font-size:12.5px}.ltable .tl small{display:none}}
 .tie{margin:8px auto 2px;max-width:440px;padding:8px 12px;border-radius:12px;border:1px solid rgba(255,209,102,.35);background:rgba(255,209,102,.07);font-size:12.5px;line-height:1.45}
 .tie b{color:var(--gold)}.tie small{display:block;margin-top:3px;font-size:12px;color:var(--text)}.tie small.muted{color:var(--muted)}
 .ip-agg{margin-top:4px;font-size:13px;color:var(--gold)}.ip-agg b{font-weight:900}
@@ -997,6 +1015,7 @@ async function api(path, body) {
     case "/api/monster/stop": return HAWK.stopMonster();
     case "/api/build": return HAWK.build(body);
     case "/api/options": return HAWK.buildOptions(body);
+    case "/api/tables": return HAWK.tables(q.league);
     case "/api/evaluate": return HAWK.evaluate(body);
     case "/api/scan": return body ? HAWK.startScan(body) : HAWK.scanStatus();
     case "/api/scan/stop": return HAWK.stopScan();
@@ -1276,6 +1295,7 @@ function renderMatch() {
         <div class="mid"><div class="x">VS</div><div class="ko">${esc(fmtKick(m.kickoff))}</div><div class="kick-cd" id="kickCountdown"></div>${tieBanner(m)}
           ${m.started ? '<div class="chips"><span class="badge live">STARTED — pre-match model</span></div>' : ""}
           ${m.referee && m.referee.name ? `<div class="ko" style="margin-top:6px">Ref: ${esc(m.referee.name)}${m.referee.avg ? ` · ${m.referee.avg.toFixed(2)} cards/g` : ""}</div>` : ""}
+          ${m.table && (m.table.home || m.table.away) ? `<button class="ghost tbl-open" data-table="${esc(m.league)}" data-hl="${esc(JSON.stringify([m.home, m.away]))}">📊 ${m.tie ? "Group table" : "League table"}</button>` : ""}
           <button class="ghost" style="width:auto;padding:5px 10px;margin-top:8px" onclick="openMatch('${m.id}', true)" title="Re-run everything: odds, lineups and the simulation">↻ Refresh</button>
           <div class="ko live-odds" id="liveOdds"></div>
           ${!m.started && !(m.lineups.home.status === "Confirmed" && m.lineups.away.status === "Confirmed") ?
@@ -1713,6 +1733,63 @@ function liveAgg(d) {
   if (!t || t.leg !== 2 || !t.agg) return "";
   const h = t.agg[0] + (d.score[0] || 0), a = t.agg[1] + (d.score[1] || 0);
   return `<div class="ip-agg">Aggregate <b>${h}–${a}</b>${h === a ? " · extra time if it stays" : ` · ${esc(h > a ? d.home : d.away)} going through`}</div>`;
+}
+/* ---------- 📊 Live tables ---------- */
+// The competition's table from 365Scores, with the games being played right now
+// added in as they stand (points, goal difference, places moving ↑ ↓) —
+// refreshed every 30 seconds while it's open. Your match's two teams are highlighted.
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest("[data-table]");
+  if (!b) return;
+  e.stopPropagation();
+  let hl = [];
+  try { hl = JSON.parse(b.dataset.hl || "[]"); } catch { /* none */ }
+  openTable(b.dataset.table, hl);
+}, true);
+async function openTable(league, highlight = []) {
+  modal(`<div class="mhead" style="justify-content:space-between"><h2 style="margin:0">📊 ${esc(league)}</h2><button class="ghost" data-close style="width:auto;padding:6px 12px">\u2715</button></div>
+    <div id="tblBody" style="margin-top:12px"><div class="note">Loading the table\u2026</div></div>`);
+  const paint = async () => {
+    const box = $("#tblBody");
+    if (!box) return;
+    let tabs, games = [];
+    try { [tabs, games] = await Promise.all([api(`/api/tables?league=${encodeURIComponent(league)}`), HAWK.scores(localDay(new Date())).catch(() => [])]); }
+    catch (err) { box.innerHTML = `<div class="note">${esc(err.message)}</div>`; return; }
+    const live = games.filter(g => g.league === league && (g.status === 3 || g.status === 4));
+    if (!$("#tblBody")) return;
+    box.innerHTML = tabs.length ? tabs.map(t => tableHTML(t, live, highlight, tabs.length > 1)).join("")
+      : `<div class="note">This competition has no table \u2014 it's knockout games only.</div>`;
+  };
+  await paint();
+  const timer = setInterval(() => { if (!$("#tblBody")) return clearInterval(timer); paint(); }, 30000);
+}
+function tableHTML(t, games, highlight, showName) {
+  const rows = t.rows.map(r => ({ ...r }));
+  let moving = false;
+  // A game on right now (or just finished) that the table doesn't count yet: add it as it stands.
+  for (const g of games) for (const [side, other] of [["home", "away"], ["away", "home"]]) {
+    const r = rows.find(x => x.next === String(g.id) && x.name === g[side]);
+    if (!r || g.score[0] == null) continue;
+    const f = g.score[side === "home" ? 0 : 1] || 0, a = g.score[side === "home" ? 1 : 0] || 0;
+    r.p++; r.gf += f; r.ga += a; r.pts += f > a ? 3 : f === a ? 1 : 0;
+    if (f > a) r.w++; else if (f === a) r.d++; else r.l++;
+    r.live = { text: `${f}\u2013${a}`, clock: g.status === 3 ? (g.clock || "live") : "FT", res: f > a ? "w" : f === a ? "d" : "l" };
+    moving = true;
+  }
+  if (moving) rows.sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+  const hl = (name) => highlight.some(h => h === name);
+  const body = rows.map((r, i) => {
+    const pos = i + 1, move = moving ? r.pos - pos : 0, dest = r.dest && t.dest[r.dest];
+    return `<tr class="${hl(r.name) ? "hl" : ""}">
+      <td class="tp">${dest ? `<i class="tdst" style="background:${esc(dest.color)}" title="${esc(dest.name)}"></i>` : ""}${pos}${move > 0 ? '<b class="up">\u25b2</b>' : move < 0 ? '<b class="dn">\u25bc</b>' : ""}</td>
+      <td class="tn"><div class="tnw"><img src="${esc(r.crest)}" alt="" onerror="this.style.visibility='hidden'"><span>${esc(r.name)}</span>${r.live ? `<em class="tl ${r.live.res}">${r.live.clock === "FT" ? "" : "\u25cf "}${esc(r.live.text)} <small>${esc(r.live.clock)}</small></em>` : ""}</div></td>
+      <td>${r.p}</td><td class="tw">${r.w}</td><td class="tw">${r.d}</td><td class="tw">${r.l}</td><td>${r.gf - r.ga > 0 ? "+" : ""}${r.gf - r.ga}</td><td class="tpts">${r.pts}</td></tr>`;
+  }).join("");
+  const legend = Object.values(t.dest || {}).map(d => `<span><i class="tdst" style="background:${esc(d.color)}"></i>${esc(d.name)}</span>`).join("");
+  return `<div class="ltable">${showName && t.name ? `<h3 class="mb-h">${esc(t.name)}</h3>` : ""}
+    ${moving ? `<div class="note" style="margin:0 0 8px">\u25cf Live \u2014 today's games are in the table as they stand; it updates every 30 seconds.</div>` : ""}
+    <div style="overflow-x:auto"><table><thead><tr><th>#</th><th style="text-align:left">Team</th><th>P</th><th class="tw">W</th><th class="tw">D</th><th class="tw">L</th><th>GD</th><th>Pts</th></tr></thead><tbody>${body}</tbody></table></div>
+    ${legend ? `<div class="tleg">${legend}</div>` : ""}</div>`;
 }
 function pct100(ps) {
   const total = ps.reduce((s, p) => s + p, 0) || 1, raw = ps.map(p => (100 * p) / total), out = raw.map(Math.floor);
@@ -3435,7 +3512,7 @@ function renderScoreList() {
   const live = games.filter(g => g.status === 3).length;
   el.innerHTML = (live ? `<div class="note" style="margin:0 0 10px"><span class="dot-live"></span>${live} live — updating every 15 seconds</div>` : "") +
     Object.entries(groups).sort((a, b) => order(a[0]) - order(b[0])).map(([lg, list]) => `
-      <div class="sc-league">${leagueLogo(lg)}${esc(lg)}</div>
+      <div class="sc-league">${leagueLogo(lg)}${esc(lg)}<button class="sc-tbl" data-table="${esc(lg)}" title="The ${esc(lg)} table, live while games are on">📊 Table</button></div>
       ${list.map(g => {
         const state = g.status === 3 ? `<span class="sc-live">${esc(g.clock || "LIVE")}</span>`
           : g.status === 4 ? `<span class="muted">${/postpon|cancel|abandon/i.test(g.statusText) ? esc(g.statusText) : "FT"}</span>`

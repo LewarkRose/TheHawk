@@ -2732,19 +2732,36 @@ function updateScan() {
     value: (a, b) => b.value.length - a.value.length || ((b.value[0] || {}).edge || 0) - ((a.value[0] || {}).edge || 0),
   };
   // Lineups confirmed only: hides matches whose teams weren't out when they were scanned (they come out about an hour before kick-off).
-  const shown = S.scan.confirmed ? d.results.filter(r => r.confirmed) : d.results, hidden = d.results.length - shown.length;
+  // Matches you've already bet on (in the Vault) don't show up again.
+  const betOn = alreadyBet(d.results), open = d.results.filter(r => !betOn.has(String(r.id)));
+  const shown = S.scan.confirmed ? open.filter(r => r.confirmed) : open, hidden = open.length - shown.length;
+  const betNote = betOn.size ? `<div class="note" style="margin:0 0 10px">🎟 ${betOn.size} match${betOn.size > 1 ? "es" : ""} you've already bet on ${betOn.size > 1 ? "are" : "is"} hidden.</div>` : "";
   const res = [...shown].sort(sorters[S.scan.sort] || sorters.worth);
   const good = shown.filter(r => r.worth >= 1.02).length, fair = shown.filter(r => r.worth >= 0.95 && r.worth < 1.02).length;
   if (!res.length && hidden) {
-    $("#scanRes").innerHTML = `<div class="note">No match with confirmed lineups yet (${hidden} still predicted). Lineups come out about an hour before kick-off — ⚡ Scan again then, or untick <b>Lineups confirmed only</b>.</div>`;
+    $("#scanRes").innerHTML = betNote + `<div class="note">No match with confirmed lineups yet (${hidden} still predicted). Lineups come out about an hour before kick-off — ⚡ Scan again then, or untick <b>Lineups confirmed only</b>.</div>`;
     return;
   }
-  $("#scanRes").innerHTML = res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${good ? `✅ ${good} worth-it builder${good > 1 ? "s" : ""}` : ""}${good && fair ? " · " : ""}${fair ? `🤏 ${fair} fair-priced` : ""}${!good && !fair ? "No good builders yet" : ""}<small>${good || fair
+  $("#scanRes").innerHTML = betNote + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${good ? `✅ ${good} worth-it builder${good > 1 ? "s" : ""}` : ""}${good && fair ? " · " : ""}${fair ? `🤏 ${fair} fair-priced` : ""}${!good && !fair ? "No good builders yet" : ""}<small>${good || fair
       ? "Best value at the top. Open one, build it on Bet365 and type its price to confirm. A Bet365 boost turns a fair-priced one into ✅."
       : d.running ? "Still scanning…" : "Bet365's builder prices are tight right now — try a lower target, another time window, or come back nearer kick-off."}</small></div>` : "") + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
     ? "Results appear here as each match is analysed…"
     : d.total === 0 && d.params ? "No fixtures kick off in that window — try a longer one."
-    : "Pick leagues and a time window, then hit Scan. It takes a few seconds per match."}</div>`;
+    : betOn.size && !open.length ? "Nothing new — you've already bet on every match scanned."
+    : "Pick leagues and a time window, then hit Scan. It takes a few seconds per match."}</div>`);
+}
+// Scanned matches that already have a bet in the Vault: sent from HAWK (or linked) by match id,
+// typed ones by team names ("Coventry vs Aston Villa").
+function alreadyBet(results) {
+  const norm = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const same = (a, b) => (a = norm(a), b = norm(b), a && b && (a === b || a.includes(b) || b.includes(a)));
+  const ids = new Set(), names = [];
+  for (const b of vaultBets()) for (const l of b.legs || []) {
+    if (l.hawk && l.hawk.game) ids.add(String(l.hawk.game));
+    const [h, a] = String(l.fixture || "").split(/\s+(?:vs?\.?|-)\s+/i);
+    if (h && a) names.push([h, a]);
+  }
+  return new Set(results.filter(r => ids.has(String(r.id)) || names.some(([h, a]) => same(h, r.home) && same(a, r.away))).map(r => String(r.id)));
 }
 function scanCard(r, params) {
   const short = params && (r.b365 || r.fair) < params.target * 0.97;

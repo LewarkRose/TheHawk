@@ -1448,6 +1448,7 @@
     return chosen;
   }
   // known: legs in markets you've already found on Bet365 in this league (from builders you checked or logged).
+  const SAFE_STEP = Math.log(1.35), SAFE_P = 0.72;
   function autoBuild(legs, target, style = "Balanced", maxLegs = 10, locked = [], banned = new Set(), favourite = true, focus = "Mix", extras = false, picks = "likely", known = new Set()) {
     const [lo, hi] = STYLES[style] || STYLES.Balanced;
     let [minPlayers, maxMatch] = FOCUS[focus] || FOCUS.Mix;
@@ -1470,11 +1471,13 @@
       let want = nPlayers < minPlayers || nMatch >= maxMatch ? "player" : null;
       if (focus === "Match") want = "match";
       let best = null, bestScore = null;
-      // With only a few legs left, each one has to move the price enough to still
-      // reach the target (a 4-leg cap at 8.00 needs about ×1.7 a leg), so the
-      // safest legs that keep the target in reach come first — not simply the safest.
-      const slotsLeft = Math.max(1, maxLegs - chosen.length), priceNow = chosen.length ? priceOf(legs, chosen, pNow) || 1 : 1;
-      const needStep = Math.log(Math.max(1.0001, target / priceNow)) / slotsLeft;
+      // Each candidate is judged by the chance the WHOLE ticket lands at your price:
+      // a leg that reaches the target now counts at its own chance; one that doesn't
+      // counts as if the rest were made of typical safe legs (about 1.35 at Bet365,
+      // landing about 72% alongside the others) — so one long-shot scorer that hits
+      // 3.25 straight away loses to two likelier legs that get there together.
+      // A leg that leaves the target out of reach with the legs left comes last.
+      const priceNow = chosen.length ? priceOf(legs, chosen, pNow) || 1 : 1;
       // Legs with a known price first (Bet365's own, or Unibet's): they're the
       // ones you'll find on Bet365 at about the price HAWK expects. Then at most
       // ONE guessed leg (tackles, fouls, saves…) — one you've found on Bet365
@@ -1501,9 +1504,11 @@
           const joint = (c / n) * adjNow * (leg.adj || 1), cond = joint / pNow;
           if (cond < lo || cond > hi) continue;
           const pr = joint > 0 ? priceOf(legs, [...chosen, leg.id], joint) : 0, reaches = pr >= target, t = trust[leg.market] || 1;
-          const step = pr > 0 ? Math.log(pr / priceNow) : 0, keepsReach = step >= needStep * 0.98;
+          const step = pr > 0 ? Math.log(pr / priceNow) : 0;
+          const need = reaches ? 0 : Math.max(1, Math.ceil(Math.log(target / Math.max(pr, 1.0001)) / SAFE_STEP));
+          const feasible = reaches || chosen.length + 1 + need <= maxLegs;
           const score = picks === "value" ? [reaches ? 1 : 0, valueScore(leg) - (1 - t), cond]
-            : reaches ? [2, joint * t] : keepsReach ? [1, cond * t] : [0, step];
+            : feasible ? [1, joint * t * SAFE_P ** need] : [0, step];
           if (!bestScore || isBetter(score, bestScore)) { best = leg.id; bestScore = score; }
         }
         if (best) break;
@@ -1773,14 +1778,17 @@
     for (const id of free(first)) tryBan([id]);
     const fresh = tryBan(free(first));                      // a ticket with none of the first one's legs
     for (const id of free(fresh)) tryBan([...free(first), id]);
-    // Best first, then as different as possible from the ones already chosen.
-    const quality = (t) => t.legs.length * 10 + Math.abs(Math.log(at(t) / target)) + 3 * (t.guessed || 0);   // (fewer guessed prices = fewer surprises)
+    // Best first: the likeliest ticket at your price (same price, higher chance =
+    // better), close to the target, with few guessed prices — then as different as
+    // possible from the ones already chosen. (It used to put the fewest legs first,
+    // which ranked a 3-leg ticket with a long-shot scorer above a likelier 4-leg one.)
+    const quality = (t) => -Math.log(Math.max(t.p || 0, 1e-6)) + 0.6 * Math.abs(Math.log(at(t) / target)) + 0.25 * (t.guessed || 0) + 0.03 * t.legs.length;
     const pool = [...found.values()].slice(1).sort((a, b) => quality(a) - quality(b));
     const chosen = [first];
     while (chosen.length < count && pool.length) {
       const overlap = (t) => Math.max(...chosen.map((c) => t.legs.filter((l) => c.legs.some((x) => x.id === l.id)).length / t.legs.length));
       let bestI = 0, bestV = Infinity;
-      pool.forEach((t, i) => { const v = quality(t) + 12 * overlap(t); if (v < bestV) { bestV = v; bestI = i; } });
+      pool.forEach((t, i) => { const v = quality(t) + 0.8 * overlap(t); if (v < bestV) { bestV = v; bestI = i; } });
       chosen.push(pool.splice(bestI, 1)[0]);
     }
     return { options: chosen.sort((a, b) => quality(a) - quality(b)) };

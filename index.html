@@ -1705,13 +1705,15 @@
             document.getElementById('stat-winrate').textContent = `${winRate.toFixed(1)}%`;
             document.getElementById('stat-record').textContent = `${wins} - ${losses} - 0${cashedOut > 0 ? ` (+${cashedOut} cashed out)` : ''}`;
 
-            // Current streak: walk backward from the most recent settled ticket (bets[0] is
-            // newest, since lockInTicket uses unshift). A Cash Out is neither a win nor a loss,
-            // so it breaks a streak rather than extending or resetting it silently.
-            const settledNewestFirst = bets.filter(b => b.status !== 'PENDING');
+            // Current streak: walk backward from the most recently SETTLED ticket (by when it
+            // was settled, not when it was placed — a later bet can finish first). A Cash Out
+            // is neither a win nor a loss, so it's skipped: it doesn't extend or break a streak.
+            const settledAtMs = (b) => Date.parse(b.settledAt || '') || 0;
+            const settledNewestFirst = bets.map((b, i) => [b, i]).filter(([b]) => b.status !== 'PENDING')
+                .sort((x, y) => settledAtMs(y[0]) - settledAtMs(x[0]) || x[1] - y[1]).map(([b]) => b);
             let streak = 0, streakType = null;
             for (const b of settledNewestFirst) {
-                if (b.status === 'CASHED_OUT') break;
+                if (b.status === 'CASHED_OUT') continue;
                 const outcome = b.status === 'WON' ? 'W' : 'L';
                 if (streakType === null) { streakType = outcome; streak = 1; }
                 else if (outcome === streakType) streak++;

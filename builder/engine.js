@@ -586,7 +586,13 @@
   async function analyse(league, game) {
     const id = String(game.id), hc = game.homeCompetitor, ac = game.awayCompetitor;
     const home = hc.name, away = ac.name, kickoff = game.startTime ? new Date(game.startTime) : null;
-    const meta = ((await data("fixtures.json")) || { fixtures: {} }).fixtures[id] || null;
+    let meta = ((await data("fixtures.json")) || { fixtures: {} }).fixtures[id] || null;
+    // Not in the copy this page has? A match in the next week should be in the files, so that
+    // copy is old or didn't load properly (a phone that was offline, a slow connection): fetch them fresh.
+    if (!meta && kickoff && kickoff.getTime() - Date.now() < 7 * 86400e3) {
+      const fresh = await getJSON(`${DATA_URL}fixtures.json?t=${Date.now()}`);
+      if (fresh && fresh.fixtures) { cache.set(DATA_URL + "fixtures.json", { t: Date.now(), v: fresh }); meta = fresh.fixtures[id] || null; }
+    }
     const fd = (meta && meta.fd) || {};
     const [quotes365, detailResp, table, formH, formA, pm, profH, profA, playersH, playersA, recentH, recentA, espn] = await Promise.all([
       odds365(id), s365("game", { gameId: id }), standings(league), form(hc.id), form(ac.id),
@@ -652,7 +658,7 @@
 
     const lamModel = profH && profA ? expectedPair(profH, fdH, profA, fdA, "goals") : null;
     for (const [team, fdName, p] of [[home, fdH, profH], [away, fdA, profA]]) {
-      if (!fdName) warnings.push(`${team}: not found in football-data — model can't rate them, using market only.`);
+      if (!fdName && meta) warnings.push(`${team}: their league isn't in HAWK's team ratings (football-data covers the main European leagues) — their chances come from the bookmakers' prices.`);
       else if (p && ((p.teams[fdName] || {}).games_this_season || 0) < 3)
         warnings.push(`${team}: under 3 league games this season, ratings lean on last season${(p.teams[fdName] || {}).promoted ? " (promoted — starts from a below-average prior)" : ""}.`);
     }

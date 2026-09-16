@@ -1242,7 +1242,8 @@ function renderMatch() {
   const chip = (side) => { const lu = m.lineups[side]; const ok = lu.status === "Confirmed";
     return `<span class="badge ${ok ? "ok" : "warn"}">${ok ? "Lineup confirmed" : "Lineup predicted"}${lu.formation ? " · " + esc(lu.formation) : ""}</span>`; };
   const ord = (n) => { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
-  const tbl = (side) => m.table[side] ? `${ord(m.table[side].position)} · ${Math.round(m.table[side].points)} pts` : "";
+  // (a knockout tie: that table is the group / league phase, not a league table)
+  const tbl = (side) => m.table[side] ? `${m.tie ? "Group stage: " : ""}${ord(m.table[side].position)} · ${Math.round(m.table[side].points)} pts` : "";
   const maxCell = Math.max(...m.grid.flat());
   const cell = (v) => `<div class="c" style="background:rgba(20,227,161,${(0.08 + 0.75 * v / maxCell).toFixed(3)})">${(100 * v).toFixed(1)}%</div>`;
   // Rounded as a set so the three always add up to 100%.

@@ -1089,7 +1089,7 @@ async function init() {
   // Worker: browsers slow a background tab's own timers to once a minute, but not
   // a worker's, so alerts stay quick while HAWK sits in another tab.
   let beat = 0;
-  const tick = () => { fastGoals(); if (++beat % 2 === 0) { checkGoals(); renderDrawer(); } if (beat % 12 === 0) checkLineups(); if (beat % 60 === 0) linkVaultBets(); };
+  const tick = () => { fastGoals(); if (++beat % 2 === 0) { checkGoals(); renderDrawer(); } if (beat % 12 === 0) checkLineups(); if (beat % 6 === 3) htScan(); if (beat % 60 === 0) linkVaultBets(); };
   if (loadPref("hawk.drawer", false) && WIDE()) toggleDrawer(true);
   linkVaultBets();
   try { new Worker(URL.createObjectURL(new Blob([`setInterval(() => postMessage(0), ${FAST_MS})`], { type: "text/javascript" }))).onmessage = tick; }
@@ -3727,7 +3727,80 @@ async function refreshInPlay() {
     api(`/api/match?league=${encodeURIComponent(lg)}&id=${ip.id}`).then(m => { ip.m = m; if (S.view === "inplay" && S.inplay === ip) renderInPlay(); })
       .catch(err => console.warn("[hawk] live lineups:", err.message));
   }
-  if (S.view === "inplay" && S.inplay === ip) renderInPlay();
+  const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest("#match input");
+  if (S.view === "inplay" && S.inplay === ip && !typing) renderInPlay();
+}
+
+/* ---------- ⏸ half-time check ---------- */
+// At half-time HAWK reads every live match in its competitions: the 1st-half
+// stats and HAWK's live chances against Bet365's live prices. A bet where Bet365
+// pays 2%+ over HAWK's chance (simple markets, 40%+ to land) pops up as a tip.
+// 365Scores' Bet365 price can lag, so you type the real one and HAWK says ✅ / 🤏 / ❌.
+const HT_TYPES = new Set([1, 14, 15, 3, 12]);
+const isHalfTime = (x) => /half.?time|^ht$|break/i.test((x && x.statusText) || "");
+S.ht = {};
+function htTips(d) {
+  return (d.rows || []).filter(r => HT_TYPES.has(r.type) && r.p >= 0.4 && r.p < 0.97 && r.price >= 1.2 && r.edge >= 0.02)
+    .sort((a, b) => b.edge - a.edge).slice(0, 2);
+}
+// What the 1st half looked like, in one line.
+function htStatsLine(d) {
+  const st = d.stats || {}, pairOf = (k) => st[k] && (st[k][0] != null || st[k][1] != null) ? `${st[k][0] || 0}–${st[k][1] || 0}` : null;
+  return [["Total Shots", "shots"], ["Shots On Target", "on target"], ["Corners", "corners"]].map(([k, t]) => pairOf(k) && `${t} ${pairOf(k)}`)
+    .concat(st["Expected Goals"] ? [`xG ${(st["Expected Goals"][0] || 0).toFixed(1)}–${(st["Expected Goals"][1] || 0).toFixed(1)}`] : []).filter(Boolean).join(" · ");
+}
+// The goals line in words: at 1-0, "Over 1.5 goals" means one more goal.
+function htTipLabel(r, d) {
+  const m = /^(Over|Under) ([\d.]+) Goals/.exec(r.label), now = (d.score[0] || 0) + (d.score[1] || 0);
+  if (!m) return r.label;
+  const need = Math.floor(+m[2]) + 1 - now;
+  return `${r.label} — ${m[1] === "Over" ? `${need} more goal${need > 1 ? "s" : ""} in the 2nd half` : `no more than ${Math.max(0, Math.ceil(+m[2]) - 1 - now)} more`}`;
+}
+let htBusy = false;
+async function htScan() {
+  if (htBusy || !goalState.on) return;
+  htBusy = true;
+  try {
+    const list = await HAWK.scores(localDay(new Date()));
+    for (const g of list.filter(g => g.status === 3 && isHalfTime(g) && !alertSeen.has(`htt|${g.id}`))) {
+      let d;
+      try { d = await HAWK.liveMatch(g.id); } catch { continue; }
+      if (!d || !d.live) continue;
+      firstTime(`htt|${g.id}`);
+      const tips = htTips(d);
+      S.ht[g.id] = { at: Date.now(), tips };
+      if (!tips.length) continue;
+      const t = tips[0];
+      alertCard({ tone: "warn", icon: "⏸", word: "HALF-TIME TIP", g, clock: "HT",
+                  body: `👀 ${esc(htTipLabel(t, d))} <span>· bet at ${odds(t.fair * 1.02)}+ · Bet365 ≈ ${odds(t.price)} · lands ${pct(t.p, 0)}</span>` });
+    }
+  } catch (e) { console.warn("[hawk] half-time check:", e.message); }
+  finally { htBusy = false; }
+}
+// The half-time card in the live view (only while it's half-time).
+function htSection(d) {
+  if (!isHalfTime(d)) return "";
+  const tips = htTips(d);
+  S.inplay.htPrices ||= {};
+  const card = (r) => {
+    const key = r.label, need = r.fair * 1.02;
+    return `<div class="co-card" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center">
+      <div><b>👀 ${esc(htTipLabel(r, d))}</b><div class="muted" style="font-size:12px;margin-top:3px">HAWK: lands ${pct(r.p, 0)} · Bet365 live ≈ ${odds(r.price)} (can lag a little)</div></div>
+      <div style="text-align:right"><div class="muted" style="font-size:12px">Bet it at</div><div class="bigodds">${odds(need)}+</div>
+        <label class="sprice">Bet365 price <input data-htprice="${esc(key)}" inputmode="decimal" placeholder="${odds(r.price)}" value="${esc(S.inplay.htPrices[key] || "")}"></label>
+        <div class="sverdict" data-htverdict="${esc(key)}">${htVerdict(r)}</div></div></div>`;
+  };
+  return `<div class="section"><h3>⏸ Half-time check</h3>
+    <div class="note" style="margin-top:0">1st half: ${esc(htStatsLine(d) || "no stats yet")}</div>
+    ${tips.length ? tips.map(card).join("") : `<div class="note">Nothing worth betting at half-time — Bet365's live prices are in line with HAWK's read of this match.</div>`}
+    <div class="note">Prices move fast and get suspended when the 2nd half starts. Only bet if the price you see is at or above "Bet it at".</div></div>`;
+}
+function htVerdict(r) {
+  const x = parseFloat(String((S.inplay.htPrices || {})[r.label] || "").replace(",", ".")), need = r.fair * 1.02;
+  if (!(x > 1)) return `<div class="muted" style="font-size:12px">Type Bet365's price to check</div>`;
+  return x >= need ? `<div class="badge ok">✅ BET IT</div><div class="muted" style="font-size:12px">${odds(x)} beats ${odds(need)}</div>`
+    : x >= r.fair * 0.95 ? `<div class="badge ok">🤏 FAIR PRICE</div><div class="muted" style="font-size:12px">OK if you like it · ✅ from ${odds(need)}</div>`
+    : `<div class="badge warn">❌ SKIP IT</div><div class="muted" style="font-size:12px">${odds(x)} is under ${odds(need)}</div>`;
 }
 
 /* ---------- cash-out helper ---------- */
@@ -3791,6 +3864,11 @@ function cashOutSection() {
     <div class="note">Only the goal legs are linked to each other; everything else is treated as independent, so take the % as a guide. Chances update every 15 seconds.</div></div>`;
 }
 function bindCashOut() {
+  document.querySelectorAll("[data-htprice]").forEach(inp => inp.oninput = () => {
+    S.inplay.htPrices[inp.dataset.htprice] = inp.value;
+    const r = htTips(S.inplay.data).find(x => x.label === inp.dataset.htprice), el = document.querySelector(`[data-htverdict="${CSS.escape(inp.dataset.htprice)}"]`);
+    if (r && el) el.innerHTML = htVerdict(r);
+  });
   document.querySelectorAll("[data-done]").forEach(b => b.onclick = async () => {
     const [betId, legId] = b.dataset.done.split("|");
     let bets;
@@ -3944,7 +4022,7 @@ function renderInPlay() {
       <div>${k && k.stake ? `<b style="color:var(--gold)">€${k.stake.toFixed(2)}</b>` : '<span class="muted">—</span>'}</div></div>`;
   };
   const headRow = `<div class="ip-row head"><div>Bet</div><div>Bet365</div><div class="hide-sm">Fair</div><div class="hide-sm">Chance</div><div>Edge</div><div>Stake</div></div>`;
-  $("#match").innerHTML = head + cashOutSection() + `
+  $("#match").innerHTML = head + htSection(d) + cashOutSection() + `
     <div class="section"><h3>Live win chances <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:600">— 🦅 HAWK LIVE</span></h3>
       ${liveHawk(d)}</div>
     ${S.inplay.m ? lineupCard(S.inplay.m, d) : ""}
@@ -4462,7 +4540,9 @@ async function matchAlerts(games) {
     // ⏸ Half-time check on your bet
     if (g.status === 3 && /half.?time|^ht$/i.test(g.statusText || "") && firstTime(`ht|${g.id}`)) {
       const t = await betNow(g.id);
-      if (t) alertCard({ tone: "info", icon: "⏸", word: "HALF-TIME", g, clock: "HT", body: `${t.done} of ${t.total} legs done${t.lost ? ` · ${t.lost} lost` : ""}`, bet: t });
+      const was = (bets.find(b => b.id === (t && t.id)) || {}).hawkP;
+      if (t) alertCard({ tone: "info", icon: "⏸", word: "HALF-TIME", g, clock: "HT",
+                         body: `${t.done} of ${t.total} legs done${t.lost ? ` · ${t.lost} lost` : ""}${was ? ` <span>· was ${pct(was, 0)} at kick-off</span>` : ""}<br><span>Tap to check a cash-out offer</span>`, bet: t });
     }
     // ✅ / ❌ / 🔥 Your bet, leg by leg
     if (g.status === 3) {

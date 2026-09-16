@@ -2661,7 +2661,9 @@ function showScan() {
   S.view = "scan";
   document.querySelectorAll(".fx").forEach(f => f.classList.remove("on"));
   renderScan();
-  pollScan();
+  // Nothing scanned yet: start straight away, so the best bets just appear.
+  if (!(S.scan.data && (S.scan.data.running || (S.scan.data.results || []).length)) && S.scan.leagues.size) toggleScan();
+  else pollScan();
 }
 // League picker for the scans: one row per group; the group button selects
 // all of it (or none, if it's all on). The choice is remembered.

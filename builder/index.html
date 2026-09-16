@@ -865,6 +865,16 @@ a.nav{text-decoration:none}
 .scanset{margin:8px 0}
 .scanset summary{cursor:pointer;color:var(--muted);font-weight:700;font-size:13px;padding:6px 0}
 .scanset[open] summary{color:var(--text)}
+/* PC: the More pages as ordinary buttons in the top menu */
+@media (min-width:821px){
+  #moreBtn{display:none}
+  .mainnav .mm{display:flex;align-items:center;gap:6px;width:auto;padding:7px 14px;border-radius:10px;color:var(--muted);font-weight:700;white-space:nowrap;transition:.15s}
+  .mainnav .mm small{display:none}
+  .mainnav .mm:hover{color:var(--text);background:var(--panel2)}
+  .mainnav .mm.on{color:#04241a;background:linear-gradient(180deg,#3ff5bd,var(--accent));box-shadow:0 4px 14px -4px rgba(20,227,161,.6)}
+  .mainnav .mm.vaultnav{color:#d9b571}
+}
+@media (max-width:1180px) and (min-width:821px){.mainnav .nav span,.mainnav .mm span{display:none}.mainnav .nav.on span,.mainnav .mm.on span{display:inline}}
 .sc-ht{display:flex;flex-direction:column;gap:2px;padding:8px 0;border-top:1px solid var(--line);cursor:pointer}
 .sc-ht:first-of-type{border-top:0}
 .nav.vaultnav{color:#d9b571}
@@ -1100,6 +1110,15 @@ async function init() {
   $("#fxToggle").onclick = () => { const p = $("#fxPanel"); foldFixtures(!p.classList.contains("folded")); if (!p.classList.contains("folded")) p.scrollIntoView({ behavior: "smooth", block: "start" }); };
   watchView();
   $("#scanBtn").onclick = showScan;
+  // PC: every page has its own button in the top menu again (Picks · Live · Builder · Radar · Value · Acca · My bets · Vault).
+  // Phone: Builder, Radar, Value, Acca and Vault sit in the ☰ More sheet above the tab bar.
+  const PHONE = matchMedia("(max-width:820px)");
+  const placeMore = () => {
+    const nav = $("#mainnav"), menu = $("#moreMenu"), items = [...document.querySelectorAll(".mm")];
+    if (PHONE.matches) items.forEach(i => menu.appendChild(i));
+    else { items.filter(i => !i.classList.contains("vaultnav")).forEach(i => nav.insertBefore(i, $("#navBets"))); nav.insertBefore($(".mm.vaultnav"), $("#moreBtn")); menu.hidden = true; }
+  };
+  placeMore(); PHONE.addEventListener("change", placeMore);
   $("#moreBtn").onclick = (e) => { e.stopPropagation(); const m = $("#moreMenu"); m.hidden = !m.hidden;
     if (!m.hidden && !narrow()) { const r = $("#moreBtn").getBoundingClientRect(); m.style.left = Math.round(Math.min(r.left, innerWidth - 270)) + "px"; m.style.top = Math.round(r.bottom + 6) + "px"; } };
   document.addEventListener("click", (e) => { const m = $("#moreMenu"); if (m && !m.hidden && !e.target.closest("#moreMenu")) m.hidden = true; });
@@ -1136,7 +1155,8 @@ async function init() {
 // finished → match report.
 async function openFromUrl() {
   const q = new URLSearchParams(location.search), id = q.get("match"), view = q.get("view");
-  if (!id && !view) return showScan();   // the home page: tonight's picks
+  // Home page: tonight's picks on a phone; on a PC the Builder, as before.
+  if (!id && !view && matchMedia("(max-width:820px)").matches) return showScan();
   // App shortcuts (long-press the HAWK icon): builder/?view=radar | scores | value | acca | scan
   const views = { radar: showRadar, scores: showScores, value: showValue, acca: showAcca, scan: showScan };
   if (view && views[view]) { history.replaceState(null, "", location.pathname); return views[view](); }
@@ -3505,8 +3525,8 @@ function watchView() {
   let view = S.view;
   const paint = () => {
     const nav = NAV_OF[view];
-    document.querySelectorAll(".mainnav .nav, .moremenu .mm").forEach(b => b.classList.toggle("on", b.dataset.nav === nav || (b.dataset.nav === "more" && UNDER_MORE.has(nav))));
-    const mb = $("#moreBtn"), mm = $(".moremenu .mm.on");
+    document.querySelectorAll(".mainnav .nav, .mm").forEach(b => b.classList.toggle("on", b.dataset.nav === nav || (b.dataset.nav === "more" && UNDER_MORE.has(nav))));
+    const mb = $("#moreBtn"), mm = $(".mm.on");
     if (mb) mb.innerHTML = UNDER_MORE.has(nav) && mm ? `${mm.firstChild.textContent.trim()} <span>${mm.querySelector("span").textContent}</span>` : `☰ <span>More</span>`;
     const menu = $("#moreMenu"); if (menu) menu.hidden = true;
     // For the phone layout: the league list shows on the builder only, folded once a match is open.

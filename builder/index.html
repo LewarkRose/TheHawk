@@ -2499,6 +2499,7 @@ function saveToVault(legs, stake, price, extra = {}) {
     bets = JSON.parse(localStorage.getItem("hawk_bets")) || [];
   } catch { toast("Couldn't open the Vault's storage in this browser."); return false; }
   if (bankroll < stake) { toast(`Not enough in your Vault bankroll (€${bankroll.toFixed(2)}).`); return false; }
+  if (stake / bankroll >= STAKE_BAD && !confirm(`€${stake.toFixed(2)} is ${Math.round(100 * stake / bankroll)}% of your €${bankroll.toFixed(2)} bankroll.\n\nBuilders land far less than half the time — this size empties the Vault on a normal bad run.\n\nLog it anyway?`)) return false;
   bets.unshift({
     id: "bet_" + Date.now(),
     date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
@@ -2537,7 +2538,7 @@ function verdict() {
     <small>${w >= 1.02 ? `Expected profit ≈ €${(ev * stake).toFixed(2)} on €${stake.toFixed(2)} (wins ${pct(r.p, 1)} of the time, pays €${(eff * stake).toFixed(2)}).`
       : w >= 0.95 ? `About what it's worth — fine if you like it. ✅ from ${odds(worthQuoted)}${boostNeed > 0 && boostNeed <= 50 ? `, or with a ${boostNeed}%+ boost` : ""}.`
       : `${w >= 0.9 ? "Close, but the" : "The"} bookmaker keeps ≈ €${(-ev * stake).toFixed(2)} of every €${stake.toFixed(2)} on average. ✅ from ${odds(worthQuoted)}${boostNeed > 0 && boostNeed <= 50 ? ` — or with a ${boostNeed}%+ boost` : ""}.`}</small></div>
-    ${stakeAdvice(fairP, eff)}`;
+    ${stakeAdvice(fairP, eff)}${stakeWarning()}`;
   bindStakeAdvice(out, (v) => { if (v) { S.chk.stake = v; $("#stake").value = v; } verdict(); });
 }
 
@@ -2590,6 +2591,19 @@ function kellyStake(p, price) {
   const pct = Math.min(full * S.kellyFrac, KELLY_CAP);
   return { stake: Math.floor(bankroll * pct * 100) / 100, pct, bankroll, capped: full * S.kellyFrac > KELLY_CAP };
 }
+// Too big a stake for the bankroll: with builders landing 1 time in 3 or worse,
+// anything over a tenth of your money empties the Vault on a normal losing run.
+const STAKE_WARN = 0.10, STAKE_BAD = 0.20;
+function stakeWarning() {
+  const { stake } = checkerInputs(), bank = vaultBankroll();
+  if (!(stake > 0) || !(bank > 0)) return "";
+  const share = stake / bank;
+  if (share < STAKE_WARN) return "";
+  const safe = Math.max(0.5, Math.floor(bank * STAKE_WARN * 100) / 100);
+  return `<div class="verdict ${share >= STAKE_BAD ? "bad" : "warn"}" style="margin-top:8px">${share >= STAKE_BAD ? "🚨" : "⚠️"} €${stake.toFixed(2)} is ${Math.round(100 * share)}% of your €${bank.toFixed(2)}
+    <small>Builders lose far more often than they win, so a normal bad run at this size empties the Vault. €${safe.toFixed(2)} or less keeps you in the game
+      <button class="linkbtn" data-usestake="${safe.toFixed(2)}">use €${safe.toFixed(2)}</button></small></div>`;
+}
 function stakeAdvice(p, price) {
   const k = kellyStake(p, price);
   if (!k) return "";
@@ -2600,9 +2614,9 @@ function stakeAdvice(p, price) {
     ${k.capped ? "(capped at 5%)" : ""} ${frac} <button class="linkbtn" data-usestake="${k.stake.toFixed(2)}">use it</button></div>`;
 }
 function bindStakeAdvice(root, useStake) {
-  const sel = root.querySelector(".kfrac"), use = root.querySelector("[data-usestake]");
+  const sel = root.querySelector(".kfrac");
   if (sel) sel.onchange = (e) => { S.kellyFrac = +e.target.value; savePref("hawk.kellyFrac", S.kellyFrac); useStake(null); };
-  if (use) use.onclick = () => useStake(use.dataset.usestake);
+  root.querySelectorAll("[data-usestake]").forEach(b => b.onclick = () => useStake(b.dataset.usestake));
 }
 
 // Build: HAWK finds up to 5 different tickets for your settings. Pressing

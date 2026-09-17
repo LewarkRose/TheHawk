@@ -2424,6 +2424,10 @@ function easyCall(r) {
   return call("bad", `❌ PROBABLY SKIP — needs ${odds(needQuoted)}, Bet365 should pay about ${odds(expect)}`,
     `No worth-it builder here? <a href="#" onclick="event.preventDefault();showScan()" style="color:inherit;text-decoration:underline">⚡ Best builders</a> lists the matches that have one.`);
 }
+// The price a builder is worth it from: HAWK's fair odds, raised where HAWK rates a
+// leg well above what its bookmaker price implies (the same number the call and the
+// price box use, so they can't disagree).
+const worthFrom = (r) => r && r.fair ? (r.fair / (r.check || 1)) * 1.02 : null;
 function guessLine(r) {
   if (r && r.b365 > 1) {
     // Bet365's own leg prices (and Unibet's for scorer / assist / shots on target) multiplied, as Bet365 builds it.
@@ -2431,13 +2435,13 @@ function guessLine(r) {
     return `<div class="guess" title="Each leg at Bet365's price (Unibet's for scorer, assist and shots on target, turned into Bet365's), corrected for legs that go together${
       n ? ` and by the ${n} Bet365 builder price${n > 1 ? "s" : ""} you've typed` : ""}.">
       Bet365 should show about <b>${odds(r.b365 * 0.96)}–${odds(r.b365 * 1.04)}</b>
-      <span class="muted">· ${guessed ? `${guessed} leg${guessed > 1 ? "s" : ""} guessed` : "all legs priced ✓"} · worth it from ${odds(r.fair * 1.02)}</span></div>`;
+      <span class="muted">· ${guessed ? `${guessed} leg${guessed > 1 ? "s" : ""} guessed` : "all legs priced ✓"} · worth it from ${odds(worthFrom(r))}${(r.check || 1) < 0.98 ? " (HAWK rates a leg above its bookmaker price, so it wants more)" : ""}</span></div>`;
   }
   const g = r && b365Guess(r.fair, S.slip.length);
   if (!g) return "";
   return `<div class="guess" title="${g.n ? `From the ${g.n} Bet365 price${g.n > 1 ? "s" : ""} you've typed in: its builders pay about ${(100 * g.cut).toFixed(1)}% less than HAWK's fair odds for each leg.` : "A first guess (about 5% less than HAWK's fair odds per leg) — it learns from the Bet365 prices you type in below."}">
     Bet365 will probably offer <b>${odds(g.lo)}–${odds(g.hi)}</b>
-    <span class="muted">· worth it from ${odds(r.fair * 1.02)}${g.n ? "" : " · learns from your prices"}</span></div>`;
+    <span class="muted">· worth it from ${odds(worthFrom(r))}${g.n ? "" : " · learns from your prices"}</span></div>`;
 }
 // The price the builder really pays: a winnings boost multiplies the profit
 // part only (a 25% boost on 3.60 pays like 1 + 2.60 × 1.25 = 4.25).
@@ -2526,7 +2530,7 @@ function verdict() {
     <small>That price implies a ${pct(1 / eff, 1)} chance — HAWK says ${pct(r.p, 1)}.</small>
     <small>${w >= 1.02 ? `Expected profit ≈ €${(ev * stake).toFixed(2)} on €${stake.toFixed(2)} (wins ${pct(r.p, 1)} of the time, pays €${(eff * stake).toFixed(2)}).`
       : w >= 0.95 ? `About what it's worth — fine if you like it. ✅ from ${odds(worthQuoted)}${boostNeed > 0 && boostNeed <= 50 ? `, or with a ${boostNeed}%+ boost` : ""}.`
-      : `${w >= 0.9 ? "Close, but " : ""}the bookmaker keeps ≈ €${(-ev * stake).toFixed(2)} of every €${stake.toFixed(2)} on average. ✅ from ${odds(worthQuoted)}${boostNeed > 0 && boostNeed <= 50 ? ` — or with a ${boostNeed}%+ boost` : ""}.`}</small></div>
+      : `${w >= 0.9 ? "Close, but the" : "The"} bookmaker keeps ≈ €${(-ev * stake).toFixed(2)} of every €${stake.toFixed(2)} on average. ✅ from ${odds(worthQuoted)}${boostNeed > 0 && boostNeed <= 50 ? ` — or with a ${boostNeed}%+ boost` : ""}.`}</small></div>
     ${stakeAdvice(r.p, eff)}`;
   bindStakeAdvice(out, (v) => { if (v) { S.chk.stake = v; $("#stake").value = v; } verdict(); });
 }

@@ -1195,6 +1195,37 @@
     }
     add("mostcorners:home", `${home} Most Corners`, "Most Corners", "most_corners", mask(n, (s) => sim.cornersTeam.home[s] > sim.cornersTeam.away[s]));
     add("mostcorners:away", `${away} Most Corners`, "Most Corners", "most_corners", mask(n, (s) => sim.cornersTeam.away[s] > sim.cornersTeam.home[s]));
+    // Offsides in the match: every player's own offsides added up, simulation by simulation.
+    const offs = new Int16Array(n);
+    for (const a of Object.values(sim.player)) if (a.offsides) for (let s = 0; s < n; s++) offs[s] += a.offsides[s];
+    if (mean(mask(n, (s) => offs[s] > 0)) > 0.2) for (const line of [1.5, 2.5, 3.5, 4.5]) {
+      add(`offs:o${line}`, withCount(`Over ${line} Offsides`, "Over", line), "Match Offsides", "offsides", mask(n, (s) => offs[s] > line), b365Whole("Over", line, "Offsides"));
+      add(`offs:u${line}`, withCount(`Under ${line} Offsides`, "Under", line), "Match Offsides", "offsides", mask(n, (s) => offs[s] < line), b365Whole("Under", line, "Offsides"));
+    }
+    // Offsides come from adding up each player's own record, which no one calibrates
+    // — so where the bookmakers price a line, HAWK's chance is blended with theirs
+    // (as the goals, corners and cards totals already are).
+    for (const id of Object.keys(legs).filter((k) => k.startsWith("offs:"))) {
+      const leg = legs[id], m2 = /^offs:([ou])([\d.]+)$/.exec(id), c = m2 && (an.cons || {})[`140|${m2[2]}`];
+      const pm = c && c.probs[m2[1] === "o" ? "Over" : "Under"];
+      if (!(pm > 0.01 && pm < 0.99) || !(leg.p > 0)) continue;
+      const p2 = blend(leg.p, pm);
+      leg.adj = p2 / leg.p; leg.p = p2; leg.fair = 1 / p2;
+    }
+    // A red card / a penalty in the match: HAWK doesn't simulate either, so the
+    // chance is the bookmakers' own (margin removed) and the leg is treated as
+    // independent of the rest. Without prices there's no leg at all.
+    const cons = consensus(an.quotes || []);
+    for (const [kind, type, market, label] of [["redcard", 142, "Red Card", "A Red Card in the Match"], ["pen", 143, "Penalty", "A Penalty in the Match"]]) {
+      const c = cons[`${type}|`];
+      if (!c || !(c.probs.Yes > 0.01) || c.books < 2) continue;
+      for (const [opt, id, text] of [["Yes", `${kind}:yes`, label], ["No", `${kind}:no`, `No ${label.replace(/^A /, "")}`]]) {
+        const q = c.probs[opt];
+        if (!(q > 0.01 && q < 0.99)) continue;
+        // an independent draw per simulation, so it mixes with the other legs sensibly
+        add(id, text, market, kind, mask(n, (s) => ((Math.sin((s + 1) * (kind === "pen" ? 12.9898 : 78.233)) * 43758.5453) % 1 + 1) % 1 < q), { marketOnly: true });
+      }
+    }
     const tsot = (s) => sim.teamSot.home[s] + sim.teamSot.away[s];
     for (const line of [5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5]) {
       add(`sot:o${line}`, withCount(`Over ${line} Shots on Target`, "Over", line), "Match Shots on Target", "sot", mask(n, (s) => tsot(s) > line));
@@ -1354,8 +1385,9 @@
     "dc:away": [14, "", "X2"], "btts:yes": [12, "", "Yes"], "btts:no": [12, "", "No"], "cs:home": [144, "", "Yes"], "cs:away": [145, "", "Yes"],
     "h1res:home": [5, "", "1"], "h1res:draw": [5, "", "X"], "h1res:away": [5, "", "2"],
     "h2res:home": [6, "", "1"], "h2res:draw": [6, "", "X"], "h2res:away": [6, "", "2"],
-    "first:home": [7, "", "Home"], "first:away": [7, "", "Away"] };
-  const LINE_TYPES = { goals: 3, corners: 137, cards: 141, h1goals: 9, sot: 139 };
+    "first:home": [7, "", "Home"], "first:away": [7, "", "Away"],
+    "redcard:yes": [142, "", "Yes"], "redcard:no": [142, "", "No"], "pen:yes": [143, "", "Yes"], "pen:no": [143, "", "No"] };
+  const LINE_TYPES = { goals: 3, corners: 137, cards: 141, h1goals: 9, sot: 139, offs: 140 };
   // 365Scores line for a leg: [line type, value, option]. Asian handicap
   // values are the home team's handicap.
   function bookLine(id) {

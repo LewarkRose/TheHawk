@@ -505,6 +505,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .verdict.good{background:rgba(20,227,161,.14);color:var(--accent)}
 .verdict.bad{background:rgba(255,93,115,.12);color:var(--red)}
 .verdict small{display:block;font-weight:500;color:var(--text);opacity:.8;margin-top:2px}
+.pc-list{display:grid;gap:8px;margin-top:14px}
+.pc-row{display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+.pc-row.total{border-color:var(--gold)}
+.pc-row input{width:100%;padding:8px;font-size:16px;font-weight:800;text-align:center;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text)}
+.pc-row input:disabled{opacity:.45}
 #verdict .verdict{white-space:normal;overflow-wrap:anywhere}   /* (the leg pills' .verdict doesn't wrap; this box must) */
 .ghost{width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1px solid var(--line);background:transparent;cursor:pointer;color:var(--muted)}
 .ghost:hover{color:var(--text);border-color:#3a4a55}
@@ -2269,6 +2274,7 @@ function renderSlip() {
       <div><label>Stake (€)</label><input id="stake" inputmode="decimal" value="${esc(S.chk.stake)}"></div></div>
       <div id="verdict"></div></div>
     <button class="ghost" id="b365" title="The legs in Bet365's order, with tick boxes, to build it there">📋 Build it on Bet365</button>
+    <button class="ghost" id="pcheck" title="Type the Bet365 price of each leg — HAWK learns Bet365's own prices instead of guessing from Unibet's">💷 Price check (teach HAWK)</button>
     <button class="ghost" id="copy">⧉ Copy slip</button>
     <button class="ghost" id="toAcca" title="Put this builder on your acca, with builders from other matches">➕ Add to acca${S.acca.some(pt => m && pt.id === String(m.id)) ? " (replaces this match)" : ""}</button>
     <button class="ghost vault" id="vault" title="Log this builder in your Vault's Bankroll & History">🦅 Send to Vault</button>
@@ -2320,6 +2326,7 @@ function renderSlip() {
     });
     $("#copy").onclick = copySlip; $("#vault").onclick = sendToVault; $("#toAcca").onclick = addSlipToAcca; verdict();
     $("#b365").onclick = openChecklist;
+  $("#pcheck").onclick = openPriceCheck;
     if ($("#optbar")) $("#optbar").onclick = (e) => { const b = e.target.closest("[data-opt]"); if (b) showOption(+b.dataset.opt); };
   }
 }
@@ -2533,6 +2540,42 @@ function verdict() {
       : `${w >= 0.9 ? "Close, but the" : "The"} bookmaker keeps ≈ €${(-ev * stake).toFixed(2)} of every €${stake.toFixed(2)} on average. ✅ from ${odds(worthQuoted)}${boostNeed > 0 && boostNeed <= 50 ? ` — or with a ${boostNeed}%+ boost` : ""}.`}</small></div>
     ${stakeAdvice(r.p, eff)}`;
   bindStakeAdvice(out, (v) => { if (v) { S.chk.stake = v; $("#stake").value = v; } verdict(); });
+}
+
+/* ---------- 💷 price check: teach HAWK Bet365's own prices ---------- */
+// HAWK has Bet365's prices for match legs (from 365Scores) but not for player
+// legs — it turns Unibet's into Bet365's, which can be well out. With the
+// builder open on Bet365 you can type each leg's single price here in one go;
+// HAWK then prices that kind of leg from Bet365's own numbers, and the total
+// teaches it Bet365's builder cut (the same as the price box).
+function openPriceCheck() {
+  const m = S.match, legs = S.slip.map(id => S.legs[id]).filter(Boolean);
+  if (!m || !legs.length) return toast("Build a slip first.");
+  const row = (l) => { const pr = legPrice(l), known = pr && pr.src === "bet365";
+    return `<div class="pc-row"><div><b>${esc(l.label)}</b><div class="muted" style="font-size:12px">${esc(l.market)} · HAWK ${pr && pr.price ? odds(pr.price) : "—"}${
+      known ? " <span title=\"Bet365's own price, from 365Scores\">✓ Bet365's</span>" : pr && pr.src === "typed" ? " ✓ yours" : pr && pr.src === "priced" ? " ≈ from Unibet" : " · guess"}</div></div>
+      <input data-pc="${esc(l.id)}" inputmode="decimal" placeholder="${pr && pr.price ? odds(pr.price) : "price"}" ${known ? "disabled" : ""}></div>`; };
+  modal(`<div class="mhead"><div><div style="font-size:20px;font-weight:800">💷 Price check</div>
+      <div class="muted">${esc(m.home)} v ${esc(m.away)} — type what Bet365 shows for each leg on its own. Skip any you can't see; every one helps.</div></div>
+      <button class="x" data-close title="Close">✕</button></div>
+    <div class="pc-list">${legs.map(row).join("")}
+      <div class="pc-row total"><div><b>The whole builder</b><div class="muted" style="font-size:12px">Bet365's price for all ${legs.length} legs together</div></div>
+        <input data-pctotal inputmode="decimal" placeholder="${(() => { const g = S.result && (S.result.b365 || b365Guess(S.result.fair, legs.length) && b365Guess(S.result.fair, legs.length).mid); return g ? odds(g) : "e.g. 3.40"; })()}" value="${esc(S.chk.price)}"></div></div>
+    <button class="build" data-pcsave style="margin-top:14px">SAVE — HAWK LEARNS THESE</button>
+    <div class="note">Legs marked ✓ Bet365's already come from Bet365, so there's nothing to type. Player legs are the ones HAWK guesses.</div>`);
+  const bg = document.querySelector(".modal-bg");
+  bg.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-pcsave]")) return;
+    const num = (v) => parseFloat(String(v || "").replace(",", "."));
+    let n = 0;
+    bg.querySelectorAll("[data-pc]").forEach(inp => { const v = num(inp.value); if (v > 1 && v < 1000) { recordPropPrice(inp.dataset.pc, v); n++; } });
+    const total = num(bg.querySelector("[data-pctotal]").value);
+    if (total > 1) { S.chk.price = String(total); recordB365Price(); }
+    applyPropBook();
+    closeModal();
+    renderSlip(); refreshTab();
+    toast(n || total > 1 ? `✓ HAWK learned ${n} leg price${n === 1 ? "" : "s"}${total > 1 ? " and the builder price" : ""}` : "Nothing typed in");
+  });
 }
 
 /* ---------- recommended stake (Kelly) ---------- */

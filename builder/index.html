@@ -505,6 +505,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .verdict.good{background:rgba(20,227,161,.14);color:var(--accent)}
 .verdict.bad{background:rgba(255,93,115,.12);color:var(--red)}
 .verdict small{display:block;font-weight:500;color:var(--text);opacity:.8;margin-top:2px}
+#verdict .verdict{white-space:normal;overflow-wrap:anywhere}   /* (the leg pills' .verdict doesn't wrap; this box must) */
 .ghost{width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1px solid var(--line);background:transparent;cursor:pointer;color:var(--muted)}
 .ghost:hover{color:var(--text);border-color:#3a4a55}
 .note{font-size:12px;color:var(--muted);margin-top:10px}
@@ -2516,11 +2517,16 @@ function verdict() {
   }
   const ev = r.p * eff - 1;
   const good = ev > 0;
-  out.innerHTML = `<div class="verdict ${good ? "good" : "bad"}">${ev >= 0.02 ? "✅ BET IT" : good ? "🤏 JUST OK" : "❌ SKIP IT"} · ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}%
+  // The same lines as the call above: ✅ from 2% over what it's worth, 🤏 down to 5% under, ❌ below.
+  const fairP = r.p * (r.check || 1), w = fairP * eff, worthQuoted = 1 + (1.02 / fairP - 1) / (1 + boost / 100);
+  const boostNeed = eff > 1 && w < 1.02 ? Math.ceil(((1.02 / fairP - 1) / (price - 1) - 1) * 100) : 0;
+  const tier = w >= 1.02 ? "✅ BET IT" : w >= 0.95 ? "🤏 FAIR PRICE" : "❌ SKIP IT";
+  out.innerHTML = `<div class="verdict ${w >= 0.95 ? "good" : "bad"}">${tier} · ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}%
     ${boost ? `<small>With your ${boost}% boost, ${odds(price)} pays like <b>${odds(eff)}</b>.</small>` : ""}
     <small>That price implies a ${pct(1 / eff, 1)} chance — HAWK says ${pct(r.p, 1)}.</small>
-    <small>${good ? `Expected profit ≈ €${(ev * stake).toFixed(2)} on €${stake.toFixed(2)} (wins ${pct(r.p, 1)} of the time, pays €${(eff * stake).toFixed(2)}).`
-                  : `The bookmaker keeps ≈ €${(-ev * stake).toFixed(2)} of every €${stake.toFixed(2)} on average. It needs ${odds(needed)}+${boost ? " with this boost" : ""} to be fair — try swapping legs or another book.`}</small></div>
+    <small>${w >= 1.02 ? `Expected profit ≈ €${(ev * stake).toFixed(2)} on €${stake.toFixed(2)} (wins ${pct(r.p, 1)} of the time, pays €${(eff * stake).toFixed(2)}).`
+      : w >= 0.95 ? `About what it's worth — fine if you like it. ✅ from ${odds(worthQuoted)}${boostNeed > 0 && boostNeed <= 50 ? `, or with a ${boostNeed}%+ boost` : ""}.`
+      : `${w >= 0.9 ? "Close, but " : ""}the bookmaker keeps ≈ €${(-ev * stake).toFixed(2)} of every €${stake.toFixed(2)} on average. ✅ from ${odds(worthQuoted)}${boostNeed > 0 && boostNeed <= 50 ? ` — or with a ${boostNeed}%+ boost` : ""}.`}</small></div>
     ${stakeAdvice(r.p, eff)}`;
   bindStakeAdvice(out, (v) => { if (v) { S.chk.stake = v; $("#stake").value = v; } verdict(); });
 }

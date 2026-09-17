@@ -2772,8 +2772,12 @@ function renderScan() {
   bindLeaguePicker("scanLeagues", sc.leagues, "hawk.scanLeagues");
   $("#hrs").onchange = (e) => { sc.hours = windowValue(e.target.value); };
   $("#srt").onchange = (e) => { sc.sort = e.target.value; updateScan(); };
-  $("#scanAuto").onclick = (e) => { const b = e.target.closest("button"); if (!b || S.auto === (b.dataset.auto === "1")) return;
-    S.auto = b.dataset.auto === "1"; savePref("hawk.auto", S.auto); renderScan(); if (S.scan.data && !S.scan.data.running) toggleScan(); };
+  $("#scanAuto").onclick = async (e) => { const b = e.target.closest("button"); if (!b || S.auto === (b.dataset.auto === "1")) return;
+    S.auto = b.dataset.auto === "1"; savePref("hawk.auto", S.auto); renderScan();
+    // Scan again with the new setting — stopping a scan that's still going first.
+    let st = await api("/api/scan");
+    if (st && st.running) { await api("/api/scan/stop", {}); for (let i = 0; i < 60 && st && st.running; i++) { await new Promise(r => setTimeout(r, 250)); st = await api("/api/scan"); } }
+    S.scan.data = null; toggleScan(); };
   $("#scanRes").oninput = (e) => {
     const i = e.target.closest("[data-price]"); if (!i) return;
     const r = (S.scan.data.results || []).find(x => String(x.id) === i.dataset.price); if (!r) return;

@@ -2526,19 +2526,21 @@ function verdict() {
       <b>${odds(needed)}</b>${boost ? ` with your ${boost}% boost (${odds(r.fair)} without)` : ""}; aim for ${odds(needed * 1.05)}+.</div>` : "";
     return;
   }
-  const ev = r.p * eff - 1;
-  const good = ev > 0;
   // The same lines as the call above: ✅ from 2% over what it's worth, 🤏 down to 5% under, ❌ below.
+  // Everything shown uses HAWK's checked chance (its own, held to what the legs' bookmaker
+  // prices imply), so the verdict and the percentage can't disagree.
   const fairP = r.p * (r.check || 1), w = fairP * eff, worthQuoted = 1 + (1.02 / fairP - 1) / (1 + boost / 100);
+  const ev = w - 1, own = r.p * eff - 1, checked = (r.check || 1) < 0.98;
   const boostNeed = eff > 1 && w < 1.02 ? Math.ceil(((1.02 / fairP - 1) / (price - 1) - 1) * 100) : 0;
   const tier = w >= 1.02 ? "✅ BET IT" : w >= 0.95 ? "🤏 FAIR PRICE" : "❌ SKIP IT";
   out.innerHTML = `<div class="verdict ${w >= 0.95 ? "good" : "bad"}">${tier} · ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}%
     ${boost ? `<small>With your ${boost}% boost, ${odds(price)} pays like <b>${odds(eff)}</b>.</small>` : ""}
-    <small>That price implies a ${pct(1 / eff, 1)} chance — HAWK says ${pct(r.p, 1)}.</small>
+    <small>That price implies a ${pct(1 / eff, 1)} chance — HAWK says ${pct(r.p, 1)}${checked ? `, or ${pct(fairP, 1)} after checking its legs against their bookmaker prices` : ""}.</small>
+    ${checked && own > 0 && ev <= 0 ? `<small>On HAWK's own chance alone this would be +${(100 * own).toFixed(1)}%, but one of its legs is one HAWK rates well above what its bookmaker price says — so HAWK asks for more.</small>` : ""}
     <small>${w >= 1.02 ? `Expected profit ≈ €${(ev * stake).toFixed(2)} on €${stake.toFixed(2)} (wins ${pct(r.p, 1)} of the time, pays €${(eff * stake).toFixed(2)}).`
       : w >= 0.95 ? `About what it's worth — fine if you like it. ✅ from ${odds(worthQuoted)}${boostNeed > 0 && boostNeed <= 50 ? `, or with a ${boostNeed}%+ boost` : ""}.`
       : `${w >= 0.9 ? "Close, but the" : "The"} bookmaker keeps ≈ €${(-ev * stake).toFixed(2)} of every €${stake.toFixed(2)} on average. ✅ from ${odds(worthQuoted)}${boostNeed > 0 && boostNeed <= 50 ? ` — or with a ${boostNeed}%+ boost` : ""}.`}</small></div>
-    ${stakeAdvice(r.p, eff)}`;
+    ${stakeAdvice(fairP, eff)}`;
   bindStakeAdvice(out, (v) => { if (v) { S.chk.stake = v; $("#stake").value = v; } verdict(); });
 }
 

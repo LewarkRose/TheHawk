@@ -454,6 +454,14 @@
                 <div id="beat-bet365-container" class="pt-1"></div>
             </div>
 
+            <!-- One line (did following HAWK's calls pay?); tap for the split -->
+            <details class="tr-fold bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
+                <summary class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">💡</span><span id="calls-line" class="min-w-0">Did following HAWK pay?</span>
+                    <span class="text-[11px] text-[#d9b571] font-semibold ml-auto shrink-0"><span class="tr-show">details ▸</span><span class="tr-hide">hide ▾</span></span></summary>
+                <p class="text-[10px] text-zinc-500">Your settled bets split by what HAWK said about the price you took: ✅ bet it (Bet365 paid more than it's worth), 🤏 fair price, ❌ skip it (Bet365 underpaid) — and the bets you built yourself.</p>
+                <div id="calls-container" class="space-y-2 pt-1"></div>
+            </details>
+
             <!-- One line (do HAWK's chances come true?); tap for the full record -->
             <details class="tr-fold bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
                 <summary class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🎯</span><span id="track-record-line" class="min-w-0">HAWK Track Record</span>
@@ -1885,8 +1893,33 @@
             return types.size > 1 ? 'Mixed' : types.has('acca') ? 'Acca' : 'Bet Builder';
         }
 
+        // --- DID FOLLOWING HAWK PAY? Settled bets by HAWK's call at the price taken ---
+        // Worth = HAWK's chance × the odds you got: 1.02+ ✅ bet it, 0.95+ 🤏 fair, lower ❌ skip.
+        // (The same lines the builder draws.) Bets without a HAWK chance are your own.
+        function renderCalls() {
+            const el = document.getElementById('calls-container'), line = document.getElementById('calls-line');
+            if (!el) return;
+            const settled = bets.filter(b => b.status === 'WON' || b.status === 'LOST' || b.status === 'CASHED_OUT');
+            const profit = (b) => b.status === 'WON' ? b.stake * b.odds - b.stake : b.status === 'CASHED_OUT' ? (+b.cashOutAmount || 0) - b.stake : -b.stake;
+            const groupOf = (b) => { if (!(b.hawkP > 0)) return 'own'; const w = b.hawkP * b.odds; return w >= 1.02 ? 'bet' : w >= 0.95 ? 'fair' : 'skip'; };
+            const groups = [['bet', '✅ HAWK said bet it'], ['fair', '🤏 HAWK said fair price'], ['skip', '❌ HAWK said skip it'], ['own', '✍️ Your own bets']].map(([k, label]) => {
+                const list = settled.filter(b => groupOf(b) === k), staked = list.reduce((s, b) => s + b.stake, 0), pl = list.reduce((s, b) => s + profit(b), 0);
+                return { k, label, n: list.length, won: list.filter(b => b.status === 'WON').length, staked, pl };
+            });
+            const money = (x) => `${x >= 0 ? '+' : '−'}€${Math.abs(x).toFixed(2)}`;
+            const row = (g) => `<div class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs flex justify-between gap-2 items-center">
+                <span class="text-white font-semibold">${g.label} <span class="text-zinc-500 font-normal">(${g.n} bet${g.n === 1 ? '' : 's'} · ${g.won} won)</span></span>
+                <span class="shrink-0">${g.n ? `<b class="${g.pl >= 0 ? 'text-emerald-400' : 'text-red-400'}">${money(g.pl)}</b> <span class="text-zinc-500">· ${g.pl >= 0 ? '+' : ''}${Math.round(100 * g.pl / g.staked)}% of €${g.staked.toFixed(2)} staked</span>` : '<span class="text-zinc-500">none yet</span>'}</span></div>`;
+            const followed = groups.filter(g => g.k === 'bet' || g.k === 'fair'), fN = followed.reduce((s, g) => s + g.n, 0), fPl = followed.reduce((s, g) => s + g.pl, 0);
+            const skip = groups.find(g => g.k === 'skip');
+            el.innerHTML = groups.map(row).join('') + (settled.length < 60 ? `<div class="text-[10px] text-amber-400/80 pt-1">${settled.length} settled bets — builders win rarely, so these swing a lot until there are 100+. Look at the trend, not one week.</div>` : '');
+            if (line) line.innerHTML = !fN && !skip.n ? 'Did following HAWK pay? <span class="text-zinc-500 font-normal">· no HAWK bets settled yet</span>'
+                : `Following HAWK: <b class="${fPl >= 0 ? 'text-emerald-400' : 'text-red-400'}">${money(fPl)}</b> <span class="text-zinc-400 font-normal">(${fN}) · skips ${skip.n ? `<b class="${skip.pl >= 0 ? 'text-emerald-400' : 'text-red-400'}">${money(skip.pl)}</b> (${skip.n})` : 'none'}</span>`;
+        }
+
         // --- HAWK TRACK RECORD: do HAWK's chances come true? ---
         function renderTrackRecord() {
+            renderCalls();
             const el = document.getElementById('track-record-container');
             if (!el) return;
             const legs = bets.flatMap(b => (b.legs || []).flatMap(l => (l.hawk && l.hawk.legs) || []))

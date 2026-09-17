@@ -3947,7 +3947,8 @@ function htStrip(games) {
     .map(([id, h]) => [games.find(g => String(g.id) === String(id)), h]).filter(([g]) => g && g.status === 3);
   if (!rows.length) return "";
   return `<div class="co-card" style="margin:0 0 12px"><b>👀 Live tips right now</b>${rows.map(([g, h]) => `<div class="sc-ht" data-htgo="${esc(g.id)}|${esc(g.league)}">
-      <span>${esc(g.home)} ${g.score[0]}–${g.score[1]} ${esc(g.away)}</span><span class="muted">👀 ${esc(h.tips[0].text || h.tips[0].label)} · bet at ${odds(h.tips[0].fair * 1.02)}+</span></div>`).join("")}</div>`;
+      <span>${esc(g.home)} ${g.score[0]}–${g.score[1]} ${esc(g.away)} <span class="muted">${esc(h.ht ? "half-time" : g.clock || "")}</span></span>
+      <span class="muted">👀 ${esc(h.tips[0].text || h.tips[0].label)} · <b style="color:var(--text)">lands ${pct(h.tips[0].p, 0)}</b> · bet at ${odds(h.tips[0].fair * 1.02)}+ · Bet365 live ≈ ${odds(h.tips[0].price)}</span></div>`).join("")}</div>`;
 }
 document.addEventListener("click", (e) => { const t = e.target.closest("[data-htgo]"); if (t) { const [id, lg] = t.dataset.htgo.split("|"); goToLive(lg, id); } });
 

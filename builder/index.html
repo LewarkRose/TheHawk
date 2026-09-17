@@ -2027,7 +2027,7 @@ function legTiles(l, row, n) {
     <div class="ts">${row && n > 0 ? `${pct(row.cond)} with the above` : "on its own"}${l.ep && l.pNoEp != null ? ` <span class="epb" title="Includes Bet365's Early Payout: +${pct(Math.max(0, l.p - l.pNoEp), 1)}">EP</span>` : ""}</div></div>`;
   const tone = !has ? "" : dead ? "dead" : ev >= 0.02 ? "good" : ev >= -0.02 ? "ok" : ev >= -0.12 ? "" : "poor";
   const verdict = !has ? "no price yet" : dead ? "pays next to nothing" : ev >= 0.02 ? `value +${(100 * ev).toFixed(0)}%` : ev >= -0.02 ? "fair price" : `${(100 * -ev).toFixed(0)}% under fair`;
-  const mark = pr && pr.src === "priced" ? `<span class="tm" title="From Unibet's real price (${odds(l.refPrice)}), turned into Bet365's">≈</span>`
+  const mark = pr && pr.src === "priced" ? `<span class="tm" title="From ${esc(l.refBook || "Unibet")}'s real price (${odds(l.refPrice)}), turned into Bet365's">≈</span>`
     : pr && pr.src === "guess" && has ? `<span class="tm" title="HAWK's guess — no bookmaker prices this leg">~</span>` : pr && pr.src === "typed" ? `<span class="tm" title="The price you typed">✓</span>` : "";
   const edit = l.kind === "player" && pr && pr.src !== "bet365"
     ? (S.ppEdit === l.id ? ` <input class="pp-in" data-pprice="${esc(l.id)}" inputmode="decimal" placeholder="${has ? odds(pr.price) : "price"}">`
@@ -2077,7 +2077,7 @@ function whyShort(l, row, n) {
   const pr = legPrice(l), has = pr && pr.price, ev = has ? pr.price * l.p - 1 : null;
   if (has) {
     const key = HAWK.propKey(l), learnt = key && S.propBook && S.propBook.n[key];
-    const src = pr.src === "priced" ? " (from Unibet's real price)" : pr.src === "typed" ? " (the price you typed)"
+    const src = pr.src === "priced" ? ` (from ${l.refBook || "Unibet"}'s real price)` : pr.src === "typed" ? " (the price you typed)"
       : pr.src === "guess" ? (learnt ? " (estimated from the Bet365 prices you've given HAWK)" : " (a rough guess — no bookmaker prices this leg)") : "";
     lines.push(["💶", pr.price <= HAWK.DEAD_PRICE ? `Bet365 pays about ${odds(pr.price)}${src} — next to nothing, yet it can still lose the bet. Swap it.`
       : `Bet365 ${odds(pr.price)}${src} vs HAWK's fair ${odds(l.fair)} — ${ev >= 0.02 ? `${(100 * ev).toFixed(0)}% more than it's worth. Value.` : ev >= -0.02 ? "about what it's worth." : ev >= -0.12 ? `${(100 * -ev).toFixed(0)}% less than it's worth, normal for a builder leg.` : `${(100 * -ev).toFixed(0)}% less than it's worth — a poor price, think about swapping.`}`]);

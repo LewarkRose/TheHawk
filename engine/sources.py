@@ -385,6 +385,97 @@ def s365_form(competitor_id, games=6):
     return "".join(out) or None
 
 
+# Finished matches with their team stats — the backup for football-data's team
+# ratings (and a second opinion). Results come 20 to a page, newest first; the
+# stats are one request per match, so a league's history is filled in over
+# several runs and kept in data/results365/ (a finished match never changes).
+S365_ROOT = "https://webws.365scores.com"
+# Stored row: [id, date, season, home, away, hg, ag, hxg, axg, hs, as, hst, ast, hc, ac, hy, ay, hr, ar]
+RESULT_FIELDS = ["id", "date", "season", "home", "away", "hid", "aid", "hg", "ag", "hxg", "axg", "hs", "as", "hst", "ast", "hc", "ac", "hy", "ay", "hr", "ar", "got"]
+FD_TO_S365 = {c["fd"]: c["s365"] for c in COMPETITIONS.values() if isinstance(c.get("fd"), str)}
+_S365_STATS = {"Expected Goals": "xg", "Total Shots": "s", "Shots On Target": "st", "Corners": "c", "Yellow Cards": "y", "Red Cards": "r"}
+
+
+def _s365_score(c):
+    try:
+        v = int(float(c.get("score")))
+        return v if v >= 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _s365_results_page(data, since):
+    """(rows, oldest date on the page, link to the older page) for one results page."""
+    rows, oldest = [], None
+    for g in (data or {}).get("games", []):
+        kick = parse_kickoff(g.get("startTime"))
+        if not kick:
+            continue
+        oldest = min(oldest or kick.date(), kick.date())
+        status = (g.get("statusText") or "").lower()
+        if g.get("statusGroup") != 4 or kick.date() < since or any(s in status for s in ("cancel", "postpon", "abandon", "award")):
+            continue
+        hg, ag = _s365_score(g.get("homeCompetitor", {})), _s365_score(g.get("awayCompetitor", {}))
+        if hg is None or ag is None:
+            continue
+        rows.append({"id": g["id"], "date": kick.date().isoformat(), "season": g.get("seasonNum"),
+                     "home": g["homeCompetitor"]["name"], "away": g["awayCompetitor"]["name"],
+                     "hid": g["homeCompetitor"].get("id"), "aid": g["awayCompetitor"].get("id"), "hg": hg, "ag": ag})
+    return rows, oldest, ((data or {}).get("paging") or {}).get("previousPage")
+
+
+def s365_results(competition_id, since, known, cursor=None, new_pages=5, old_pages=6, deadline=None):
+    """Finished matches of one competition since `since`, as result rows without
+    stats: first the newest pages until one holds a match already in `known`
+    (ids), then — while the history isn't complete — `old_pages` more going
+    back from `cursor` (the link saved last run). Returns (rows, cursor, done);
+    cursor None + done True once `since` is reached. None if 365Scores didn't answer."""
+    data = _s365("games/results", competitions=competition_id)
+    if data is None:
+        return None
+    rows, link = [], None
+    for page in range(new_pages):
+        got, oldest, link = _s365_results_page(data, since)
+        rows += [r for r in got if r["id"] not in known]
+        if any(r["id"] in known for r in got) or not link or (oldest and oldest < since):
+            break
+        data = _get_json(S365_ROOT + link)
+    if not known:
+        cursor = link   # first time: carry on from where the newest pages ended
+    done = cursor is None and bool(known)
+    for page in range(old_pages if cursor else 0):
+        if deadline and time.time() > deadline:   # out of time this run: carry on next run
+            break
+        data = _get_json(S365_ROOT + cursor)
+        if data is None:
+            break
+        got, oldest, cursor = _s365_results_page(data, since)
+        rows += [r for r in got if r["id"] not in known]
+        if not cursor or (oldest and oldest < since):
+            cursor, done = None, True
+            break
+    return rows, cursor, done
+
+
+def s365_match_stats(game_id, home_id, away_id):
+    """{"hs": .., "as": .., "hst": .., ...} for one finished match (None for a
+    stat 365Scores doesn't have there), or None if it didn't answer."""
+    data = _s365("game/stats", games=game_id)
+    if data is None:
+        return None
+    out = {f"{side}{key}": None for key in _S365_STATS.values() for side in ("h", "a")}
+    for s in data.get("statistics") or []:
+        key = _S365_STATS.get(s.get("name"))
+        side = "h" if s.get("competitorId") == home_id else "a" if s.get("competitorId") == away_id else None
+        if not key or not side:
+            continue
+        try:
+            out[f"{side}{key}"] = float(str(s.get("value")).split("/")[0].replace("%", "").strip())
+        except ValueError:
+            pass
+    return out   # keys match football-data's: hs/as, hst/ast, hc/ac, hy/ay, hr/ar, hxg/axg
+
+
 def s365_odds(game_id):
     """Every bookmaker line 365Scores has for this game, as a list of
     quotes: {"book", "type" (lineTypeId), "market", "value" (line, e.g.

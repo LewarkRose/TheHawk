@@ -4234,9 +4234,11 @@ function healthLine() {
   const stuck = Date.now() - new Date(m.generated).getTime() > 6 * 3600e3;   // updates run every 3 hours
   // Team ratings only change once matches are played, so a day or two old is fine:
   // they warn after 3 days (fixtures and player stats warn straight away).
-  const fine = (name, s) => s.ok || (name === "football-data" && s.last_ok && Date.now() - Date.parse(s.last_ok) < 3 * 86400e3);
+  // With football-data down for longer, the ratings are rebuilt from 365Scores' results: still ✅.
+  const backup = ((m.health || {}).ratings || {}).s365 > 0;
+  const fine = (name, s) => s.ok || (name === "football-data" && (backup || s.last_ok && Date.now() - Date.parse(s.last_ok) < 3 * 86400e3));
   const parts = Object.entries(m.sources || {}).map(([name, s]) => fine(name, s)
-    ? `<span class="ok" title="${s.ok ? "" : `${esc(name)} is down — using ratings from ${esc(ago(s.last_ok))}, still fine`}">✅ ${esc(SOURCE_LABELS[name] || name)}</span>`
+    ? `<span class="ok" title="${s.ok ? "" : backup ? "football-data is down — team ratings built from 365Scores' results instead" : `${esc(name)} is down — using ratings from ${esc(ago(s.last_ok))}, still fine`}">✅ ${esc(SOURCE_LABELS[name] || name)}${!s.ok && backup ? " (365Scores)" : ""}</span>`
     : `<span class="bad" title="${esc(name)} didn't answer — HAWK is using its last good data">⚠️ ${esc(SOURCE_LABELS[name] || name)} from ${esc(s.last_ok ? ago(s.last_ok) : "an earlier run")}</span>`);
   return `<div class="dhealth ${stuck || parts.some(p => p.includes("bad")) ? "warn" : ""}">📡 ${parts.join(" · ") || "Data"}
     <span class="muted">— updated ${esc(S.dataAge)}${stuck ? " (the 3-hourly update seems stuck — check GitHub Actions)" : ""}</span></div>`;

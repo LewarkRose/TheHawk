@@ -805,14 +805,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   .vrow .vm{grid-column:1/-1}
   .vrow > div:nth-child(4),.vrow > div:nth-child(5){display:none}
 }
-/* floating "jump to slip" button, shown when the slip isn't beside the match */
-.jump{display:none;position:fixed;right:14px;bottom:18px;z-index:15;padding:11px 16px;border-radius:999px;border:0;cursor:pointer;
-  font-weight:900;color:#03261b;background:linear-gradient(90deg,#10c98e,#3ff5bd);box-shadow:0 8px 24px rgba(0,0,0,.45)}
-/* (the floating 🎟 button retired: My bets is in the menu on every screen now) */
-/* 🎟 My bets in the page menu on wide screens (phones and tablets have the floating button) */
-
+/* the count on 🎟 My bets in the page menu */
 .nav.betsnav .jn{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:5px;border-radius:999px;background:var(--gold);color:#2e2200;font-size:11px}
-.jump .jn{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;margin-left:4px;border-radius:999px;background:#03261b;color:#3ff5bd;font-size:12px}
 /* 🎟 My bets */
 .mb-h{margin:16px 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .mb-card{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:var(--panel2)}
@@ -989,7 +983,6 @@ a.nav{text-decoration:none}
   <aside class="slipcol"><div class="slip-bar"><span>🧩 Your builder</span><button onclick="toggleSlipAway(true)" title="Hide the builder on this page (it's always there on the Builder page)">✕</button></div><div class="panel slip" id="slip"></div></aside>
 </main>
 <button class="slip-back" onclick="toggleSlipAway(false)" title="Show your builder beside this page">🧩 Builder</button>
-<button class="jump" id="jump" onclick="openMyBets()" title="Your bets in the Vault">🎟 My bets</button>
 <div id="toast"></div>
 <div id="goalfeed" aria-live="polite"></div>
 
@@ -5154,8 +5147,7 @@ async function linkVaultBets() {
 }
 function jumpLabel() {
   const n = vaultBets().filter(b => b.status === "PENDING").length;
-  $("#jump").innerHTML = `🎟 My bets${n ? ` <span class="jn">${n}</span>` : ""}`;
-  const nb = $("#navBetsN"); if (nb) { nb.textContent = n; nb.hidden = !n; }   // the same button in the page menu (PC)
+  const nb = $("#navBetsN"); if (nb) { nb.textContent = n; nb.hidden = !n; }   // the count on the 🎟 My bets button
   if (typeof renderDrawer === "function") renderDrawer();
 }
 // 🎟 My bets: a popup on phones and tablets; on a wide screen a drawer on the

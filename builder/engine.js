@@ -1918,6 +1918,21 @@
     .filter((l) => !(l.bookPrice > 1) && !(l.refBooks >= 2) && !typed.has(l.id)).map((l) => l.id);
   const withPriced = (e, body) => (body.priced
     ? { ...body, banned: [...(body.banned || []), ...unpricedIds(e, new Set(body.typed || []))] } : body);
+  // The scan's cheap version of 🎯 Auto: one build per target in your own style,
+  // best of the three (worth it at Bet365 first, then the likeliest). Scanning
+  // dozens of matches can't afford the builder's full search.
+  function autoBest(e, params) {
+    const maxLegs = +params.maxLegs || 6, banned = new Set(params.banned || []), known = new Set(params.known || []);
+    let best = null, bestKey = null;
+    for (const target of AUTO_TARGETS) {
+      const t = autoBuild(e.legs, target, params.style, maxLegs, params.locked || [], banned,
+                          params.favourite !== false, params.focus || "Mix", !!params.extras, params.picks === "value" ? "value" : "likely", known);
+      if (!t.legs.length || !(t.p >= AUTO_MIN_P)) continue;
+      const w = worthOf(t), key = [w >= 1.02 ? 2 : w >= 0.95 ? 1 : 0, w + 0.5 * t.p];
+      if (!bestKey || key[0] > bestKey[0] || (key[0] === bestKey[0] && key[1] > bestKey[1])) { best = { ...t, worth: +w.toFixed(3), autoTarget: target }; bestKey = key; }
+    }
+    return best;
+  }
   function buildOptions(body, count = 5) {
     if (body.auto) { const e0 = entryFor(body.id); return { options: autoOptions(e0, withPriced(e0, body), count, 1) }; }
     const e = entryFor(body.id);
@@ -1985,6 +2000,7 @@
         // Don't keep scanned matches around (memory), only ones you opened.
         if (!wasOpen) matches.delete(id);
         job.done++;
+        await sleep(0);   // hand the screen back between matches
       }
     };
     await Promise.all([worker(), worker()]);
@@ -2003,7 +2019,7 @@
     runFixtureJob(scan, (league, f, json, e) => {
       // The best ticket for this match (worth betting at Bet365 first), from a quicker search than the builder's.
       const p2 = withPriced(e, { ...params, favourite: true, known: params.known || [] });
-      const t = params.auto ? autoOptions(e, p2, 1, 1)[0] : searchOptions(e, p2, 1, 1)[0];
+      const t = params.auto ? autoBest(e, p2) : searchOptions(e, p2, 1, 1)[0];
       if (!t) return;   // 🎯 Auto: nothing here lands 1 in 4 or better
       scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair, b365: t.b365 || null, b365raw: t.b365raw || null, check: t.check || 1, worth: +worthOf(t).toFixed(3), guessed: t.guessed || 0,
         legs: t.legs.map((r) => legSummary(e, json, r.id)),

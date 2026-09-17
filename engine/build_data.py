@@ -12,6 +12,8 @@ results with the site:
                               Polymarket page, UK bookmaker odds snapshot
   data/profiles/<code>.json   team ratings for one league (model.build_profile)
   data/players/<id>.json      per-player stats, last 20 matches, one team
+  data/props/<game>.json      player-prop prices for one match: the median of the
+                              books that price closest to Bet365 (PropLine)
   data/results365/<code>.json finished matches with team stats from 365Scores,
                               filled in a few hundred matches per run — the
                               backup for team ratings when football-data is down
@@ -40,7 +42,13 @@ import sources
 
 DAYS_AHEAD = 8
 LIVE_DATA = os.environ.get("HAWK_LIVE", "https://lewarkrose.github.io/TheHawk") + "/data/"
-MAX_AGE = {"profiles": dt.timedelta(days=10), "players": dt.timedelta(days=4), "results365": dt.timedelta(days=60)}
+MAX_AGE = {"profiles": dt.timedelta(days=10), "players": dt.timedelta(days=4), "results365": dt.timedelta(days=60),
+           "props": dt.timedelta(hours=12)}
+# Player-prop prices (PropLine, free key in PROPLINE_KEY): only matches kicking
+# off inside this window, and never more than this many requests in one run —
+# the free key allows 1,000 a day and the Action runs every 3 hours.
+PROPS_HOURS = 60
+PROPS_PER_RUN = 90
 # 365Scores backup ratings: how far back to keep matches, how many match-stat
 # requests one run may make (one per match; the history fills in over several
 # runs), and how old football-data's last ratings may be before 365Scores' win.
@@ -221,11 +229,43 @@ def main(out_dir):
     print(f"{len(fixtures)} fixtures, {len(codes_needed)} leagues to rate, {len(sh_teams)} squads to fetch")
 
     print(f"fixtures step done in {time.time() - started:.0f}s")
+    stamp = now.isoformat()
+    # 1b. Player-prop prices for the matches coming up (PropLine): the median of
+    # DraftKings, FanDuel, Unibet and BetRivers — the books that price closest to
+    # Bet365 (within ~2-3% on the markets both show). Bet365 itself has no feed.
+    props = {"fresh": 0, "reused": 0, "missing": 0, "legs": 0}
+    pl_key = os.environ.get("PROPLINE_KEY", "").strip()
+    if pl_key:
+        soon = sorted(((f, fid) for fid, f in fixtures.items()
+                       if f["league"] in sources.PL_SPORTS and (parse_time(f["kickoff"]) or now) <= now + dt.timedelta(hours=PROPS_HOURS)),
+                      key=lambda x: x[0]["kickoff"])[:PROPS_PER_RUN]
+        by_league = {}
+        for f, fid in soon:
+            by_league.setdefault(f["league"], []).append((f, fid))
+        for league, games in by_league.items():
+            events = sources.pl_events(league, pl_key)
+            for f, fid in games:
+                ev = next((e for e in events
+                           if sources.name_similarity(f["home"], e.get("home_team", "")) > 0.7
+                           and sources.name_similarity(f["away"], e.get("away_team", "")) > 0.7), None)
+                rows = sources.pl_props(league, ev["id"], pl_key) if ev else []
+                if rows:
+                    write(out_dir / "props" / f"{fid}.json", {"built": stamp, "books": list(sources.PL_BOOKS), "rows": rows})
+                    props["fresh"] += 1
+                    props["legs"] += len(rows)
+                elif (old := reuse("props", f"{fid}.json")):
+                    write(out_dir / "props" / f"{fid}.json", old)
+                    props["reused"] += 1
+                else:
+                    props["missing"] += 1
+        print(f"player prices: {props['fresh']} matches ({props['legs']} legs), {props['reused']} kept, {props['missing']} without")
+    else:
+        print("player prices: no PROPLINE_KEY — skipping (HAWK falls back to Unibet's prices)")
+
     # 2a. 365Scores results with team stats, kept up to date for every league
     # HAWK rates: new finished matches each run, the older history a few
     # hundred matches at a time (newest first) until S365_HISTORY_DAYS is covered.
-    stamp = now.isoformat()
-    since = today - dt.timedelta(days=S365_HISTORY_DAYS)
+    since = today - dt.timedelta(days=S365_HISTORY_DAYS)   # (stamp set above)
     results365, cursors, budget = {}, {}, S365_STATS_PER_RUN
     step_end = time.time() + S365_SECONDS
     def listing(code):
@@ -331,7 +371,7 @@ def main(out_dir):
     write(out_dir / "meta.json", {"generated": stamp, "seconds": round(time.time() - started),
                                   "fixtures": len(fixtures), "squads": squads["fresh"] + squads["reused"],
                                   "sources": status, "health": {"fixtures": {"leagues_ok": s365_ok, "leagues_failed": s365_failed},
-                                                                "ratings": rated, "players": squads},
+                                                                "ratings": rated, "players": squads, "props": props},
                                   "alerts": alerts, "problems": problems})
     print(f"done in {time.time() - started:.0f}s; squads {squads}; ratings {rated}; {len(problems)} problems")
     for p in problems:

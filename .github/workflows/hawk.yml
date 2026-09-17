@@ -41,6 +41,10 @@ jobs:
         # If a source is down, the site still publishes with whatever was built.
         continue-on-error: true
         working-directory: engine
+        # PROPLINE_KEY (repo secret, optional): player-prop prices from the books
+        # that price closest to Bet365. Without it HAWK falls back to Unibet's.
+        env:
+          PROPLINE_KEY: ${{ secrets.PROPLINE_KEY }}
         run: python build_data.py ../data
 
       # HAWK grades itself: saves its chances for matches kicking off soon and

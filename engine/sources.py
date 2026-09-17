@@ -940,3 +940,92 @@ PIPELINE_CHECKS = {
     "Polymarket": check_polymarket,
     "StatsHub": check_statshub,
 }
+
+# ---------------------------------------------------------------------------
+# PropLine — player-prop prices from the books that price closest to Bet365
+# ---------------------------------------------------------------------------
+# Bet365 has no feed for player props, and no free service carries its prices.
+# Measured on 18 matches against Bet365's own match prices (365Scores), these
+# books sit within ~2-3%: DraftKings +0.1%, FanDuel +0.4%, Unibet -0.6%,
+# BetRivers -0.7%. HAWK takes their median as the stand-in for Bet365's price.
+# Needs a free PropLine key in the PROPLINE_KEY environment variable (a GitHub
+# secret); without one this is skipped and HAWK falls back to Unibet alone.
+PL_BASE = "https://api.prop-line.com/v1"
+PL_BOOKS = ("draftkings", "fanduel", "unibet", "betrivers")
+PL_SPORTS = {
+    "Premier League": "soccer_epl", "La Liga": "soccer_la_liga", "Serie A": "soccer_serie_a",
+    "Bundesliga": "soccer_bundesliga", "Ligue 1": "soccer_ligue_1", "MLS": "soccer_mls",
+    "Championship": "soccer_championship", "Eredivisie": "soccer_eredivisie", "Liga MX": "soccer_liga_mx",
+    "Liga Portugal": "soccer_primeira_liga", "Brasileirão": "soccer_brasileirao",
+    "Argentina Primera": "soccer_argentina_primera", "Scottish Premiership": "soccer_scottish_premiership",
+    "Saudi Pro League": "soccer_saudi_pro",
+}
+# PropLine market -> (HAWK prop key, how to read the line from an outcome)
+PL_MARKETS = {
+    "anytime_goal_scorer": "score", "goal_or_assist": "soa", "player_shots_on_target": "sot",
+    "player_shots": "shots", "player_assists": "assist", "player_tackles": "tackles",
+    "player_cards": "booked", "goalie_saves": "saves",
+}
+_PL_PLUS = re.compile(r"(\d+)\+")
+
+
+def _pl(path, key, **params):
+    if not key:
+        return None
+    return _get_json(PL_BASE + path, dict(params, apiKey=key), timeout=25)
+
+
+def _american_to_decimal(price):
+    try:
+        a = float(price)
+    except (TypeError, ValueError):
+        return None
+    if a == 0:
+        return None
+    return round(1 + (a / 100 if a > 0 else 100 / abs(a)), 3)
+
+
+def pl_events(league, key):
+    sport = PL_SPORTS.get(league)
+    data = _pl(f"/sports/{sport}/events", key) if sport else None
+    return data if isinstance(data, list) else []
+
+
+def pl_props(league, event_id, key):
+    """[{key: "sot2", player: "Bryan Mbeumo", price: 2.35, books: 3}] — the median
+    price of the close-to-Bet365 books for every player leg HAWK builds with."""
+    sport = PL_SPORTS.get(league)
+    data = _pl(f"/sports/{sport}/events/{event_id}/odds", key,
+               markets=",".join(PL_MARKETS), bookmakers=",".join(PL_BOOKS)) if sport else None
+    prices = {}
+    for book in (data or {}).get("bookmakers", []):
+        for market in book.get("markets", []):
+            stat = PL_MARKETS.get(market.get("key"))
+            if not stat:
+                continue
+            for out in market.get("outcomes", []):
+                player = out.get("description") or market.get("description") or ""
+                name = str(out.get("name") or "")
+                need = 1
+                if stat in ("sot", "shots", "tackles", "saves", "assist"):
+                    m = _PL_PLUS.search(name)
+                    point = out.get("point")
+                    if m:
+                        need = int(m.group(1))
+                    elif point is not None and "over" in name.lower():
+                        need = int(float(point) + 0.5)
+                    else:
+                        continue
+                elif "no" in name.lower().split() or name.lower().startswith("no "):
+                    continue
+                dec = _american_to_decimal(out.get("price"))
+                if not player or not dec or dec <= 1.01:
+                    continue
+                leg = f"{stat}{need if stat not in ('score', 'soa', 'booked') else ''}"
+                prices.setdefault((leg, player.strip()), []).append(dec)
+    rows = []
+    for (leg, player), vals in prices.items():
+        vals.sort()
+        median = vals[len(vals) // 2] if len(vals) % 2 else round((vals[len(vals) // 2 - 1] + vals[len(vals) // 2]) / 2, 3)
+        rows.append({"key": leg, "player": player, "price": median, "books": len(vals)})
+    return rows

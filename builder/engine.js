@@ -1436,6 +1436,9 @@
   // Bet365 against Unibet on the markets both price (1X2, goals, BTTS, corners): measured on 307 prices
   // across 25 top-5-league games (Sept 2026), Bet365 paid 1.2% more on average (typically within ±4%).
   const REF_TO_B365 = Math.log(1.012);
+  // Player-prop prices carry roughly 7% margin, and HAWK leans 60% on them where
+  // two or more of the close-to-Bet365 books price the same leg.
+  const PROP_MARGIN = 0.93, PROP_MARKET_WEIGHT = 0.6;
   const b365FromRef = (leg) => { const k = propKey(leg), r = k && refRatio[k] != null ? refRatio[k] : REF_TO_B365;
                                   return Math.max(1.01, Math.round(100 * leg.refPrice * Math.exp(r)) / 100); };
   const propKey = (leg) => { const m = /^p:(?:home|away):\d+:([a-z]+?)(\d*)$/.exec(leg.id || ""); return m ? m[1] + m[2] : null; };
@@ -1599,13 +1602,39 @@
     const an = await analyse(league, await gameFor(league, id));
     if (!an.M) throw new Error("no odds or ratings for this match yet");
     const squads = buildSquads(an), sim = simulate(an, squads), legs = catalogue(an, sim);
-    // Unibet's prices for the player legs it offers (a few seconds at most; the match loads without them).
+    // Player-leg prices: first the ones the data build publishes (the median of
+    // DraftKings, FanDuel, Unibet and BetRivers — the books that sit within ~2-3%
+    // of Bet365 on the markets both price), then Unibet live for anything left.
+    try {
+      const file = await data(`props/${id}.json`);
+      const rows = (file && file.rows) || [];
+      if (rows.length) {
+        let used = 0;
+        for (const leg of Object.values(legs)) {
+          const k = leg.kind === "player" ? propKey(leg) : null;
+          const hit = k && rows.find((r) => r.key === k && samePlayer(r.player, leg.player));
+          if (hit && hit.price > 1.01) { leg.refPrice = hit.price; leg.refBook = hit.books > 1 ? `${hit.books} bookmakers` : "a bookmaker"; leg.refBooks = hit.books; used++; }
+        }
+        // Calibrate the player legs to those prices, as the goals, corners, cards and
+        // offsides totals already are: a prop price carries about 7% margin, so the
+        // chance it implies is ~0.93 / price. Two books or more, 60% weight to them.
+        let tuned = 0;
+        for (const leg of Object.values(legs)) {
+          if (!(leg.refPrice > 1.01) || !(leg.refBooks >= 2) || !(leg.p > 0)) continue;
+          const pm = Math.min(0.97, PROP_MARGIN / leg.refPrice), p2 = blend(leg.p, pm, PROP_MARKET_WEIGHT);
+          if (!(p2 > 0.001 && p2 < 0.999)) continue;
+          leg.pModel = leg.p; leg.adj = (leg.adj || 1) * (p2 / leg.p); leg.p = p2; leg.fair = 1 / p2;
+          tuned++;
+        }
+        if (used) an.refFile = { built: file.built, legs: used, tuned };
+      }
+    } catch (e) { console.warn("[hawk] player prices:", e.message); }
     try {
       const ref = await Promise.race([kambiProps(league, an.home, an.away, an.kickoff), sleep(5000).then(() => null)]);
       if (ref && ref.rows.length) {
         for (const leg of Object.values(legs)) {
           const k = leg.kind === "player" ? propKey(leg) : null;
-          const hit = k && ref.rows.find((r) => r.key === k && samePlayer(r.player, leg.player));
+          const hit = k && !(leg.refPrice > 1) && ref.rows.find((r) => r.key === k && samePlayer(r.player, leg.player));
           if (hit) { leg.refPrice = hit.price; leg.refBook = REF_BOOK; }
         }
         an.refEvent = ref.event;
@@ -1883,8 +1912,10 @@
   // (player props — no free feed has Bet365's). What's left are legs 365Scores
   // carries Bet365's own price for, so HAWK's expected builder price is built
   // from real numbers and lands far closer to what you'll see on Bet365.
-  // (`typed` = legs you gave Bet365's price for in the price check — those count as priced too.)
-  const unpricedIds = (e, typed) => Object.values(e.legs).filter((l) => !(l.bookPrice > 1) && !typed.has(l.id)).map((l) => l.id);
+  // Priced = Bet365's own price (365Scores), or two or more of the close-to-Bet365
+  // books (the published player prices), or a price you typed in yourself.
+  const unpricedIds = (e, typed) => Object.values(e.legs)
+    .filter((l) => !(l.bookPrice > 1) && !(l.refBooks >= 2) && !typed.has(l.id)).map((l) => l.id);
   const withPriced = (e, body) => (body.priced
     ? { ...body, banned: [...(body.banned || []), ...unpricedIds(e, new Set(body.typed || []))] } : body);
   function buildOptions(body, count = 5) {

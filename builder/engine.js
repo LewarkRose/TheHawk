@@ -1962,9 +1962,13 @@
         // paying closest to — or above — fair). The first is used; the rest are
         // this match's "other leg" options. Below 1.15 a leg adds risk but
         // hardly any odds, so it's left out.
+        // Ranked on HAWK's chance, but counted as at most 3% over the chance Bet365's own price
+        // implies (its ~5% margin taken off): otherwise the legs HAWK disagrees with the bookies
+        // on most (cards, mostly) always look best — and those are where HAWK is least sure.
+        // Near-ties (within 1%) go to the likelier leg.
         const ranked = json.legs.filter((leg) => leg.bookPrice && leg.bookPrice >= MIN_ACCA_PRICE && leg.kind === "match" && leg.p >= lo && leg.p <= hi)
-          .map((leg) => ({ leg, ratio: leg.bookPrice * leg.p }))   // above 1 = Bet365 pays more than fair
-          .sort((a, b) => b.ratio - a.ratio || b.leg.p - a.leg.p);
+          .map((leg) => ({ leg, ratio: leg.bookPrice * Math.min(leg.p, (1.03 / leg.bookPrice) / 1.05) }))   // above 1 = Bet365 pays more than fair
+          .sort((a, b) => Math.round(100 * b.ratio) - Math.round(100 * a.ratio) || b.leg.p - a.leg.p);
         // One per group: "Over 2.5" and "Over 1.5 goals" aren't two different options.
         const seen = new Set(), alts = [];
         for (const { leg, ratio } of ranked) {

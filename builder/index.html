@@ -3430,7 +3430,7 @@ function monsterPick() {
   // 1 leg per match: each match uses the leg you've cycled to with "other leg" (best first).
   const withAlt = (r) => { const i = (mo.alt || {})[String(r.id)] || 0; return r.alts && r.alts[i] ? { ...r, ...r.alts[i], altIdx: i } : r; };
   const pool = d.results.map(withAlt).filter(r => !mo.skip.has(String(r.id)) && (!r.kickoff || new Date(r.kickoff).getTime() > now))
-    .sort(single ? (a, b) => b.ratio - a.ratio || b.p - a.p : (a, b) => b.p - a.p);
+    .sort(single ? (a, b) => Math.round(100 * b.ratio) - Math.round(100 * a.ratio) || b.p - a.p : (a, b) => b.p - a.p);
   const picked = [], bench = [];
   let n = 0;
   for (const r of pool) { if (n < mo.legs) { picked.push(r); n += r.legs.length; } else bench.push(r); }
@@ -4232,8 +4232,11 @@ function healthLine() {
   const m = S.meta;
   if (!m) return "";
   const stuck = Date.now() - new Date(m.generated).getTime() > 6 * 3600e3;   // updates run every 3 hours
-  const parts = Object.entries(m.sources || {}).map(([name, s]) => s.ok
-    ? `<span class="ok">✅ ${esc(SOURCE_LABELS[name] || name)}</span>`
+  // Team ratings only change once matches are played, so a day or two old is fine:
+  // they warn after 3 days (fixtures and player stats warn straight away).
+  const fine = (name, s) => s.ok || (name === "football-data" && s.last_ok && Date.now() - Date.parse(s.last_ok) < 3 * 86400e3);
+  const parts = Object.entries(m.sources || {}).map(([name, s]) => fine(name, s)
+    ? `<span class="ok" title="${s.ok ? "" : `${esc(name)} is down — using ratings from ${esc(ago(s.last_ok))}, still fine`}">✅ ${esc(SOURCE_LABELS[name] || name)}</span>`
     : `<span class="bad" title="${esc(name)} didn't answer — HAWK is using its last good data">⚠️ ${esc(SOURCE_LABELS[name] || name)} from ${esc(s.last_ok ? ago(s.last_ok) : "an earlier run")}</span>`);
   return `<div class="dhealth ${stuck || parts.some(p => p.includes("bad")) ? "warn" : ""}">📡 ${parts.join(" · ") || "Data"}
     <span class="muted">— updated ${esc(S.dataAge)}${stuck ? " (the 3-hourly update seems stuck — check GitHub Actions)" : ""}</span></div>`;

@@ -1771,10 +1771,12 @@
   }
   function build(body) {
     const e = entryFor(body.id);
+    body = withPriced(e, body);
     return autoBuild(e.legs, +body.target || 3, body.style, +body.maxLegs || 10, body.locked || [], new Set(body.banned || []),
                      body.favourite !== false, body.focus || "Mix", !!body.extras, body.picks === "value" ? "value" : "likely", new Set(body.known || []));
   }
   const evaluateBody = (body) => evaluate(entryFor(body.id).legs, body.legs || []);
+  const buildBodyPriced = (body) => { const e = entryFor(body.id); return withPriced(e, body); };
   // "Build again": up to `count` different tickets for the same settings. The
   // first is the normal build; the others come from building again with one
   // of its legs (or all of them) left out, and so on, keeping only tickets
@@ -1845,10 +1847,18 @@
     const tier = (t) => (t.worth >= 1.02 ? 2 : t.worth >= 0.95 ? 1 : 0);
     return [...found.values()].sort((a, b) => tier(b) - tier(a) || (b.worth + 0.5 * b.p) - (a.worth + 0.5 * a.p)).slice(0, count);
   }
+  // "Only legs Bet365 prices": leave out every leg whose price HAWK has to guess
+  // (player props — no free feed has Bet365's). What's left are legs 365Scores
+  // carries Bet365's own price for, so HAWK's expected builder price is built
+  // from real numbers and lands far closer to what you'll see on Bet365.
+  // (`typed` = legs you gave Bet365's price for in the price check — those count as priced too.)
+  const unpricedIds = (e, typed) => Object.values(e.legs).filter((l) => !(l.bookPrice > 1) && !typed.has(l.id)).map((l) => l.id);
+  const withPriced = (e, body) => (body.priced
+    ? { ...body, banned: [...(body.banned || []), ...unpricedIds(e, new Set(body.typed || []))] } : body);
   function buildOptions(body, count = 5) {
-    if (body.auto) return { options: autoOptions(entryFor(body.id), body, count, 1) };
+    if (body.auto) { const e0 = entryFor(body.id); return { options: autoOptions(e0, withPriced(e0, body), count, 1) }; }
     const e = entryFor(body.id);
-    return { options: searchOptions(e, body, count, 2) };
+    return { options: searchOptions(e, withPriced(e, body), count, 2) };
   }
 
   // Head to head: the last 5 finished meetings of the two clubs (any
@@ -1925,12 +1935,12 @@
     if (scan.running) return jobStatus(scan);
     const params = { ...windowParams(body), target: Math.min(Math.max(+body.target || 3, 1.2), 50),
                      style: STYLES[body.style] ? body.style : "Balanced", focus: FOCUS[body.focus] ? body.focus : "Mix",
-                     maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12), extras: !!body.extras, picks: body.picks === "value" ? "value" : "likely", auto: !!body.auto };
+                     maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12), extras: !!body.extras, picks: body.picks === "value" ? "value" : "likely", auto: !!body.auto, priced: !!body.priced, typed: body.typed || [] };
     Object.assign(scan, newJob(), { running: true, params });
     runFixtureJob(scan, (league, f, json, e) => {
       // The best ticket for this match (worth betting at Bet365 first), from a quicker search than the builder's.
-      const t = params.auto ? autoOptions(e, { ...params, favourite: true, known: params.known || [] }, 1, 1)[0]
-        : searchOptions(e, { ...params, favourite: true, known: params.known || [] }, 1, 1)[0];
+      const p2 = withPriced(e, { ...params, favourite: true, known: params.known || [] });
+      const t = params.auto ? autoOptions(e, p2, 1, 1)[0] : searchOptions(e, p2, 1, 1)[0];
       if (!t) return;   // 🎯 Auto: nothing here lands 1 in 4 or better
       scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair, b365: t.b365 || null, b365raw: t.b365raw || null, check: t.check || 1, worth: +worthOf(t).toFixed(3), guessed: t.guessed || 0,
         legs: t.legs.map((r) => legSummary(e, json, r.id)),

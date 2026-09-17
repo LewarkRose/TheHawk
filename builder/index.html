@@ -1006,7 +1006,7 @@ function foldFixtures(fold) {
 function loadPref(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } }
 function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
-            target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), auto: loadPref("hawk.auto", false), favourite: true, result: null, tab: "players", q: "",
+            target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), auto: loadPref("hawk.auto", false), priced: loadPref("hawk.priced", false), favourite: true, result: null, tab: "players", q: "",
             chk: { price: "", boost: "", stake: "5" }, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
@@ -2248,6 +2248,8 @@ function renderSlip() {
       : "Picks the legs most likely to land together at your target odds."}</div>
     <div class="opts"><label><input type="checkbox" id="fav" ${S.favourite ? "checked" : ""}> Start with the favourite to win</label>
       <label>Max legs <select id="mx">${[3,4,5,6,7,8,9,10,12].map(n => `<option ${n === S.maxLegs ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>
+    <div class="opts" style="margin-top:6px"><label title="Player legs are the ones HAWK has to guess Bet365's price for (no free feed has them). With this on it builds only from legs 365Scores carries Bet365's own price for, so the price HAWK expects is much closer to what you'll see.">
+      <input type="checkbox" id="pricedOnly" ${S.priced ? "checked" : ""}> Quick mode: only legs Bet365 prices (no player legs, but HAWK’s price is close)</label></div>
     <div class="opts" style="margin-top:6px"><label title="These are counted from each player's own record, with no allowance for the opponent or referee, so HAWK is less sure of them. You can always add them yourself.">
       <input type="checkbox" id="xtra" ${S.extras ? "checked" : ""}> Auto-build can use fouls, tackles &amp; offsides</label></div>
     <div class="opts" style="margin-top:6px"><label title="Bet365 pays a Full Time Result leg early once that team goes 2 goals ahead (the EP badge on your slip). With this on, HAWK's Result chances include it.">
@@ -2295,6 +2297,8 @@ function renderSlip() {
   $("#picks").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.picks = b.dataset.p; savePref("hawk.picks", S.picks); renderSlip(); } };
   $("#fav").onchange = (e) => { S.favourite = e.target.checked; };
   $("#xtra").onchange = (e) => { S.extras = e.target.checked; };
+  $("#pricedOnly").onchange = (e) => { S.priced = e.target.checked; savePref("hawk.priced", S.priced);
+    toast(S.priced ? "HAWK will only use legs Bet365 prices — its expected price gets much closer" : "Player legs are back — HAWK guesses their Bet365 price"); };
   $("#epOn").onchange = (e) => {
     S.ep = e.target.checked; savePref("hawk.ep", S.ep); HAWK.setEarlyPayout(S.ep);
     if (S.match) openMatch(S.match.id, true);   // re-run the match with (or without) it
@@ -2614,7 +2618,7 @@ function bindStakeAdvice(root, useStake) {
 // leg, starts a fresh set.
 function buildBody() {
   const locked = S.slip.filter(id => S.locked.has(id));
-  return { id: String(S.match.id), auto: S.auto, target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs,
+  return { id: String(S.match.id), auto: S.auto, priced: S.priced, typed: typedLegIds(), target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs,
            favourite: S.favourite, extras: S.extras, picks: S.picks, locked, banned: [...new Set([...S.banned, ...unofferedLegIds()])],
            known: knownLegIds(),
            learnt: propPrices().length };   // (a new Bet365 prop price → fresh options)
@@ -2735,6 +2739,8 @@ function markOnBet365() {
   for (const id of S.slip) { const l = S.legs[id]; if (l) { on.add(no365Key(l)); off.delete(no365Key(l)); } }
   savePref("hawk.onBet365", [...on].slice(-500)); savePref("hawk.notOn365", [...off]);
 }
+// Legs you've given Bet365's own price for (price check / ✎), for this match.
+const typedLegIds = () => propPrices().filter(x => x.match === String(S.match && S.match.id) && x.price > 1).map(x => x.leg);
 const knownLegIds = () => { const on = onBet365(); return S.match && on.size ? Object.values(S.legs).filter(l => on.has(no365Key(l))).map(l => l.id) : []; };
 function unofferedLegIds() {
   const set = notOn365();
@@ -2808,7 +2814,7 @@ function renderScan() {
     <div class="section" style="border-top:0">
       <h3>🏆 Picks</h3>
       <div class="seg" id="scanAuto" style="margin:0 0 8px;max-width:360px">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
-      <div class="note" style="margin-top:0">HAWK's best builder for every match — ${S.auto ? `<b style="color:var(--gold)">🎯 Auto</b>: odds about 2–4, up to ${S.maxLegs} legs, lands 1 in 4 or better`
+      <div class="note" style="margin-top:0">HAWK's best builder for every match — ${S.auto ? `<b style="color:var(--gold)">🎯 Auto</b>: odds about 2–4, up to ${S.maxLegs} legs, lands 1 in 4 or better${S.priced ? " · only legs Bet365 prices" : ""}`
         : `target <b style="color:var(--gold)">${S.target.toFixed(2)}</b> · max ${S.maxLegs} legs <a href="#" onclick="event.preventDefault();showBuilder()" style="color:var(--accent)">change</a>`}.
         Build one on Bet365, type its price, and HAWK tells you ✅ / 🤏 / ❌.</div>
       <details class="scanset"><summary>⚙️ Leagues and time (${sc.leagues.size} competitions)</summary>
@@ -2952,7 +2958,7 @@ async function toggleScan() {
     if (S.scan.data && S.scan.data.running) S.scan.data = await api("/api/scan/stop", {});
     else {
       if (!S.scan.leagues.size) return toast("Pick at least one league.");
-      S.scan.data = await api("/api/scan", { leagues: [...S.scan.leagues], hours: hoursFor(S.scan.hours), target: S.target, auto: S.auto,
+      S.scan.data = await api("/api/scan", { leagues: [...S.scan.leagues], hours: hoursFor(S.scan.hours), target: S.target, auto: S.auto, priced: S.priced,
                                              style: S.style, focus: S.focus, maxLegs: S.maxLegs, extras: S.extras, picks: S.picks });
     }
   } catch (err) { toast(err.message); }

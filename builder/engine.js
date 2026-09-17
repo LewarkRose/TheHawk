@@ -1830,7 +1830,23 @@
     for (const t of pool) { if (chosen.length >= count) break; if (!chosen.includes(t)) chosen.push(t); }
     return chosen.map((t) => ({ ...t, worth: +worthOf(t).toFixed(3) }));
   }
+  // 🎯 Auto: no target odds to pick. HAWK tries a few targets (about 2, 2.75 and
+  // 3.75) with up to your max legs, keeps only builders that land at least 1 time in 4,
+  // and puts the ones worth it at Bet365 first (then fair price, then the rest),
+  // best value and likeliest first within each.
+  const AUTO_TARGETS = [2, 2.75, 3.75], AUTO_MIN_P = 0.25;
+  function autoOptions(e, params, count = 5, depth = 1) {
+    const found = new Map(), maxLegs = +params.maxLegs || 6;
+    for (const target of AUTO_TARGETS)
+      for (const t of searchOptions(e, { ...params, target, maxLegs }, count, depth)) {
+        const k = t.legs.map((l) => l.id).sort().join("|");
+        if (t.legs.length && t.p >= AUTO_MIN_P && !found.has(k)) found.set(k, { ...t, autoTarget: target });
+      }
+    const tier = (t) => (t.worth >= 1.02 ? 2 : t.worth >= 0.95 ? 1 : 0);
+    return [...found.values()].sort((a, b) => tier(b) - tier(a) || (b.worth + 0.5 * b.p) - (a.worth + 0.5 * a.p)).slice(0, count);
+  }
   function buildOptions(body, count = 5) {
+    if (body.auto) return { options: autoOptions(entryFor(body.id), body, count, 1) };
     const e = entryFor(body.id);
     return { options: searchOptions(e, body, count, 2) };
   }
@@ -1909,11 +1925,13 @@
     if (scan.running) return jobStatus(scan);
     const params = { ...windowParams(body), target: Math.min(Math.max(+body.target || 3, 1.2), 50),
                      style: STYLES[body.style] ? body.style : "Balanced", focus: FOCUS[body.focus] ? body.focus : "Mix",
-                     maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12), extras: !!body.extras, picks: body.picks === "value" ? "value" : "likely" };
+                     maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12), extras: !!body.extras, picks: body.picks === "value" ? "value" : "likely", auto: !!body.auto };
     Object.assign(scan, newJob(), { running: true, params });
     runFixtureJob(scan, (league, f, json, e) => {
       // The best ticket for this match (worth betting at Bet365 first), from a quicker search than the builder's.
-      const t = searchOptions(e, { ...params, favourite: true, known: params.known || [] }, 1, 1)[0];
+      const t = params.auto ? autoOptions(e, { ...params, favourite: true, known: params.known || [] }, 1, 1)[0]
+        : searchOptions(e, { ...params, favourite: true, known: params.known || [] }, 1, 1)[0];
+      if (!t) return;   // 🎯 Auto: nothing here lands 1 in 4 or better
       scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair, b365: t.b365 || null, b365raw: t.b365raw || null, check: t.check || 1, worth: +worthOf(t).toFixed(3), guessed: t.guessed || 0,
         legs: t.legs.map((r) => legSummary(e, json, r.id)),
         value: json.value.legs.slice(0, 4).map((v) => ({ label: v.label, price: v.price, edge: v.edge })) });

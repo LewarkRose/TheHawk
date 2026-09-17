@@ -1000,7 +1000,7 @@ function foldFixtures(fold) {
 function loadPref(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } }
 function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
-            target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), favourite: true, result: null, tab: "players", q: "",
+            target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), auto: loadPref("hawk.auto", false), favourite: true, result: null, tab: "players", q: "",
             chk: { price: "", boost: "", stake: "5" }, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
@@ -2229,9 +2229,11 @@ function renderSlip() {
   }).join("");
   const predicted = m && Object.values(m.lineups).some(lu => lu.status !== "Confirmed");
   $("#slip").innerHTML = `
-    <div class="target"><div><div class="muted" style="font-size:12px;letter-spacing:.1em" title="HAWK builds until Bet365's likely price for the builder reaches this">TARGET · BET365 PRICE</div><div class="big" id="tgt">${S.target.toFixed(2)}</div></div>
+    <div class="seg" id="autoSeg" style="margin-top:0" title="Auto: HAWK picks the odds and legs for you">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
+    ${S.auto ? `<div class="hint" style="margin-top:0">HAWK tries odds from about 2 to 4 with up to your max legs (below) and only keeps builders that land at least 1 time in 4 — worth-it ones at Bet365 first.</div>` : ""}
+    <div class="target" ${S.auto ? 'style="display:none"' : ""}><div><div class="muted" style="font-size:12px;letter-spacing:.1em" title="HAWK builds until Bet365's likely price for the builder reaches this">TARGET · BET365 PRICE</div><div class="big" id="tgt">${S.target.toFixed(2)}</div></div>
       <div class="muted" style="text-align:right;font-size:12px">${r && r.p && S.slip.length ? `this one lands<br><b style="font-size:16px;color:var(--text)">${pct(r.p, 1)}</b>` : `HAWK builds to<br><b style="font-size:13px;color:var(--text)">Bet365's price</b>`}</div></div>
-    <input type="range" min="0" max="100" step="0.5" value="${oddsToSlider(S.target)}" id="rng">
+    <input type="range" min="0" max="100" step="0.5" value="${oddsToSlider(S.target)}" id="rng" ${S.auto ? 'style="display:none"' : ""}>
     <div class="seg" id="seg" title="How likely each leg should be">${Object.entries(STYLES).map(([s, st]) => `<button class="${S.style === s ? "on" : ""}" data-s="${s}">${st.label}</button>`).join("")}</div>
     <div class="hint">${STYLES[S.style].hint}</div>
     <div class="seg" id="focus" style="margin-top:0" title="What the builder is made of">${[["Mix", "Mix"], ["Players", "Player props"], ["Match", "Match stats"]].map(([f, lab]) => `<button class="${S.focus === f ? "on" : ""}" data-f="${f}">${lab}</button>`).join("")}</div>
@@ -2278,6 +2280,7 @@ function renderSlip() {
 </div>
     ${healthLine()}${learningNote()}${trustNote()}`;
 
+  $("#autoSeg").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.auto = b.dataset.auto === "1"; savePref("hawk.auto", S.auto); renderSlip(); } };
   $("#rng").oninput = (e) => { S.target = sliderToOdds(+e.target.value); $("#tgt").textContent = S.target.toFixed(2); };
   $("#rng").onchange = () => renderSlip();
   $("#seg").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.style = b.dataset.s; renderSlip(); } };
@@ -2556,7 +2559,7 @@ function bindStakeAdvice(root, useStake) {
 // leg, starts a fresh set.
 function buildBody() {
   const locked = S.slip.filter(id => S.locked.has(id));
-  return { id: String(S.match.id), target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs,
+  return { id: String(S.match.id), auto: S.auto, target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs,
            favourite: S.favourite, extras: S.extras, picks: S.picks, locked, banned: [...new Set([...S.banned, ...unofferedLegIds()])],
            known: knownLegIds(),
            learnt: propPrices().length };   // (a new Bet365 prop price → fresh options)
@@ -2749,8 +2752,9 @@ function renderScan() {
   $("#match").innerHTML = `
     <div class="section" style="border-top:0">
       <h3>🏆 Picks</h3>
-      <div class="note" style="margin-top:0">HAWK's best builder for every match — target <b style="color:var(--gold)">${S.target.toFixed(2)}</b> · max ${S.maxLegs} legs
-        <a href="#" onclick="event.preventDefault();showBuilder()" style="color:var(--accent)">change</a>.
+      <div class="seg" id="scanAuto" style="margin:0 0 8px;max-width:360px">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
+      <div class="note" style="margin-top:0">HAWK's best builder for every match — ${S.auto ? `<b style="color:var(--gold)">🎯 Auto</b>: odds about 2–4, up to ${S.maxLegs} legs, lands 1 in 4 or better`
+        : `target <b style="color:var(--gold)">${S.target.toFixed(2)}</b> · max ${S.maxLegs} legs <a href="#" onclick="event.preventDefault();showBuilder()" style="color:var(--accent)">change</a>`}.
         Build one on Bet365, type its price, and HAWK tells you ✅ / 🤏 / ❌.</div>
       <details class="scanset"><summary>⚙️ Leagues and time (${sc.leagues.size} competitions)</summary>
       ${leaguePicker("scanLeagues", sc.leagues)}</details>
@@ -2768,6 +2772,8 @@ function renderScan() {
   bindLeaguePicker("scanLeagues", sc.leagues, "hawk.scanLeagues");
   $("#hrs").onchange = (e) => { sc.hours = windowValue(e.target.value); };
   $("#srt").onchange = (e) => { sc.sort = e.target.value; updateScan(); };
+  $("#scanAuto").onclick = (e) => { const b = e.target.closest("button"); if (!b || S.auto === (b.dataset.auto === "1")) return;
+    S.auto = b.dataset.auto === "1"; savePref("hawk.auto", S.auto); renderScan(); if (S.scan.data && !S.scan.data.running) toggleScan(); };
   $("#scanRes").oninput = (e) => {
     const i = e.target.closest("[data-price]"); if (!i) return;
     const r = (S.scan.data.results || []).find(x => String(x.id) === i.dataset.price); if (!r) return;
@@ -2887,7 +2893,7 @@ async function toggleScan() {
     if (S.scan.data && S.scan.data.running) S.scan.data = await api("/api/scan/stop", {});
     else {
       if (!S.scan.leagues.size) return toast("Pick at least one league.");
-      S.scan.data = await api("/api/scan", { leagues: [...S.scan.leagues], hours: hoursFor(S.scan.hours), target: S.target,
+      S.scan.data = await api("/api/scan", { leagues: [...S.scan.leagues], hours: hoursFor(S.scan.hours), target: S.target, auto: S.auto,
                                              style: S.style, focus: S.focus, maxLegs: S.maxLegs, extras: S.extras, picks: S.picks });
     }
   } catch (err) { toast(err.message); }

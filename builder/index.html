@@ -3924,7 +3924,7 @@ async function htScan() {
 // play once there's a tip (it refreshes every 15 s with the page).
 function htSection(d) {
   const ht = isHalfTime(d), tips = htTips(d);
-  if (!ht && !tips.length) return "";
+  if (!d.live) return "";
   S.inplay.htPrices ||= {};
   const card = (r) => {
     const key = r.label, need = r.fair * 1.02;
@@ -3935,7 +3935,7 @@ function htSection(d) {
         <div class="sverdict" data-htverdict="${esc(key)}">${htVerdict(r)}</div></div></div>`;
   };
   return `<div class="section"><h3>${ht ? "⏸ Half-time check" : "👀 Live check"}</h3>
-    ${ht ? `<div class="note" style="margin-top:0">1st half: ${esc(htStatsLine(d) || "no stats yet")}</div>` : ""}
+    <div class="note" style="margin-top:0">${ht ? `1st half: ${esc(htStatsLine(d) || "no stats yet")}` : `So far: ${esc(htStatsLine(d) || "no stats yet")}`}</div>
     ${tips.length ? tips.map(card).join("") : `<div class="note">Nothing worth betting right now — Bet365's live prices are in line with HAWK's read. HAWK keeps checking every 15 seconds while this page is open, and every 2 minutes in the background (30 s at half-time).</div>`}
     <div class="note">Prices move fast and get suspended after chances and goals. Only bet if the price you see is at or above "Bet it at".</div></div>`;
 }

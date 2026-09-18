@@ -620,6 +620,83 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .scard .schips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
     .scard .sfoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
     .scard .iconbtn{width:44px;height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+    /* the recipe: what HAWK is about to build, in a sentence, with chips that change a word each */
+    .recipe{margin-top:2px;font-size:13.5px;line-height:1.85;color:var(--muted)}
+    .recipe b{color:var(--text)}
+    .recipe .hl{color:var(--gold)}
+    .rchips{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+    .rchips button{min-height:36px;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);
+      color:var(--text);font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
+    .rchips button:hover{border-color:var(--accent)}
+    .rchips button.on{border-color:rgba(20,227,161,.45);background:rgba(20,227,161,.1);color:var(--accent)}
+    .rmore{margin-top:11px;border-top:1px solid var(--line);padding-top:9px}
+    .rmore summary{font-size:12.5px;font-weight:700;color:var(--muted);cursor:pointer;list-style:none;padding:3px 0}
+    .rmore summary::-webkit-details-marker{display:none}
+    /* what HAWK knows: a scoreboard, not a wall of sentences */
+    .brain{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden}
+    .brain .bh{display:flex;align-items:center;gap:9px;padding:10px 13px;border-bottom:1px solid var(--line)}
+    .brain .bh .dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+    .brain .bh .dot.warn{background:var(--gold)}
+    .brain .bh h4{margin:0;font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
+      font-size:19px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+    .btiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;padding:12px 13px}
+    .btile{text-align:center;padding:9px 4px;border:1px solid var(--line);border-radius:11px;background:var(--panel2)}
+    .btile .n{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:27px;line-height:1;font-weight:700;color:var(--gold)}
+    .btile .n small{font-size:16px}
+    .btile .k{margin-top:3px;font-size:10.5px;color:var(--muted)}
+    .brain .bsay{padding:0 13px 11px;font-size:12.5px;color:var(--muted);line-height:1.5}
+    .bchips{display:flex;flex-wrap:wrap;gap:6px;padding:0 13px 12px}
+    .bchip{font-size:11.5px;padding:4px 10px;border-radius:7px;border:1px solid var(--line);color:var(--muted)}
+    .bchip.up{background:rgba(20,227,161,.1);border-color:rgba(20,227,161,.4);color:var(--accent)}
+    .bchip.dn{background:rgba(255,93,115,.09);border-color:rgba(255,93,115,.38);color:var(--red)}
+    .brain .bfoot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 13px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+    /* check mode: the price box and verdict under the Bet365 list */
+    .cm{margin-top:12px;padding:13px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
+    .cm .lab{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+    .cm .big{width:100%;margin-top:7px;padding:14px;font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
+      font-size:38px;font-weight:700;text-align:center;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text)}
+    .cm .row2{display:flex;align-items:flex-end;gap:10px;margin-top:10px}
+    .cm .row2 input{width:92px;padding:9px;font-size:17px;font-weight:800;text-align:center;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text)}
+    .cmv{display:flex;align-items:center;gap:11px;margin-top:12px}
+    .cmv .tier{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:24px;line-height:1;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+    .cmv .tier.ok{color:var(--accent)} .cmv .tier.fair{color:var(--gold)} .cmv .tier.bad{color:var(--red)}
+    .cmbar{position:relative;height:9px;border-radius:5px;background:#22303a;overflow:hidden;margin-top:11px}
+    .cmbar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--accent-d),var(--accent))}
+    .cmbar b{position:absolute;top:-3px;width:2px;height:15px;background:var(--red);border-radius:1px}
+    .cmgo{display:flex;gap:9px;margin-top:12px}
+    .cmgo button{height:50px;border-radius:12px;border:0;font-size:13.5px;font-weight:800;cursor:pointer}
+    .cmgo .place{flex:1;background:var(--accent);color:#06231a}
+    .cmgo .skip{width:110px;background:var(--panel);color:var(--text);border:1px solid var(--line)}
+    /* Picks: one line of what's set, everything else behind the cog */
+    .pkbar{display:flex;align-items:center;gap:10px}
+    .pkbar h3{font-size:15px}
+    /* the summary wraps rather than pushing the page wider than the phone */
+    .pksum{margin-top:2px;font-size:11.5px;color:var(--muted);overflow-wrap:anywhere}
+    .pkbar > div{min-width:0}
+    .pkbar .iconbtn{width:44px;height:44px;padding:0;font-size:16px;display:inline-flex;align-items:center;justify-content:center}
+    /* your day: the bets you have running, and what the day has done so far */
+    .myday{border:1px solid var(--line);border-radius:14px;background:var(--panel);margin:0 0 12px;overflow:hidden}
+    .myday .mh{display:flex;align-items:center;gap:9px;padding:10px 13px;border-bottom:1px solid var(--line)}
+    .myday .mh h4{margin:0;font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:19px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+    .myday .big{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:22px;line-height:1;font-weight:700}
+    .mybet{padding:11px 13px;border-top:1px solid var(--line)}
+    .mybet:first-of-type{border-top:0}
+    .mybet .top{display:flex;align-items:center;gap:10px}
+    .myleg{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:6px;background:#22303a;border:1px solid var(--line);color:var(--muted);margin:5px 5px 0 0}
+    .myleg.won{background:rgba(20,227,161,.1);border-color:rgba(20,227,161,.4);color:var(--accent)}
+    .myleg.lost{background:rgba(255,93,115,.09);border-color:rgba(255,93,115,.38);color:var(--red)}
+    /* Today: the day's plan */
+    .tdhead{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    .tdhead .bank{text-align:right}
+    .tdhead .bank .n{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:26px;line-height:1;font-weight:700;color:var(--accent)}
+    .tdplan{padding:14px 15px;border-radius:16px;border:1px solid var(--accent);background:linear-gradient(180deg,#1a2a2c,#172024);margin-bottom:13px}
+    .tdstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+    .tdstats .k{font-size:10px;letter-spacing:.12em;color:var(--muted)}
+    .tdstats .v{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:26px;line-height:1.05;font-weight:700}
+    .tdrow{display:flex;align-items:center;gap:11px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:7px}
+    .tdrow.done{opacity:.55}
+    .tdrow input[type=checkbox]{width:18px;height:18px;flex:none}
+    .tdrow .px{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:20px;line-height:1;font-weight:700;color:var(--gold)}
 .scard .teams{display:flex;align-items:center;gap:7px;font-weight:800;flex-wrap:wrap}
 .scard .teams img{width:20px;height:20px}
 .lchip{display:inline-block;font-size:11.5px;padding:3px 9px;border-radius:7px;background:#22303a;border:1px solid #2e3e49;margin:0}
@@ -973,6 +1050,7 @@ a.nav{text-decoration:none}
     <nav class="mainnav" id="mainnav">
       <button class="nav" id="scanBtn" data-nav="scan" title="Tonight's picks: HAWK's best builder for every match">🏆 <span>Picks</span></button>
       <button class="nav" id="scoresBtn" data-nav="live" title="Live scores, half-time tips, your bets live and cash-out">🔴 <span>Live</span></button>
+      <button class="nav" id="navToday" data-nav="today" title="The day's plan: what to bet, what's running, what it's done">📅 <span>Today</span></button>
       <button class="nav betsnav" id="navBets" onclick="openMyBets()" title="Your bets from the Vault: the ones still running and the last settled">🎟 <span>My bets</span><b class="jn" id="navBetsN" hidden></b></button>
       <button class="nav morenav" id="moreBtn" data-nav="more" title="Builder, Value, Acca and the Vault">☰ <span>More</span></button>
     </nav>
@@ -1016,12 +1094,12 @@ function loadPref(key, fallback) { try { const v = localStorage.getItem(key); re
 function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
             target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), auto: loadPref("hawk.auto", false), priced: loadPref("hawk.priced", false), favourite: true, result: null, tab: "players", q: "",
-            chk: { price: "", boost: "", stake: "5" }, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
+            chk: { price: "", boost: "", stake: "5" }, moreOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },   // perMatch is always 1: one Bet365-priced leg per match, so the acca has no builder cut
-            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", confirmed: loadPref("hawk.scanConfirmed", false), showBet: loadPref("hawk.scanShowBet", false), minOdds: loadPref("hawk.minOdds", 2), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
+            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", confirmed: loadPref("hawk.scanConfirmed", false), setOpen: false, showBet: loadPref("hawk.scanShowBet", false), minOdds: loadPref("hawk.minOdds", 2), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null,
                      tab: "value", minMove: 0.1 },
             watch: [] };
@@ -1167,7 +1245,7 @@ async function openFromUrl() {
   // Home page: tonight's picks on a phone; on a PC the Builder, as before.
   if (!id && !view && matchMedia("(max-width:820px)").matches) return showScan();
   // App shortcuts (long-press the HAWK icon): builder/?view=scores | value | acca | scan
-  const views = { scores: showScores, value: showValue, acca: showAcca, scan: showScan };
+  const views = { scores: showScores, value: showValue, acca: showAcca, scan: showScan, today: showToday };
   if (view && views[view]) { history.replaceState(null, "", location.pathname); return views[view](); }
   // From a goal notification: builder/?view=live&id=GAME&league=L
   if (view === "live" && q.get("id")) { history.replaceState(null, "", location.pathname); return goToLive(q.get("league"), q.get("id")); }
@@ -2224,22 +2302,23 @@ function renderSlip() {
     <div class="target" ${S.auto ? 'style="display:none"' : ""}><div><div class="muted" style="font-size:12px;letter-spacing:.1em" title="HAWK builds until Bet365's likely price for the builder reaches this">TARGET · BET365 PRICE</div><div class="big" id="tgt">${S.target.toFixed(2)}</div></div>
       <div class="muted" style="text-align:right;font-size:12px">${r && r.p && S.slip.length ? `this one lands<br><b style="font-size:16px;color:var(--text)">${pct(r.p, 1)}</b>` : `HAWK builds to<br><b style="font-size:13px;color:var(--text)">Bet365's price</b>`}</div></div>
     <input type="range" min="0" max="100" step="0.5" value="${oddsToSlider(S.target)}" id="rng" ${S.auto ? 'style="display:none"' : ""}>
-    <div class="seg" id="seg" title="How likely each leg should be">${Object.entries(STYLES).map(([s, st]) => `<button class="${S.style === s ? "on" : ""}" data-s="${s}">${st.label}</button>`).join("")}</div>
-    <div class="hint">${STYLES[S.style].hint}</div>
-    <div class="seg" id="focus" style="margin-top:0" title="What the builder is made of">${[["Mix", "Mix"], ["Players", "Player props"], ["Match", "Match stats"]].map(([f, lab]) => `<button class="${S.focus === f ? "on" : ""}" data-f="${f}">${lab}</button>`).join("")}</div>
-    <div class="seg seg2" id="picks" style="margin-top:0" title="How HAWK chooses between legs">${[["likely", "🎯 Most likely"], ["value", "💰 Value first"]].map(([k, lab]) => `<button class="${S.picks === k ? "on" : ""}" data-p="${k}">${lab}</button>`).join("")}</div>
-    <div class="hint">${S.picks === "value" ? "Prefers legs where Bet365's own price beats HAWK's fair odds, and moves HAWK agrees with — usually a better builder price."
-      : "Picks the legs most likely to land together at your target odds."}</div>
-    <div class="opts"><label><input type="checkbox" id="fav" ${S.favourite ? "checked" : ""}> Start with the favourite to win</label>
-      <label>Max legs <select id="mx">${[3,4,5,6,7,8,9,10,12].map(n => `<option ${n === S.maxLegs ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>
-    <div class="opts" style="margin-top:6px"><label title="Only legs with a real price behind them: Bet365's own (365Scores), two or more of the books that price closest to Bet365 (player legs), or a price you typed in. HAWK's expected builder price is then much closer to what Bet365 shows.">
-      <input type="checkbox" id="pricedOnly" ${S.priced ? "checked" : ""}> Quick mode: only legs with a real bookmaker price</label></div>
-    <div class="opts" style="margin-top:6px"><label title="These are counted from each player's own record, with no allowance for the opponent or referee, so HAWK is less sure of them. You can always add them yourself.">
-      <input type="checkbox" id="xtra" ${S.extras ? "checked" : ""}> Auto-build can use fouls, tackles &amp; offsides</label></div>
-    <div class="opts" style="margin-top:6px"><label title="Bet365 pays a Full Time Result leg early once that team goes 2 goals ahead (the EP badge on your slip). With this on, HAWK's Result chances include it.">
-      <input type="checkbox" id="epOn" ${S.ep ? "checked" : ""}> Bet365 Early Payout (EP) on Result legs</label></div>
-    <div class="opts" style="margin-top:6px"><label title="Bet365's Sub On Play On: if your player is subbed off before his leg lands, the bet moves to the player who comes on for him. HAWK follows the sub live and the Vault settles it that way.">
-      <input type="checkbox" id="subOn" ${S.subOn ? "checked" : ""}> Bet365 Sub On Play On for player legs</label></div>
+    ${recipeLine()}
+    <div class="rchips" id="rchips">
+      <button data-cyc="style" title="How likely each leg should be">${STYLES[S.style].label}</button>
+      <button data-cyc="focus" title="What the builder is made of">${{ Mix: "Mix of markets", Players: "Player props", Match: "Match stats" }[S.focus]}</button>
+      <button data-cyc="picks" title="How HAWK chooses between legs">${S.picks === "value" ? "Best value" : "Most likely"}</button>
+      <button data-cyc="max" title="The most legs HAWK will use">Max ${S.maxLegs} legs</button>
+      <button data-cyc="priced" class="${S.priced ? "on" : ""}" title="Only legs with a real bookmaker price behind them — HAWK's expected builder price is then much closer to what Bet365 shows">Real prices only</button>
+      <button data-cyc="fav" class="${S.favourite ? "on" : ""}" title="Start every builder with the favourite to win (or the double chance)">Favourite first</button>
+    </div>
+    <details class="rmore" ${S.moreOpen ? "open" : ""} id="rmore"><summary>Bet365 extras — ${[S.ep, S.subOn, S.extras].filter(Boolean).length} on</summary>
+      <div class="opts" style="margin-top:6px"><label title="These are counted from each player's own record, with no allowance for the opponent or referee, so HAWK is less sure of them. You can always add them yourself.">
+        <input type="checkbox" id="xtra" ${S.extras ? "checked" : ""}> Auto-build can use fouls, tackles &amp; offsides</label></div>
+      <div class="opts" style="margin-top:6px"><label title="Bet365 pays a Full Time Result leg early once that team goes 2 goals ahead (the EP badge on your slip). With this on, HAWK's Result legs count the early payout.">
+        <input type="checkbox" id="epOn" ${S.ep ? "checked" : ""}> Bet365 Early Payout (EP) on Result legs</label></div>
+      <div class="opts" style="margin-top:6px"><label title="Bet365's Sub On Play On: if your player is subbed off before his leg lands, the bet moves to the player who comes on for him. HAWK counts the replacement's chances too.">
+        <input type="checkbox" id="subOn" ${S.subOn ? "checked" : ""}> Bet365 Sub On Play On for player legs</label></div>
+    </details>
     <button class="build" id="go" ${m ? "" : "disabled"}>${sameOptions() && S.options.list.length > 1
       ? `🔄 BUILD AGAIN — option ${(S.options.at + 1) % S.options.list.length + 1} of ${S.options.list.length}` : "⚡ BUILD MY BET BUILDER"}</button>
     ${S.slip.length ? `
@@ -2279,7 +2358,7 @@ function renderSlip() {
       <div><label title="Winnings boost, e.g. 25 for a 25% boost">Boost %</label><input id="boost" inputmode="decimal" placeholder="0" value="${esc(S.chk.boost)}"></div>
       <div><label>Stake (€)</label><input id="stake" inputmode="decimal" value="${esc(S.chk.stake)}"></div></div>
       <div id="verdict"></div></div>
-    <button class="ghost" id="b365" title="The legs in Bet365's order, with tick boxes, to build it there">📋 Build it on Bet365</button>
+    <button class="ghost" id="b365" title="The legs in Bet365's order to tick off, the price box and the verdict — everything for the 40 seconds you're in the Bet365 app">📋 Build it on Bet365</button>
     <button class="ghost" id="pcheck" title="Type the Bet365 price of each leg — HAWK learns Bet365's own prices instead of guessing from Unibet's">💷 Price check (teach HAWK)</button>
     <button class="ghost" id="copy">⧉ Copy slip</button>
     <button class="ghost" id="toAcca" title="Put this builder on your acca, with builders from other matches">➕ Add to acca${S.acca.some(pt => m && pt.id === String(m.id)) ? " (replaces this match)" : ""}</button>
@@ -2288,27 +2367,33 @@ function renderSlip() {
     ` : `<div class="note" style="margin-top:14px">${m ? "Set your target odds and hit build — or add legs yourself from the Players tab." : "Pick a fixture to start."}</div>`}
     ${m && m.warnings.length ? m.warnings.map(w => `<div class="warn">${esc(w)}</div>`).join("") : ""}
     ${no365Note()}
-    <div class="note">Fair odds = 1 ÷ chance to land, from ${m ? m.sims.toLocaleString() : "12,000"} simulated matches.
-      Match legs are calibrated to the bookmakers; player legs are HAWK's own estimates (no free feed has player-prop prices).
-</div>
-    ${aimNote()}${healthLine()}${learningNote()}${trustNote()}`;
+    ${brainBoard(m)}`;
 
   $("#autoSeg").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.auto = b.dataset.auto === "1"; savePref("hawk.auto", S.auto); renderSlip(); } };
   $("#rng").oninput = (e) => { S.target = sliderToOdds(+e.target.value); $("#tgt").textContent = S.target.toFixed(2); };
   $("#rng").onchange = () => renderSlip();
-  $("#seg").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.style = b.dataset.s; renderSlip(); } };
-  $("#focus").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.focus = b.dataset.f; renderSlip(); } };
-  $("#picks").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.picks = b.dataset.p; savePref("hawk.picks", S.picks); renderSlip(); } };
-  $("#fav").onchange = (e) => { S.favourite = e.target.checked; };
+  // Every chip cycles through its own options — one tap, no menus.
+  $("#rchips").onclick = (e) => {
+    const b = e.target.closest("[data-cyc]"); if (!b) return;
+    const next = (list, cur) => list[(list.indexOf(cur) + 1) % list.length];
+    switch (b.dataset.cyc) {
+      case "style": S.style = next(Object.keys(STYLES), S.style); savePref("hawk.style", S.style); break;
+      case "focus": S.focus = next(["Mix", "Players", "Match"], S.focus); savePref("hawk.focus", S.focus); break;
+      case "picks": S.picks = S.picks === "value" ? "likely" : "value"; savePref("hawk.picks", S.picks); break;
+      case "max": S.maxLegs = next([3, 4, 5, 6, 8, 10, 12], S.maxLegs); savePref("hawk.maxLegs", S.maxLegs); break;
+      case "priced": S.priced = !S.priced; savePref("hawk.priced", S.priced);
+        toast(S.priced ? "Only legs with a real bookmaker price — HAWK's expected price gets much closer" : "Legs HAWK has to price itself are back in"); break;
+      case "fav": S.favourite = !S.favourite; savePref("hawk.fav", S.favourite); break;
+    }
+    renderSlip();
+  };
+  const rmore = $("#rmore"); if (rmore) rmore.ontoggle = () => { S.moreOpen = rmore.open; };
   $("#xtra").onchange = (e) => { S.extras = e.target.checked; };
-  $("#pricedOnly").onchange = (e) => { S.priced = e.target.checked; savePref("hawk.priced", S.priced);
-    toast(S.priced ? "Only legs with a real bookmaker price — HAWK's expected price gets much closer" : "Legs HAWK has to price itself are back in"); };
   $("#epOn").onchange = (e) => {
     S.ep = e.target.checked; savePref("hawk.ep", S.ep); HAWK.setEarlyPayout(S.ep);
     if (S.match) openMatch(S.match.id, true);   // re-run the match with (or without) it
   };
   if ($("#subOn")) $("#subOn").onchange = (e) => { S.subOn = e.target.checked; savePref("hawk.subOn", S.subOn); toast(S.subOn ? "Sub On Play On: a subbed-off player\u2019s leg moves to his sub" : "Sub On Play On off"); };
-  $("#mx").onchange = (e) => { S.maxLegs = +e.target.value; savePref("hawk.maxLegs", S.maxLegs); };
   $("#go").onclick = build;
   $("#slip").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => removeLeg(b.dataset.rm));
   $("#slip").querySelectorAll("[data-swap]").forEach(b => b.onclick = () => swapLeg(b.dataset.swap));
@@ -2650,6 +2735,19 @@ function bindStakeAdvice(root, useStake) {
 // Build again (same settings) moves to the next one; the numbered buttons on
 // the ticket jump straight to one. Changing a setting, or locking/removing a
 // leg, starts a fresh set.
+// What HAWK is about to build, as one line. The chips under it change a word each.
+const STYLE_RANGE = { Banker: "72% and 95%", Balanced: "55% and 90%", Punchy: "35% and 78%" };
+function recipeLine() {
+  const legs = `up to <b>${S.maxLegs}</b> leg${S.maxLegs === 1 ? "" : "s"}`;
+  const how = S.picks === "value" ? "the <b>best-value</b>" : "the <b>likeliest</b>";
+  const of = { Mix: "<b>mix</b> of markets", Players: "<b>player</b> legs", Match: "<b>match</b> legs" }[S.focus] || "<b>mix</b> of markets";
+  const range = STYLE_RANGE[S.style] || STYLE_RANGE.Balanced;
+  const aim = S.auto
+    ? (S.scan.minOdds ? `Stack legs until Bet365 pays <b class="hl">${S.scan.minOdds.toFixed(2)}+</b>` : `Stack legs to about <b class="hl">2–4</b>`)
+    : `Stack legs until Bet365 pays about <b class="hl">${S.target.toFixed(2)}</b>`;
+  return `<div class="recipe">${aim}, ${legs}, picking ${how} ${of} — each one landing between <b>${range}</b>.${
+    S.priced ? " Only legs with a real bookmaker price." : ""}</div>`;
+}
 function buildBody() {
   const locked = S.slip.filter(id => S.locked.has(id));
   return { id: String(S.match.id), auto: S.auto, priced: S.priced, typed: typedLegIds(), target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs,
@@ -2713,10 +2811,21 @@ function openChecklist() {
       <label class="chk-row"><input type="checkbox"><span>${l.b365 ? `<b>${esc(l.b365)}</b> <span class="muted">= ${esc(l.label.replace(/^.*?(Over|Under)/, "$1"))}</span>`
         : esc(l.player ? capitalise(l.label.replace(l.player + ": ", "").replace(l.player + " ", "")) : l.label)}</span>
         <span class="muted">${esc(l.market)} <button class="linkbtn muted" data-cno365="${esc(l.id)}" title="Can't find it on Bet365? HAWK stops using ${esc(l.market)} for this league and swaps in the next best leg">not there?</button></span></label>`).join("")}`).join("")}</div>
-    <div class="chk-price">${fair ? `HAWK's fair odds <b>${odds(fair)}</b> — it's worth it if Bet365 pays <b style="color:var(--accent)">${odds(worth)}+</b>.
-      Type Bet365's price into the slip's price box and HAWK checks it (and suggests a stake) — and learns from it how Bet365 prices player legs, so there's nothing else to type.` : ""}</div>
+    <div class="cm">
+      <label class="lab" for="cmPrice">What Bet365 shows</label>
+      <input class="big" id="cmPrice" inputmode="decimal" placeholder="${r && r.b365 ? odds(r.b365) : "0.00"}" value="${esc(S.chk.price)}">
+      <div class="row2"><div><div class="lab">Stake (€)</div><input id="cmStake" inputmode="decimal" value="${esc(S.chk.stake)}"></div>
+        <div class="muted" style="flex:1;font-size:11.5px;line-height:1.5">${fair
+          ? `HAWK's fair odds <b style="color:var(--text)">${odds(fair)}</b> — worth it from <b style="color:var(--accent)">${odds(worthFrom(r) || worth)}</b>.`
+          : ""}</div></div>
+      <div id="cmVerdict"></div>
+      <div class="cmgo"><button class="place" id="cmPlace">I placed it</button>
+        <button class="skip" id="cmSkip">Skipped</button></div>
+      <div class="muted" style="margin-top:8px;font-size:11px;text-align:center">Either way the price is saved and HAWK learns from it.</div>
+    </div>
     <div class="note">Bet365 names some legs a little differently (e.g. "Anytime Goalscorer", "Player Shots on Target 1+"). If a leg isn't offered,
       tap <b>🔄 swap</b> on it in the slip — HAWK puts the next best leg in.</div>`);
+    checkVerdict();
   const bg = document.querySelector(".modal-bg");
   bg.querySelectorAll(".chk-row input[type=checkbox]").forEach(cb => cb.onchange = () => {
     cb.closest(".chk-row").classList.toggle("done", cb.checked);
@@ -2728,6 +2837,23 @@ function openChecklist() {
     await notOnBet365(b.dataset.cno365);
     openChecklist();      // the list again, with the replacement leg in
   });
+  const price = bg.querySelector("#cmPrice"), stake = bg.querySelector("#cmStake");
+  if (price) price.oninput = () => { S.chk.price = price.value; checkVerdict(); };
+  if (price) price.onchange = () => { recordB365Price(); renderSlip(); };
+  if (stake) stake.oninput = () => { S.chk.stake = stake.value; checkVerdict(); };
+  const num = (el) => parseFloat(String((el || {}).value || "").replace(",", "."));
+  const savePrice = () => { if (num(price) > 1) { S.chk.price = price.value; recordB365Price(); renderSlip(); } };
+  const pl = bg.querySelector("#cmPlace");
+  if (pl) pl.onclick = () => {
+    const x = num(price), st = num(stake);
+    if (!(x > 1)) return toast("Type the price Bet365 shows first.");
+    if (!(st > 0)) return toast("Put a stake in.");
+    savePrice();
+    if (logBetToVault(x, st)) { closeModal(); toast(`🎟 Logged — €${st.toFixed(2)} at ${odds(x)}. It's in your Vault.`); jumpLabel(); linkVaultBets(); }
+    else toast("Couldn't save that one — log it in the Vault instead.");
+  };
+  const sk = bg.querySelector("#cmSkip");
+  if (sk) sk.onclick = () => { savePrice(); closeModal(); toast(num(price) > 1 ? "Price saved — HAWK learns from it." : "No price, nothing learnt."); };
   bg.querySelectorAll("[data-cprice]").forEach(inp => {
     inp.onclick = (e) => e.preventDefault() || inp.focus();   // typing a price doesn't tick the row
     inp.onchange = () => {
@@ -2847,14 +2973,18 @@ function renderScan() {
   const sc = S.scan;
   $("#match").innerHTML = `
     <div class="section" style="border-top:0">
-      <h3>🏆 Picks</h3>
-      <div class="seg" id="scanAuto" style="margin:0 0 8px;max-width:360px">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
-      <div class="note" style="margin-top:0">HAWK's best builder for every match — ${S.auto ? (sc.minOdds
-        ? `<b style="color:var(--gold)">${sc.minOdds.toFixed(2)}+</b>, up to ${S.maxLegs} legs, likeliest first${S.priced ? " · only priced legs" : ""}`
-        : `<b style="color:var(--gold)">🎯 Auto</b>: odds about 2–4, up to ${S.maxLegs} legs, lands 1 in 4 or better${S.priced ? " · only priced legs" : ""}`)
-        : `target <b style="color:var(--gold)">${S.target.toFixed(2)}</b> · max ${S.maxLegs} legs <a href="#" onclick="event.preventDefault();showBuilder()" style="color:var(--accent)">change</a>`}.
-        Build one on Bet365, type its price, and HAWK tells you ✅ / 🤏 / ❌.</div>
-      <details class="scanset"><summary>⚙️ Leagues and time (${sc.leagues.size} competitions)</summary>
+      <div class="pkbar">
+        <div style="flex:1;min-width:0">
+          <h3 style="margin:0">🏆 Picks</h3>
+          <div class="pksum" id="pkSum">${scanSummary()}</div>
+        </div>
+        <button class="ghost iconbtn" id="pkGear" aria-label="Scan settings" title="Leagues, kick-off, odds and sorting">⚙️</button>
+        <button class="build" id="scanGo" style="width:auto;margin:0;padding:11px 18px"></button>
+      </div>
+      <details class="scanset" id="pkSet" ${sc.setOpen ? "open" : ""}><summary>⚙️ Scan settings</summary>
+      <div class="note" style="margin-top:0">HAWK's best builder for every match. Build one on Bet365, type its price, and it tells you ✅ / 🤏 / ❌.</div>
+      <div class="seg" id="scanAuto" style="margin:8px 0;max-width:360px">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
+      <details class="scanset"><summary>🏅 Leagues (${sc.leagues.size} competitions)</summary>
       ${leaguePicker("scanLeagues", sc.leagues)}</details>
       <div class="opts" style="justify-content:flex-start;gap:16px;flex-wrap:wrap">
         <label>Kick-off <select id="hrs">${KICKOFF_WINDOWS.filter(([h]) => h !== 72).map(([h, t]) =>
@@ -2863,18 +2993,20 @@ function renderScan() {
           [[0, "any odds"], [2, "2.00+"], [2.5, "2.50+"], [3, "3.00+"], [5, "5.00+"], [8, "8.00+"], [12, "12.00+"], [20, "20.00+"]].map(([v, t]) =>
           `<option value="${v}" ${v === sc.minOdds ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label title="Most likely: the legs likeliest to land together. Value first: legs where Bet365's own price beats HAWK's fair odds — the same reason a pick turns up on the green board, built into the builder.">Built from <select id="scanPicks">${
-          [["likely", "\ud83c\udfaf Likeliest legs"], ["value", "\ud83d\udcb0 Legs with value"]].map(([v, t]) =>
+          [["likely", "🎯 Likeliest legs"], ["value", "💰 Legs with value"]].map(([v, t]) =>
           `<option value="${v}" ${v === S.picks ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label>Sort by <select id="srt">${[["worth", "Worth it at Bet365"], ["lands", "Most likely to land"], ["legs", "Fewest legs"], ["kickoff", "Kick-off time"], ["value", "Single legs with value"]].map(([k, t]) =>
           `<option value="${k}" ${k === sc.sort ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="scanConf" ${sc.confirmed ? "checked" : ""}> Lineups confirmed only</label>
-        <button class="build" id="scanGo" style="width:auto;margin:0 0 0 auto;padding:10px 20px"></button>
       </div>
+      </details>
       <div id="scanProg"></div>
     </div>
     <div class="section" id="scanRes"></div>`;
   bindLeaguePicker("scanLeagues", sc.leagues, "hawk.scanLeagues");
-  $("#hrs").onchange = (e) => { sc.hours = windowValue(e.target.value); };
+  $("#pkGear").onclick = () => { const d = $("#pkSet"); if (d) { d.open = !d.open; sc.setOpen = d.open; if (d.open) d.scrollIntoView({ behavior: "smooth", block: "nearest" }); } };
+  const pkSet = $("#pkSet"); if (pkSet) pkSet.ontoggle = () => { sc.setOpen = pkSet.open; };
+  $("#hrs").onchange = (e) => { sc.hours = windowValue(e.target.value); $("#pkSum").innerHTML = scanSummary(); };
   $("#srt").onchange = (e) => { sc.sort = e.target.value; updateScan(); };
   // Changing what HAWK builds means the scan has to run again: stop the one
   // going, wait for it to let go, then start fresh.
@@ -2939,6 +3071,7 @@ function renderScan() {
   updateScan();
 }
 function updateScan() {
+  const sum = $("#pkSum"); if (sum) sum.innerHTML = scanSummary();
   if (S.view !== "scan" || !$("#scanRes")) return;
   const d = S.scan.data || { running: false, total: 0, done: 0, errors: 0, results: [] };
   const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest("#scanRes [data-price]");
@@ -3046,6 +3179,16 @@ function pickBoard(results) {
 // with a mark where the price's break-even sits, so you can see whether it
 // clears without working anything out. The rail down the left is the verdict.
 const CHEVRON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+// What the scan is set to, in one line — the settings themselves are behind the cog.
+function scanSummary() {
+  const sc = S.scan;
+  const when = (KICKOFF_WINDOWS.find(([h]) => h === sc.hours) || [0, "24 hours"])[1];
+  const odds = sc.minOdds ? `${sc.minOdds.toFixed(2)}+` : S.auto ? "any odds" : `target ${S.target.toFixed(2)}`;
+  const n = (S.scan.data && (S.scan.data.results || []).length) || 0, total = (S.scan.data && S.scan.data.total) || 0;
+  return [String(when).toLowerCase(), odds, `${sc.leagues.size} leagues`,
+          sc.confirmed ? "XI confirmed" : null, S.priced ? "priced legs" : null,
+          total ? `${n} of ${total} matches` : null].filter(Boolean).join(" · ");
+}
 function scanCard(r, params) {
   const short = params && (r.b365 || r.fair) < params.target * 0.97;
   const typed = S.scan.prices[scanKey(r)];
@@ -3586,7 +3729,7 @@ function monsterClick(e) {
 /* ---------- page navigation ---------- */
 // The page buttons in the header light up for the page on screen. S.view is
 // set all over the place, so it's watched rather than every caller updating it.
-const NAV_OF = { match: "builder", inplay: "live", scores: "live", scan: "scan", value: "value", acca: "acca" };
+const NAV_OF = { match: "builder", inplay: "live", scores: "live", scan: "scan", value: "value", acca: "acca", today: "today" };
 const UNDER_MORE = new Set(["builder", "value", "acca"]);
 function watchView() {
   let view = S.view;
@@ -3722,7 +3865,7 @@ function renderScoreList() {
   for (const g of games) (groups[g.league] ||= []).push(g);
   const order = (l) => { const i = S.allLeagues.indexOf(l); return i < 0 ? 99 : i; };
   const live = games.filter(g => g.status === 3).length;
-  el.innerHTML = htStrip(sc.data) + (live ? `<div class="note" style="margin:0 0 10px"><span class="dot-live"></span>${live} live — updating every 15 seconds</div>` : "") +
+  el.innerHTML = myDayCard(sc.data) + htStrip(sc.data) + (live ? `<div class="note" style="margin:0 0 10px"><span class="dot-live"></span>${live} live — updating every 15 seconds</div>` : "") +
     Object.entries(groups).sort((a, b) => order(a[0]) - order(b[0])).map(([lg, list]) => `
       <div class="sc-league">${leagueLogo(lg)}${esc(lg)}<button class="sc-tbl" data-table="${esc(lg)}" title="The ${esc(lg)} table, live while games are on">📊 Table</button></div>
       ${list.map(g => {
@@ -3944,6 +4087,157 @@ function htVerdict(r) {
 }
 
 // Live page: the tips from HAWK's latest check of each live match (tap one for its live card).
+// Your day, from the Vault: what's still running, how each leg is doing, and
+// what today has paid so far. Nothing here is a tip — it's your own money.
+/* ---------- 📅 Today: the day's plan ---------- */
+// HAWK picks the day's bets from what it has already scanned: the singles
+// Bet365 overprices (no builder cut on those) and the Monster acca. Stakes are
+// sized to your bankroll, and the headline is the one number you asked for —
+// the chance the day ends up green.
+const PLAN_MAX = 6;
+function planUnit(bank) { return Math.max(0.5, Math.floor((bank / 7) * 10) / 10); }
+function dayKey() { return "hawk.plan." + localDay(new Date()); }
+function bankNow() { const b = parseFloat(localStorage.getItem("hawk_bankroll")); return isFinite(b) ? b : 0; }
+// Every combination of win/lose across the day's bets: the expected return, and
+// how often the day finishes ahead. Fine up to ~14 bets.
+function dayOdds(picks, unit) {
+  const n = picks.length, stake = n * unit;
+  let ev = 0, green = 0;
+  for (let mask = 0; mask < (1 << n); mask++) {
+    let pr = 1, ret = 0;
+    for (let i = 0; i < n; i++) {
+      const hit = (mask >> i) & 1;
+      pr *= hit ? picks[i].p : 1 - picks[i].p;
+      if (hit) ret += unit * picks[i].price;
+    }
+    ev += pr * ret;
+    if (ret > stake) green += pr;
+  }
+  return { stake, ev, green, edge: stake ? ev / stake - 1 : 0 };
+}
+// The day's picks: best single per match (Bet365's own price), then the Monster.
+function dayPicks() {
+  const out = [];
+  const seen = new Set();
+  const res = (S.scan.data && S.scan.data.results) || [];
+  const rows = [];
+  for (const r of res) for (const sg of r.singles || [])
+    if (sg.price >= SINGLE_MIN_ODDS && sg.edge > 0) rows.push({ ...sg, home: r.home, away: r.away, game: r.id, league: r.league, kickoff: r.kickoff });
+  rows.sort((a, b) => b.edge - a.edge);
+  for (const row of rows) {
+    if (out.length >= PLAN_MAX - 1 || seen.has(String(row.game))) continue;
+    seen.add(String(row.game));
+    out.push({ key: `s:${row.game}:${row.id}`, kind: "single", label: row.label, where: `${row.home} v ${row.away}`,
+               price: row.price, p: row.p, kickoff: row.kickoff, game: String(row.game), league: row.league });
+  }
+  const mo = S.monster.data;
+  if (mo && !mo.running && typeof monsterPick === "function") {
+    const { picked } = monsterPick();
+    const parts = (picked || []).filter((r) => r.bookPrice > 1 && r.p);
+    if (parts.length >= 4) {
+      const price = parts.reduce((a, r) => a * r.bookPrice, 1), pp = parts.reduce((a, r) => a * r.p, 1);
+      out.push({ key: "monster", kind: "acca", label: `Monster acca — ${parts.length} legs`,
+                 where: "one leg per match, Bet365's own prices", price: +price.toFixed(2), p: pp,
+                 kickoff: parts.map((r) => r.kickoff).sort()[0] || null });
+    }
+  }
+  return out;
+}
+function showToday() {
+  S.view = "today";
+  document.querySelectorAll(".fx").forEach((f) => f.classList.remove("on"));
+  renderToday();
+}
+function renderToday() {
+  const bank = bankNow(), picks = dayPicks(), unit = planUnit(bank);
+  const fit = picks.slice(0, Math.max(0, Math.min(picks.length, Math.floor((bank * 0.85) / unit))));
+  const sums = fit.length ? dayOdds(fit, unit) : null;
+  const placed = loadPref(dayKey(), []);
+  const scanned = !!(S.scan.data && S.scan.data.total);
+  $("#match").innerHTML = `
+    <div class="section" style="border-top:0">
+      <div class="tdhead"><div style="flex:1;min-width:0"><h3 style="margin:0">📅 Today</h3>
+        <div class="muted" style="font-size:11.5px">${esc(new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }))}</div></div>
+        <div class="bank"><div class="muted" style="font-size:10px;letter-spacing:.13em">BANKROLL</div><div class="n">€${bank.toFixed(2)}</div></div></div>
+      ${fit.length ? `<div class="tdplan">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font-family:'Barlow Condensed','Segoe UI Semibold',system-ui,sans-serif;font-size:22px;font-weight:700;letter-spacing:.04em;text-transform:uppercase">Today's plan</div>
+          <span style="flex:1"></span><span class="muted" style="font-size:11px">${fit.length} bet${fit.length === 1 ? "" : "s"} · €${unit.toFixed(2)} each</span></div>
+        <div class="tdstats">
+          <div><div class="k">STAKE</div><div class="v">€${sums.stake.toFixed(2)}</div></div>
+          <div><div class="k">EXPECTED BACK</div><div class="v" style="color:var(--gold)">€${sums.ev.toFixed(2)}</div></div>
+          <div><div class="k">END UP</div><div class="v" style="color:${sums.green >= 0.5 ? "var(--accent)" : "var(--gold)"}">${Math.round(100 * sums.green)}%</div></div>
+        </div>
+        <div class="muted" style="margin-top:10px;font-size:11.5px;line-height:1.5">${
+          sums.edge >= 0 ? `Spread across ${fit.length} bets you keep about <b style="color:var(--text)">€${(1 + sums.edge).toFixed(2)}</b> per €1 staked — and the day ends green ${Math.round(100 * sums.green)} times in 100.`
+          : `These are the best HAWK can see right now, but they still lose about <b style="color:var(--text)">${Math.round(-100 * sums.edge)}%</b> over time. Scan again nearer kick-off.`}</div>
+      </div>` : `<div class="note">${scanned ? "Nothing worth backing in the last scan. Change the settings on Picks and scan again."
+          : "Run a scan on Picks (and the Monster acca, if you want one) and today's plan builds itself here."}</div>`}
+      ${fit.map((x) => { const on = placed.includes(x.key); return `<div class="tdrow ${on ? "done" : ""}">
+        <input type="checkbox" data-plan="${esc(x.key)}" ${on ? "checked" : ""} aria-label="Placed">
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(x.label)}</div>
+          <div class="muted" style="font-size:11px">${esc(x.where)}${x.kickoff ? ` · ${esc(fmtKick(x.kickoff))}` : ""}</div></div>
+        <div style="text-align:right;flex:none"><div class="px">${odds(x.price)}</div>
+          <div class="muted" style="font-size:11px">${pct(x.p, 0)} · €${unit.toFixed(2)}</div></div>
+        ${x.game ? `<button class="ghost iconbtn" data-plango="${esc(x.game)}|${esc(x.league || "")}" title="Open the match">›</button>` : ""}
+      </div>`; }).join("")}
+      ${fit.length ? `<div class="note" style="margin-top:10px">Tick each one as you place it. Your bankroll and settled bets come from the Vault.</div>` : ""}
+      <div class="opts" style="margin-top:12px;gap:8px">
+        <button class="ghost" style="width:auto;padding:9px 15px" onclick="showScan()">🏆 Picks</button>
+        <button class="ghost" style="width:auto;padding:9px 15px" onclick="showAcca()">👹 Monster acca</button>
+        <button class="ghost" style="width:auto;padding:9px 15px" onclick="showScores()">📺 Live</button>
+      </div>
+    </div>
+    <div class="section" id="tdDay"></div>`;
+  $("#match").querySelectorAll("[data-plan]").forEach((cb) => cb.onchange = () => {
+    const list = loadPref(dayKey(), []).filter((k) => k !== cb.dataset.plan);
+    if (cb.checked) list.push(cb.dataset.plan);
+    savePref(dayKey(), list);
+    cb.closest(".tdrow").classList.toggle("done", cb.checked);
+  });
+  $("#match").querySelectorAll("[data-plango]").forEach((b) => b.onclick = () => {
+    const [id, lg] = b.dataset.plango.split("|");
+    if (id) goToMatch(lg || undefined, id);
+  });
+  const day = $("#tdDay"); if (day) day.innerHTML = myDayCard((S.scores && S.scores.data) || []);
+}
+function myDayCard(games) {
+  let bets = [];
+  try { bets = JSON.parse(localStorage.getItem("hawk_bets")) || []; } catch { return ""; }
+  const today = localDay(new Date());
+  const onToday = (b) => (b.legs || []).some((l) => l.hawk && l.hawk.kickoff && localDay(new Date(l.hawk.kickoff)) === today);
+  const mine = bets.filter((b) => b.status === "PENDING" && onToday(b));
+  const done = bets.filter((b) => b.status !== "PENDING" && onToday(b));
+  if (!mine.length && !done.length) return "";
+  const staked = mine.reduce((a, b) => a + (+b.stake || 0), 0);
+  const pl = done.reduce((a, b) => a + (b.status === "WON" ? (+b.potentialReturn || 0) - (+b.stake || 0)
+    : b.status === "CASHED_OUT" ? (+b.cashOut || 0) - (+b.stake || 0) : -(+b.stake || 0)), 0);
+  const won = done.filter((b) => b.status === "WON").length, lost = done.filter((b) => b.status === "LOST").length;
+  const clockOf = (id) => { const g = (games || []).find((x) => String(x.id) === String(id)); return g && g.status === 3 ? (g.clock || "live") : g && g.status === 4 ? "FT" : null; };
+  const rows = mine.map((b) => {
+    const legs = (b.legs || []).flatMap((l) => (l.hawk && l.hawk.legs || []).map((h) => ({ ...h, game: l.hawk.game })));
+    const chips = legs.map((h) => {
+      const st = h.result === "won" || h.userDone ? "won" : h.result === "lost" ? "lost" : "";
+      const clock = clockOf(h.game);
+      return `<span class="myleg ${st}">${esc(String(h.label || "").slice(0, 34))}${clock && !st ? ` · ${esc(clock)}` : ""}</span>`;
+    }).join("");
+    const left = legs.filter((h) => !(h.result === "won" || h.userDone) && h.result !== "lost").length;
+    return `<div class="mybet"><div class="top">
+      <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:800">${esc((b.legs[0] || {}).fixture || "Your bet")}${
+        b.legs.length > 1 ? ` <span class="muted" style="font-weight:600">+${b.legs.length - 1} more</span>` : ""}</div>
+        <div class="muted" style="font-size:11px">€${(+b.stake || 0).toFixed(2)} at ${odds(b.odds)} · ${left ? `${left} leg${left === 1 ? "" : "s"} to go` : "all legs landed"}</div></div>
+      <div style="text-align:right;flex:none"><div class="muted" style="font-size:10px;letter-spacing:.12em">RETURNS</div>
+        <div class="big" style="color:var(--gold)">€${(+b.potentialReturn || 0).toFixed(2)}</div></div></div>
+      <div>${chips}</div></div>`;
+  }).join("");
+  return `<div class="myday">
+    <div class="mh"><span class="dot-live"></span><h4>Your day</h4><span style="flex:1"></span>
+      ${mine.length ? `<span class="muted" style="font-size:11px">€${staked.toFixed(2)} running</span>` : ""}
+      ${done.length ? `<span class="big" style="color:${pl >= 0 ? "var(--accent)" : "var(--red)"}">${pl >= 0 ? "+" : "−"}€${Math.abs(pl).toFixed(2)}</span>` : ""}</div>
+    ${rows || `<div class="mybet"><div class="muted" style="font-size:12px">Nothing running — ${won} won, ${lost} lost today.</div></div>`}
+    ${done.length && rows ? `<div class="mybet"><div class="muted" style="font-size:12px">Settled today: ${won} won · ${lost} lost</div></div>` : ""}
+  </div>`;
+}
 function htStrip(games) {
   const rows = Object.entries(S.ht).filter(([, h]) => h.tips.length && Date.now() - h.at < 5 * 60e3)
     .map(([id, h]) => [games.find(g => String(g.id) === String(id)), h]).filter(([g]) => g && g.status === 3);
@@ -4381,6 +4675,82 @@ function learningNote() {
     ${L.changes.slice(0, 4).map((c) => `<b>${esc(c.market)}</b> ${c.pts >= 0 ? "+" : ""}${c.pts.toFixed(1)} pts`).join(" · ")}
     <button class="linkbtn" onclick="toggleLearning()">${L.on ? "turn off" : "turn on"}</button></div>`;
 }
+// Everything HAWK has learnt, on one board: how much of Bet365's cut it knows,
+// how many matches it has graded itself, and the corrections that came out of
+// both. The sentences underneath are the small print.
+function brainBoard(m) {
+  const rows = loadPref("hawk.b365prices", []).filter(x => x.model > 1 && x.price > 1);
+  const cut = S.aim ? Math.round(100 * (1 - Math.exp(S.aim.cl))) : 0;
+  const last = rows.slice(-10);
+  const off = last.length && S.aim
+    ? last.reduce((a, x) => a + Math.abs(x.price / (x.model * Math.exp(S.aim.cl * x.legs)) - 1), 0) / last.length : null;
+  const L = S.learn || {}, graded = L.matches || (S.graded && S.graded.matches) || 0;
+  const health = healthLine(), warn = /class="dhealth warn"|class="bad"/.test(health);
+  const tile = (n, k, small) => `<div class="btile"><div class="n">${n}${small ? `<small>${small}</small>` : ""}</div><div class="k">${k}</div></div>`;
+  const say = rows.length
+    ? `HAWK's guess has landed within <b style="color:var(--text)">${off == null ? "—" : (100 * off).toFixed(0) + "%"}</b> of Bet365 on your last ${last.length} builder${last.length === 1 ? "" : "s"}. Every price you type tightens it.`
+    : `Type Bet365's real price after you check a builder and HAWK learns <i>your</i> cut instead of assuming one.`;
+  const chips = (L.changes || []).slice(0, 4).map((c) =>
+    `<span class="bchip ${c.pts >= 0 ? "up" : "dn"}" title="HAWK was running ${c.pts >= 0 ? "low" : "high"} here, so its chances are corrected ${c.pts >= 0 ? "up" : "down"}">${
+      esc(c.market)} <b>${c.pts >= 0 ? "+" : ""}${c.pts.toFixed(1)}</b></span>`).join("");
+  const T = S.trust || {}, trusted = Object.entries(T).filter(([, t]) => t.kind === "ok").length;
+  return `<div class="brain">
+    <div class="bh"><span class="dot ${warn ? "warn" : ""}"></span><h4>What HAWK knows</h4>
+      <span style="flex:1"></span><span class="muted" style="font-size:11px">${esc(S.dataAge || "—")}</span></div>
+    <div class="btiles">${tile(rows.length, "prices you typed")}${tile(graded, "matches graded")}${tile(cut, "Bet365's cut a leg", "%")}</div>
+    <div class="bsay">${say}</div>
+    ${chips ? `<div class="bchips">${chips}<button class="linkbtn" onclick="toggleLearning()">${L.on ? "turn off" : "turn on"}</button></div>`
+      : `<div class="bsay" style="padding-top:0">Corrections appear here once a market has ${LEARN_MIN}+ graded legs.</div>`}
+    <div class="bfoot"><span>Fair odds = 1 ÷ chance, from ${m ? m.sims.toLocaleString() : "12,000"} simulated matches. Match legs are calibrated to the bookmakers; player legs are HAWK's own estimates.</span>
+      ${trusted ? `<span>· <b style="color:var(--text)">${trusted}</b> market${trusted === 1 ? "" : "s"} trusted</span>` : ""}
+      <span style="flex:1"></span><button class="linkbtn" onclick="toggleBrainDetail()">details</button></div>
+    <div id="brainDetail" hidden>${health}${learningNote()}${trustNote()}</div>
+  </div>`;
+}
+// The verdict under check mode's price box: the same numbers as the slip's, in
+// the shape you want while you're standing in the Bet365 app.
+function checkVerdict() {
+  const out = $("#cmVerdict"); if (!out) return;
+  const r = S.result, p = (r && r.p) || 0, fairP = p * ((r && r.check) || 1);
+  const x = parseFloat(String(($("#cmPrice") || {}).value || "").replace(",", "."));
+  const need = x > 1 ? 1 / x : 0, w = fairP * (x > 1 ? x : 0);
+  const tier = !(x > 1) ? null : w >= 1.02 ? "ok" : w >= 0.95 ? "fair" : "bad";
+  const label = { ok: "Bet it", fair: "Fair price", bad: "Skip it" }[tier];
+  const wid = (v) => Math.max(1.5, Math.min(100, 100 * v)).toFixed(1);
+  out.innerHTML = !(x > 1)
+    ? `<div class="muted" style="margin-top:11px;font-size:12px">Type the price and HAWK tells you straight away.</div>`
+    : `<div class="cmv"><div class="tier ${tier}">${label}</div>
+        <div class="muted" style="flex:1;font-size:12px;line-height:1.45">${odds(x)} needs <b style="color:var(--text)">${(100 * need).toFixed(0)}%</b>
+          · HAWK says <b style="color:var(--gold)">${(100 * fairP).toFixed(1)}%</b></div></div>
+       <div class="cmbar"><i style="width:${wid(fairP)}%"></i><b style="left:${wid(need)}%"></b></div>`;
+  const btn = $("#cmPlace");
+  if (btn) { const st = parseFloat(String(($("#cmStake") || {}).value || "").replace(",", ".")) || 0;
+    btn.textContent = x > 1 && st > 0 ? `I placed it — €${st.toFixed(2)}` : "I placed it"; }
+}
+// "I placed it": the builder writes the bet straight into the Vault's own store,
+// so it shows up there (and on Live) without you typing it again.
+function logBetToVault(price, stake) {
+  const m = S.match, r = S.result;
+  const legs = S.slip.map((id) => S.legs[id]).filter(Boolean);
+  if (!m || !legs.length || !(price > 1) || !(stake > 0)) return false;
+  const hawk = { game: String(m.id), league: m.league, home: m.home, away: m.away, kickoff: m.kickoff, linked: true,
+                 legs: legs.map((l) => ({ id: l.id, label: l.label, market: l.market, player: l.player || null, side: l.side || null })) };
+  const bet = { id: "bet_" + Date.now(),
+    date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+    legs: [{ fixture: `${m.home} vs ${m.away}`, selection: legs.map((l) => l.label).join(" & "), angle: "HAWK builder",
+             odds: price, type: "builder", league: m.league,
+             subSelections: legs.map((l) => ({ label: l.label, odds: l.bookPrice || null })), hawk }],
+    stake, odds: price, potentialReturn: +(stake * price).toFixed(2), status: "PENDING",
+    hawkChance: r && r.p ? +r.p.toFixed(4) : null };
+  try {
+    const bets = vaultBets(); bets.unshift(bet);
+    localStorage.setItem("hawk_bets", JSON.stringify(bets));
+    const bank = parseFloat(localStorage.getItem("hawk_bankroll"));
+    if (isFinite(bank)) localStorage.setItem("hawk_bankroll", (bank - stake).toFixed(2));
+  } catch { return false; }
+  return true;
+}
+function toggleBrainDetail() { const d = $("#brainDetail"); if (d) d.hidden = !d.hidden; }
 function toggleLearning() {
   savePref("hawk.learn", !S.learn.on);
   applyLearning();

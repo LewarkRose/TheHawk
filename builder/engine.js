@@ -1849,7 +1849,6 @@
         g90: p.g90, c90: p.c90, x: p.x, sv90: p.sv90, minutes: p.minutes, has_data: p.has_data, recent: p.recent,
         recent_starts: p.recent_starts, field: p.field, num: p.num, short: p.short, teamMins: p.teamMins }))])),
       warnings: an.warnings, value: { book: PRICE_BOOK, legs: value }, sims: sim.n, missing: an.missing || { home: [], away: [] },
-      movers: an.inPlay ? [] : moverRows(an, sim.exp).slice(0, 8),
       upset: upsetRadar(an, M, squads, sim.exp), tie: tieInfo(an),
     };
   }
@@ -2022,7 +2021,7 @@
   // Background jobs over every fixture in a time window, two matches at a
   // time: the "Best builders" scan and the Value finder.
   function newJob() { return { running: false, stop: false, total: 0, done: 0, errors: 0, results: [], params: null }; }
-  const jobStatus = (job) => ({ ...job, results: job.results.slice(), movers: (job.movers || []).slice() });
+  const jobStatus = (job) => ({ ...job, results: job.results.slice() });
   function windowParams(body) {
     return { leagues: (body.leagues || []).filter((l) => LEAGUES.includes(l)), hours: Math.min(Math.max(+body.hours || 24, 1), 168) };
   }
@@ -2087,18 +2086,6 @@
           .sort((a, b) => b.edge - a.edge).slice(0, 6) });
     });
     return jobStatus(scan);
-  }
-  // Upset watch: the upset radar for every fixture in the window (the Radar page).
-  const radarJob = newJob();
-  function startRadar(body) {
-    if (radarJob.running) return jobStatus(radarJob);
-    Object.assign(radarJob, newJob(), { running: true, params: windowParams(body) });
-    runFixtureJob(radarJob, (league, f, json) => {
-      if (json.started || !json.upset) return;
-      radarJob.results.push({ ...fixtureInfo(league, f, json), upset: json.upset,
-                              probs: { home: json.probs.home, draw: json.probs.draw, away: json.probs.away } });
-    });
-    return jobStatus(radarJob);
   }
   // What an acca needs to remember about one leg once the match isn't loaded.
   function legSummary(e, json, id) {
@@ -2787,43 +2774,14 @@
              }).filter(Boolean) };
   }
 
-  // Market movers: Bet365 selections whose price has moved 5%+ since it opened.
-  // A shortening price means money has come for it. "agree" = the move went
-  // towards HAWK's fair price (it shortened from above HAWK's fair, or drifted
-  // from below it); "value" = what's left of the edge at today's price.
-  // Correct scores and long shots are left out: their prices jump in big steps
-  // (100 → 150) that say nothing about where the money is going.
-  const MOVER_SKIP_TYPES = new Set([126, 127]), MOVER_MAX_PRICE = 10;
-  function moverRows(an, exp, minMove = 0.05) {
-    const rows = [];
-    for (const b of an.quotes) {
-      if (b.book !== PRICE_BOOK || !b.opens || b.source !== "365Scores" || MOVER_SKIP_TYPES.has(b.type)) continue;
-      const cons = an.cons[`${b.type}|${b.value}`];
-      for (const [option, price] of Object.entries(b.prices)) {
-        const open = b.opens[option];
-        if (!(open > 1) || Math.max(open, price) > MOVER_MAX_PRICE) continue;
-        const move = price / open - 1;
-        if (Math.abs(move) < minMove) continue;
-        const model = selectionModel(an, exp, b.type, b.value, option), pMarket = cons ? cons.probs[option] : null;
-        const [w, ignored] = marketTrust(model && model.q, pMarket, cons ? cons.books : 0);
-        const q = ignored ? pMarket : blend(model ? model.q : null, pMarket, w);
-        if (!(q > 0 && q < 1)) continue;
-        const fair = 1 / q;
-        rows.push({ type: b.type, market: b.market, label: marketLabel(b.type, b.market, b.value, option, an.home, an.away),
-                    open, price, move, p: q, fair, agree: move < 0 ? fair < open : fair > open, value: price * q - 1 });
-      }
-    }
-    return rows.sort((a, b) => Math.abs(b.move) - Math.abs(a.move));
-  }
 
   const valueJob = newJob();
   function startValue(body) {
     if (valueJob.running) return jobStatus(valueJob);
-    Object.assign(valueJob, newJob(), { running: true, params: windowParams(body), movers: [] });
+    Object.assign(valueJob, newJob(), { running: true, params: windowParams(body) });
     runFixtureJob(valueJob, (league, f, json, e) => {
       const info = fixtureInfo(league, f, json);
       for (const row of priceRows(e)) valueJob.results.push({ ...info, ...row });
-      for (const row of moverRows(e.an, json.expected)) valueJob.movers.push({ ...info, ...row });
     });
     return jobStatus(valueJob);
   }
@@ -2832,7 +2790,6 @@
                   scores, matchReport, ticketLive, gameEvents, halfStats, readLeg, isPlayerText, nameSimilarity, kambiLive, tables,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
-                  startRadar, radarStatus: () => jobStatus(radarJob), stopRadar: () => { radarJob.stop = true; return jobStatus(radarJob); },
                   startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },
                   meta: () => data("meta.json"),
                   _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas, espnLineups, matchPlayer, playerRows,

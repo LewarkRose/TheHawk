@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HAWK · Bet Builder</title>
 <!-- Icons: new names / ?v= so browsers drop the old cached logo -->
@@ -372,10 +375,29 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 @keyframes shine{to{background-position:-200% 0}}
 .ticket{margin-top:14px;border-radius:14px;border:1px solid var(--accent);background:linear-gradient(180deg,#1a2a2c,#172024);overflow:hidden}
 .ticket .th{display:flex;justify-content:space-between;align-items:center;padding:12px 14px}
+    /* the header: how often this builder lands, and where the price's break-even sits */
+    .ticket .thb{display:flex;align-items:center;gap:14px;padding:12px 14px 13px}
+    .tpct{flex:none}
+    .tpct .num{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:40px;line-height:.95;font-weight:700;color:var(--gold)}
+    .tpct .num small{font-size:21px}
+    .tpct .lab{font-size:10px;letter-spacing:.14em;color:var(--muted)}
+    .tbar{flex:1;min-width:0}
+    .tbar .track{position:relative;height:8px;border-radius:4px;background:#22303a;overflow:hidden}
+    .tbar .track i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--accent-d),var(--accent))}
+    .tbar .track b{position:absolute;top:-3px;width:2px;height:14px;background:var(--red);border-radius:1px}
+    .tbar .bnote{margin-top:5px;font-size:11px;color:var(--muted)}
 .ticket .th b{color:var(--accent);font-style:italic;letter-spacing:.04em;font-size:15px}
 .ticket .th .odds{font-size:20px;font-weight:900}
 .legs{position:relative;padding:0 14px 6px 14px}
 .leg{position:relative;padding:8px 0 10px 28px;animation:in .35s both}
+    /* The edge says where the leg's price comes from: green Bet365's own,
+       blue the books that price closest to Bet365, grey HAWK's own estimate. */
+    .leg.priced,.leg.ref,.leg.guess{padding-left:25px;border-radius:3px}
+    .leg.priced{border-left:3px solid var(--accent)}
+    .leg.ref{border-left:3px solid var(--blue)}
+    .leg.guess{border-left:3px solid #4d5f6b}
+    .legkey{display:flex;gap:12px;flex-wrap:wrap;padding:2px 14px 10px;font-size:11px;color:var(--muted)}
+    .legkey i{display:inline-block;width:9px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
 .leg::before{content:"";position:absolute;left:8px;top:22px;bottom:-8px;width:2px;background:#2d4a44}
 .leg:last-child::before{display:none}
 .leg .ck{position:absolute;left:0;top:9px;width:18px;height:18px;border-radius:50%;background:var(--accent);color:#03261b;
@@ -574,12 +596,33 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* best builders scan */
 .prog{height:8px;border-radius:5px;background:#24313a;overflow:hidden;margin-top:12px}
 .prog span{display:block;height:100%;background:linear-gradient(90deg,var(--accent-d),var(--accent));transition:width .4s}
-.scard{display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;
+.scard{display:flex;gap:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;
   background:var(--panel2);margin-bottom:10px;cursor:pointer;transition:.15s;animation:in .3s both}
 .scard:hover{border-color:var(--accent)}
+    /* the rail down the left is the verdict at a glance: green worth it, gold fair, grey under */
+    .scard .rail{flex:none;width:6px;background:var(--muted);opacity:.55}
+    .scard .rail.ok{background:linear-gradient(180deg,var(--accent),var(--accent-d));opacity:1}
+    .scard .rail.fair{background:linear-gradient(180deg,var(--gold),#b8975a);opacity:1}
+    .scard .rail.bad{background:linear-gradient(180deg,#3c4a54,#2b363e);opacity:1}
+    .scard .sbody{flex:1;min-width:0;padding:12px 14px;display:flex;flex-direction:column;gap:9px}
+    .scard .stop{display:flex;align-items:flex-start;gap:12px}
+    .scard .smeta{margin-top:3px;font-size:11px;letter-spacing:.02em;color:var(--muted);text-transform:uppercase}
+    .spct{flex:none;text-align:right}
+    .spct .num{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:44px;line-height:.9;font-weight:700;color:var(--gold)}
+    .spct .num small{font-size:22px}
+    .spct .lab{font-size:10px;letter-spacing:.16em;color:var(--muted)}
+    /* the bar: how often it lands, with the mark showing what the price needs */
+    .sbar .track{position:relative;height:10px;border-radius:5px;background:#22303a;overflow:hidden}
+    .sbar .track i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:linear-gradient(90deg,var(--accent-d),var(--accent))}
+    .sbar .track i.bad{background:linear-gradient(90deg,#3c4a54,#4d5f6b)}
+    .sbar .track b{position:absolute;top:-3px;width:2px;height:16px;background:#fff;border-radius:1px}
+    .sbar .bnote{display:flex;justify-content:space-between;gap:10px;margin-top:5px;font-size:11px;color:var(--muted)}
+    .scard .schips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+    .scard .sfoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .scard .iconbtn{width:44px;height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center}
 .scard .teams{display:flex;align-items:center;gap:7px;font-weight:800;flex-wrap:wrap}
 .scard .teams img{width:20px;height:20px}
-.lchip{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:999px;background:#22303a;border:1px solid #2e3e49;margin:4px 4px 0 0}
+.lchip{display:inline-block;font-size:11.5px;padding:3px 9px;border-radius:7px;background:#22303a;border:1px solid #2e3e49;margin:0}
 .lchip.pl{border-color:rgba(74,168,255,.45)}
 .vline{font-size:12px;color:var(--accent);margin-top:6px}
 .bigodds{font-size:24px;font-weight:900;color:var(--gold)}
@@ -895,9 +938,8 @@ a.nav{text-decoration:none}
   .modal{padding:14px}
   .chart{gap:4px}
   .hits{grid-template-columns:repeat(2,1fr)}
-  .scard{grid-template-columns:1fr}
-  .scard > div:last-child{text-align:left;display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
-  .scard .sprice{justify-content:flex-start}
+  .spct .num{font-size:38px}
+  .scard .sbody{padding:11px 12px}
 }
 </style>
 </head>
@@ -2157,7 +2199,8 @@ function renderSlip() {
     const vd = legVerdict(l, row, n);
     // On a phone the card flips (tap it): the front has the numbers, the back
     // the reasoning. On a bigger screen both show, one under the other.
-    return `<div class="leg card tilt3d fcard ${S.flipped.has(id) ? "flipped" : ""}" data-fid="${id}" style="animation-delay:${n * 60}ms"><div class="fin">
+    const src = l.bookPrice > 1 || typedLegIds().includes(id) ? "priced" : l.refBooks >= 2 ? "ref" : "guess";
+    return `<div class="leg card tilt3d fcard ${src} ${S.flipped.has(id) ? "flipped" : ""}" data-fid="${id}" style="animation-delay:${n * 60}ms"><div class="fin">
       <div class="fa">
         <div class="sc-head">${legFace(l)}<div class="sc-name"><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}</div></div>
           <span class="verdict ${vd.tone}" title="${esc(vd.why)}">${vd.label}</span></div>
@@ -2203,12 +2246,32 @@ function renderSlip() {
     ${sameOptions() && S.options.list.length > 1 ? `<div class="optbar" id="optbar"><span class="muted">Options</span>${S.options.list.map((o, i) =>
       `<button class="${i === S.options.at ? "on" : ""}" data-opt="${i}" title="${o.legs.length} legs · ${pct(o.p, 1)} to land · Bet365 ≈ ${odds(o.b365 || o.fair)} · fair ${odds(o.fair)}${o.guessed ? ` · ${o.guessed} guessed price${o.guessed > 1 ? "s" : ""}` : " · all priced"}${o.worth >= 1.02 ? " · worth it at Bet365" : ""}">${o.worth >= 1.02 ? "✅ " : o.worth >= 0.95 ? "🤏 " : ""}${i + 1}<small>${o.legs.length} legs · ${odds(o.b365 || o.fair)}${o.guessed ? "" : " ✓"}</small></button>`).join("")}</div>` : ""}
     <div class="ticket">
-      <div class="th"><b>BET BUILDER</b><span class="odds" title="${r && r.b365 ? `About what Bet365 will show for this builder. HAWK's fair odds: ${odds(r.fair)}` : "HAWK's fair odds"}">${
-        r && r.b365 ? `<small class="muted" style="font-size:11px;font-weight:600;margin-right:6px">Bet365 ≈</small>${odds(r.b365)}` : r && r.fair ? odds(r.fair) : "…"}</span></div>
+      ${(() => {
+        // The chance is the headline. The mark on the bar is what the price you'd
+        // get needs to land — your typed price if you've checked it, else HAWK's guess.
+        const p = (r && r.p) || 0, typed = parseFloat(String(S.chk.price || "").replace(",", "."));
+        const price = typed > 1 ? typed : (r && (r.b365 || r.fair)) || 0;
+        const need = price > 1 ? 1 / price : 0;
+        const w = (x) => Math.max(1.5, Math.min(100, 100 * x)).toFixed(1);
+        return `<div class="th thb">
+          <div class="tpct"><div class="num">${Math.floor(100 * p)}<small>.${Math.round(1000 * p) % 10}%</small></div><div class="lab">LANDS</div></div>
+          <div class="tbar">
+            <div class="track"><i style="width:${w(p)}%"></i>${need ? `<b style="left:${w(need)}%"></b>` : ""}</div>
+            <div class="bnote">${need ? `red mark = what <b style="color:var(--text)">${odds(price)}</b> needs (${(100 * need).toFixed(0)}%)${
+              typed > 1 ? "" : " — HAWK's guess until you type Bet365's price"}` : "Add legs and HAWK works out the chance."}</div>
+          </div>
+          <div style="flex:none;text-align:right">
+            <div class="muted" style="font-size:10px;letter-spacing:.14em">BET365 &asymp;</div>
+            <div class="odds" style="font-size:20px">${r && r.b365 ? odds(r.b365) : r && r.fair ? odds(r.fair) : "…"}</div>
+          </div></div>`;
+      })()}
       <div id="call">${easyCall(r)}</div>
       <div class="legs">${legRows}</div>
-      <div class="sum"><div><div class="k">Chance to land</div><div class="v">${r && r.p ? pct(r.p, 1) : "–"}</div></div>
-        <div><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${r && r.fair ? odds(r.fair) : "–"}</div></div></div>
+      <div class="legkey"><span><i style="background:var(--accent)"></i>Bet365's price</span>
+        <span><i style="background:var(--blue)"></i>close books' price</span>
+        <span><i style="background:#4d5f6b"></i>HAWK's estimate</span></div>
+      <div class="sum"><div><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${r && r.fair ? odds(r.fair) : "–"}</div></div>
+        <div><div class="k">Worth it from</div><div class="v" style="color:var(--gold)">${worthFrom(r) ? odds(worthFrom(r)) : "–"}</div></div></div>
       ${guessLine(r)}
     </div>
     <div class="check"><div class="row">
@@ -2786,7 +2849,9 @@ function renderScan() {
     <div class="section" style="border-top:0">
       <h3>🏆 Picks</h3>
       <div class="seg" id="scanAuto" style="margin:0 0 8px;max-width:360px">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
-      <div class="note" style="margin-top:0">HAWK's best builder for every match — ${S.auto ? `<b style="color:var(--gold)">🎯 Auto</b>: odds about 2–4, up to ${S.maxLegs} legs, lands 1 in 4 or better${S.priced ? " · only priced legs" : ""}`
+      <div class="note" style="margin-top:0">HAWK's best builder for every match — ${S.auto ? (sc.minOdds
+        ? `<b style="color:var(--gold)">${sc.minOdds.toFixed(2)}+</b>, up to ${S.maxLegs} legs, likeliest first${S.priced ? " · only priced legs" : ""}`
+        : `<b style="color:var(--gold)">🎯 Auto</b>: odds about 2–4, up to ${S.maxLegs} legs, lands 1 in 4 or better${S.priced ? " · only priced legs" : ""}`)
         : `target <b style="color:var(--gold)">${S.target.toFixed(2)}</b> · max ${S.maxLegs} legs <a href="#" onclick="event.preventDefault();showBuilder()" style="color:var(--accent)">change</a>`}.
         Build one on Bet365, type its price, and HAWK tells you ✅ / 🤏 / ❌.</div>
       <details class="scanset"><summary>⚙️ Leagues and time (${sc.leagues.size} competitions)</summary>
@@ -2833,7 +2898,23 @@ function renderScan() {
     const r = (S.scan.data.results || []).find(x => String(x.id) === i.dataset.price); if (!r) return;
     const v = parseFloat(i.value.replace(",", "."));
     if (v > 1) S.scan.prices[scanKey(r)] = v; else delete S.scan.prices[scanKey(r)];
-    const box = i.closest(".scard").querySelector(".sverdict"); if (box) box.innerHTML = scanVerdict(r);
+    // The verdict, the rail and the bar's mark all follow the price you type.
+    const card = i.closest(".scard"), box = card && card.querySelector(".sverdict");
+    if (box) box.innerHTML = scanVerdict(r);
+    if (card) {
+      const tone = v > 1 ? (v >= scanNeed(r).need ? "ok" : v >= r.fair * 0.95 ? "fair" : "bad")
+                 : r.worth >= 1.02 ? "ok" : r.worth >= 0.95 ? "fair" : "bad";
+      const rail = card.querySelector(".rail"); if (rail) rail.className = "rail " + tone;
+      const price = v > 1 ? v : (r.b365 || r.fair), need = price > 1 ? 1 / price : 0;
+      const mark = card.querySelector(".sbar .track b"), note = card.querySelector(".sbar .bnote");
+      if (mark) mark.style.left = Math.max(1.5, Math.min(100, 100 * need)).toFixed(1) + "%";
+      const gap = 100 * ((r.p || 0) - need);
+      const bar = card.querySelector(".sbar .track i");
+      if (bar) bar.className = gap >= 0 ? "" : "bad";
+      if (note) note.innerHTML = `<span>Needs <b style="color:var(--text)">${(100 * need).toFixed(0)}%</b> at ${odds(price)}</span>
+        <span style="color:${gap >= 1 ? "var(--accent)" : gap >= -1 ? "var(--gold)" : "var(--muted)"};font-weight:700">${
+          Math.abs(gap) < 1 ? "about level" : `${Math.abs(gap).toFixed(0)} point${Math.abs(gap) < 1.5 ? "" : "s"} ${gap > 0 ? "clear" : "short"}`}</span>`;
+    }
   };
   $("#scanRes").onchange = (e) => {
     const i = e.target.closest("[data-price]"); if (!i) return;
@@ -2958,27 +3039,48 @@ function pickBoard(results) {
       <span><b>${odds(x.price)}</b> ${esc(x.label)} <span class="muted">· ${esc(x.home)} v ${esc(x.away)} ${esc(fmtKick(x.kickoff))}</span></span>
       <span class="muted">lands ${pct(x.p, 0)} · <b style="color:${x.edge >= 0.02 ? "var(--accent)" : x.edge >= -0.03 ? "var(--gold)" : "var(--muted)"}">${x.edge >= 0 ? "+" : ""}${(100 * x.edge).toFixed(0)}%</b></span></div>`).join("")}</details>`;
 }
+// One match's builder. The chance it lands is the headline; under it a bar
+// with a mark where the price's break-even sits, so you can see whether it
+// clears without working anything out. The rail down the left is the verdict.
+const CHEVRON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
 function scanCard(r, params) {
   const short = params && (r.b365 || r.fair) < params.target * 0.97;
   const typed = S.scan.prices[scanKey(r)];
+  // What the price you'd actually get needs: your typed price if you've checked it, else HAWK's guess.
+  const price = +typed > 1 ? +typed : (r.b365 || r.fair);
+  const need = price > 1 ? 1 / price : 0, p = r.p || 0, gap = 100 * (p - need);
+  const w = (x) => Math.max(1.5, Math.min(100, 100 * x)).toFixed(1);
+  const tone = +typed > 1 ? (+typed >= scanNeed(r).need ? "ok" : +typed >= r.fair * 0.95 ? "fair" : "bad")
+             : r.worth >= 1.02 ? "ok" : r.worth >= 0.95 ? "fair" : "bad";
   return `<div class="scard" data-open="${esc(r.id)}">
-    <div><div class="teams"><img src="${esc(r.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(r.home)}
-        <span class="muted" style="font-weight:500">vs</span><img src="${esc(r.awayCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(r.away)}</div>
-      <div class="muted" style="font-size:12px;margin-top:2px">${esc(r.league)} · ${esc(fmtKick(r.kickoff))} ·
-        <span class="badge ${r.confirmed ? "ok" : "warn"}">${r.confirmed ? "Lineups confirmed" : "Lineups predicted"}</span></div>
-      <div>${r.legs.map(l => `<span class="lchip ${l.kind === "player" ? "pl" : ""}">${esc(l.label)}</span>`).join("")}</div>
-      ${r.value.length ? `<div class="vline">Bet365 value: ${r.value.map(v => `${esc(v.label)} @ ${odds(v.price)} (+${(100 * v.edge).toFixed(1)}%)`).join(" · ")}</div>` : ""}</div>
-    <div style="text-align:right">
-      <div class="muted" style="font-size:12px">Lands</div>
-      <div class="bigodds">${pct(r.p, 0)}</div>
-      <div class="muted" style="font-size:12px">Bet365 ≈ ${odds(r.b365 || r.fair)} · ✅ from ${odds(scanNeed(r).need)}</div>
-      <label class="sprice">Bet365 price <input data-price="${esc(r.id)}" inputmode="decimal" placeholder="e.g. ${odds(r.b365 || r.fair)}" value="${typed ? typed : ""}"></label>
-      <div class="sverdict">${scanVerdict(r)}</div>
-      <div class="muted" style="font-size:12px">${r.legs.length} legs${short ? " · short of target" : ""}${
-        r.worth ? `<br>${r.worth >= 1.02 ? "worth it" : r.worth >= 0.95 ? "about fair" : `HAWK expects ${Math.round(100 * (1 - r.worth))}% under fair`}` : ""}</div>
-      <button class="ghost" style="width:auto;padding:6px 12px">Open ›</button>
-      <button class="ghost" style="width:auto;padding:6px 12px" data-acca="${esc(r.id)}" title="Put this builder on your acca">${
-        S.acca.some(pt => pt.id === String(r.id)) ? "✓ In acca" : "➕ Acca"}</button></div></div>`;
+    <i class="rail ${tone}"></i>
+    <div class="sbody">
+      <div class="stop">
+        <div style="flex:1;min-width:0">
+          <div class="teams"><img src="${esc(r.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(r.home)}
+            <span class="muted" style="font-weight:500">v</span><img src="${esc(r.awayCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(r.away)}</div>
+          <div class="smeta">${esc(r.league)} · ${esc(fmtKick(r.kickoff))} · ${r.confirmed ? "XI confirmed" : "XI predicted"}</div>
+        </div>
+        <div class="spct"><div class="num">${Math.round(100 * p)}<small>%</small></div><div class="lab">LANDS</div></div>
+      </div>
+      <div class="sbar">
+        <div class="track"><i class="${gap >= 0 ? "" : "bad"}" style="width:${w(p)}%"></i><b style="left:${w(need)}%"></b></div>
+        <div class="bnote"><span>Needs <b style="color:var(--text)">${(100 * need).toFixed(0)}%</b> at ${odds(price)}</span>
+          <span style="color:${gap >= 1 ? "var(--accent)" : gap >= -1 ? "var(--gold)" : "var(--muted)"};font-weight:700">${
+            Math.abs(gap) < 1 ? "about level" : `${Math.abs(gap).toFixed(0)} point${Math.abs(gap) < 1.5 ? "" : "s"} ${gap > 0 ? "clear" : "short"}`}</span></div>
+      </div>
+      <div class="schips">${r.legs.map(l => `<span class="lchip ${l.kind === "player" ? "pl" : ""}">${esc(l.label)}</span>`).join("")}
+        <span class="muted" style="font-size:11.5px">${r.legs.length} legs${short ? " · short of target" : ""}</span></div>
+      ${r.value.length ? `<div class="vline">Bet365 value: ${r.value.map(v => `${esc(v.label)} @ ${odds(v.price)} (+${(100 * v.edge).toFixed(1)}%)`).join(" · ")}</div>` : ""}
+      <div class="sfoot">
+        <label class="sprice">Bet365 <input data-price="${esc(r.id)}" inputmode="decimal" placeholder="${odds(r.b365 || r.fair)}" value="${typed ? typed : ""}"></label>
+        <div class="sverdict">${scanVerdict(r)}</div>
+        <span style="flex:1"></span>
+        <button class="ghost" style="width:auto;padding:6px 12px" data-acca="${esc(r.id)}" title="Put this builder on your acca">${
+          S.acca.some(pt => pt.id === String(r.id)) ? "✓ In acca" : "➕ Acca"}</button>
+        <button class="ghost iconbtn" aria-label="Open this builder" title="Open this builder">${CHEVRON}</button>
+      </div>
+    </div></div>`;
 }
 async function toggleScan() {
   try {

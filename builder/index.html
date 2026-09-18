@@ -2280,7 +2280,7 @@ function renderSlip() {
     <div class="note">Fair odds = 1 ÷ chance to land, from ${m ? m.sims.toLocaleString() : "12,000"} simulated matches.
       Match legs are calibrated to the bookmakers; player legs are HAWK's own estimates (no free feed has player-prop prices).
 </div>
-    ${healthLine()}${learningNote()}${trustNote()}`;
+    ${aimNote()}${healthLine()}${learningNote()}${trustNote()}`;
 
   $("#autoSeg").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.auto = b.dataset.auto === "1"; savePref("hawk.auto", S.auto); renderSlip(); } };
   $("#rng").oninput = (e) => { S.target = sliderToOdds(+e.target.value); $("#tgt").textContent = S.target.toFixed(2); };
@@ -2335,6 +2335,7 @@ function renderSlip() {
 // first Torino v Roma slip: 3.27 fair, 2.70 at Bet365, 4 legs) and moves to
 // your own prices as they come in.
 const B365_K0 = 0.05, B365_K0_WEIGHT = 3, B365_KEEP = 60;
+const AIM_PRIOR = -0.105, AIM_PRIOR_W = 4;   // Bet365's builder cut per leg before HAWK has your prices
 function recordB365Price() {
   const r = S.result, m = S.match, price = checkerInputs().price;
   if (!m || !r || !r.fair || !(price > 1) || !S.slip.length) return;
@@ -2357,8 +2358,12 @@ function recordB365Price() {
 // for half, so "Bet365 should show" catches up quickly.
 function applyAim() {
   const cs = loadPref("hawk.b365prices", []).filter(x => x.model > 1 && x.price > 1 && x.legs > 0).slice(-30)
-    .map(x => Math.log(x.price / x.model) / x.legs).filter(c => Math.abs(c) < 0.3);
-  const cl = Math.max(-0.15, Math.min(0.08, cs.reduce((a, b) => a + b, 0) / (cs.length + 1)));
+    .map(x => Math.log(x.price / x.model) / x.legs).filter(c => Math.abs(c) < 0.5);
+  // Before you've typed any prices, assume Bet365 shaves about 10% a leg: measured
+  // on real builders (1.80 v 2.19, 3.10 v 4.14, 1.57 v 2.29 …), where it came in
+  // 15-45% under what HAWK expected. Your own prices then take over from this.
+  const sum = cs.reduce((a, b) => a + b, 0) + AIM_PRIOR * AIM_PRIOR_W;
+  const cl = Math.max(-0.25, Math.min(0.08, sum / (cs.length + AIM_PRIOR_W)));
   S.aim = { c: 0, cl, n: cs.length };
   HAWK.setAim({ c: 0, cl });
 }
@@ -2432,6 +2437,17 @@ function easyCall(r) {
 // leg well above what its bookmaker price implies (the same number the call and the
 // price box use, so they can't disagree).
 const worthFrom = (r) => r && r.fair ? (r.fair / (r.check || 1)) * 1.02 : null;
+// How close HAWK's expected Bet365 price has been to the prices you typed, and
+// how much of its cut it has learnt from you. Typing one number after each check
+// is what closes the gap — this shows it happening.
+function aimNote() {
+  const rows = loadPref("hawk.b365prices", []).filter(x => x.model > 1 && x.price > 1);
+  const cut = S.aim ? Math.round(100 * (1 - Math.exp(S.aim.cl))) : 0;
+  if (!rows.length) return `<div class="note">🧠 HAWK assumes Bet365 shaves about ${cut}% a leg on builders. Type the real price in the box above after you check one and it learns yours instead.</div>`;
+  const last = rows.slice(-10), off = last.reduce((a, x) => a + Math.abs(x.price / (x.model * Math.exp(S.aim.cl * x.legs)) - 1), 0) / last.length;
+  return `<div class="note">🧠 Learnt from <b>${rows.length}</b> builder price${rows.length === 1 ? "" : "s"} you typed: Bet365 shaves about <b>${cut}%</b> a leg,
+    and HAWK's guess has been within <b>${(100 * off).toFixed(0)}%</b> on your last ${last.length}. More prices, closer guesses.</div>`;
+}
 function guessLine(r) {
   if (r && r.b365 > 1) {
     // Bet365's own leg prices (and Unibet's for scorer / assist / shots on target) multiplied, as Bet365 builds it.

@@ -2885,8 +2885,11 @@ function renderScan() {
   };
   $("#minOdds").onchange = async (e) => { sc.minOdds = +e.target.value; savePref("hawk.minOdds", sc.minOdds);
     if (sc.minOdds) sc.sort = "lands";   // you set the payout — HAWK sorts by what lands most
+    renderScan();   // the line above the boxes says what HAWK is building: redraw it
     await rescan(); };
-  $("#scanPicks").onchange = async (e) => { S.picks = e.target.value === "value" ? "value" : "likely"; savePref("hawk.picks", S.picks); await rescan(); };
+  $("#scanPicks").onchange = async (e) => { S.picks = e.target.value === "value" ? "value" : "likely"; savePref("hawk.picks", S.picks);
+    renderScan();
+    await rescan(); };
   $("#scanAuto").onclick = async (e) => { const b = e.target.closest("button"); if (!b || S.auto === (b.dataset.auto === "1")) return;
     S.auto = b.dataset.auto === "1"; savePref("hawk.auto", S.auto); renderScan();
     // Scan again with the new setting — stopping a scan that's still going first.

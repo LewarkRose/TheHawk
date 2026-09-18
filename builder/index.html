@@ -2229,7 +2229,9 @@ function renderSlip() {
   const predicted = m && Object.values(m.lineups).some(lu => lu.status !== "Confirmed");
   $("#slip").innerHTML = `
     <div class="seg" id="autoSeg" style="margin-top:0" title="Auto: HAWK picks the odds and legs for you">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
-    ${S.auto ? `<div class="hint" style="margin-top:0">HAWK tries odds from about 2 to 4 with up to your max legs (below) and only keeps builders that land at least 1 time in 4 — worth-it ones at Bet365 first.</div>` : ""}
+    ${S.auto ? `<div class="hint" style="margin-top:0">${S.scan.minOdds
+      ? `You've asked Picks for <b>${S.scan.minOdds.toFixed(2)}+</b>, so HAWK stacks legs (up to your max, below) until Bet365's likely price gets there, likeliest build first. Change it on Picks, or use 🎚 My odds here.`
+      : "HAWK tries odds from about 2 to 4 with up to your max legs (below) and only keeps builders that land at least 1 time in 4 — worth-it ones at Bet365 first."}</div>` : ""}
     <div class="target" ${S.auto ? 'style="display:none"' : ""}><div><div class="muted" style="font-size:12px;letter-spacing:.1em" title="HAWK builds until Bet365's likely price for the builder reaches this">TARGET · BET365 PRICE</div><div class="big" id="tgt">${S.target.toFixed(2)}</div></div>
       <div class="muted" style="text-align:right;font-size:12px">${r && r.p && S.slip.length ? `this one lands<br><b style="font-size:16px;color:var(--text)">${pct(r.p, 1)}</b>` : `HAWK builds to<br><b style="font-size:13px;color:var(--text)">Bet365's price</b>`}</div></div>
     <input type="range" min="0" max="100" step="0.5" value="${oddsToSlider(S.target)}" id="rng" ${S.auto ? 'style="display:none"' : ""}>
@@ -2849,6 +2851,9 @@ function renderScan() {
         <label title="Only builders that pay at least this — HAWK then picks the likeliest one that does">At least <select id="minOdds">${
           [[0, "any odds"], [2, "2.00+"], [2.5, "2.50+"], [3, "3.00+"], [5, "5.00+"], [8, "8.00+"], [12, "12.00+"], [20, "20.00+"]].map(([v, t]) =>
           `<option value="${v}" ${v === sc.minOdds ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+        <label title="Most likely: the legs likeliest to land together. Value first: legs where Bet365's own price beats HAWK's fair odds — the same reason a pick turns up on the green board, built into the builder.">Built from <select id="scanPicks">${
+          [["likely", "\ud83c\udfaf Likeliest legs"], ["value", "\ud83d\udcb0 Legs with value"]].map(([v, t]) =>
+          `<option value="${v}" ${v === S.picks ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label>Sort by <select id="srt">${[["worth", "Worth it at Bet365"], ["lands", "Most likely to land"], ["legs", "Fewest legs"], ["kickoff", "Kick-off time"], ["value", "Single legs with value"]].map(([k, t]) =>
           `<option value="${k}" ${k === sc.sort ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="scanConf" ${sc.confirmed ? "checked" : ""}> Lineups confirmed only</label>
@@ -2860,11 +2865,17 @@ function renderScan() {
   bindLeaguePicker("scanLeagues", sc.leagues, "hawk.scanLeagues");
   $("#hrs").onchange = (e) => { sc.hours = windowValue(e.target.value); };
   $("#srt").onchange = (e) => { sc.sort = e.target.value; updateScan(); };
-  $("#minOdds").onchange = async (e) => { sc.minOdds = +e.target.value; savePref("hawk.minOdds", sc.minOdds);
-    if (sc.minOdds) sc.sort = "lands";   // you set the payout — HAWK sorts by what lands most
+  // Changing what HAWK builds means the scan has to run again: stop the one
+  // going, wait for it to let go, then start fresh.
+  const rescan = async () => {
     let st = await api("/api/scan");
     if (st && st.running) { await api("/api/scan/stop", {}); for (let i = 0; i < 60 && st && st.running; i++) { await new Promise(r => setTimeout(r, 250)); st = await api("/api/scan"); } }
-    S.scan.data = null; toggleScan(); };
+    S.scan.data = null; toggleScan();
+  };
+  $("#minOdds").onchange = async (e) => { sc.minOdds = +e.target.value; savePref("hawk.minOdds", sc.minOdds);
+    if (sc.minOdds) sc.sort = "lands";   // you set the payout — HAWK sorts by what lands most
+    await rescan(); };
+  $("#scanPicks").onchange = async (e) => { S.picks = e.target.value === "value" ? "value" : "likely"; savePref("hawk.picks", S.picks); await rescan(); };
   $("#scanAuto").onclick = async (e) => { const b = e.target.closest("button"); if (!b || S.auto === (b.dataset.auto === "1")) return;
     S.auto = b.dataset.auto === "1"; savePref("hawk.auto", S.auto); renderScan();
     // Scan again with the new setting — stopping a scan that's still going first.
@@ -3012,11 +3023,14 @@ function scanCard(r, params) {
       <div>${r.legs.map(l => `<span class="lchip ${l.kind === "player" ? "pl" : ""}">${esc(l.label)}</span>`).join("")}</div>
       ${r.value.length ? `<div class="vline">Bet365 value: ${r.value.map(v => `${esc(v.label)} @ ${odds(v.price)} (+${(100 * v.edge).toFixed(1)}%)`).join(" · ")}</div>` : ""}</div>
     <div style="text-align:right">
-      <div class="muted" style="font-size:12px">Bet it at</div>
-      <div class="bigodds">${odds(scanNeed(r).need)}+</div>
+      ${S.scan.minOdds ? `<div class="muted" style="font-size:12px">Lands</div>
+      <div class="bigodds">${pct(r.p, 0)}</div>
+      <div class="muted" style="font-size:12px">Bet365 ≈ ${odds(r.b365 || r.fair)} · ✅ from ${odds(scanNeed(r).need)}</div>`
+      : `<div class="muted" style="font-size:12px">Bet it at</div>
+      <div class="bigodds">${odds(scanNeed(r).need)}+</div>`}
       <label class="sprice">Bet365 price <input data-price="${esc(r.id)}" inputmode="decimal" placeholder="e.g. ${odds(r.b365 || r.fair)}" value="${typed ? typed : ""}"></label>
       <div class="sverdict">${scanVerdict(r)}</div>
-      <div class="muted" style="font-size:12px">${r.legs.length} legs · lands ${pct(r.p, 0)}${short ? " · short of target" : ""}${
+      <div class="muted" style="font-size:12px">${r.legs.length} legs${S.scan.minOdds ? "" : ` · lands ${pct(r.p, 0)}`}${short ? " · short of target" : ""}${
         r.worth ? `<br>${r.worth >= 1.02 ? "worth it" : r.worth >= 0.95 ? "about fair" : `HAWK expects ${Math.round(100 * (1 - r.worth))}% under fair`}` : ""}</div>
       <button class="ghost" style="width:auto;padding:6px 12px">Open ›</button>
       <button class="ghost" style="width:auto;padding:6px 12px" data-acca="${esc(r.id)}" title="Put this builder on your acca">${

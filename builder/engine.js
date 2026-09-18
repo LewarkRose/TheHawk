@@ -1598,6 +1598,10 @@
       chosen.push(best);
       chosen = pruneImplied(legs, chosen, keep, n);
       m = maskOf(legs, chosen, n);
+      // A leg the prune throws straight back out — one the ticket already implies,
+      // so it changes nothing — would otherwise be picked again, pruned again,
+      // for ever (the page would hang). Leave it out of this build for good.
+      if (!chosen.includes(best)) banned = new Set([...banned, best]);
     }
     return evaluate(legs, chosen);
   }
@@ -1927,13 +1931,18 @@
   // so HAWK aims a bit above what you asked for and keeps only the builds whose
   // expected Bet365 price really clears it — likeliest first.
   const minTargets = (min) => [min * 1.15, min * 1.45, min * 1.9];
+  // The "lands 1 in 4" floor is for when HAWK picks the odds itself. Once you
+  // ask for a price, it would just rule everything out (nothing paying 8.00
+  // lands 1 in 4), so it's dropped — HAWK shows the likeliest build that pays
+  // what you asked for, with its real chance, and the verdict says the rest.
+  const minChance = (min) => (min ? 0 : AUTO_MIN_P);
   function autoOptions(e, params, count = 5, depth = 0) {
     const found = new Map(), maxLegs = +params.maxLegs || 6;
     const min = +params.minOdds || 0;   // "at least these odds"
     for (const target of (min ? minTargets(min) : AUTO_TARGETS))
       for (const t of searchOptions(e, { ...params, target, maxLegs }, count, depth)) {
         const k = t.legs.map((l) => l.id).sort().join("|");
-        if (!t.legs.length || !(t.p >= AUTO_MIN_P) || found.has(k)) continue;
+        if (!t.legs.length || !(t.p >= minChance(min)) || found.has(k)) continue;
         if (min && !((t.b365 || t.fair) >= min)) continue;   // below the odds you asked for
         found.set(k, { ...t, autoTarget: target });
       }
@@ -1961,7 +1970,7 @@
     for (const target of (min ? minTargets(min) : AUTO_TARGETS)) {
       const t = autoBuild(e.legs, target, params.style, maxLegs, params.locked || [], banned,
                           params.favourite !== false, params.focus || "Mix", !!params.extras, params.picks === "value" ? "value" : "likely", known);
-      if (!t.legs.length || !(t.p >= AUTO_MIN_P)) continue;
+      if (!t.legs.length || !(t.p >= minChance(min))) continue;
       if (min && !((t.b365 || t.fair) >= min)) continue;   // below the odds you asked for
       const w = worthOf(t), key = min ? [0, t.p] : [w >= 1.02 ? 2 : w >= 0.95 ? 1 : 0, w + 0.5 * t.p];
       if (!bestKey || key[0] > bestKey[0] || (key[0] === bestKey[0] && key[1] > bestKey[1])) { best = { ...t, worth: +w.toFixed(3), autoTarget: target }; bestKey = key; }

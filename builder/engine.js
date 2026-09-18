@@ -1378,11 +1378,26 @@
   const UNPRICED_CUT = 0.05;   // a leg nobody prices: about 5% under HAWK's fair odds
   const hasPrice = (leg) => leg.bookPrice > 1 || (leg.refPrice > 1 && !refOff(leg));
   const legB365 = (leg) => (leg.bookPrice > 1 ? leg.bookPrice : propEstimate(leg) || Math.max(1.01, Math.exp(-UNPRICED_CUT) / leg.p));
+  // Two squeezes Bet365 applies that the maths above doesn't catch, measured on
+  // the builders you've priced: a second (or third) leg on the SAME player pays
+  // far less than its own price suggests, and a leg on a short favourite is cut
+  // harder still. Without these HAWK expected 4.10 where Bet365 showed 2.87.
+  const SAME_PLAYER_CUT = 0.85, SHORT_FAVE = 1.25, SHORT_FAVE_CUT = 0.92;
+  function squeeze(legs, ids) {
+    const seen = new Set();
+    let f = 1;
+    for (const id of ids) {
+      const l = legs[id];
+      if (l.player) { if (seen.has(l.player)) f *= SAME_PLAYER_CUT; else seen.add(l.player); }
+      if (l.bookPrice > 1 && l.bookPrice <= SHORT_FAVE) f *= SHORT_FAVE_CUT;
+    }
+    return f;
+  }
   function b365Raw(legs, ids, joint) {
     if (!ids.length || !(joint > 0)) return null;
     let prod = 1, pp = 1;
     for (const id of ids) { const l = legs[id]; prod *= legB365(l); pp *= l.p * (l.adj || 1); }
-    return prod * Math.min(1.5, Math.max(0.3, pp / joint));
+    return prod * Math.min(1.5, Math.max(0.3, pp / joint)) * squeeze(legs, ids);
   }
   const b365Of = (legs, ids, joint) => { const r = b365Raw(legs, ids, joint); return r && r * aimOf(ids.length); };
   // What auto-build compares with your target.

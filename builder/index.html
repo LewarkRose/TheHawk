@@ -1005,7 +1005,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },
-            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", confirmed: loadPref("hawk.scanConfirmed", false), showBet: loadPref("hawk.scanShowBet", false), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
+            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", confirmed: loadPref("hawk.scanConfirmed", false), showBet: loadPref("hawk.scanShowBet", false), minOdds: loadPref("hawk.minOdds", 0), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
             radar: { leagues: null, hours: "today", min: 1, data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null,
                      tab: "value", minMove: 0.1 },
@@ -2642,6 +2642,7 @@ function bindStakeAdvice(root, useStake) {
 function buildBody() {
   const locked = S.slip.filter(id => S.locked.has(id));
   return { id: String(S.match.id), auto: S.auto, priced: S.priced, typed: typedLegIds(), target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs,
+           minOdds: S.auto ? S.scan.minOdds : 0,   // 🎯 Auto follows the "at least" you set on Picks
            favourite: S.favourite, extras: S.extras, picks: S.picks, locked, banned: [...new Set([...S.banned, ...unofferedLegIds()])],
            known: knownLegIds(),
            learnt: propPrices().length };   // (a new Bet365 prop price → fresh options)
@@ -2845,7 +2846,10 @@ function renderScan() {
       <div class="opts" style="justify-content:flex-start;gap:16px;flex-wrap:wrap">
         <label>Kick-off <select id="hrs">${KICKOFF_WINDOWS.filter(([h]) => h !== 72).map(([h, t]) =>
           `<option value="${h}" ${h === sc.hours ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-        <label>Sort by <select id="srt">${[["worth", "Worth it at Bet365"], ["legs", "Fewest legs"], ["kickoff", "Kick-off time"], ["value", "Single legs with value"]].map(([k, t]) =>
+        <label title="Only builders that pay at least this — HAWK then picks the likeliest one that does">At least <select id="minOdds">${
+          [[0, "any odds"], [2, "2.00+"], [2.5, "2.50+"], [3, "3.00+"], [4, "4.00+"], [5, "5.00+"]].map(([v, t]) =>
+          `<option value="${v}" ${v === sc.minOdds ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+        <label>Sort by <select id="srt">${[["worth", "Worth it at Bet365"], ["lands", "Most likely to land"], ["legs", "Fewest legs"], ["kickoff", "Kick-off time"], ["value", "Single legs with value"]].map(([k, t]) =>
           `<option value="${k}" ${k === sc.sort ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="scanConf" ${sc.confirmed ? "checked" : ""}> Lineups confirmed only</label>
         <button class="build" id="scanGo" style="width:auto;margin:0 0 0 auto;padding:10px 20px"></button>
@@ -2856,6 +2860,11 @@ function renderScan() {
   bindLeaguePicker("scanLeagues", sc.leagues, "hawk.scanLeagues");
   $("#hrs").onchange = (e) => { sc.hours = windowValue(e.target.value); };
   $("#srt").onchange = (e) => { sc.sort = e.target.value; updateScan(); };
+  $("#minOdds").onchange = async (e) => { sc.minOdds = +e.target.value; savePref("hawk.minOdds", sc.minOdds);
+    if (sc.minOdds) sc.sort = "lands";   // you set the payout — HAWK sorts by what lands most
+    let st = await api("/api/scan");
+    if (st && st.running) { await api("/api/scan/stop", {}); for (let i = 0; i < 60 && st && st.running; i++) { await new Promise(r => setTimeout(r, 250)); st = await api("/api/scan"); } }
+    S.scan.data = null; toggleScan(); };
   $("#scanAuto").onclick = async (e) => { const b = e.target.closest("button"); if (!b || S.auto === (b.dataset.auto === "1")) return;
     S.auto = b.dataset.auto === "1"; savePref("hawk.auto", S.auto); renderScan();
     // Scan again with the new setting — stopping a scan that's still going first.
@@ -2876,6 +2885,7 @@ function renderScan() {
     const r = (S.scan.data.results || []).find(x => String(x.id) === i.dataset.price);
     if (r && S.scan.prices[scanKey(r)]) { learnScanPrice(r, S.scan.prices[scanKey(r)]); updateScan(); }
   };
+  $("#scanRes").addEventListener("toggle", (e) => { if (e.target.id === "pickBoard") S.scan.picksOpen = e.target.open; }, true);
   $("#scanRes").addEventListener("click", (e) => { if (!e.target.closest("[data-showbet]")) return;
     e.stopPropagation(); S.scan.showBet = !S.scan.showBet; savePref("hawk.scanShowBet", S.scan.showBet); updateScan(); }, true);
   $("#scanConf").onchange = (e) => { sc.confirmed = e.target.checked; savePref("hawk.scanConfirmed", sc.confirmed); updateScan(); };
@@ -2898,6 +2908,7 @@ function updateScan() {
   if (typing) return;
   const sorters = {
     worth: (a, b) => scanWorth(b) - scanWorth(a) || (b.p || 0) - (a.p || 0),
+    lands: (a, b) => (b.p || 0) - (a.p || 0),
     legs: (a, b) => a.legs.length - b.legs.length || (a.kickoff || "").localeCompare(b.kickoff || ""),
     kickoff: (a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""),
     value: (a, b) => b.value.length - a.value.length || ((b.value[0] || {}).edge || 0) - ((a.value[0] || {}).edge || 0),
@@ -2915,7 +2926,7 @@ function updateScan() {
     $("#scanRes").innerHTML = betNote + `<div class="note">No match with confirmed lineups yet (${hidden} still predicted). Lineups come out about an hour before kick-off — ⚡ Scan again then, or untick <b>Lineups confirmed only</b>.</div>`;
     return;
   }
-  $("#scanRes").innerHTML = betNote + singlesBoard(shown) + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${[good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`, likely && `👀 ${likely} worth checking`].filter(Boolean).join(" · ") || "Nothing worth checking yet"}<small>${
+  $("#scanRes").innerHTML = betNote + pickBoard(shown) + singlesBoard(shown) + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${[good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`, likely && `👀 ${likely} worth checking`].filter(Boolean).join(" · ") || "Nothing worth checking yet"}<small>${
       "HAWK can't see Bet365's prices, so it tells you the price each builder needs. Build one on Bet365, type its price in the box and HAWK tells you straight away. 👀 ones are the likeliest to be ✅ — start at the top."}${
       !good && !fair && !likely && !d.running ? (() => { const best = [...shown].sort((a, b) => b.worth - a.worth)[0];
         return best ? ` Nothing clears the bar tonight. The closest is <b>${esc(best.home)} v ${esc(best.away)}</b> — HAWK expects Bet365 to pay about ${Math.round(100 * (1 - best.worth))}% under what it's worth. Check it: if Bet365 is kinder than HAWK expects it could still be ✅.` : ""; })() : ""}</small></div>` : "") + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
@@ -2975,6 +2986,21 @@ function singlesBoard(results) {
       <span><b>${odds(x.price)}</b> ${esc(x.label)} <span class="muted">· ${esc(x.home)} v ${esc(x.away)} ${esc(fmtKick(x.kickoff))}</span></span>
       <span class="muted">lands ${pct(x.p, 0)} · <b style="color:var(--accent)">+${(100 * x.edge).toFixed(0)}% value</b></span></div>`).join("")}</div>`;
 }
+// One pick per match, for every match scanned: Bet365's own price on the result,
+// double chance or handicap leg that's worth the most. Green = worth backing,
+// grey = the price is under what it's worth (bet it if you fancy it, but it costs).
+function pickBoard(results) {
+  const rows = results.filter(r => r.pick).map(r => ({ ...r.pick, home: r.home, away: r.away, id: r.id, league: r.league, kickoff: r.kickoff }));
+  if (!rows.length) return "";
+  rows.sort((a, b) => b.edge - a.edge);
+  const good = rows.filter(x => x.edge >= 0.02).length;
+  return `<details class="tr-fold co-card" style="margin:0 0 12px" ${S.scan.picksOpen ? "open" : ""} id="pickBoard"><summary><b>🎯 One pick per match</b>
+      <span class="muted"> — ${rows.length} matches · ${good} worth backing</span></summary>
+    <div class="note" style="margin:4px 0 8px">Bet365's own price on the result, double chance or handicap it rates best. Green ones beat what they're worth; the rest are there so you have a pick in every game.</div>
+    ${rows.map(x => `<div class="sc-ht" data-htgo="${esc(x.id)}|${esc(x.league)}">
+      <span><b>${odds(x.price)}</b> ${esc(x.label)} <span class="muted">· ${esc(x.home)} v ${esc(x.away)} ${esc(fmtKick(x.kickoff))}</span></span>
+      <span class="muted">lands ${pct(x.p, 0)} · <b style="color:${x.edge >= 0.02 ? "var(--accent)" : x.edge >= -0.03 ? "var(--gold)" : "var(--muted)"}">${x.edge >= 0 ? "+" : ""}${(100 * x.edge).toFixed(0)}%</b></span></div>`).join("")}</details>`;
+}
 function scanCard(r, params) {
   const short = params && (r.b365 || r.fair) < params.target * 0.97;
   const typed = S.scan.prices[scanKey(r)];
@@ -3001,7 +3027,7 @@ async function toggleScan() {
     if (S.scan.data && S.scan.data.running) S.scan.data = await api("/api/scan/stop", {});
     else {
       if (!S.scan.leagues.size) return toast("Pick at least one league.");
-      S.scan.data = await api("/api/scan", { leagues: [...S.scan.leagues], hours: hoursFor(S.scan.hours), target: S.target, auto: S.auto, priced: S.priced,
+      S.scan.data = await api("/api/scan", { leagues: [...S.scan.leagues], hours: hoursFor(S.scan.hours), target: S.target, auto: S.auto, priced: S.priced, minOdds: S.scan.minOdds,
                                              style: S.style, focus: S.focus, maxLegs: S.maxLegs, extras: S.extras, picks: S.picks });
     }
   } catch (err) { toast(err.message); }

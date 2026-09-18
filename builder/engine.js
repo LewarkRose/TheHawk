@@ -1923,15 +1923,23 @@
   // and puts the ones worth it at Bet365 first (then fair price, then the rest),
   // best value and likeliest first within each.
   const AUTO_TARGETS = [2, 2.75, 3.75], AUTO_MIN_P = 0.25;
+  // "At least 2.00": Bet365 pays about a tenth less per leg than the fair price,
+  // so HAWK aims a bit above what you asked for and keeps only the builds whose
+  // expected Bet365 price really clears it — likeliest first.
+  const minTargets = (min) => [min * 1.15, min * 1.45, min * 1.9];
   function autoOptions(e, params, count = 5, depth = 0) {
     const found = new Map(), maxLegs = +params.maxLegs || 6;
-    for (const target of AUTO_TARGETS)
+    const min = +params.minOdds || 0;   // "at least these odds"
+    for (const target of (min ? minTargets(min) : AUTO_TARGETS))
       for (const t of searchOptions(e, { ...params, target, maxLegs }, count, depth)) {
         const k = t.legs.map((l) => l.id).sort().join("|");
-        if (t.legs.length && t.p >= AUTO_MIN_P && !found.has(k)) found.set(k, { ...t, autoTarget: target });
+        if (!t.legs.length || !(t.p >= AUTO_MIN_P) || found.has(k)) continue;
+        if (min && !((t.b365 || t.fair) >= min)) continue;   // below the odds you asked for
+        found.set(k, { ...t, autoTarget: target });
       }
     const tier = (t) => (t.worth >= 1.02 ? 2 : t.worth >= 0.95 ? 1 : 0);
-    return [...found.values()].sort((a, b) => tier(b) - tier(a) || (b.worth + 0.5 * b.p) - (a.worth + 0.5 * a.p)).slice(0, count);
+    return [...found.values()].sort((a, b) => min ? b.p - a.p
+      : tier(b) - tier(a) || (b.worth + 0.5 * b.p) - (a.worth + 0.5 * a.p)).slice(0, count);
   }
   // "Only legs Bet365 prices": leave out every leg whose price HAWK has to guess
   // (player props — no free feed has Bet365's). What's left are legs 365Scores
@@ -1948,12 +1956,14 @@
   // dozens of matches can't afford the builder's full search.
   function autoBest(e, params) {
     const maxLegs = +params.maxLegs || 6, banned = new Set(params.banned || []), known = new Set(params.known || []);
+    const min = +params.minOdds || 0;   // "at least these odds": a bigger payout, still the likeliest that pays it
     let best = null, bestKey = null;
-    for (const target of AUTO_TARGETS) {
+    for (const target of (min ? minTargets(min) : AUTO_TARGETS)) {
       const t = autoBuild(e.legs, target, params.style, maxLegs, params.locked || [], banned,
                           params.favourite !== false, params.focus || "Mix", !!params.extras, params.picks === "value" ? "value" : "likely", known);
       if (!t.legs.length || !(t.p >= AUTO_MIN_P)) continue;
-      const w = worthOf(t), key = [w >= 1.02 ? 2 : w >= 0.95 ? 1 : 0, w + 0.5 * t.p];
+      if (min && !((t.b365 || t.fair) >= min)) continue;   // below the odds you asked for
+      const w = worthOf(t), key = min ? [0, t.p] : [w >= 1.02 ? 2 : w >= 0.95 ? 1 : 0, w + 0.5 * t.p];
       if (!bestKey || key[0] > bestKey[0] || (key[0] === bestKey[0] && key[1] > bestKey[1])) { best = { ...t, worth: +w.toFixed(3), autoTarget: target }; bestKey = key; }
     }
     return best;
@@ -2041,7 +2051,8 @@
     if (scan.running) return jobStatus(scan);
     const params = { ...windowParams(body), target: Math.min(Math.max(+body.target || 3, 1.2), 50),
                      style: STYLES[body.style] ? body.style : "Balanced", focus: FOCUS[body.focus] ? body.focus : "Mix",
-                     maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12), extras: !!body.extras, picks: body.picks === "value" ? "value" : "likely", auto: !!body.auto, priced: !!body.priced, typed: body.typed || [] };
+                     maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12), extras: !!body.extras, picks: body.picks === "value" ? "value" : "likely", auto: !!body.auto, priced: !!body.priced,
+                     minOdds: Math.min(Math.max(+body.minOdds || 0, 0), 20), typed: body.typed || [] };
     Object.assign(scan, newJob(), { running: true, params });
     runFixtureJob(scan, (league, f, json, e) => {
       // The best ticket for this match (worth betting at Bet365 first), from a quicker search than the builder's.
@@ -2053,6 +2064,15 @@
         value: json.value.legs.slice(0, 4).map((v) => ({ label: v.label, price: v.price, edge: v.edge })),
         // Single bets at Bet365's own price that beat HAWK's chance — no builder
         // cut, nothing to guess. Only ones that land often enough to be real.
+        // One pick per match, whatever the match: the result / double chance /
+        // handicap leg at Bet365's own price that's worth the most (even when
+        // that's still under fair — the card says so).
+        pick: (() => {
+          const rows = json.legs.filter((l) => l.bookPrice > 1.01 && l.p >= 0.3 && /Full Time Result|Double Chance|Handicap|Draw No Bet/.test(l.market))
+            .map((l) => ({ id: l.id, label: l.label, market: l.market, price: l.bookPrice, p: l.p, edge: l.bookPrice * l.p - 1 }))
+            .sort((a, b) => b.edge - a.edge);
+          return rows[0] || null;
+        })(),
         singles: json.legs.filter((l) => l.bookPrice > 1.01 && l.p >= 0.25 && l.bookPrice * l.p >= 1.02)
           .map((l) => ({ id: l.id, label: l.label, market: l.market, price: l.bookPrice, p: l.p, edge: l.bookPrice * l.p - 1 }))
           .sort((a, b) => b.edge - a.edge).slice(0, 6) });

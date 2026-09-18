@@ -2050,7 +2050,12 @@
       if (!t) return;   // 🎯 Auto: nothing here lands 1 in 4 or better
       scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair, b365: t.b365 || null, b365raw: t.b365raw || null, check: t.check || 1, worth: +worthOf(t).toFixed(3), guessed: t.guessed || 0,
         legs: t.legs.map((r) => legSummary(e, json, r.id)),
-        value: json.value.legs.slice(0, 4).map((v) => ({ label: v.label, price: v.price, edge: v.edge })) });
+        value: json.value.legs.slice(0, 4).map((v) => ({ label: v.label, price: v.price, edge: v.edge })),
+        // Single bets at Bet365's own price that beat HAWK's chance — no builder
+        // cut, nothing to guess. Only ones that land often enough to be real.
+        singles: json.legs.filter((l) => l.bookPrice > 1.01 && l.p >= 0.25 && l.bookPrice * l.p >= 1.02)
+          .map((l) => ({ id: l.id, label: l.label, market: l.market, price: l.bookPrice, p: l.p, edge: l.bookPrice * l.p - 1 }))
+          .sort((a, b) => b.edge - a.edge).slice(0, 6) });
     });
     return jobStatus(scan);
   }

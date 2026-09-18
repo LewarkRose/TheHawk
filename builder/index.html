@@ -2899,9 +2899,10 @@ function updateScan() {
     $("#scanRes").innerHTML = betNote + `<div class="note">No match with confirmed lineups yet (${hidden} still predicted). Lineups come out about an hour before kick-off — ⚡ Scan again then, or untick <b>Lineups confirmed only</b>.</div>`;
     return;
   }
-  $("#scanRes").innerHTML = betNote + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${[good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`, likely && `👀 ${likely} worth checking`].filter(Boolean).join(" · ") || "Nothing worth checking yet"}<small>${
+  $("#scanRes").innerHTML = betNote + singlesBoard(shown) + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${[good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`, likely && `👀 ${likely} worth checking`].filter(Boolean).join(" · ") || "Nothing worth checking yet"}<small>${
       "HAWK can't see Bet365's prices, so it tells you the price each builder needs. Build one on Bet365, type its price in the box and HAWK tells you straight away. 👀 ones are the likeliest to be ✅ — start at the top."}${
-      !good && !fair && !likely && !d.running ? " Nothing here is worth a look: on every one of these HAWK expects Bet365 to pay less than the bet is worth. A night to skip — unless you have a boost." : ""}</small></div>` : "") + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
+      !good && !fair && !likely && !d.running ? (() => { const best = [...shown].sort((a, b) => b.worth - a.worth)[0];
+        return best ? ` Nothing clears the bar tonight. The closest is <b>${esc(best.home)} v ${esc(best.away)}</b> — HAWK expects Bet365 to pay about ${Math.round(100 * (1 - best.worth))}% under what it's worth. Check it: if Bet365 is kinder than HAWK expects it could still be ✅.` : ""; })() : ""}</small></div>` : "") + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
     ? "Results appear here as each match is analysed…"
     : d.total === 0 && d.params ? "No fixtures kick off in that window — try a longer one."
     : betOn.size && !open.length ? "Nothing new — you've already bet on every match scanned."
@@ -2943,6 +2944,21 @@ function learnScanPrice(r, price) {
   applyPropBook();
   applyAim();
 }
+// Single bets worth it at Bet365's own price, across every match in the scan.
+// No builder cut and no guessing: the price is Bet365's, so ✅ means ✅.
+const SINGLE_MIN_ODDS = 2;
+function singlesBoard(results) {
+  const rows = [];
+  for (const r of results) for (const s of r.singles || []) if (s.price >= SINGLE_MIN_ODDS)
+    rows.push({ ...s, home: r.home, away: r.away, id: r.id, league: r.league, kickoff: r.kickoff });
+  rows.sort((a, b) => b.edge - a.edge);
+  if (!rows.length) return "";
+  return `<div class="co-card" style="margin:0 0 12px"><b>✅ Worth it at Bet365 — single bets from ${odds(SINGLE_MIN_ODDS)}</b>
+    <div class="note" style="margin:4px 0 8px">Bet365's own price, so there's nothing to check and no builder cut. One leg, one price.</div>
+    ${rows.slice(0, 8).map(x => `<div class="sc-ht" data-htgo="${esc(x.id)}|${esc(x.league)}">
+      <span><b>${odds(x.price)}</b> ${esc(x.label)} <span class="muted">· ${esc(x.home)} v ${esc(x.away)} ${esc(fmtKick(x.kickoff))}</span></span>
+      <span class="muted">lands ${pct(x.p, 0)} · <b style="color:var(--accent)">+${(100 * x.edge).toFixed(0)}% value</b></span></div>`).join("")}</div>`;
+}
 function scanCard(r, params) {
   const short = params && (r.b365 || r.fair) < params.target * 0.97;
   const typed = S.scan.prices[scanKey(r)];
@@ -2958,7 +2974,8 @@ function scanCard(r, params) {
       <div class="bigodds">${odds(scanNeed(r).need)}+</div>
       <label class="sprice">Bet365 price <input data-price="${esc(r.id)}" inputmode="decimal" placeholder="e.g. ${odds(r.b365 || r.fair)}" value="${typed ? typed : ""}"></label>
       <div class="sverdict">${scanVerdict(r)}</div>
-      <div class="muted" style="font-size:12px">${r.legs.length} legs · lands ${pct(r.p, 0)}${short ? " · short of target" : ""}</div>
+      <div class="muted" style="font-size:12px">${r.legs.length} legs · lands ${pct(r.p, 0)}${short ? " · short of target" : ""}${
+        r.worth ? `<br>${r.worth >= 1.02 ? "worth it" : r.worth >= 0.95 ? "about fair" : `HAWK expects ${Math.round(100 * (1 - r.worth))}% under fair`}` : ""}</div>
       <button class="ghost" style="width:auto;padding:6px 12px">Open ›</button>
       <button class="ghost" style="width:auto;padding:6px 12px" data-acca="${esc(r.id)}" title="Put this builder on your acca">${
         S.acca.some(pt => pt.id === String(r.id)) ? "✓ In acca" : "➕ Acca"}</button></div></div>`;

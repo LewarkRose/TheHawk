@@ -76,7 +76,9 @@
   // Legs the auto-builder leaves out unless asked: counted per player with no
   // link to the opponent or the referee, so they're the least certain.
   const EXTRA_MARKETS = new Set(["Player Fouls Committed", "Player Fouls Won", "Player Tackles", "Player Offsides"]);
-  const MATCHES_KEPT = 8; // simulated matches kept in memory (each holds ~12 MB of legs)
+  // Simulated matches kept in memory: each holds ~12 MB of legs, so a phone keeps
+  // fewer — eight of them was enough to crash the tab on a phone browser.
+  const MATCHES_KEPT = typeof matchMedia === "function" && matchMedia("(max-width:820px)").matches ? 3 : 6;
 
   // ---------------------------------------------------------------------------
   // HTTP with retries and a small cache
@@ -1898,7 +1900,7 @@
   // and puts the ones worth it at Bet365 first (then fair price, then the rest),
   // best value and likeliest first within each.
   const AUTO_TARGETS = [2, 2.75, 3.75], AUTO_MIN_P = 0.25;
-  function autoOptions(e, params, count = 5, depth = 1) {
+  function autoOptions(e, params, count = 5, depth = 0) {
     const found = new Map(), maxLegs = +params.maxLegs || 6;
     for (const target of AUTO_TARGETS)
       for (const t of searchOptions(e, { ...params, target, maxLegs }, count, depth)) {
@@ -1934,7 +1936,7 @@
     return best;
   }
   function buildOptions(body, count = 5) {
-    if (body.auto) { const e0 = entryFor(body.id); return { options: autoOptions(e0, withPriced(e0, body), count, 1) }; }
+    if (body.auto) { const e0 = entryFor(body.id); return { options: autoOptions(e0, withPriced(e0, body), count, 0) }; }
     const e = entryFor(body.id);
     return { options: searchOptions(e, withPriced(e, body), count, 2) };
   }

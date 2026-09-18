@@ -1005,7 +1005,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },
-            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", confirmed: loadPref("hawk.scanConfirmed", false), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
+            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", confirmed: loadPref("hawk.scanConfirmed", false), showBet: loadPref("hawk.scanShowBet", false), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
             radar: { leagues: null, hours: "today", min: 1, data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null,
                      tab: "value", minMove: 0.1 },
@@ -2860,10 +2860,12 @@ function renderScan() {
     const r = (S.scan.data.results || []).find(x => String(x.id) === i.dataset.price);
     if (r && S.scan.prices[scanKey(r)]) { learnScanPrice(r, S.scan.prices[scanKey(r)]); updateScan(); }
   };
+  $("#scanRes").addEventListener("click", (e) => { if (!e.target.closest("[data-showbet]")) return;
+    e.stopPropagation(); S.scan.showBet = !S.scan.showBet; savePref("hawk.scanShowBet", S.scan.showBet); updateScan(); }, true);
   $("#scanConf").onchange = (e) => { sc.confirmed = e.target.checked; savePref("hawk.scanConfirmed", sc.confirmed); updateScan(); };
   $("#scanGo").onclick = toggleScan;
   $("#scanRes").onclick = (e) => {
-    if (e.target.closest(".sprice")) return;
+    if (e.target.closest(".sprice") || e.target.closest("[data-showbet]")) return;
     const a = e.target.closest("[data-acca]"); if (a) return addScanToAcca(a.dataset.acca);
     const c = e.target.closest("[data-open]"); if (c) openFromScan(c.dataset.open);
   };
@@ -2886,9 +2888,10 @@ function updateScan() {
   };
   // Lineups confirmed only: hides matches whose teams weren't out when they were scanned (they come out about an hour before kick-off).
   // Matches you've already bet on (in the Vault) don't show up again.
-  const betOn = alreadyBet(d.results), open = d.results.filter(r => !betOn.has(String(r.id)));
+  const betOn = alreadyBet(d.results), open = S.scan.showBet ? d.results : d.results.filter(r => !betOn.has(String(r.id)));
   const shown = S.scan.confirmed ? open.filter(r => r.confirmed) : open, hidden = open.length - shown.length;
-  const betNote = betOn.size ? `<div class="note" style="margin:0 0 10px">🎟 ${betOn.size} match${betOn.size > 1 ? "es" : ""} you've already bet on ${betOn.size > 1 ? "are" : "is"} hidden.</div>` : "";
+  const betNote = betOn.size ? `<div class="note" style="margin:0 0 10px">🎟 ${betOn.size} match${betOn.size > 1 ? "es" : ""} you've already bet on ${
+    S.scan.showBet ? "shown" : betOn.size > 1 ? "are hidden" : "is hidden"}. <button class="linkbtn" data-showbet>${S.scan.showBet ? "hide them" : "show them"}</button></div>` : "";
   const res = [...shown].sort(sorters[S.scan.sort] || sorters.worth);
   const typedIn = shown.filter(r => S.scan.prices[scanKey(r)]), good = typedIn.filter(r => scanWorth(r) >= 1.02).length;
   const fair = typedIn.filter(r => scanWorth(r) >= 0.95 && scanWorth(r) < 1.02).length, likely = shown.filter(r => !S.scan.prices[scanKey(r)] && r.worth >= 0.95).length;

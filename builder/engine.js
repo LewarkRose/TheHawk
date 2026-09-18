@@ -52,7 +52,7 @@
   const DEEP_MARKET_SOURCES = 5, DEEP_MARKET_WEIGHT = 0.85, MAX_LOGIT_GAP = 0.5;
   const STAT_TYPES = { 137: "corners", 141: "cards", 139: "sot" };
   // sim.py
-  const N_SIMS = 12000, PRIOR_MINUTES = 450, REST_SHARE = 0.05, XG_WEIGHT = 0.6;
+  const N_SIMS = 12000, SCAN_SIMS = 4000, PRIOR_MINUTES = 450, REST_SHARE = 0.05, XG_WEIGHT = 0.6;
   const START_PROB = { true: { Starting: 1.0, Substitute: 0.0 }, false: { Starting: 1.0, Substitute: 0.08 } };
   const SUB_APPEAR_PROB = 0.35, SUB_MINUTES = 22, DOUBTFUL_START = 0.45;
   const START_MINUTES = { F: 78, M: 82, D: 88, G: 90 }, PRIOR_STARTS = 4;
@@ -968,8 +968,13 @@
     }
     return { goals, assists };
   }
+  // Scanning dozens of matches runs the same simulation for each one, and each
+  // run blocks the screen. A scan uses a third of the simulations: plenty to rank
+  // matches, a third of the work and a third of the memory. Opening a match
+  // re-simulates it in full.
+  let scanSims = false;
   function simulate(an, squads) {
-    const rng = mulberry32(7), n = N_SIMS, exp = teamExpectations(an), M = an.M;
+    const rng = mulberry32(7), n = scanSims ? SCAN_SIMS : N_SIMS, exp = teamExpectations(an), M = an.M;
     const cells = [], cum = [];
     let acc = 0;
     for (let i = 0; i <= MAX_GOALS; i++) for (let j = 0; j <= MAX_GOALS; j++) { acc += M[i][j]; cells.push([i, j]); cum.push(acc); }
@@ -1631,8 +1636,11 @@
         if (used) an.refFile = { built: file.built, legs: used, tuned };
       }
     } catch (e) { console.warn("[hawk] player prices:", e.message); }
+    // Unibet is only asked when the published prices didn't cover enough player
+    // legs — its feed takes seconds, and waiting on it is most of a match's load.
     try {
-      const ref = await Promise.race([kambiProps(league, an.home, an.away, an.kickoff), sleep(5000).then(() => null)]);
+      const covered = Object.values(legs).filter((l) => l.refPrice > 1).length;
+      const ref = covered >= 20 ? null : await Promise.race([kambiProps(league, an.home, an.away, an.kickoff), sleep(4000).then(() => null)]);
       if (ref && ref.rows.length) {
         for (const leg of Object.values(legs)) {
           const k = leg.kind === "player" ? propKey(leg) : null;
@@ -1985,6 +1993,7 @@
     return { leagues: (body.leagues || []).filter((l) => LEAGUES.includes(l)), hours: Math.min(Math.max(+body.hours || 24, 1), 168) };
   }
   async function runFixtureJob(job, perMatch) {
+    scanSims = true;   // lighter simulations while a scan is running
     const now = Date.now(), horizon = now + job.params.hours * 3600 * 1000, todo = [];
     for (const league of job.params.leagues) {
       let list = [];
@@ -1996,16 +2005,17 @@
     let next = 0;
     const worker = async () => {
       while (next < todo.length && !job.stop) {
-        const [league, f] = todo[next++], id = String(f.id), wasOpen = matches.has(id);
+        const [league, f] = todo[next++], id = String(f.id);
         try { const json = await match(league, id); perMatch(league, f, json, matches.get(id)); }
         catch (err) { console.warn("[hawk] skipped", f.home, "v", f.away, err.message); job.errors++; }
         // Don't keep scanned matches around (memory), only ones you opened.
-        if (!wasOpen) matches.delete(id);
+        matches.delete(id);   // scan-quality simulations are never kept
         job.done++;
         await sleep(0);   // hand the screen back between matches
       }
     };
     await Promise.all([worker(), worker()]);
+    scanSims = false;
     job.running = false;
   }
   const fixtureInfo = (league, f, json) => ({ league, id: String(f.id), home: f.home, away: f.away, homeCrest: f.homeCrest,

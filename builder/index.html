@@ -1016,7 +1016,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     background:linear-gradient(180deg,#1d2b30,#152024);color:var(--accent);font-weight:800;font-size:12px;cursor:pointer;writing-mode:vertical-rl;box-shadow:-8px 0 20px -8px rgba(0,0,0,.7)}
   body.drawer-open .slip-back{right:390px}
 }
-@media (min-width:1251px){body.slip-away:not([data-view="match"]) main.grid{grid-template-columns:290px minmax(0,1fr)}}
+/* Only the builder pages keep the league column when the slip is away. Today,
+   Picks and Live are full-width pages: leaving 290px reserved there squeezed
+   the whole day into a strip with two thirds of the screen empty. */
+@media (min-width:1251px){body.slip-away:not([data-view="match"]):not([data-view="today"]):not([data-view="scan"]):not([data-view="scores"]) main.grid{grid-template-columns:290px minmax(0,1fr)}}
 /* 🎟 My bets drawer (wide screens): swings in from the right and stays open beside the builder */
 .bdrawer{display:none}
 body.drawer-open .bdrawer{display:block;position:fixed;right:0;bottom:0;width:390px;z-index:20;overflow:auto;padding:16px 16px 22px;
@@ -1187,7 +1190,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },   // perMatch is always 1: one Bet365-priced leg per match, so the acca has no builder cut
-            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: loadPref("hawk.scanSort", "lands"), confirmed: loadPref("hawk.scanConfirmed", false), setOpen: false, onlyWorth: loadPref("hawk.onlyWorth", false), exactLegs: loadPref("hawk.exactLegs", 0), showSingles: loadPref("hawk.showSingles", false), showBet: loadPref("hawk.scanShowBet", false), minOdds: loadPref("hawk.minOdds", 2), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
+            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: loadPref("hawk.scanSort", "lands"), confirmed: loadPref("hawk.scanConfirmed", false), setOpen: false, autoAt: null, onlyWorth: loadPref("hawk.onlyWorth", false), exactLegs: loadPref("hawk.exactLegs", 0), showSingles: loadPref("hawk.showSingles", false), showBet: loadPref("hawk.scanShowBet", false), minOdds: loadPref("hawk.minOdds", 2), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null,
                      tab: "value", minMove: 0.1 },
             watch: [] };
@@ -3214,6 +3217,13 @@ function renderScan() {
 }
 function updateScan() {
   const sum = $("#pkSum"); if (sum) sum.innerHTML = scanSummary();
+  // A scan that has stopped — finished or stopped by you — hands its board to
+  // the paper record, once.
+  const sd = S.scan.data;
+  if (sd && !sd.running && sd.done && (sd.results || []).length) {
+    const stamp = sd.done + "|" + sd.results.length;
+    if (S.scan.autoAt !== stamp) { S.scan.autoAt = stamp; autoPaper(sd.results || []); }
+  }
   if (S.view !== "scan" || !$("#scanRes")) return;
   const d = S.scan.data || { running: false, total: 0, done: 0, errors: 0, results: [] };
   const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest("#scanRes [data-price]");
@@ -4206,7 +4216,36 @@ function dayPicks() {
 // the time, then settled from the final score exactly as a real bet would be.
 // It is the only way to check HAWK's claims without paying to find out.
 const paperList = () => loadPref("hawk.paper", []);
-const savePaper = (l) => savePref("hawk.paper", l.slice(-120));
+const savePaper = (l) => savePref("hawk.paper", l.slice(-400));
+// What HAWK itself puts at the top of a scan, recorded whether or not you back
+// it. Volume is the point: your own bets will never reach a number of picks
+// that proves anything, and these cost nothing.
+// A 3% ticket tells you nothing when it loses, and hundreds of them would be
+// needed before it told you anything at all, so the board only takes picks
+// HAWK gives a real chance. One entry per match, whatever you scan afterwards.
+const AUTO_PAPER_PER_SCAN = 6, AUTO_PAPER_MIN_P = 0.12;
+function autoPaper(results) {
+  if (!results || !results.length) return 0;
+  const list = paperList(), have = new Set(list.map((x) => x.key)), now = Date.now();
+  const booked = new Set(list.filter((x) => x.auto && !x.result).map((x) => x.game));
+  const picks = results
+    .filter((r) => r.p >= AUTO_PAPER_MIN_P && r.legs && r.legs.length && !booked.has(String(r.id))
+                   && (!r.kickoff || Date.parse(r.kickoff) > now + 60e3))
+    .sort((a, b) => b.p - a.p).slice(0, AUTO_PAPER_PER_SCAN);
+  let added = 0;
+  for (const r of picks) {
+    const key = `auto:${r.id}:${r.legs.map((l) => l.id).sort().join(",")}`;
+    if (have.has(key)) continue;
+    list.push({ key, auto: true, game: String(r.id), league: r.league || null,
+                label: r.legs.map((l) => l.label).join(" + "), where: `${r.home} v ${r.away}`,
+                price: +((r.b365 || r.fair) || 0).toFixed(2), p: r.p, kickoff: r.kickoff || null,
+                legs: r.legs.map((l) => ({ id: l.id, label: l.label, market: l.market, player: l.player || null, side: l.side || null })),
+                at: now, result: null });
+    added++;
+  }
+  if (added) savePaper(list);
+  return added;
+}
 function paperHas(key) { return paperList().some((x) => x.key === key); }
 function paperToggle(pick) {
   const list = paperList(), i = list.findIndex((x) => x.key === pick.key);
@@ -4226,10 +4265,16 @@ async function scorePaper() {
   if (!open.length) return;
   paperBusy = true;
   let changed = false;
+  // Several picks share a match — read each match once.
+  const facts = new Map();
   try {
     for (const x of open) {
       let f = null;
-      try { f = await HawkSettle.fetchMatchFacts(x.game); } catch { continue; }
+      if (facts.has(x.game)) f = facts.get(x.game);
+      else {
+        try { f = await HawkSettle.fetchMatchFacts(x.game); } catch { f = null; }
+        facts.set(x.game, f);
+      }
       if (!f || !f.finished) continue;
       const legs = x.legs && x.legs.length ? x.legs : [{ id: x.key.split(":").slice(2).join(":"), label: x.label }];
       let out = "won";
@@ -4247,30 +4292,43 @@ async function scorePaper() {
   if (changed && S.view === "today") renderToday();
 }
 // The record: what following HAWK would have done, at a notional EUR1 a pick.
-function paperCard() {
-  const list = paperList();
-  if (!list.length) return `<div class="paper"><div class="muted" style="font-size:12.5px">
-    <b style="color:var(--text)">Following without betting.</b> Tap ⊙ Follow on any pick and HAWK settles it from the final score —
-    no money on it. It's how you check what HAWK claims before you trust it with a stake.</div></div>`;
+// Two records, because they answer different questions. Yours: did the picks
+// you'd have taken pay? HAWK's own board: are its percentages honest at all?
+function paperBlock(list, title, note, rows) {
   const done = list.filter((x) => x.result), won = done.filter((x) => x.result === "won");
-  const back = won.reduce((a, x) => a + (+x.price || 0), 0), keep = done.length ? back / done.length : null;
+  const keep = done.length ? won.reduce((a, x) => a + (+x.price || 0), 0) / done.length : null;
+  const said = done.length ? done.reduce((a, x) => a + (x.p || 0), 0) / done.length : null;
+  const hit = done.length ? won.length / done.length : null;
   const openN = list.length - done.length;
-  const rows = list.slice().reverse().slice(0, 6).map((x) => `<div class="prow">
+  return `<div class="paper">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="flex:1"><div class="muted" style="font-size:10px;letter-spacing:.13em">${title}</div>
+        <div class="n">${done.length ? `${won.length}<span class="muted" style="font-size:15px"> of ${done.length} landed</span>`
+          : `${list.length}<span class="muted" style="font-size:15px"> picked, none finished yet</span>`}</div></div>
+      ${done.length ? `<div style="text-align:right"><div class="muted" style="font-size:10px;letter-spacing:.13em">PER €1</div>
+        <div class="n" style="color:${keep >= 1 ? "var(--accent)" : "var(--gold)"}">€${keep.toFixed(2)}</div></div>` : ""}
+    </div>
+    ${done.length ? `<div class="muted" style="font-size:11.5px;margin-top:6px">HAWK said <b style="color:var(--text)">${(100 * said).toFixed(0)}%</b>
+      · landed <b style="color:${hit >= said ? "var(--accent)" : "var(--gold)"}">${Math.round(100 * hit)}%</b>${
+      openN ? ` · ${openN} still to settle` : ""}</div>` : ""}
+    ${rows || ""}
+    ${note ? `<div class="muted" style="font-size:11px;margin-top:7px">${note}</div>` : ""}
+    ${done.length && done.length < 25 ? `<div class="muted" style="font-size:11px;margin-top:6px">${25 - done.length} more before this means much.</div>` : ""}
+  </div>`;
+}
+function paperCard() {
+  const list = paperList(), mine = list.filter((x) => !x.auto), auto = list.filter((x) => x.auto);
+  const rows = mine.slice().reverse().slice(0, 5).map((x) => `<div class="prow">
     <span class="tick ${x.result || "open"}">${x.result === "won" ? "✓" : x.result === "lost" ? "✕" : "·"}</span>
     <span style="flex:1;min-width:0"><b>${esc(x.label)}</b>
       <span class="muted" style="font-size:11px">· ${esc(x.where || "")}</span></span>
     <span class="muted" style="flex:none">${odds(x.price)}</span></div>`).join("");
-  return `<div class="paper">
-    <div style="display:flex;align-items:center;gap:12px">
-      <div style="flex:1"><div class="muted" style="font-size:10px;letter-spacing:.13em">FOLLOWED, NO MONEY ON IT</div>
-        <div class="n">${won.length}<span class="muted" style="font-size:15px"> of ${done.length} landed</span></div></div>
-      ${done.length ? `<div style="text-align:right"><div class="muted" style="font-size:10px;letter-spacing:.13em">PER €1</div>
-        <div class="n" style="color:${keep >= 1 ? "var(--accent)" : "var(--gold)"}">€${keep.toFixed(2)}</div></div>` : ""}
-    </div>
-    ${openN ? `<div class="muted" style="font-size:11.5px;margin-top:6px">${openN} still to settle</div>` : ""}
-    ${rows}
-    ${done.length < 20 ? `<div class="muted" style="font-size:11px;margin-top:8px">${20 - done.length} more before this means much.</div>` : ""}
-  </div>`;
+  const yours = mine.length ? paperBlock(mine, "FOLLOWED, NO MONEY ON IT", "", rows)
+    : `<div class="paper"><div class="muted" style="font-size:12.5px"><b style="color:var(--text)">Following without betting.</b>
+        Tap ⊙ Follow on any pick and HAWK settles it from the final score — no money on it.</div></div>`;
+  const board = auto.length ? paperBlock(auto, "HAWK'S OWN BOARD, GRADED",
+    "Taken from every scan whether you back them or not, at the price HAWK expects Bet365 to show. Volume is the point — your own bets will never reach a number that proves anything.", "") : "";
+  return yours + board;
 }
 function showToday() {
   S.view = "today";

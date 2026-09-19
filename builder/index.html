@@ -3433,7 +3433,9 @@ function learnScanPrice(r, price) {
 // cards to find it. Builds made only of legs Bet365 publishes a price for are
 // preferred, because then the price on the card is real prices multiplied
 // rather than a guess, which is what makes so many of them read SKIP.
-const LEG_MIN_ODDS = 2;
+// The floor you set on Picks, not a number of mine: asking for 3.00+ and being
+// shown a card headed "likeliest at 2.00+" is the app arguing with you.
+const legMinOdds = () => S.scan.minOdds || 2;
 const legPriceOf = (o) => o.b365 || o.fair;
 // How much of the ticket HAWK had to guess at: 0 = every leg is Bet365-priced.
 const legGuessed = (o) => (o.legs || []).filter(l => !(l.bookPrice > 1)).length;
@@ -3443,13 +3445,13 @@ function theLeg(results) {
   for (const r of results) {
     const alts = (r.alts || []).map(a => ({ ...a, id: r.id, home: r.home, away: r.away, league: r.league,
                                             kickoff: r.kickoff, value: [] }));
-    for (const o of [r, ...alts]) if ((o.legs || []).length >= 2 && legPriceOf(o) >= LEG_MIN_ODDS) all.push(o);
+    for (const o of [r, ...alts]) if ((o.legs || []).length >= 2 && legPriceOf(o) >= legMinOdds()) all.push(o);
   }
   if (!all.length) {
     const near = results.filter(r => (r.legs || []).length >= 2).sort((a, b) => legPriceOf(b) - legPriceOf(a))[0];
     return `<div class="theleg none">
       <div class="tl-k">TONIGHT'S BET</div>
-      <div class="tl-no">No builder tonight gets to ${odds(LEG_MIN_ODDS)} at a chance worth having.</div>
+      <div class="tl-no">No builder tonight gets to ${odds(legMinOdds())} at a chance worth having.</div>
       ${near ? `<div class="tl-near">The biggest is <b>${esc(near.home)} v ${esc(near.away)}</b> at about ${
         odds(legPriceOf(near))}, landing ${pct(near.p, 0)}. Ask for more legs in the settings and the price goes up —
         so does the cut Bet365 takes for them.</div>` : ""}
@@ -3465,7 +3467,7 @@ function theLeg(results) {
   const chip = (l) => `<span class="lchip ${l.kind === "player" ? "pl" : ""}">${esc(l.label)}${
     l.bookPrice > 1 ? ` <b class="tl-real">${odds(l.bookPrice)}</b>` : ""}</span>`;
   return `<div class="theleg ${tone}">
-    <div class="tl-k">TONIGHT'S BET · LIKELIEST AT ${odds(LEG_MIN_ODDS)}+</div>
+    <div class="tl-k">TONIGHT'S BET · LIKELIEST AT ${odds(legMinOdds())}+</div>
     <div class="tl-main" data-htgo="${esc(top.id)}|${esc(top.league)}">
       <div style="flex:1;min-width:0">
         <div class="tl-where">${esc(top.home)} v ${esc(top.away)} · ${esc(top.league)} · ${esc(fmtKick(top.kickoff))}</div>

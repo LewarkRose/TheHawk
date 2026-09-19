@@ -1974,10 +1974,13 @@
   // (player props — no free feed has Bet365's). What's left are legs 365Scores
   // carries Bet365's own price for, so HAWK's expected builder price is built
   // from real numbers and lands far closer to what you'll see on Bet365.
-  // Priced = Bet365's own price (365Scores), or two or more of the close-to-Bet365
-  // books (the published player prices), or a price you typed in yourself.
+  // Priced = Bet365's OWN price (365Scores), or a price you typed in yourself.
+  // It used to count a leg as priced when two or more of the close-to-Bet365
+  // books carried it. That let player props straight back in — a reference
+  // price makes HAWK's estimate better, but Bet365 still marks the leg up about
+  // 27% (measured blind, 20 Sep), which is the whole reason for this option.
   const unpricedIds = (e, typed) => Object.values(e.legs)
-    .filter((l) => !(l.bookPrice > 1) && !(l.refBooks >= 2) && !typed.has(l.id)).map((l) => l.id);
+    .filter((l) => !(l.bookPrice > 1) && !typed.has(l.id)).map((l) => l.id);
   const withPriced = (e, body) => (body.priced
     ? { ...body, banned: [...(body.banned || []), ...unpricedIds(e, new Set(body.typed || []))] } : body);
   // The scan's cheap version of 🎯 Auto: one build per target in your own style,

@@ -1965,13 +1965,20 @@
   function autoBest(e, params) {
     const maxLegs = +params.maxLegs || 6, banned = new Set(params.banned || []), known = new Set(params.known || []);
     const min = +params.minOdds || 0;   // "at least these odds": a bigger payout, still the likeliest that pays it
+    const onlyWorth = !!params.onlyWorth;
     let best = null, bestKey = null;
-    for (const target of (min ? minTargets(min) : AUTO_TARGETS)) {
+    // Worth-it hunting needs more than three tries: the ticket that clears the
+    // cut is usually two legs, not the one that happens to hit a round target.
+    const targets = onlyWorth ? [1.6, 2, 2.5, 3, 3.75, 5].filter((t) => !min || t >= min).concat(min ? minTargets(min) : [])
+                  : (min ? minTargets(min) : AUTO_TARGETS);
+    for (const target of targets) {
       const t = autoBuild(e.legs, target, params.style, maxLegs, params.locked || [], banned,
                           params.favourite !== false, params.focus || "Mix", !!params.extras, params.picks === "value" ? "value" : "likely", known);
       if (!t.legs.length || !(t.p >= minChance(min))) continue;
       if (min && !((t.b365 || t.fair) >= min)) continue;   // below the odds you asked for
-      const w = worthOf(t), key = min ? [0, t.p] : [w >= 1.02 ? 2 : w >= 0.95 ? 1 : 0, w + 0.5 * t.p];
+      const w = worthOf(t);
+      if (onlyWorth && w < 1.02) continue;   // not one HAWK would back: don't offer it
+      const key = min && !onlyWorth ? [0, t.p] : [w >= 1.02 ? 2 : w >= 0.95 ? 1 : 0, w + 0.5 * t.p];
       if (!bestKey || key[0] > bestKey[0] || (key[0] === bestKey[0] && key[1] > bestKey[1])) { best = { ...t, worth: +w.toFixed(3), autoTarget: target }; bestKey = key; }
     }
     return best;
@@ -2060,7 +2067,7 @@
     const params = { ...windowParams(body), target: Math.min(Math.max(+body.target || 3, 1.2), 50),
                      style: STYLES[body.style] ? body.style : "Balanced", focus: FOCUS[body.focus] ? body.focus : "Mix",
                      maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12), extras: !!body.extras, picks: body.picks === "value" ? "value" : "likely", auto: !!body.auto, priced: !!body.priced,
-                     minOdds: Math.min(Math.max(+body.minOdds || 0, 0), 20), typed: body.typed || [] };
+                     minOdds: Math.min(Math.max(+body.minOdds || 0, 0), 20), onlyWorth: !!body.onlyWorth, typed: body.typed || [] };
     Object.assign(scan, newJob(), { running: true, params });
     runFixtureJob(scan, (league, f, json, e) => {
       // The best ticket for this match (worth betting at Bet365 first), from a quicker search than the builder's.

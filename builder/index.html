@@ -697,6 +697,14 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .tdrow.done{opacity:.55}
     .tdrow input[type=checkbox]{width:18px;height:18px;flex:none}
     .tdrow .px{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:20px;line-height:1;font-weight:700;color:var(--gold)}
+    /* the radar is reference, so it sits folded until you want it */
+    .up-sum{display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;list-style:none;padding:2px 0}
+    .up-sum::-webkit-details-marker{display:none}
+    .up-head-t{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:800}
+    .up-sum-h{font-size:11.5px}
+    /* what to do, in words, on every Picks card */
+    .sdo{font-size:12.5px;font-weight:700}
+    .sdo.ok{color:var(--accent)} .sdo.fair{color:var(--gold)} .sdo.bad{color:var(--muted)}
 .scard .teams{display:flex;align-items:center;gap:7px;font-weight:800;flex-wrap:wrap}
 .scard .teams img{width:20px;height:20px}
 .lchip{display:inline-block;font-size:11.5px;padding:3px 9px;border-radius:7px;background:#22303a;border:1px solid #2e3e49;margin:0}
@@ -1094,7 +1102,7 @@ function loadPref(key, fallback) { try { const v = localStorage.getItem(key); re
 function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
             target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), auto: loadPref("hawk.auto", false), priced: loadPref("hawk.priced", false), favourite: true, result: null, tab: "players", q: "",
-            chk: { price: "", boost: "", stake: "5" }, moreOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
+            chk: { price: "", boost: "", stake: "5" }, moreOpen: false, radarOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
@@ -1942,8 +1950,12 @@ function upsetCard(m) {
   const u = m.upset;
   if (!u || m.started) return "";
   const ups = u.signals.filter(s => s.dir === "up"), downs = u.signals.filter(s => s.dir === "down"), infos = u.signals.filter(s => s.dir === "info");
-  return `<div class="section upset-card">
-    <div class="up-head"><h3 style="margin:0">⚡ Upset radar</h3>${u.open
+  return `<div class="section upset-card"><details ${S.radarOpen ? "open" : ""} id="upDet">
+    <summary class="up-sum"><span class="up-head-t">⚡ Upset radar</span>
+      ${u.open ? `<span class="up-level med">🤝 Toss-up</span>`
+        : `<span class="up-level ${UPSET_TONE[u.level]}">${esc(u.label)} risk</span>`}
+      <span class="muted up-sum-h">background — doesn't change the chances above</span></summary>
+    <div class="up-head" style="margin-top:10px"><h3 style="margin:0">⚡ Upset radar</h3>${u.open
       ? `<span class="up-level med" title="Neither team is a clear favourite, so either result is no real upset">🤝 Toss-up · no clear favourite</span>`
       : `<span class="up-level ${UPSET_TONE[u.level]}" title="How likely ${esc(u.favName)} (the favourite) are to slip up">${esc(u.label)} risk · ${esc(u.favName)} could slip up</span>`}</div>
     <div class="up-who">Favourite: <b>${esc(u.favName)}</b> (${pct(1 - u.favFail)} to win) · Underdog: <b>${esc(u.dogName)}</b> (${pct(u.dogWin)})</div>
@@ -1959,6 +1971,9 @@ function upsetCard(m) {
     <div class="note">✅ points to an upset, ✖ points to ${esc(u.favName)}, ⚠️ is a caution. The risk weighs the evidence the odds may not fully show — HAWK's own team ratings,
       money moving, Polymarket, missing regulars, rotation (once lineups are out), tiredness, who creates the chances and recent form — plus how live ${esc(u.dogName)} already are.
       It's a warning light, not a prediction that the upset happens: even "Very high" usually means under 50%.</div>
+    <div class="note"><b>Nothing here changes HAWK's chances or prices.</b> The percentages on your legs already allow for it —
+      this is the reasoning behind them, not an extra step for you to take.</div>
+    </details>
   </div>`;
 }
 // How the radar has done at this level on finished matches (graded on
@@ -2388,6 +2403,7 @@ function renderSlip() {
     renderSlip();
   };
   const rmore = $("#rmore"); if (rmore) rmore.ontoggle = () => { S.moreOpen = rmore.open; };
+  const upDet = $("#upDet"); if (upDet) upDet.ontoggle = () => { S.radarOpen = upDet.open; };
   $("#xtra").onchange = (e) => { S.extras = e.target.checked; };
   $("#epOn").onchange = (e) => {
     S.ep = e.target.checked; savePref("hawk.ep", S.ep); HAWK.setEarlyPayout(S.ep);
@@ -3215,6 +3231,8 @@ function scanCard(r, params) {
           <span style="color:${gap >= 1 ? "var(--accent)" : gap >= -1 ? "var(--gold)" : "var(--muted)"};font-weight:700">${
             Math.abs(gap) < 1 ? "about level" : `${Math.abs(gap).toFixed(0)} point${Math.abs(gap) < 1.5 ? "" : "s"} ${gap > 0 ? "clear" : "short"}`}</span></div>
       </div>
+      <div class="sdo ${tone}">${typed ? "" : `${tone === "bad" ? "Only back it at" : "Back it at"} ${odds(scanNeed(r).need)}+`}${
+        typed ? "" : `<span class="muted" style="font-weight:600"> · HAWK expects ≈ ${odds(r.b365 || r.fair)}</span>`}</div>
       <div class="schips">${r.legs.map(l => `<span class="lchip ${l.kind === "player" ? "pl" : ""}">${esc(l.label)}</span>`).join("")}
         <span class="muted" style="font-size:11.5px">${r.legs.length} legs${short ? " · short of target" : ""}</span></div>
       ${r.value.length ? `<div class="vline">Bet365 value: ${r.value.map(v => `${esc(v.label)} @ ${odds(v.price)} (+${(100 * v.edge).toFixed(1)}%)`).join(" · ")}</div>` : ""}

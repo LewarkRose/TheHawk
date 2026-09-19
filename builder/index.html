@@ -640,6 +640,34 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .sbar .track i.bad{background:linear-gradient(90deg,#3c4a54,#4d5f6b)}
     .sbar .track b{position:absolute;top:-3px;width:2px;height:16px;background:#fff;border-radius:1px}
     .sbar .bnote{display:flex;justify-content:space-between;gap:10px;margin-top:5px;font-size:11px;color:var(--muted)}
+    /* Tonight's bet: the one card you came for, above everything else */
+    .theleg{position:relative;margin:0 0 14px;padding:15px 17px 14px;border-radius:17px;border:1px solid rgba(20,227,161,.42);
+      background:linear-gradient(140deg,rgba(20,227,161,.09),var(--panel) 58%);box-shadow:0 16px 34px -22px rgba(0,0,0,.9)}
+    .theleg.fair{border-color:rgba(255,209,102,.42);background:linear-gradient(140deg,rgba(255,209,102,.08),var(--panel) 58%)}
+    .theleg.bad,.theleg.none{border-color:var(--line);background:var(--panel)}
+    .tl-k{font-size:10px;font-weight:800;letter-spacing:.15em;color:var(--muted);text-transform:uppercase}
+    .tl-main{display:flex;align-items:flex-start;gap:14px;margin-top:8px;cursor:pointer}
+    .tl-where{font-size:12px;color:var(--muted)}
+    .tl-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+    .tl-real{color:var(--accent);font-weight:800}
+    .tl-price{flex:none;text-align:right}
+    .tl-price .n{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:40px;line-height:.9;font-weight:700;color:var(--accent)}
+    .tl-price .n small{font-size:18px;margin-left:1px}
+    .theleg.fair .tl-price .n{color:var(--gold)}
+    .theleg.bad .tl-price .n{color:var(--text)}
+    .tl-price .k{margin-top:3px;font-size:9.5px;letter-spacing:.16em;color:var(--muted)}
+    .tl-facts{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:11px;font-size:12.5px;color:var(--muted)}
+    .tl-facts b{color:var(--text)}
+    .tl-check{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
+    .tl-alts{margin-top:9px}
+    .tl-alt{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:var(--panel2);
+      border:1px solid var(--line);font-size:12.5px;cursor:pointer}
+    .tl-alt:hover{border-color:#3a4a55}
+    .tl-ak{font-size:9.5px;font-weight:800;letter-spacing:.13em;color:var(--muted)}
+    .tl-ap{color:var(--gold)}
+    .tl-no{margin-top:7px;font-size:15px;font-weight:700}
+    .tl-near,.tl-note{margin-top:8px;font-size:11.5px;line-height:1.5;color:var(--muted)}
+    .tl-near b{color:var(--text)}
     /* One buildable option inside a match card, and the other ways to build it */
     .scard .sopt{display:flex;flex-direction:column;gap:9px;min-width:0}
     .scard .soname{display:flex;align-items:baseline;gap:8px;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
@@ -3291,7 +3319,9 @@ function updateScan() {
   }
   // Single bets are off unless you ask for them — you build, you don't bet singles.
   const singles = S.scan.showSingles ? pickBoard(shown) + singlesBoard(shown) : "";
-  $("#scanRes").innerHTML = betNote + singles + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${[good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`, likely && `👀 ${likely} worth checking`].filter(Boolean).join(" · ") || "Nothing worth checking yet"}<small>${
+  // One leg, at the top, every scan: the thing you actually came for.
+  const leg = shown.length && !d.running ? theLeg(shown) : "";
+  $("#scanRes").innerHTML = betNote + leg + singles + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${[good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`, likely && `👀 ${likely} worth checking`].filter(Boolean).join(" · ") || "Nothing worth checking yet"}<small>${
       "HAWK can't see Bet365's prices, so it tells you the price each builder needs. Build one on Bet365, type its price in the box and HAWK tells you straight away. 👀 ones are the likeliest to be ✅ — start at the top."}${
       !good && !fair && !likely && !d.running ? (() => { const best = [...shown].sort((a, b) => b.worth - a.worth)[0];
         return best ? ` Nothing clears the bar tonight. The closest is <b>${esc(best.home)} v ${esc(best.away)}</b> — HAWK expects Bet365 to pay about ${Math.round(100 * (1 - best.worth))}% under what it's worth. Check it: if Bet365 is kinder than HAWK expects it could still be ✅.` : ""; })() : ""}</small></div>` : "") + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
@@ -3335,6 +3365,71 @@ function learnScanPrice(r, price) {
   savePref("hawk.b365prices", list.slice(-B365_KEEP));
   applyPropBook();
   applyAim();
+}
+// THE BET: press scan, get one builder. The likeliest ticket that still pays
+// 2.00+, biggest number first, at the top, every time — instead of reading 23
+// cards to find it. Builds made only of legs Bet365 publishes a price for are
+// preferred, because then the price on the card is real prices multiplied
+// rather than a guess, which is what makes so many of them read SKIP.
+const LEG_MIN_ODDS = 2;
+const legPriceOf = (o) => o.b365 || o.fair;
+// How much of the ticket HAWK had to guess at: 0 = every leg is Bet365-priced.
+const legGuessed = (o) => (o.legs || []).filter(l => !(l.bookPrice > 1)).length;
+function theLeg(results) {
+  // Every builder found tonight — the headline one per match and its alternatives.
+  const all = [];
+  for (const r of results) {
+    const alts = (r.alts || []).map(a => ({ ...a, id: r.id, home: r.home, away: r.away, league: r.league,
+                                            kickoff: r.kickoff, value: [] }));
+    for (const o of [r, ...alts]) if ((o.legs || []).length >= 2 && legPriceOf(o) >= LEG_MIN_ODDS) all.push(o);
+  }
+  if (!all.length) {
+    const near = results.filter(r => (r.legs || []).length >= 2).sort((a, b) => legPriceOf(b) - legPriceOf(a))[0];
+    return `<div class="theleg none">
+      <div class="tl-k">TONIGHT'S BET</div>
+      <div class="tl-no">No builder tonight gets to ${odds(LEG_MIN_ODDS)} at a chance worth having.</div>
+      ${near ? `<div class="tl-near">The biggest is <b>${esc(near.home)} v ${esc(near.away)}</b> at about ${
+        odds(legPriceOf(near))}, landing ${pct(near.p, 0)}. Ask for more legs in the settings and the price goes up —
+        so does the cut Bet365 takes for them.</div>` : ""}
+    </div>`;
+  }
+  // Likeliest to land, and among near-equal chances the one with less guesswork
+  // in its price. That is the whole ask: biggest % that still pays 2.00+.
+  all.sort((a, b) => (b.p - a.p) || (legGuessed(a) - legGuessed(b)));
+  const top = all[0];
+  const runner = all.find(o => o.id !== top.id);
+  const need = scanNeed(top), price = legPriceOf(top), guessed = legGuessed(top);
+  const tone = top.worth >= 1.02 ? "ok" : top.worth >= 0.95 ? "fair" : "bad";
+  const chip = (l) => `<span class="lchip ${l.kind === "player" ? "pl" : ""}">${esc(l.label)}${
+    l.bookPrice > 1 ? ` <b class="tl-real">${odds(l.bookPrice)}</b>` : ""}</span>`;
+  return `<div class="theleg ${tone}">
+    <div class="tl-k">TONIGHT'S BET · LIKELIEST AT ${odds(LEG_MIN_ODDS)}+</div>
+    <div class="tl-main" data-htgo="${esc(top.id)}|${esc(top.league)}">
+      <div style="flex:1;min-width:0">
+        <div class="tl-where">${esc(top.home)} v ${esc(top.away)} · ${esc(top.league)} · ${esc(fmtKick(top.kickoff))}</div>
+        <div class="tl-chips">${top.legs.map(chip).join("")}</div>
+      </div>
+      <div class="tl-price"><div class="n">${Math.round(100 * top.p)}<small>%</small></div><div class="k">LANDS</div></div>
+    </div>
+    <div class="tl-facts">
+      <span>HAWK expects <b>${odds(price)}</b></span>
+      <span>Back it at <b style="color:var(--gold)">${odds(need.need)}+</b></span>
+      <span class="muted">${guessed ? `${guessed} of ${top.legs.length} leg prices are HAWK's guess`
+        : `every leg at Bet365's own price — nothing guessed`}</span>
+    </div>
+    <div class="tl-check">
+      <label class="sprice">Bet365 <input data-price="${esc(String(top.id))}" inputmode="decimal" placeholder="${odds(price)}"
+        value="${S.scan.prices[scanKey(top)] || ""}"></label>
+      <div class="sverdict">${scanVerdict(top)}</div>
+    </div>
+    ${runner ? `<div class="tl-alts"><div class="tl-alt" data-htgo="${esc(runner.id)}|${esc(runner.league)}">
+      <span class="tl-ak">NEXT</span><b>${Math.round(100 * runner.p)}%</b>
+      <span class="muted">${esc(runner.home)} v ${esc(runner.away)} · ${runner.legs.length} legs</span>
+      <span style="flex:1"></span><b class="tl-ap">${odds(legPriceOf(runner))}</b></div></div>` : ""}
+    <div class="tl-note">${guessed
+      ? `Type Bet365's real price above and this card answers straight away — and HAWK learns your cut for next time.`
+      : `Built only from legs Bet365 prices itself, so the ${odds(price)} is those prices multiplied, not a guess.`}</div>
+  </div>`;
 }
 // Single bets worth it at Bet365's own price, across every match in the scan.
 // No builder cut and no guessing: the price is Bet365's, so ✅ means ✅.

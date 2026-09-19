@@ -2778,6 +2778,7 @@ function buildBody() {
   const locked = S.slip.filter(id => S.locked.has(id));
   return { id: String(S.match.id), auto: S.auto, priced: S.priced, typed: typedLegIds(), target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs,
            minOdds: S.auto ? S.scan.minOdds : 0,   // 🎯 Auto follows the "at least" you set on Picks
+           onlyWorth: S.auto ? S.scan.onlyWorth : false,
            favourite: S.favourite, extras: S.extras, picks: S.picks, locked, banned: [...new Set([...S.banned, ...unofferedLegIds()])],
            known: knownLegIds(),
            learnt: propPrices().length };   // (a new Bet365 prop price → fresh options)

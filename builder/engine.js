@@ -1938,11 +1938,13 @@
   function autoOptions(e, params, count = 5, depth = 0) {
     const found = new Map(), maxLegs = +params.maxLegs || 6;
     const min = +params.minOdds || 0;   // "at least these odds"
+    const onlyWorth = !!params.onlyWorth;   // and only ones HAWK would back
     for (const target of (min ? minTargets(min) : AUTO_TARGETS))
       for (const t of searchOptions(e, { ...params, target, maxLegs }, count, depth)) {
         const k = t.legs.map((l) => l.id).sort().join("|");
         if (!t.legs.length || !(t.p >= minChance(min)) || found.has(k)) continue;
         if (min && !((t.b365 || t.fair) >= min)) continue;   // below the odds you asked for
+        if (onlyWorth && worthOf(t) < 1.02) continue;          // not one HAWK would back
         found.set(k, { ...t, autoTarget: target });
       }
     const tier = (t) => (t.worth >= 1.02 ? 2 : t.worth >= 0.95 ? 1 : 0);

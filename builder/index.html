@@ -718,6 +718,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .scard .teams img{width:20px;height:20px}
 .lchip{display:inline-block;font-size:11.5px;padding:3px 9px;border-radius:7px;background:#22303a;border:1px solid #2e3e49;margin:0}
 .lchip.pl{border-color:rgba(74,168,255,.45)}
+    /* the weak link: the leg least likely to land, so you know which to swap */
+    .lchip.weak{border-color:rgba(255,209,102,.55);background:rgba(255,209,102,.08)}
+    .lchip.weak b{color:var(--gold)}
 .vline{font-size:12px;color:var(--accent);margin-top:6px}
 .bigodds{font-size:24px;font-weight:900;color:var(--gold)}
 .sprice{display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:12px;color:var(--muted);margin:4px 0;cursor:text}
@@ -1073,7 +1076,6 @@ a.nav{text-decoration:none}
     </nav>
     <div class="moremenu" id="moreMenu" hidden>
       <button class="mm" id="navBuilder" data-nav="builder">⚡ <span>Builder</span><small>build a bet on one match</small></button>
-      <button class="mm" id="valueBtn" data-nav="value">💰 <span>Value</span><small>prices that beat HAWK's odds</small></button>
       <button class="mm" id="accaBtn" data-nav="acca">🧩 <span>Acca</span><small>several matches on one ticket</small></button>
       <a class="mm vaultnav" href="../">🏦 <span>Vault</span><small>bankroll, all bets, track record</small></a>
     </div>
@@ -1171,8 +1173,6 @@ async function api(path, body) {
     case "/api/evaluate": return HAWK.evaluate(body);
     case "/api/scan": return body ? HAWK.startScan(body) : HAWK.scanStatus();
     case "/api/scan/stop": return HAWK.stopScan();
-    case "/api/value": return body ? HAWK.startValue(body) : HAWK.valueStatus();
-    case "/api/value/stop": return HAWK.stopValue();
   }
   throw new Error("unknown request " + p);
 }
@@ -1194,7 +1194,6 @@ async function init() {
   // matches to check); your own picks are remembered.
   const pick = (key) => new Set(loadPref(key, [...groupOf("top5").leagues, ...groupOf("europe").leagues]).filter(l => leagues.includes(l)));
   S.scan.leagues = pick("hawk.scanLeagues");
-  S.value.leagues = pick("hawk.valueLeagues");
   S.monster.leagues = pick("hawk.monsterLeagues");
   applyLearning();
   // HAWK's graded predictions on every match (built on GitHub by engine/grade.mjs).
@@ -1202,7 +1201,6 @@ async function init() {
     if (!g) return;
     S.graded = g; applyLearning(); renderSlip();
   }).catch(() => { /* not built yet */ });
-  $("#valueBtn").onclick = showValue;
   $("#accaBtn").onclick = showAcca;
   $("#scoresBtn").onclick = showScores;
   renderAccaBtn();
@@ -1262,8 +1260,8 @@ async function openFromUrl() {
   // Home page: the day's plan. What to back, what's running, what it's done —
   // the builder and everything else are a tap away when you want them.
   if (!id && !view) return showToday();
-  // App shortcuts (long-press the HAWK icon): builder/?view=scores | value | acca | scan
-  const views = { scores: showScores, value: showValue, acca: showAcca, scan: showScan, today: showToday };
+  // App shortcuts (long-press the HAWK icon): builder/?view=scores | acca | scan
+  const views = { scores: showScores, acca: showAcca, scan: showScan, today: showToday };
   if (view && views[view]) { history.replaceState(null, "", location.pathname); return views[view](); }
   // From a goal notification: builder/?view=live&id=GAME&league=L
   if (view === "live" && q.get("id")) { history.replaceState(null, "", location.pathname); return goToLive(q.get("league"), q.get("id")); }
@@ -2380,7 +2378,6 @@ function renderSlip() {
     </div>
     <div class="check"><div class="row">
       <div><label>Bookmaker's price</label><input id="price" inputmode="decimal" placeholder="e.g. ${(() => { const g = r && b365Guess(r.fair, S.slip.length); return g ? odds(g.mid) : "3.25"; })()}" value="${esc(S.chk.price)}"></div>
-      <div><label title="Winnings boost, e.g. 25 for a 25% boost">Boost %</label><input id="boost" inputmode="decimal" placeholder="0" value="${esc(S.chk.boost)}"></div>
       <div><label>Stake (€)</label><input id="stake" inputmode="decimal" value="${esc(S.chk.stake)}"></div></div>
       <div id="verdict"></div></div>
     <button class="ghost" id="b365" title="The legs in Bet365's order to tick off, the price box and the verdict — everything for the 40 seconds you're in the Bet365 app">📋 Build it on Bet365</button>
@@ -2436,7 +2433,7 @@ function renderSlip() {
   jumpLabel();
   if ($("#price")) {
     // Remember what you typed, so adding or removing a leg doesn't clear it.
-    for (const key of ["price", "boost", "stake"]) $("#" + key).oninput = (e) => { S.chk[key] = e.target.value; verdict(); };
+    for (const key of ["price", "stake"]) $("#" + key).oninput = (e) => { S.chk[key] = e.target.value; verdict(); };
     $("#price").onchange = () => { recordB365Price(); renderSlip(); };
     $("#slip").querySelectorAll("[data-ppedit]").forEach(b => b.onclick = () => { S.ppEdit = b.dataset.ppedit; renderSlip(); const i = $(`[data-pprice="${b.dataset.ppedit}"]`); if (i) i.focus(); });
     $("#slip").querySelectorAll("[data-pprice]").forEach(inp => inp.onchange = () => {
@@ -3273,7 +3270,14 @@ function scanCard(r, params) {
       </div>
       <div class="sdo ${tone}">${typed ? "" : `${tone === "bad" ? "Only back it at" : "Back it at"} ${odds(scanNeed(r).need)}+`}${
         typed ? "" : `<span class="muted" style="font-weight:600"> · HAWK expects ≈ ${odds(r.b365 || r.fair)}</span>`}</div>
-      <div class="schips">${r.legs.map(l => `<span class="lchip ${l.kind === "player" ? "pl" : ""}">${esc(l.label)}</span>`).join("")}
+      <div class="schips">${(() => {
+        // The weak link: whichever leg is least likely to land — the one to swap
+        // if you want the ticket to come in.
+        const weak = r.legs.length > 1 ? r.legs.reduce((w, l) => (!w || (l.p || 1) < (w.p || 1) ? l : w), null) : null;
+        return r.legs.map(l => { const isWeak = weak && l.id === weak.id;
+          return `<span class="lchip ${l.kind === "player" ? "pl" : ""}${isWeak ? " weak" : ""}"${
+            isWeak ? ` title="The weak link — least likely to land. Swap this one first."` : ""}>${esc(l.label)}${
+            isWeak && l.p ? ` <b>${Math.round(100 * l.p)}%</b>` : ""}</span>`; }).join(""); })()}
         <span class="muted" style="font-size:11.5px">${r.legs.length} legs${short ? " · short of target" : ""}</span></div>
       ${r.value.length ? `<div class="vline">Bet365 value: ${r.value.map(v => `${esc(v.label)} @ ${odds(v.price)} (+${(100 * v.edge).toFixed(1)}%)`).join(" · ")}</div>` : ""}
       <div class="sfoot">
@@ -3311,116 +3315,6 @@ async function openFromScan(id) {
   await evaluateSlip();
 }
 
-/* ---------- value finder ---------- */
-function showValue() {
-  S.view = "value";
-  document.querySelectorAll(".fx").forEach(f => f.classList.remove("on"));
-  renderValue();
-  pollValue();
-}
-function renderValue() {
-  const v = S.value;
-  const sel = (id, opts, cur) => `<select id="${id}">${opts.map(([val, t]) => `<option value="${val}" ${String(val) === String(cur) ? "selected" : ""}>${t}</option>`).join("")}</select>`;
-  $("#match").innerHTML = `
-    <div class="section" style="border-top:0">
-      <h3>💰 Value finder</h3>
-      <div class="note" style="margin-top:0">Checks <b>every market</b> the bookmakers list — result, double chance, draw no bet, Asian handicaps,
-        every goals line, both teams to score, clean sheets, first to score, correct score, half-time markets, corners, cards, shots on
-        target, offsides, penalties, red cards — at all 6 bookmakers, and lists every price that beats HAWK's fair odds. <b>Edge</b> = how much
-        more the price pays than it should: +5% means that over many bets you'd expect about €5 profit per €100 staked. These are <b>single bets</b>.</div>
-      ${leaguePicker("valLeagues", v.leagues)}
-      <div class="opts" style="justify-content:flex-start;gap:14px;flex-wrap:wrap">
-        <label>Kick-off ${sel("vHrs", KICKOFF_WINDOWS.filter(([h]) => h !== 72), v.hours)}</label>
-        <button class="build" id="valGo" style="width:auto;margin:0 0 0 auto;padding:10px 20px"></button>
-      </div>
-      <div class="opts" style="justify-content:flex-start;gap:14px;flex-wrap:wrap;margin-top:10px">
-        <label>Bookmaker <span id="vBookWrap"></span></label>
-        <label>Market <span id="vMarketWrap"></span></label>
-        <label>Chance ${sel("vMinP", [[0, "any"], [0.25, "25%+"], [0.4, "40%+"], [0.6, "60%+"]], v.minP)}</label>
-        <label>Edge ${sel("vMinE", [[0.02, "+2%+"], [0.05, "+5%+"], [0.1, "+10%+"]], v.minEdge)}</label>
-        <label><input type="checkbox" id="vBest" ${v.bestOnly ? "checked" : ""}> Best price only</label>
-      </div>
-      <div id="valProg"></div>
-    </div>
-    <div class="section" id="valRes"></div>`;
-  bindLeaguePicker("valLeagues", v.leagues, "hawk.valueLeagues");
-  $("#vHrs").onchange = (e) => { v.hours = windowValue(e.target.value); };
-  $("#vMinP").onchange = (e) => { v.minP = +e.target.value; updateValue(); };
-  $("#vMinE").onchange = (e) => { v.minEdge = +e.target.value; updateValue(); };
-  $("#vBest").onchange = (e) => { v.bestOnly = e.target.checked; updateValue(); };
-  $("#valGo").onclick = toggleValue;
-  $("#valRes").onclick = (e) => { const r = e.target.closest("[data-vopen]"); if (r) openFromValue(+r.dataset.vopen); };
-  updateValue();
-}
-function valueRows() {
-  const v = S.value, d = v.data;
-  let rows = ((d && d.results) || []).filter(r => r.edge >= v.minEdge && r.p >= v.minP && (v.book === "All" || r.book === v.book)
-                                                  && (v.market === "All" || r.market === v.market));
-  if (v.bestOnly) {  // keep only the best price for each match + market
-    const best = {};
-    for (const r of rows) { const k = r.id + "|" + r.label; if (!best[k] || r.price > best[k].price) best[k] = r; }
-    rows = Object.values(best);
-  }
-  return rows.sort((a, b) => b.edge - a.edge);
-}
-function updateValue() {
-  if (S.view !== "value" || !$("#valRes")) return;
-  const v = S.value, d = v.data || { running: false, total: 0, done: 0, errors: 0, results: [] };
-  const books = [...new Set(d.results.map(r => r.book))].sort();
-  $("#vBookWrap").innerHTML = `<select id="vBook">${["All", ...books].map(b => `<option ${b === v.book ? "selected" : ""}>${esc(b)}</option>`).join("")}</select>`;
-  $("#vBook").onchange = (e) => { v.book = e.target.value; updateValue(); };
-  const markets = [...new Set(d.results.map(r => r.market))].sort();
-  $("#vMarketWrap").innerHTML = `<select id="vMarket">${["All", ...markets].map(m => `<option ${m === v.market ? "selected" : ""}>${esc(m)}</option>`).join("")}</select>`;
-  $("#vMarket").onchange = (e) => { v.market = e.target.value; updateValue(); };
-  $("#valGo").textContent = d.running ? "■ STOP" : (d.total ? "💰 SCAN AGAIN" : "💰 FIND VALUE");
-  $("#valProg").innerHTML = d.running || d.total ? `<div class="prog"><span style="width:${d.total ? 100 * d.done / d.total : 3}%"></span></div>
-    <div class="note">${d.running ? `Checking odds… ${d.done} of ${d.total || "?"} fixtures` : `Checked ${d.done} fixture${d.done === 1 ? "" : "s"}`}${
-      d.errors ? ` · ${d.errors} skipped (no odds or data yet)` : ""}</div>` : "";
-  const rows = valueRows();
-  S.value.shown = rows;
-  $("#valRes").innerHTML = rows.length ? `<div class="vhead"><div>Match</div><div>Bet</div><div>Price</div><div>Fair</div><div>Chance</div><div>Edge</div></div>` +
-    rows.map((r, i) => `<div class="vrow" data-vopen="${i}" title="Open the match with this leg on your slip">
-      <div class="vm"><div class="teams"><img src="${esc(r.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">${esc(r.home)}
-        <span class="muted" style="font-weight:500">v</span> ${esc(r.away)}</div>
-        <div class="muted" style="font-size:11.5px">${esc(r.league)} · ${esc(fmtKick(r.kickoff))}</div></div>
-      <div><b>${esc(r.label)}</b><div class="muted" style="font-size:11.5px">${esc(r.book)} · ${esc(r.basis)}${r.push ? " · stake back on a push" : ""}</div></div>
-      <div class="vp">${odds(r.price)}</div><div class="muted">${odds(r.fair)}</div><div>${pct(r.p, r.p < 0.1 ? 1 : 0)}</div>
-      <div class="ve">+${(100 * r.edge).toFixed(1)}%</div></div>`).join("") +
-    `<div class="note">Fair = HAWK's odds. <b>model + market</b>: HAWK's model blended with all bookmakers' combined price.
-      <b>market</b>: markets HAWK doesn't model (offsides, penalties, red cards) — fair is the other bookmakers' combined price, so these
-      are one bookmaker out of line. <b>model</b>: only one price listed (e.g. correct scores), so it rests on HAWK's model alone — trust these least.
-      A price well above every other book is sometimes a mistake the bookmaker fixes quickly — check it's still there before betting.
-      Edges are long-run averages, not guarantees.</div>`
-    : `<div class="note">${d.running ? "Value appears here as each match is checked…"
-      : d.total ? "Nothing beats HAWK's fair odds with these filters — normal; bookmakers are sharp on main markets. Try a lower chance filter or a longer window."
-      : "Pick leagues and a window, then hit Find value. It takes a few seconds per match."}</div>`;
-}
-async function toggleValue() {
-  try {
-    if (S.value.data && S.value.data.running) S.value.data = await api("/api/value/stop", {});
-    else {
-      if (!S.value.leagues.size) return toast("Pick at least one league.");
-      S.value.data = await api("/api/value", { leagues: [...S.value.leagues], hours: hoursFor(S.value.hours) });
-    }
-  } catch (err) { toast(err.message); }
-  updateValue();
-  pollValue();
-}
-async function pollValue() {
-  clearTimeout(S.value.timer);
-  try { S.value.data = await api("/api/value"); } catch (err) { /* keep the last status */ }
-  updateValue();
-  if (S.value.data && S.value.data.running) S.value.timer = setTimeout(pollValue, 1500);
-}
-async function openFromValue(i) {
-  const r = (S.value.shown || [])[i]; if (!r) return;
-  await goToMatch(r.league, r.id);
-  // Only markets the builder simulates can go on the slip (not handicaps, correct scores, half-time...).
-  if (r.legId && S.legs[r.legId]) { S.slip = [r.legId]; S.locked = new Set([r.legId]); await evaluateSlip(); }
-  toast(`${r.label} — ${r.book} @ ${odds(r.price)} (fair ${odds(r.fair)})`);
-}
-
-/* ---------- acca: several matches on one ticket ---------- */
 // Each part is one match: a single leg or a same-match builder, with HAWK's
 // chance for it. Matches are independent, so the acca's chance is the
 // product of the parts'. Kept in this browser's storage.
@@ -3595,14 +3489,13 @@ function renderAccaBody() {
     </div>
     <div class="check"><div class="row">
       <div><label>Acca price</label><input id="aPrice" inputmode="decimal" placeholder="${t.known ? odds(t.known) : "e.g. 25.00"}" value="${esc(c.price)}"></div>
-      <div><label title="Acca boost or winnings boost, e.g. 20 for 20%">Boost %</label><input id="aBoost" inputmode="decimal" placeholder="0" value="${esc(c.boost)}"></div>
       <div><label>Stake (€)</label><input id="aStake" inputmode="decimal" value="${esc(c.stake)}"></div></div>
       <div id="accaVerdict"></div></div>
     <div class="abtns"><button class="ghost" id="aCopy">📋 Copy acca</button><button class="ghost vault" id="aVault">🦅 Send to Vault</button>
       <button class="ghost" id="aClear">🗑 Clear</button></div>
     <div class="note">${builders ? `${builders} of these ${builders === 1 ? "is a" : "are"} same-match builder${builders === 1 ? "" : "s"}: Bet365 prices each builder itself, so type the acca price Bet365 shows. ` : ""}
       Bet365 prices on single legs are re-checked every 3 minutes while HAWK is open. ▲/▼ = moved since you added it.</div>`;
-  for (const [id, key] of [["aPrice", "price"], ["aBoost", "boost"], ["aStake", "stake"]])
+  for (const [id, key] of [["aPrice", "price"], ["aStake", "stake"]])
     $("#" + id).oninput = (e) => { c[key] = e.target.value; accaVerdict(); };
   $("#aCopy").onclick = copyAcca; $("#aVault").onclick = sendAccaToVault;
   bindFlips(el, S.flipped);
@@ -3787,8 +3680,8 @@ function monsterClick(e) {
 /* ---------- page navigation ---------- */
 // The page buttons in the header light up for the page on screen. S.view is
 // set all over the place, so it's watched rather than every caller updating it.
-const NAV_OF = { match: "builder", inplay: "live", scores: "live", scan: "scan", value: "value", acca: "acca", today: "today" };
-const UNDER_MORE = new Set(["builder", "value", "acca"]);
+const NAV_OF = { match: "builder", inplay: "live", scores: "live", scan: "scan", acca: "acca", today: "today" };
+const UNDER_MORE = new Set(["builder", "acca"]);
 function watchView() {
   let view = S.view;
   const paint = () => {

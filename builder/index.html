@@ -4466,7 +4466,10 @@ function autoPaper(results) {
     list.push({ key, auto: true, game: String(r.id), league: r.league || null,
                 label: r.legs.map((l) => l.label).join(" + "), where: `${r.home} v ${r.away}`,
                 price: +((r.b365 || r.fair) || 0).toFixed(2), p: r.p, kickoff: r.kickoff || null,
-                legs: r.legs.map((l) => ({ id: l.id, label: l.label, market: l.market, player: l.player || null, side: l.side || null })),
+                // bookPrice and p per leg so the closing line can be compared
+                // with what was on offer when HAWK picked it (see clvOf).
+                legs: r.legs.map((l) => ({ id: l.id, label: l.label, market: l.market, player: l.player || null,
+                                           side: l.side || null, bookPrice: l.bookPrice || null, p: l.p ?? null })),
                 at: now, result: null });
     added++;
   }
@@ -4504,6 +4507,12 @@ async function scorePaper() {
       }
       if (!f || !f.finished) continue;
       const legs = x.legs && x.legs.length ? x.legs : [{ id: x.key.split(":").slice(2).join(":"), label: x.label }];
+      // Bet365's last price before kick-off, for every leg it published one for.
+      // Taken against the price that was there when HAWK picked it, this is the
+      // only measure that tells skill from luck at this sample size.
+      for (const leg of legs) {
+        if (leg.close === undefined) { const c = HawkSettle.closingPrice(leg, f); if (c) { leg.close = c; changed = true; } }
+      }
       let out = "won";
       for (const leg of legs) {
         const r = HawkSettle.legResult(leg, f, { earlyPayout: true });
@@ -4517,6 +4526,38 @@ async function scorePaper() {
   // Only redraw when something actually settled — redrawing every time would
   // call this again and again.
   if (changed && S.view === "today") renderToday();
+}
+// CLOSING LINE VALUE. The price a market settles at just before kick-off is the
+// best forecast anyone has of a match. Beat it consistently and you have an
+// edge — and you know it long before the wins show up, because profit over a
+// hundred bets is mostly noise while this isn't.
+// Per leg, because that's where Bet365 publishes a closing price: for each leg
+// HAWK picked, the price on offer then against the price at the off.
+function clvOf(list) {
+  const rows = [];
+  for (const x of list) for (const l of x.legs || [])
+    if (l.close > 1 && l.bookPrice > 1) rows.push(l.bookPrice / l.close - 1);
+  if (rows.length < 3) return { n: rows.length };
+  const avg = rows.reduce((a, b) => a + b, 0) / rows.length;
+  const sd = Math.sqrt(rows.reduce((a, b) => a + (b - avg) ** 2, 0) / Math.max(1, rows.length - 1));
+  const se = sd / Math.sqrt(rows.length);
+  return { n: rows.length, avg, se, beat: rows.filter((r) => r > 0.005).length,
+           worse: rows.filter((r) => r < -0.005).length,
+           // Two standard errors clear of zero either way is a signal; short of
+           // that the honest answer is "not enough yet", however nice it looks.
+           verdict: avg > 2 * se ? "ahead" : avg < -2 * se ? "behind" : "unclear" };
+}
+function clvLine(list) {
+  const c = clvOf(list);
+  if (!c.n) return "";
+  if (c.n < 3 || c.verdict === undefined)
+    return `<div class="muted" style="font-size:11px;margin-top:6px">Closing prices on ${c.n} leg${c.n === 1 ? "" : "s"} so far — it takes a few hundred to mean anything.</div>`;
+  const tone = c.verdict === "ahead" ? "var(--accent)" : c.verdict === "behind" ? "var(--red)" : "var(--muted)";
+  const word = c.verdict === "ahead" ? "ahead of the closing line"
+             : c.verdict === "behind" ? "behind the closing line" : "level with the closing line, so far";
+  return `<div class="muted" style="font-size:11.5px;margin-top:6px" title="Bet365's price when HAWK picked the leg against its price at kick-off. Beating it is the earliest sign of a real edge; ${c.n} legs, needs a few hundred to be sure.">
+    Closing line: <b style="color:${tone}">${c.avg >= 0 ? "+" : ""}${(100 * c.avg).toFixed(2)}%</b>
+    <span class="muted">± ${(100 * c.se).toFixed(2)} · ${c.beat} better, ${c.worse} worse, of ${c.n} legs · ${word}</span></div>`;
 }
 // The record: what following HAWK would have done, at a notional EUR1 a pick.
 // Two records, because they answer different questions. Yours: did the picks
@@ -4539,6 +4580,7 @@ function paperBlock(list, title, note, rows) {
       · landed <b style="color:${hit >= said ? "var(--accent)" : "var(--gold)"}">${Math.round(100 * hit)}%</b>${
       openN ? ` · ${openN} still to settle` : ""}</div>` : ""}
     ${rows || ""}
+    ${clvLine(list)}
     ${note ? `<div class="muted" style="font-size:11px;margin-top:7px">${note}</div>` : ""}
     ${done.length && done.length < 25 ? `<div class="muted" style="font-size:11px;margin-top:6px">${25 - done.length} more before this means much.</div>` : ""}
   </div>`;

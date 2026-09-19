@@ -547,6 +547,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 #toast.show{opacity:1}
 /* goal alerts */
 #goalfeed{position:fixed;right:18px;bottom:18px;z-index:60;display:flex;flex-direction:column;gap:10px;width:min(360px,calc(100vw - 32px));pointer-events:none}
+/* With My bets open the alerts were landing on top of your own bets. */
+@media (min-width:1400px){body.drawer-open #goalfeed{right:412px}}
 .goal-card{pointer-events:auto;position:relative;overflow:hidden;cursor:pointer;padding:12px 14px 14px;border-radius:16px;
   background:linear-gradient(135deg,#10251f 0%,#141b22 60%);border:1px solid rgba(20,227,161,.55);
   box-shadow:0 18px 40px rgba(0,0,0,.5),0 0 0 1px rgba(20,227,161,.15),0 0 28px rgba(20,227,161,.25);animation:goalIn .55s cubic-bezier(.2,1.4,.4,1)}
@@ -3128,7 +3130,7 @@ function renderScan() {
         <label>Kick-off <select id="hrs">${KICKOFF_WINDOWS.filter(([h]) => h !== 72).map(([h, t]) =>
           `<option value="${h}" ${h === sc.hours ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label title="Mix keeps player legs in every builder. Match stats drops them for goals, corners, cards and shots on target. Player props goes the other way.">Made of <select id="scanFocus">${
-          [["Mix", "\U0001f500 Mix"], ["Match", "\u26bd Match stats"], ["Players", "\U0001f45f Player props"]].map(([v, t]) =>
+          [["Mix", "\ud83d\udd00 Mix"], ["Match", "\u26bd Match stats"], ["Players", "\ud83d\udc5f Player props"]].map(([v, t]) =>
           `<option value="${v}" ${v === S.focus ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Every builder opens with the favourite to win (or their double chance). Off, HAWK is free to build without a result leg at all.">
           <input type="checkbox" id="scanFav" ${S.favourite ? "checked" : ""}> Start with the favourite</label>
@@ -5381,6 +5383,37 @@ const alertAgo = (t) => { const m = Math.max(0, Math.round((Date.now() - t) / 60
 // A notice that isn't about a goal (value found, lineups confirmed). It gets
 // the same card as a goal, so every sound HAWK makes leaves something you can
 // still see fifteen seconds later — a 2-second toast was far too easy to miss.
+// A phone shows one alert at a time (the rest are hidden by CSS), so a card
+// must not start its countdown until it's the one on screen \u2014 otherwise an
+// alert times out behind another and you get the beep with nothing to look at.
+// On a PC they stack in the corner and each runs its own clock, as before.
+const oneAtATime = () => matchMedia("(max-width:560px)").matches;
+function feedStart(card) {
+  if (card.dataset.timing) return;
+  card.dataset.timing = "1";
+  const go = () => {
+    setTimeout(() => card.classList.add("bye"), GOAL_SHOW_MS);
+    setTimeout(() => { card.remove(); feedTick(); }, GOAL_SHOW_MS + 600);
+  };
+  // Away from HAWK when it fired? The card waits for you to come back.
+  if (document.hidden) document.addEventListener("visibilitychange", function once() { if (!document.hidden) { document.removeEventListener("visibilitychange", once); go(); } });
+  else go();
+}
+function feedTick() {
+  const box = $("#goalfeed"); if (!box) return;
+  if (oneAtATime()) { if (box.firstElementChild) feedStart(box.firstElementChild); }
+  else [...box.children].forEach(feedStart);
+}
+function feedAdd(card) {
+  const box = $("#goalfeed"); if (!box) return;
+  // Phone: queued behind whatever is showing, so they arrive in order. PC:
+  // newest on top of the stack.
+  if (oneAtATime()) box.appendChild(card); else box.prepend(card);
+  const cap = oneAtATime() ? 6 : 3;
+  // Never yank the card being read: on a phone the oldest one still waiting goes.
+  while (box.children.length > cap) (oneAtATime() ? box.children[1] : box.lastElementChild).remove();
+  feedTick();
+}
 function noticeCard({ icon = "\ud83d\udd14", word, text, tone = "good", onClick }) {
   const box = $("#goalfeed"); if (!box) { toast(`${icon} ${word} \u00b7 ${text}`, 6000); return; }
   const card = document.createElement("div");
@@ -5389,14 +5422,9 @@ function noticeCard({ icon = "\ud83d\udd14", word, text, tone = "good", onClick 
     <div class="g-top"><span class="g-ball">${icon}</span><span class="g-word">${esc(word)}</span></div>
     <div class="g-who">${esc(text)}</div>
     <div class="g-bar"><i></i></div>`;
-  card.onclick = (e) => { card.remove(); if (!e.target.closest(".gx") && onClick) onClick(); };
+  card.onclick = (e) => { card.remove(); feedTick(); if (!e.target.closest(".gx") && onClick) onClick(); };
   logAlert(icon, word, text);
-  box.prepend(card);
-  while (box.children.length > 3) box.lastElementChild.remove();
-  const hideLater = () => { setTimeout(() => card.classList.add("bye"), GOAL_SHOW_MS); setTimeout(() => card.remove(), GOAL_SHOW_MS + 600); };
-  // Away from HAWK when it fired? The card waits for you to come back.
-  if (document.hidden) document.addEventListener("visibilitychange", function once() { if (!document.hidden) { document.removeEventListener("visibilitychange", once); hideLater(); } });
-  else hideLater();
+  feedAdd(card);
 }
 // The alert card (bottom-right, top on a phone), like the goal one.
 function alertCard({ tone = "good", icon, word, g, clock, body, bet }) {
@@ -5410,14 +5438,10 @@ function alertCard({ tone = "good", icon, word, g, clock, body, bet }) {
     <div class="g-who">${body}</div>
     ${bet && bet.p != null ? `<div class="g-bet">🎟 Your bet: <b>${pct(bet.p, bet.p < 0.1 ? 1 : 0)}</b> to land now${bet.ret ? ` · worth ≈ €${(bet.p * bet.ret).toFixed(2)}` : ""}</div>` : ""}
     <div class="g-bar"><i></i></div>`;
-  card.onclick = (e) => { card.remove(); if (!e.target.closest(".gx")) (g.status === 4 ? showReport(g.id) : goToLive(g.league, g.id)); };
+  card.onclick = (e) => { card.remove(); feedTick(); if (!e.target.closest(".gx")) (g.status === 4 ? showReport(g.id) : goToLive(g.league, g.id)); };
   { const tmp = document.createElement("div"); tmp.innerHTML = body;
     logAlert(icon, word, `${g.home} ${g.score[0] == null ? "v" : `${g.score[0]}-${g.score[1]}`} ${g.away} · ${tmp.textContent}`); }
-  box.prepend(card);
-  while (box.children.length > 3) box.lastElementChild.remove();
-  const hideLater = () => { setTimeout(() => card.classList.add("bye"), GOAL_SHOW_MS); setTimeout(() => card.remove(), GOAL_SHOW_MS + 600); };
-  if (document.hidden) document.addEventListener("visibilitychange", function once() { if (!document.hidden) { document.removeEventListener("visibilitychange", once); hideLater(); } });
-  else hideLater();
+  feedAdd(card);
   if (tone !== "info") beep();
   flashTitle(`${icon} ${word}`);
   if (document.hidden || !document.hasFocus()) {
@@ -5586,12 +5610,16 @@ function beep() {
     });
   } catch {}
 }
+let titleFlash = null;
 function flashTitle(text) {
   const base = "HAWK · Bet Builder";
   let n = 0;
-  const t = setInterval(() => {
+  // Two alerts at once used to leave two timers fighting over the tab's name,
+  // each overwriting the other every second. The newest one wins.
+  if (titleFlash) clearInterval(titleFlash);
+  const t = titleFlash = setInterval(() => {
     document.title = n % 2 ? base : text;
-    if (++n > 20 || (document.hasFocus() && n > 4)) { clearInterval(t); document.title = base; }
+    if (++n > 20 || (document.hasFocus() && n > 4)) { clearInterval(t); if (titleFlash === t) titleFlash = null; document.title = base; }
   }, 1000);
 }
 

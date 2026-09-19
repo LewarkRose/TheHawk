@@ -2613,7 +2613,12 @@ const B365_K0 = 0.05, B365_K0_WEIGHT = 3, B365_KEEP = 60;
 // they are builds that were PLACED, so their prices looked acceptable at the
 // time. The ones Bet365 priced at 1.53 never became bets. Only blind samples
 // measure this, which is why these ten outrank those thirty-seven.
-const AIM_PRIOR = -0.029, AIM_PRIOR_W = 4;
+// Refitted 20 Sep on fifteen blind checks (2, 3 and 6 legs; 0, 1 and 4 props),
+// after a six-leg with four props came back at 12.00 against a 16.24 estimate.
+// Almost none of the builder cut is per-leg: adding a leg Bet365 prices costs
+// about 1.4%, while each leg it doesn't publish costs 27%. Typical error across
+// the fifteen drops from 13.6% to 9.7%, and the six-leg predicts 11.90 v 12.00.
+const AIM_PRIOR = -0.014, AIM_PRIOR_W = 4;
 function recordB365Price() {
   const r = S.result, m = S.match, price = checkerInputs().price;
   if (!m || !r || !r.fair || !(price > 1) || !S.slip.length) return;
@@ -2640,10 +2645,11 @@ function recordB365Price() {
 // prices you've typed, each pulled towards a sensible prior so a handful of
 // builders can't send it silly. Roma v Inter, 19 Sep: guess 4.54, Bet365 4.00
 // — four legs, two of them guessed, which is exactly what `gl` is for.
-// -0.221, not -0.02: the blind ten put nearly the whole builder cut here rather
-// than on leg count. A prop leg costs about 20% of the ticket's value, which is
-// why every builder with one in it reads skip and always will.
-const AIM_GUESS_PRIOR = -0.221, AIM_GUESS_W = 6;
+// -0.321: the blind fifteen put nearly the whole builder cut here rather than on
+// leg count. Each leg Bet365 doesn't publish a price for costs about 27% of the
+// ticket's value — a six-leg with four props came back at 0.32 of fair, 32 cents
+// on the euro. Leg count is almost free by comparison; props are the whole game.
+const AIM_GUESS_PRIOR = -0.321, AIM_GUESS_W = 6;
 function applyAim() {
   const rows = loadPref("hawk.b365prices", []).filter(x => x.model > 1 && x.price > 1 && x.legs > 0).slice(-30)
     .map(x => ({ y: Math.log(x.price / x.model), n: x.legs,

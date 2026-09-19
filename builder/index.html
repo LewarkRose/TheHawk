@@ -627,6 +627,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .scard .rail.ok{background:linear-gradient(180deg,var(--accent),var(--accent-d));opacity:1}
     .scard .rail.fair{background:linear-gradient(180deg,var(--gold),#b8975a);opacity:1}
     .scard .rail.bad{background:linear-gradient(180deg,#3c4a54,#2b363e);opacity:1}
+    /* price not known yet: neither good nor bad until Bet365 says */
+    .scard .rail.check{background:linear-gradient(180deg,var(--blue),#2b5f8f);opacity:1}
+    .badge.check{background:rgba(74,168,255,.14);color:var(--blue)}
+    .sdo.check{color:var(--blue)}
+    .theleg.check{border-color:rgba(74,168,255,.42);background:linear-gradient(140deg,rgba(74,168,255,.09),var(--panel) 58%)}
+    .theleg.check .tl-price .n{color:var(--blue)}
     .scard .sbody{flex:1;min-width:0;padding:12px 14px;display:flex;flex-direction:column;gap:9px}
     .scard .stop{display:flex;align-items:flex-start;gap:12px}
     .scard .smeta{margin-top:3px;font-size:11px;letter-spacing:.02em;color:var(--muted);text-transform:uppercase}
@@ -902,6 +908,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .call small.risk{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.1);color:var(--text);opacity:1}
 .call.good{color:var(--accent);background:rgba(20,227,161,.1);border-color:rgba(20,227,161,.4)}
 .call.warn{color:var(--gold);background:rgba(255,209,102,.1);border-color:rgba(255,209,102,.4)}
+.call.check{color:var(--blue);background:rgba(74,168,255,.1);border-color:rgba(74,168,255,.4)}
 .call.bad{color:#ff8a9a;background:rgba(255,93,115,.1);border-color:rgba(255,93,115,.4)}
 .up-level{font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px}
 .up-level.low{background:rgba(20,227,161,.12);color:var(--accent)}
@@ -3312,7 +3319,10 @@ function updateScan() {
     S.scan.showBet ? "shown" : betOn.size > 1 ? "are hidden" : "is hidden"}. <button class="linkbtn" data-showbet>${S.scan.showBet ? "hide them" : "show them"}</button></div>` : "";
   const res = [...shown].sort(sorters[S.scan.sort] || sorters.worth);
   const typedIn = shown.filter(r => S.scan.prices[scanKey(r)]), good = typedIn.filter(r => scanWorth(r) >= 1.02).length;
-  const fair = typedIn.filter(r => scanWorth(r) >= 0.95 && scanWorth(r) < 1.02).length, likely = shown.filter(r => !S.scan.prices[scanKey(r)] && r.worth >= 0.95).length;
+  const fair = typedIn.filter(r => scanWorth(r) >= 0.95 && scanWorth(r) < 1.02).length;
+  // Not "how many look good to HAWK" — how many are still waiting on the only
+  // number that settles it. About one in three of those comes back green.
+  const toCheck = shown.filter(r => isGuess(r)).length;
   if (!res.length && hidden) {
     $("#scanRes").innerHTML = betNote + `<div class="note">No match with confirmed lineups yet (${hidden} still predicted). Lineups come out about an hour before kick-off — ⚡ Scan again then, or untick <b>Lineups confirmed only</b>.</div>`;
     return;
@@ -3321,10 +3331,10 @@ function updateScan() {
   const singles = S.scan.showSingles ? pickBoard(shown) + singlesBoard(shown) : "";
   // One leg, at the top, every scan: the thing you actually came for.
   const leg = shown.length && !d.running ? theLeg(shown) : "";
-  $("#scanRes").innerHTML = betNote + leg + singles + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${[good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`, likely && `👀 ${likely} worth checking`].filter(Boolean).join(" · ") || "Nothing worth checking yet"}<small>${
-      "HAWK can't see Bet365's prices, so it tells you the price each builder needs. Build one on Bet365, type its price in the box and HAWK tells you straight away. 👀 ones are the likeliest to be ✅ — start at the top."}${
-      !good && !fair && !likely && !d.running ? (() => { const best = [...shown].sort((a, b) => b.worth - a.worth)[0];
-        return best ? ` Nothing clears the bar tonight. The closest is <b>${esc(best.home)} v ${esc(best.away)}</b> — HAWK expects Bet365 to pay about ${Math.round(100 * (1 - best.worth))}% under what it's worth. Check it: if Bet365 is kinder than HAWK expects it could still be ✅.` : ""; })() : ""}</small></div>` : "") + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
+  $("#scanRes").innerHTML = betNote + leg + singles + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "check"}" style="margin:0 0 12px">${
+      [good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`, toCheck && `👀 ${toCheck} to check on Bet365`].filter(Boolean).join(" · ") || "Nothing to check"}<small>${
+      "HAWK can't see Bet365's builder prices — it can only say what each one has to beat. That's a target, not a verdict: on your own record Bet365 paid MORE than HAWK expected on about one build in three. Build the top one on Bet365, type the real price in its box, and the card answers for real."}</small></div>` : "")
+    + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
     ? "Results appear here as each match is analysed…"
     : d.total === 0 && d.params ? "No fixtures kick off in that window — try a longer one."
     : betOn.size && !open.length ? "Nothing new — you've already bet on every match scanned."
@@ -3354,8 +3364,12 @@ function scanVerdict(r) {
   if (x > 1) return x >= need ? `<div class="badge ok">✅ BET IT</div><div class="muted" style="font-size:12px">${odds(x)} beats ${odds(need)}</div>`
     : x >= fair * 0.95 ? `<div class="badge ok">🤏 FAIR PRICE</div><div class="muted" style="font-size:12px">OK if you like it · ✅ from ${odds(need)}</div>`
     : `<div class="badge warn">❌ SKIP IT</div><div class="muted" style="font-size:12px">${odds(x)} is under ${odds(need)}</div>`;
+  // No real price yet. HAWK's estimate is the worst guide there is to Bet365's
+  // builder price, so it doesn't get to pass judgement — it just says what the
+  // number has to beat. Roughly one in three comes back green once checked.
+  if (isGuess(r)) return `<div class="badge check">👀 CHECK IT</div><div class="muted" style="font-size:12px">✅ from ${odds(need)} · Bet365's price decides</div>`;
   const guess = r.worth >= 1.02 ? "👀 likely ✅" : r.worth >= 0.95 ? "👀 could be 🤏" : "probably under";
-  return `<div class="muted" style="font-size:12px">HAWK's guess ≈ ${odds(r.b365 || r.fair)} · ${guess}</div>`;
+  return `<div class="muted" style="font-size:12px">Every leg priced · ≈ ${odds(r.b365 || r.fair)} · ${guess}</div>`;
 }
 // A price typed on a card teaches HAWK Bet365's builder cut, the same as the slip's price box.
 function learnScanPrice(r, price) {
@@ -3488,8 +3502,14 @@ function scanOpt(ref) {
   return a ? { ...a, id: r.id, league: r.league, home: r.home, away: r.away, homeCrest: r.homeCrest,
                awayCrest: r.awayCrest, kickoff: r.kickoff, confirmed: r.confirmed, value: [] } : null;
 }
+// A guess is not a verdict. Until Bet365's real price is in, a build whose
+// price HAWK had to estimate is "unknown", not "skip" — on the record, Bet365
+// paid MORE than HAWK expected on 30% of the builds that were actually checked.
+// Marking those red before checking them was hiding the green ones.
+const isGuess = (o) => !S.scan.prices[scanKey(o)] && (o.legs || []).some(l => !(l.bookPrice > 1));
 const optTone = (o) => { const x = S.scan.prices[scanKey(o)];
   return +x > 1 ? (+x >= scanNeed(o).need ? "ok" : +x >= o.fair * 0.95 ? "fair" : "bad")
+       : isGuess(o) ? "check"
        : o.worth >= 1.02 ? "ok" : o.worth >= 0.95 ? "fair" : "bad"; };
 // One ticket: how often it lands against what its price needs, its legs, and
 // the box where you check Bet365's real price against it.
@@ -3513,7 +3533,9 @@ function scanOption(o, params, ref, n) {
             Math.abs(gap) < 1 ? "about level" : `${Math.abs(gap).toFixed(0)} point${Math.abs(gap) < 1.5 ? "" : "s"} ${gap > 0 ? "clear" : "short"}`}</span></div>
       </div>
       <div class="sdo ${tone}">${typed ? "" : `${tone === "bad" ? "Only back it at" : "Back it at"} ${odds(scanNeed(o).need)}+`}${
-        typed ? "" : `<span class="muted" style="font-weight:600"> · HAWK expects ≈ ${odds(o.b365 || o.fair)}</span>`}</div>
+        typed ? "" : tone === "check"
+          ? `<span class="muted" style="font-weight:600"> · check Bet365 — about 1 in 3 pays more than HAWK expects</span>`
+          : `<span class="muted" style="font-weight:600"> · HAWK expects ≈ ${odds(o.b365 || o.fair)}</span>`}</div>
       <div class="schips">${(() => {
         // The weak link: whichever leg is least likely to land — the one to swap
         // if you want the ticket to come in.

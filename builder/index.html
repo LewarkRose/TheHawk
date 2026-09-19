@@ -619,7 +619,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .sbar .bnote{display:flex;justify-content:space-between;gap:10px;margin-top:5px;font-size:11px;color:var(--muted)}
     .scard .schips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
     .scard .sfoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .scard .iconbtn{width:44px;height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+    .iconbtn{flex:none;width:44px;height:44px;padding:0;margin-top:0;display:inline-flex;align-items:center;justify-content:center}
     /* the recipe: what HAWK is about to build, in a sentence, with chips that change a word each */
     .recipe{margin-top:2px;font-size:13.5px;line-height:1.85;color:var(--muted)}
     .recipe b{color:var(--text)}
@@ -673,7 +673,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     /* the summary wraps rather than pushing the page wider than the phone */
     .pksum{margin-top:2px;font-size:11.5px;color:var(--muted);overflow-wrap:anywhere}
     .pkbar > div{min-width:0}
-    .pkbar .iconbtn{width:44px;height:44px;padding:0;font-size:16px;display:inline-flex;align-items:center;justify-content:center}
+    .pkbar .iconbtn{font-size:16px}
     /* your day: the bets you have running, and what the day has done so far */
     .myday{border:1px solid var(--line);border-radius:14px;background:var(--panel);margin:0 0 12px;overflow:hidden}
     .myday .mh{display:flex;align-items:center;gap:9px;padding:10px 13px;border-bottom:1px solid var(--line)}
@@ -696,6 +696,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .tdrow{display:flex;align-items:center;gap:11px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:7px}
     .tdrow.done{opacity:.55}
     .tdrow input[type=checkbox]{width:18px;height:18px;flex:none}
+    .tdrow > div:first-of-type{flex:1;min-width:0}
     .tdrow .px{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:20px;line-height:1;font-weight:700;color:var(--gold)}
     /* the radar is reference, so it sits folded until you want it */
     .up-sum{display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;list-style:none;padding:2px 0}

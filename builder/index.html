@@ -698,6 +698,14 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .tdrow input[type=checkbox]{width:18px;height:18px;flex:none}
     .tdrow > div:first-of-type{flex:1;min-width:0}
     .tdrow .px{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:20px;line-height:1;font-weight:700;color:var(--gold)}
+    /* paper mode: following a pick with no money on it */
+    .tdrow .follow{flex:none;width:auto;margin:0;padding:6px 10px;font-size:11.5px;font-weight:700;border-radius:9px;min-height:36px}
+    .tdrow .follow.on{border-color:rgba(74,168,255,.5);background:rgba(74,168,255,.12);color:var(--blue)}
+    .paper{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+    .paper .n{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:24px;line-height:1;font-weight:700}
+    .prow{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:12.5px}
+    .prow .tick{flex:none;width:18px;text-align:center;font-weight:900}
+    .prow .tick.won{color:var(--accent)} .prow .tick.lost{color:var(--red)} .prow .tick.open{color:var(--muted)}
     /* the radar is reference, so it sits folded until you want it */
     .up-sum{display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;list-style:none;padding:2px 0}
     .up-sum::-webkit-details-marker{display:none}
@@ -4177,6 +4185,77 @@ function dayPicks() {
   }
   return out.sort((a, b) => (b.p * b.price) - (a.p * a.price));
 }
+/* ---------- paper mode: follow a pick, no money on it ---------- */
+// Everything you follow is stored with the price and the chance HAWK gave it at
+// the time, then settled from the final score exactly as a real bet would be.
+// It is the only way to check HAWK's claims without paying to find out.
+const paperList = () => loadPref("hawk.paper", []);
+const savePaper = (l) => savePref("hawk.paper", l.slice(-120));
+function paperHas(key) { return paperList().some((x) => x.key === key); }
+function paperToggle(pick) {
+  const list = paperList(), i = list.findIndex((x) => x.key === pick.key);
+  if (i >= 0) list.splice(i, 1);
+  else list.push({ key: pick.key, game: pick.game || null, league: pick.league || null, label: pick.label,
+                   where: pick.where, price: pick.price, p: pick.p, kickoff: pick.kickoff || null,
+                   legs: pick.legs || null, at: Date.now(), result: null });
+  savePaper(list);
+  return i < 0;
+}
+// Settle anything whose match has finished. Runs quietly; a leg HAWK can't read
+// is left alone rather than guessed at.
+let paperBusy = false;
+async function scorePaper() {
+  if (paperBusy || !window.HawkSettle) return;
+  const list = paperList(), open = list.filter((x) => !x.result && x.game);
+  if (!open.length) return;
+  paperBusy = true;
+  let changed = false;
+  try {
+    for (const x of open) {
+      let f = null;
+      try { f = await HawkSettle.fetchMatchFacts(x.game); } catch { continue; }
+      if (!f || !f.finished) continue;
+      const legs = x.legs && x.legs.length ? x.legs : [{ id: x.key.split(":").slice(2).join(":"), label: x.label }];
+      let out = "won";
+      for (const leg of legs) {
+        const r = HawkSettle.legResult(leg, f, { earlyPayout: true });
+        if (r === "lost") { out = "lost"; break; }
+        if (r !== "won") { out = null; break; }   // can't read it: leave it open
+      }
+      if (out) { x.result = out; x.score = f.score || null; changed = true; }
+    }
+    if (changed) savePaper(list);
+  } finally { paperBusy = false; }
+  // Only redraw when something actually settled — redrawing every time would
+  // call this again and again.
+  if (changed && S.view === "today") renderToday();
+}
+// The record: what following HAWK would have done, at a notional EUR1 a pick.
+function paperCard() {
+  const list = paperList();
+  if (!list.length) return `<div class="paper"><div class="muted" style="font-size:12.5px">
+    <b style="color:var(--text)">Following without betting.</b> Tap ⊙ Follow on any pick and HAWK settles it from the final score —
+    no money on it. It's how you check what HAWK claims before you trust it with a stake.</div></div>`;
+  const done = list.filter((x) => x.result), won = done.filter((x) => x.result === "won");
+  const back = won.reduce((a, x) => a + (+x.price || 0), 0), keep = done.length ? back / done.length : null;
+  const openN = list.length - done.length;
+  const rows = list.slice().reverse().slice(0, 6).map((x) => `<div class="prow">
+    <span class="tick ${x.result || "open"}">${x.result === "won" ? "✓" : x.result === "lost" ? "✕" : "·"}</span>
+    <span style="flex:1;min-width:0"><b>${esc(x.label)}</b>
+      <span class="muted" style="font-size:11px">· ${esc(x.where || "")}</span></span>
+    <span class="muted" style="flex:none">${odds(x.price)}</span></div>`).join("");
+  return `<div class="paper">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="flex:1"><div class="muted" style="font-size:10px;letter-spacing:.13em">FOLLOWED, NO MONEY ON IT</div>
+        <div class="n">${won.length}<span class="muted" style="font-size:15px"> of ${done.length} landed</span></div></div>
+      ${done.length ? `<div style="text-align:right"><div class="muted" style="font-size:10px;letter-spacing:.13em">PER €1</div>
+        <div class="n" style="color:${keep >= 1 ? "var(--accent)" : "var(--gold)"}">€${keep.toFixed(2)}</div></div>` : ""}
+    </div>
+    ${openN ? `<div class="muted" style="font-size:11.5px;margin-top:6px">${openN} still to settle</div>` : ""}
+    ${rows}
+    ${done.length < 20 ? `<div class="muted" style="font-size:11px;margin-top:8px">${20 - done.length} more before this means much.</div>` : ""}
+  </div>`;
+}
 function showToday() {
   S.view = "today";
   document.querySelectorAll(".fx").forEach((f) => f.classList.remove("on"));
@@ -4213,6 +4292,8 @@ function renderToday() {
           <div class="muted" style="font-size:11px">${esc(x.where)}${x.kickoff ? ` · ${esc(fmtKick(x.kickoff))}` : ""}</div></div>
         <div style="text-align:right;flex:none"><div class="px">${odds(x.price)}</div>
           <div class="muted" style="font-size:11px">${pct(x.p, 0)} · €${unit.toFixed(2)}</div></div>
+        <button class="ghost follow ${paperHas(x.key) ? "on" : ""}" data-follow="${esc(x.key)}" title="Follow it with no money on it — HAWK settles it from the final score">${
+          paperHas(x.key) ? "⊙ Following" : "⊙ Follow"}</button>
         ${x.game ? `<button class="ghost iconbtn" data-plango="${esc(x.game)}|${esc(x.league || "")}" title="Open the match">›</button>` : ""}
       </div>`; }).join("")}
       ${fit.length ? `<div class="note" style="margin-top:10px">Tick each one as you place it. Your bankroll and settled bets come from the Vault.</div>` : ""}
@@ -4222,6 +4303,7 @@ function renderToday() {
         <button class="ghost" style="width:auto;padding:9px 15px" onclick="showScores()">📺 Live</button>
       </div>
     </div>
+    ${paperCard()}
     <div class="section" id="tdDay"></div>`;
   $("#match").querySelectorAll("[data-plan]").forEach((cb) => cb.onchange = () => {
     const list = loadPref(dayKey(), []).filter((k) => k !== cb.dataset.plan);
@@ -4229,11 +4311,19 @@ function renderToday() {
     savePref(dayKey(), list);
     cb.closest(".tdrow").classList.toggle("done", cb.checked);
   });
+  $("#match").querySelectorAll("[data-follow]").forEach((b) => b.onclick = () => {
+    const pick = fit.find((x) => x.key === b.dataset.follow); if (!pick) return;
+    const on = paperToggle(pick);
+    b.classList.toggle("on", on); b.textContent = on ? "⊙ Following" : "⊙ Follow";
+    toast(on ? "Following it — no money on it. HAWK settles it at full time." : "Stopped following it.");
+    const card = $("#match").querySelector(".paper"); if (card) card.outerHTML = paperCard();
+  });
   $("#match").querySelectorAll("[data-plango]").forEach((b) => b.onclick = () => {
     const [id, lg] = b.dataset.plango.split("|");
     if (id) goToMatch(lg || undefined, id);
   });
   const day = $("#tdDay"); if (day) day.innerHTML = myDayCard((S.scores && S.scores.data) || []);
+  scorePaper();
 }
 function myDayCard(games) {
   let bets = [];

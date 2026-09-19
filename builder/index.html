@@ -3356,8 +3356,11 @@ function updateScan() {
   const typedIn = shown.filter(r => S.scan.prices[scanKey(r)]), good = typedIn.filter(r => scanWorth(r) >= 1.02).length;
   const fair = typedIn.filter(r => scanWorth(r) >= 0.95 && scanWorth(r) < 1.02).length;
   // Not "how many look good to HAWK" — how many are still waiting on the only
-  // number that settles it. About one in three of those comes back green.
-  const toCheck = shown.filter(r => isGuess(r)).length;
+  // number that settles it: the price you read off Bet365. Counted whether or
+  // not HAWK had to guess a leg, because even an estimate built from real
+  // prices multiplied is still an estimate, out by about 10% either way.
+  const toCheck = shown.filter(r => !S.scan.prices[scanKey(r)]).length;
+  const guessing = shown.filter(r => isGuess(r)).length;
   if (!res.length && hidden) {
     $("#scanRes").innerHTML = betNote + `<div class="note">No match with confirmed lineups yet (${hidden} still predicted). Lineups come out about an hour before kick-off — ⚡ Scan again then, or untick <b>Lineups confirmed only</b>.</div>`;
     return;
@@ -3368,7 +3371,10 @@ function updateScan() {
   const leg = shown.length && !d.running ? theLeg(shown) : "";
   $("#scanRes").innerHTML = betNote + leg + singles + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "check"}" style="margin:0 0 12px">${
       [good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`, toCheck && `👀 ${toCheck} to check on Bet365`].filter(Boolean).join(" · ") || "Nothing to check"}<small>${
-      "HAWK can't see Bet365's builder prices — it can only say what each one has to beat. That's a target, not a verdict: on your own record Bet365 paid MORE than HAWK expected on about one build in three. Build the top one on Bet365, type the real price in its box, and the card answers for real."}</small></div>` : "")
+      guessing
+        ? "HAWK can't see Bet365's builder prices — it can only say what each one has to beat. That's a target, not a verdict."
+        : "Every leg here has Bet365's own price behind it, so the estimate is those prices multiplied rather than a guess — but it's still out by about 10% either way, which is the difference between a fair price and a good one."}
+      Build the top one on Bet365, type the real price in its box, and the card answers for real.</small></div>` : "")
     + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
     ? "Results appear here as each match is analysed…"
     : d.total === 0 && d.params ? "No fixtures kick off in that window — try a longer one."

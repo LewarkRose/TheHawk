@@ -4804,7 +4804,8 @@ async function toggleStar(legId) {
 }
 function valueAlert(what, price, fair, onClick) {
   const msg = `💰 Value: ${what} — Bet365 ${odds(price)}, fair ${odds(fair)} (+${(100 * (price / fair - 1)).toFixed(1)}%)`;
-  beep(); flashTitle("💰 Value!"); toast(msg);
+  beep(); flashTitle("💰 Value!");
+  noticeCard({ icon: "💰", word: "Value found", tone: "warn", text: `${what} — Bet365 ${odds(price)}, fair ${odds(fair)} (+${(100 * (price / fair - 1)).toFixed(1)}%)`, onClick });
   if ("Notification" in window && Notification.permission === "granted") {
     try { const n = new Notification("HAWK", { body: msg }); n.onclick = () => { window.focus(); if (onClick) onClick(); }; }
     catch { systemNotify("💰 Value!", msg, { tag: "value" }); }   // phones only allow it through the service worker
@@ -4916,7 +4917,9 @@ async function checkLineups() {
 }
 async function lineupsIn(w, source) {
   const msg = `Lineups confirmed: ${w.home} v ${w.away}${source === "ESPN" ? " (ESPN — first to publish)" : ""}`;
-  beep(); flashTitle("🔔 Lineups in!"); toast("🔔 " + msg);
+  beep(); flashTitle("🔔 Lineups in!");
+  noticeCard({ icon: "🔔", word: "Lineups confirmed", tone: "info", text: `${w.home} v ${w.away}${source === "ESPN" ? " (ESPN — first to publish)" : ""}`,
+               onClick: () => goToMatch(w.league, w.id) });
   // Its lineup alert is done, but keep following it for goals.
   const follow = loadPref("hawk.goalFollow", {});
   follow[String(w.id)] = w.kickoff || new Date().toISOString();
@@ -5151,6 +5154,25 @@ async function betOutcome(b) {
     }
   }
   return check ? { check } : { won: true };
+}
+// A notice that isn't about a goal (value found, lineups confirmed). It gets
+// the same card as a goal, so every sound HAWK makes leaves something you can
+// still see fifteen seconds later — a 2-second toast was far too easy to miss.
+function noticeCard({ icon = "\ud83d\udd14", word, text, tone = "good", onClick }) {
+  const box = $("#goalfeed"); if (!box) { toast(`${icon} ${word} \u00b7 ${text}`, 6000); return; }
+  const card = document.createElement("div");
+  card.className = `goal-card t-${tone}`;
+  card.innerHTML = `<button class="gx" title="Close">\u2715</button>
+    <div class="g-top"><span class="g-ball">${icon}</span><span class="g-word">${esc(word)}</span></div>
+    <div class="g-who">${esc(text)}</div>
+    <div class="g-bar"><i></i></div>`;
+  card.onclick = (e) => { card.remove(); if (!e.target.closest(".gx") && onClick) onClick(); };
+  box.prepend(card);
+  while (box.children.length > 3) box.lastElementChild.remove();
+  const hideLater = () => { setTimeout(() => card.classList.add("bye"), GOAL_SHOW_MS); setTimeout(() => card.remove(), GOAL_SHOW_MS + 600); };
+  // Away from HAWK when it fired? The card waits for you to come back.
+  if (document.hidden) document.addEventListener("visibilitychange", function once() { if (!document.hidden) { document.removeEventListener("visibilitychange", once); hideLater(); } });
+  else hideLater();
 }
 // The alert card (bottom-right, top on a phone), like the goal one.
 function alertCard({ tone = "good", icon, word, g, clock, body, bet }) {

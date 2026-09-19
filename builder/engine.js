@@ -1373,8 +1373,12 @@
   // aim.cl: Bet365's extra builder cut per leg (it grows with every leg you add),
   // in logs; aim.c: any cut on top of that for the whole builder.
   let aim = null;
-  function setAim(a) { aim = a && typeof a === "object" ? { c: Number.isFinite(+a.c) ? +a.c : 0, cl: Number.isFinite(+a.cl) ? +a.cl : 0 } : null; }
-  const aimOf = (n) => (aim ? Math.exp(aim.c + aim.cl * n) : 1);
+  function setAim(a) { aim = a && typeof a === "object"
+    ? { c: Number.isFinite(+a.c) ? +a.c : 0, cl: Number.isFinite(+a.cl) ? +a.cl : 0, gl: Number.isFinite(+a.gl) ? +a.gl : 0 } : null; }
+  // n legs, of which `guessed` are ones HAWK had to price itself: Bet365 cuts
+  // those harder, so they get their own term.
+  const aimOf = (n, guessed = 0) => (aim ? Math.exp(aim.c + aim.cl * n + (aim.gl || 0) * guessed) : 1);
+  const guessedCount = (legs, ids) => ids.reduce((k, id) => k + (legs[id] && legs[id].bookPrice > 1 ? 0 : 1), 0);
   const UNPRICED_CUT = 0.05;   // a leg nobody prices: about 5% under HAWK's fair odds
   const hasPrice = (leg) => leg.bookPrice > 1 || (leg.refPrice > 1 && !refOff(leg));
   const legB365 = (leg) => (leg.bookPrice > 1 ? leg.bookPrice : propEstimate(leg) || Math.max(1.01, Math.exp(-UNPRICED_CUT) / leg.p));
@@ -1399,7 +1403,7 @@
     for (const id of ids) { const l = legs[id]; prod *= legB365(l); pp *= l.p * (l.adj || 1); }
     return prod * Math.min(1.5, Math.max(0.3, pp / joint)) * squeeze(legs, ids);
   }
-  const b365Of = (legs, ids, joint) => { const r = b365Raw(legs, ids, joint); return r && r * aimOf(ids.length); };
+  const b365Of = (legs, ids, joint) => { const r = b365Raw(legs, ids, joint); return r && r * aimOf(ids.length, guessedCount(legs, ids)); };
   // What auto-build compares with your target.
   const priceOf = (legs, ids, joint) => (aim ? b365Of(legs, ids, joint) || 0 : joint > 0 ? 1 / joint : 0);
 

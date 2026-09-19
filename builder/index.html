@@ -1116,7 +1116,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },   // perMatch is always 1: one Bet365-priced leg per match, so the acca has no builder cut
-            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", confirmed: loadPref("hawk.scanConfirmed", false), setOpen: false, onlyWorth: loadPref("hawk.onlyWorth", true), showBet: loadPref("hawk.scanShowBet", false), minOdds: loadPref("hawk.minOdds", 2), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
+            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: loadPref("hawk.scanSort", "lands"), confirmed: loadPref("hawk.scanConfirmed", false), setOpen: false, onlyWorth: loadPref("hawk.onlyWorth", false), showSingles: loadPref("hawk.showSingles", false), showBet: loadPref("hawk.scanShowBet", false), minOdds: loadPref("hawk.minOdds", 2), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null,
                      tab: "value", minMove: 0.1 },
             watch: [] };
@@ -2478,16 +2478,32 @@ function recordB365Price() {
 // (your 5-leg 5.50 against HAWK's 7.06 = about 5% a leg) and applied to however
 // many legs the next builder has. Your last 30 prices; one price already counts
 // for half, so "Bet365 should show" catches up quickly.
+// Two numbers are fitted, not one: `cl`, the cut Bet365 takes for every leg,
+// and `gl`, the extra it takes on a leg HAWK had to price itself (player props
+// — no free feed carries Bet365's own price for those). Least squares on the
+// prices you've typed, each pulled towards a sensible prior so a handful of
+// builders can't send it silly. Roma v Inter, 19 Sep: guess 4.54, Bet365 4.00
+// — four legs, two of them guessed, which is exactly what `gl` is for.
+const AIM_GUESS_PRIOR = -0.02, AIM_GUESS_W = 6;
 function applyAim() {
-  const cs = loadPref("hawk.b365prices", []).filter(x => x.model > 1 && x.price > 1 && x.legs > 0).slice(-30)
-    .map(x => Math.log(x.price / x.model) / x.legs).filter(c => Math.abs(c) < 0.5);
-  // Before you've typed any prices, assume Bet365 shaves about 10% a leg: measured
-  // on real builders (1.80 v 2.19, 3.10 v 4.14, 1.57 v 2.29 …), where it came in
-  // 15-45% under what HAWK expected. Your own prices then take over from this.
-  const sum = cs.reduce((a, b) => a + b, 0) + AIM_PRIOR * AIM_PRIOR_W;
-  const cl = Math.max(-0.25, Math.min(0.08, sum / (cs.length + AIM_PRIOR_W)));
-  S.aim = { c: 0, cl, n: cs.length };
-  HAWK.setAim({ c: 0, cl });
+  const rows = loadPref("hawk.b365prices", []).filter(x => x.model > 1 && x.price > 1 && x.legs > 0).slice(-30)
+    .map(x => ({ y: Math.log(x.price / x.model), n: x.legs,
+                 g: (x.detail || []).filter(d => !(d.b > 1)).length }))
+    .filter(x => Math.abs(x.y / x.n) < 0.5);
+  // Ridge regression on [legs, guessed legs], with both priors as extra rows:
+  // sum over rows of (y - cl*n - gl*g)^2, plus the priors' pull.
+  let a11 = AIM_PRIOR_W, a12 = 0, a22 = AIM_GUESS_W, b1 = AIM_PRIOR * AIM_PRIOR_W, b2 = AIM_GUESS_PRIOR * AIM_GUESS_W;
+  for (const r of rows) {
+    a11 += r.n * r.n; a12 += r.n * r.g; a22 += r.g * r.g;
+    b1 += r.n * r.y;  b2 += r.g * r.y;
+  }
+  const det = a11 * a22 - a12 * a12;
+  let cl = AIM_PRIOR, gl = AIM_GUESS_PRIOR;
+  if (Math.abs(det) > 1e-9) { cl = (b1 * a22 - b2 * a12) / det; gl = (a11 * b2 - a12 * b1) / det; }
+  cl = Math.max(-0.25, Math.min(0.08, cl));
+  gl = Math.max(-0.15, Math.min(0.05, gl));
+  S.aim = { c: 0, cl, gl, n: rows.length };
+  HAWK.setAim({ c: 0, cl, gl });
 }
 // From one builder price: the Bet365 price of its player legs, as a shift in
 // log-odds (the same for all of them). Bet365's builder price ≈ its single
@@ -2567,7 +2583,9 @@ function aimNote() {
   const cut = S.aim ? Math.round(100 * (1 - Math.exp(S.aim.cl))) : 0;
   if (!rows.length) return `<div class="note">🧠 HAWK assumes Bet365 shaves about ${cut}% a leg on builders. Type the real price in the box above after you check one and it learns yours instead.</div>`;
   const last = rows.slice(-10), off = last.reduce((a, x) => a + Math.abs(x.price / (x.model * Math.exp(S.aim.cl * x.legs)) - 1), 0) / last.length;
-  return `<div class="note">🧠 Learnt from <b>${rows.length}</b> builder price${rows.length === 1 ? "" : "s"} you typed: Bet365 shaves about <b>${cut}%</b> a leg,
+  const gcut = S.aim && S.aim.gl ? Math.round(100 * (1 - Math.exp(S.aim.gl))) : 0;
+  return `<div class="note">🧠 Learnt from <b>${rows.length}</b> builder price${rows.length === 1 ? "" : "s"} you typed: Bet365 shaves about <b>${cut}%</b> a leg${
+    gcut > 0 ? `, and <b>${gcut}%</b> more on legs HAWK prices itself` : ""},
     and HAWK's guess has been within <b>${(100 * off).toFixed(0)}%</b> on your last ${last.length}. More prices, closer guesses.</div>`;
 }
 function guessLine(r) {
@@ -3009,7 +3027,9 @@ function renderScan() {
         <button class="build" id="scanGo" style="width:auto;margin:0;padding:11px 18px"></button>
       </div>
       <details class="scanset" id="pkSet" ${sc.setOpen ? "open" : ""}><summary>⚙️ Scan settings</summary>
-      <div class="note" style="margin-top:0">HAWK's best builder for every match. Build one on Bet365, type its price, and it tells you ✅ / 🤏 / ❌.</div>
+      <div class="note" style="margin-top:0">${sc.minOdds
+        ? `Every builder here pays <b style="color:var(--gold)">${sc.minOdds.toFixed(2)}+</b> on Bet365. The big number is <b>how often it lands</b> — likeliest first.`
+        : "HAWK's best builder for every match, likeliest first."} Build one on Bet365 and type its price in to check it.</div>
       <div class="seg" id="scanAuto" style="margin:8px 0;max-width:360px">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
       <details class="scanset"><summary>🏅 Leagues (${sc.leagues.size} competitions)</summary>
       ${leaguePicker("scanLeagues", sc.leagues)}</details>
@@ -3024,6 +3044,8 @@ function renderScan() {
           `<option value="${v}" ${v === S.picks ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label>Sort by <select id="srt">${[["worth", "Worth it at Bet365"], ["lands", "Most likely to land"], ["legs", "Fewest legs"], ["kickoff", "Kick-off time"], ["value", "Single legs with value"]].map(([k, t]) =>
           `<option value="${k}" ${k === sc.sort ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Single bets at Bet365's own price — one leg, no builder cut. Off because you build.">
+          <input type="checkbox" id="scanSingles" ${sc.showSingles ? "checked" : ""}> Show single bets</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Only show a match when HAWK would actually back the builder \u2014 the price it expects from Bet365 beats what the ticket is worth. Most matches won't have one.">
           <input type="checkbox" id="scanWorthOnly" ${sc.onlyWorth ? "checked" : ""}> Only ones worth backing</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="scanConf" ${sc.confirmed ? "checked" : ""}> Lineups confirmed only</label>
@@ -3036,7 +3058,7 @@ function renderScan() {
   $("#pkGear").onclick = () => { const d = $("#pkSet"); if (d) { d.open = !d.open; sc.setOpen = d.open; if (d.open) d.scrollIntoView({ behavior: "smooth", block: "nearest" }); } };
   const pkSet = $("#pkSet"); if (pkSet) pkSet.ontoggle = () => { sc.setOpen = pkSet.open; };
   $("#hrs").onchange = (e) => { sc.hours = windowValue(e.target.value); $("#pkSum").innerHTML = scanSummary(); };
-  $("#srt").onchange = (e) => { sc.sort = e.target.value; updateScan(); };
+  $("#srt").onchange = (e) => { sc.sort = e.target.value; savePref("hawk.scanSort", sc.sort); updateScan(); };
   // Changing what HAWK builds means the scan has to run again: stop the one
   // going, wait for it to let go, then start fresh.
   const rescan = async () => {
@@ -3044,6 +3066,7 @@ function renderScan() {
     if (st && st.running) { await api("/api/scan/stop", {}); for (let i = 0; i < 60 && st && st.running; i++) { await new Promise(r => setTimeout(r, 250)); st = await api("/api/scan"); } }
     S.scan.data = null; toggleScan();
   };
+  $("#scanSingles").onchange = (e) => { sc.showSingles = e.target.checked; savePref("hawk.showSingles", sc.showSingles); updateScan(); };
   $("#scanWorthOnly").onchange = async (e) => { sc.onlyWorth = e.target.checked; savePref("hawk.onlyWorth", sc.onlyWorth);
     renderScan(); await rescan(); };
   $("#minOdds").onchange = async (e) => { sc.minOdds = +e.target.value; savePref("hawk.minOdds", sc.minOdds);
@@ -3131,7 +3154,9 @@ function updateScan() {
     $("#scanRes").innerHTML = betNote + `<div class="note">No match with confirmed lineups yet (${hidden} still predicted). Lineups come out about an hour before kick-off — ⚡ Scan again then, or untick <b>Lineups confirmed only</b>.</div>`;
     return;
   }
-  $("#scanRes").innerHTML = betNote + pickBoard(shown) + singlesBoard(shown) + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${[good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`, likely && `👀 ${likely} worth checking`].filter(Boolean).join(" · ") || "Nothing worth checking yet"}<small>${
+  // Single bets are off unless you ask for them — you build, you don't bet singles.
+  const singles = S.scan.showSingles ? pickBoard(shown) + singlesBoard(shown) : "";
+  $("#scanRes").innerHTML = betNote + singles + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "warn"}" style="margin:0 0 12px">${[good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`, likely && `👀 ${likely} worth checking`].filter(Boolean).join(" · ") || "Nothing worth checking yet"}<small>${
       "HAWK can't see Bet365's prices, so it tells you the price each builder needs. Build one on Bet365, type its price in the box and HAWK tells you straight away. 👀 ones are the likeliest to be ✅ — start at the top."}${
       !good && !fair && !likely && !d.running ? (() => { const best = [...shown].sort((a, b) => b.worth - a.worth)[0];
         return best ? ` Nothing clears the bar tonight. The closest is <b>${esc(best.home)} v ${esc(best.away)}</b> — HAWK expects Bet365 to pay about ${Math.round(100 * (1 - best.worth))}% under what it's worth. Check it: if Bet365 is kinder than HAWK expects it could still be ✅.` : ""; })() : ""}</small></div>` : "") + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running

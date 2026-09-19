@@ -1933,7 +1933,20 @@
   // "At least 2.00": Bet365 pays about a tenth less per leg than the fair price,
   // so HAWK aims a bit above what you asked for and keeps only the builds whose
   // expected Bet365 price really clears it — likeliest first.
-  const minTargets = (min) => [min * 1.15, min * 1.45, min * 1.9];
+  // Aiming well above your "at least" costs chance for payout you didn't ask
+  // for: at 2.00+ it was only ever trying 2.30, 2.90 and 3.80, so the likeliest
+  // ticket that just clears 2.00 was never built. It aims just over the line
+  // first now, and keeps the higher aims for the other options.
+  const minTargets = (min) => [min * 1.04, min * 1.15, min * 1.45, min * 1.9];
+  // How far below your "at least" a build may look on HAWK's guess and still be
+  // shown: measured on 44 checked builds, Bet365 came in above HAWK's estimate
+  // on 13 of them, by as much as a third. A likelier ticket that clears 2.00
+  // only once the real price is seen is worth more than one that never clears.
+  // 0.88, not 0.72: a build HAWK guesses at 1.76 can still pay 2.00 at Bet365,
+  // and a third of them beat the guess by about that much. Any looser and
+  // "at least 2.00" starts handing back tickets guessing 1.45, which is the
+  // filter lying in the other direction.
+  const B365_GUESS_LOW = 0.88;
   // The "lands 1 in 4" floor is for when HAWK picks the odds itself. Once you
   // ask for a price, it would just rule everything out (nothing paying 8.00
   // lands 1 in 4), so it's dropped — HAWK shows the likeliest build that pays
@@ -1949,7 +1962,7 @@
         const k = t.legs.map((l) => l.id).sort().join("|");
         if (!t.legs.length || !(t.p >= (exact ? 0 : minChance(min))) || found.has(k)) continue;
         if (exact && t.legs.length !== exact) continue;      // not the number of legs you asked for
-        if (!exact && min && !((t.b365 || t.fair) >= min)) continue;   // below the odds you asked for
+        if (min && !((t.b365 || t.fair) >= min * B365_GUESS_LOW)) continue;   // below the odds you asked for, allowing for the guess being out
         if (onlyWorth && worthOf(t) < 1.02) continue;          // not one HAWK would back
         found.set(k, { ...t, autoTarget: target });
       }
@@ -1995,7 +2008,15 @@
                           params.favourite !== false, params.focus || "Mix", !!params.extras, picks, known);
       if (!t.legs.length || !(t.p >= (exact ? 0 : minChance(min)))) continue;
       if (exact && t.legs.length !== exact) continue;      // not the number of legs you asked for
-      if (!exact && min && !((t.b365 || t.fair) >= min)) continue;   // below the odds you asked for
+      // "At least 2.00" is about the price Bet365 ends up showing, and HAWK's
+      // guess at that is its weakest number — out by up to a third either way.
+      // Throwing a build out on the guess hides the likeliest tickets that do
+      // clear once checked, so the gate is widened by the size of the error and
+      // the card asks you to check the real price.
+      // Asking for a number of legs used to throw your odds floor away, so
+      // "exactly 2 legs, at least 2.00" handed back 2-leg tickets paying 1.16.
+      // Both are your terms: they both apply.
+      if (min && !((t.b365 || t.fair) >= min * B365_GUESS_LOW)) continue;
       const w = worthOf(t);
       if (onlyWorth && w < 1.02) continue;   // not one HAWK would back: don't offer it
       const k = t.legs.map((l) => l.id).sort().join("|");

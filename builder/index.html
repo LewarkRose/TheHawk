@@ -3428,6 +3428,8 @@ function theLeg(results) {
     <div class="tl-facts">
       <span>HAWK expects <b>${odds(price)}</b></span>
       <span>Back it at <b style="color:var(--gold)">${odds(need.need)}+</b></span>
+      ${S.scan.minOdds && price < S.scan.minOdds ? `<span style="color:var(--blue)">clears your ${
+        odds(S.scan.minOdds)} only if Bet365 pays over the guess — it did on 1 in 3</span>` : ""}
       <span class="muted">${guessed ? `${guessed} of ${top.legs.length} leg prices are HAWK's guess`
         : `every leg at Bet365's own price — nothing guessed`}</span>
     </div>

@@ -4853,11 +4853,16 @@ function saveWatch() { try { localStorage.setItem(WATCH_KEY, JSON.stringify(S.wa
 function isWatched(id) { return S.watch.some(w => String(w.id) === String(id)); }
 function renderWatch() {
   const btn = $("#watchBtn"), pop = $("#watchPop"), n = S.watch.length + S.alerts.length;
-  btn.hidden = !n;
-  if (!n) pop.hidden = true;
+  const log = loadPref("hawk.alertLog", []);
+  btn.hidden = !n && !log.length;
+  if (!n && !log.length) pop.hidden = true;
   btn.innerHTML = `🔔 <span>Alerts</span><em class="count">${n}</em>`;
   btn.title = `${n} alert${n === 1 ? "" : "s"} on (lineups and prices) — click to see them`;
-  pop.innerHTML = (S.watch.length ? `<div class="muted" style="font-size:12px;padding:2px 4px 6px">Lineup alerts — checked every 2 minutes while this tab is open</div>` +
+  pop.innerHTML = (log.length ? `<div class="muted" style="font-size:12px;padding:2px 4px 6px;display:flex;align-items:center;gap:8px">
+      <span style="flex:1">What HAWK told you</span><button data-clearlog title="Clear this list" style="background:none;border:0;color:var(--muted);cursor:pointer;font-size:11.5px">clear</button></div>` +
+    log.slice(0, 8).map(a => `<div class="row"><div><span>${a.icon || "🔔"}</span> <b>${esc(a.word || "")}</b>
+      <div class="muted" style="font-size:11.5px">${esc(a.text || "")} · ${esc(alertAgo(a.at))}</div></div></div>`).join("")
+    + `<div style="height:8px"></div>` : "") + (S.watch.length ? `<div class="muted" style="font-size:12px;padding:2px 4px 6px">Lineup alerts — checked every 2 minutes while this tab is open</div>` +
     S.watch.map(w => `<div class="row"><a href="#" data-go="${esc(w.id)}" style="color:var(--text)">${esc(w.home)} v ${esc(w.away)}</a>
       <button data-unwatch="${esc(w.id)}" title="Stop this alert">✕</button></div>`).join("") : "") +
     (S.alerts.length ? `<div class="muted" style="font-size:12px;padding:8px 4px 6px">Price alerts — Bet365 checked every 3 minutes while this tab is open</div>` +
@@ -4866,6 +4871,7 @@ function renderWatch() {
       <button data-unstar="${i}" title="Stop this alert">✕</button></div>`).join("") : "");
   pop.onclick = (e) => {
     e.preventDefault();
+    if (e.target.closest("[data-clearlog]")) { savePref("hawk.alertLog", []); renderWatch(); return; }
     const us = e.target.closest("[data-unstar]");
     if (us) { S.alerts.splice(+us.dataset.unstar, 1); savePref("hawk.priceAlerts", S.alerts); renderWatch(); refreshTab(); return; }
     const ga = e.target.closest("[data-goal]");
@@ -5156,6 +5162,17 @@ async function betOutcome(b) {
   }
   return check ? { check } : { won: true };
 }
+// Everything HAWK has beeped about, kept so a card you miss is still
+// readable afterwards in the Alerts panel. Last 20, oldest dropped.
+const ALERT_LOG_KEEP = 20;
+function logAlert(icon, word, text) {
+  const list = loadPref("hawk.alertLog", []);
+  list.unshift({ icon, word, text: String(text || "").slice(0, 160), at: Date.now() });
+  savePref("hawk.alertLog", list.slice(0, ALERT_LOG_KEEP));
+  if (typeof renderWatch === "function") renderWatch();
+}
+const alertAgo = (t) => { const m = Math.max(0, Math.round((Date.now() - t) / 60000));
+  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
 // A notice that isn't about a goal (value found, lineups confirmed). It gets
 // the same card as a goal, so every sound HAWK makes leaves something you can
 // still see fifteen seconds later — a 2-second toast was far too easy to miss.
@@ -5168,6 +5185,7 @@ function noticeCard({ icon = "\ud83d\udd14", word, text, tone = "good", onClick 
     <div class="g-who">${esc(text)}</div>
     <div class="g-bar"><i></i></div>`;
   card.onclick = (e) => { card.remove(); if (!e.target.closest(".gx") && onClick) onClick(); };
+  logAlert(icon, word, text);
   box.prepend(card);
   while (box.children.length > 3) box.lastElementChild.remove();
   const hideLater = () => { setTimeout(() => card.classList.add("bye"), GOAL_SHOW_MS); setTimeout(() => card.remove(), GOAL_SHOW_MS + 600); };
@@ -5188,6 +5206,8 @@ function alertCard({ tone = "good", icon, word, g, clock, body, bet }) {
     ${bet && bet.p != null ? `<div class="g-bet">🎟 Your bet: <b>${pct(bet.p, bet.p < 0.1 ? 1 : 0)}</b> to land now${bet.ret ? ` · worth ≈ €${(bet.p * bet.ret).toFixed(2)}` : ""}</div>` : ""}
     <div class="g-bar"><i></i></div>`;
   card.onclick = (e) => { card.remove(); if (!e.target.closest(".gx")) (g.status === 4 ? showReport(g.id) : goToLive(g.league, g.id)); };
+  { const tmp = document.createElement("div"); tmp.innerHTML = body;
+    logAlert(icon, word, `${g.home} ${g.score[0] == null ? "v" : `${g.score[0]}-${g.score[1]}`} ${g.away} · ${tmp.textContent}`); }
   box.prepend(card);
   while (box.children.length > 3) box.lastElementChild.remove();
   const hideLater = () => { setTimeout(() => card.classList.add("bye"), GOAL_SHOW_MS); setTimeout(() => card.remove(), GOAL_SHOW_MS + 600); };
@@ -5267,6 +5287,7 @@ async function goalAlert(g, side, score, fast = false) {
   const hideLater = () => { setTimeout(() => card.classList.add("bye"), GOAL_SHOW_MS); setTimeout(() => card.remove(), GOAL_SHOW_MS + 600); };
   if (document.hidden) document.addEventListener("visibilitychange", function once() { if (!document.hidden) { document.removeEventListener("visibilitychange", once); hideLater(); } });
   else hideLater();
+  logAlert(off ? "❌" : "⚽", off ? "Goal ruled out" : "GOAL!", `${g.home} ${score[0]}-${score[1]} ${g.away}${team ? ` · ${team}` : ""}`);
   if (!off) { beep(); flashTitle("⚽ GOAL!"); }
   // A PC / phone notification when HAWK isn't the window you're looking at.
   if (document.hidden || !document.hasFocus()) {

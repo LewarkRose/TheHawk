@@ -38,6 +38,10 @@
 @media (prefers-reduced-motion:reduce){.bg-glow i{animation:none}}
 main.grid{position:relative;z-index:1}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif}
+/* The tilted pitch paints a few pixels wider than it measures, which left the
+   whole page sliding sideways on a phone. clip, not hidden: hidden here would
+   break the sticky headers. */
+html{overflow-x:clip}
 button,input,select{font:inherit;color:inherit}
 img{max-width:100%}
 /* header: row 1 = logo · pages · alerts + Vault, row 2 = leagues */
@@ -728,13 +732,21 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       body[data-view="today"] main.grid, body[data-view="scan"] main.grid{grid-template-columns:minmax(0,1fr)}
       body[data-view="today"] #fxPanel, body[data-view="scan"] #fxPanel,
       body[data-view="today"] .slipcol, body[data-view="scan"] .slipcol{display:none}
+      /* The acca keeps the league list — that's how you go and add another
+         match — but the builder column only works on an open fixture, so on
+         the acca it sat there saying "pick a fixture" and took 400px for it. */
+      body[data-view="acca"] main.grid{grid-template-columns:290px minmax(0,1fr)}
+      body[data-view="acca"] .slipcol{display:none}
+      body[data-view="acca"] #match{max-width:1040px}
     }
     /* Live on a PC: the day down the left, your own money down the right,
        so you never switch between watching and checking. */
     @media (min-width:1251px){
       body[data-view="scores"] main.grid{grid-template-columns:minmax(0,1fr)}
       body[data-view="scores"] #fxPanel, body[data-view="scores"] .slipcol{display:none}
-      body[data-view="scores"] #scList{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:18px;align-items:start}
+      /* The scores are capped: a row stretched across 1200px leaves the teams
+         at opposite edges with the score marooned in the middle. */
+      body[data-view="scores"] #scList{display:grid;grid-template-columns:minmax(0,900px) 370px;gap:18px;align-items:start;justify-content:space-between}
       body[data-view="scores"] #scList > *{grid-column:1}
       body[data-view="scores"] #scList > .myday{grid-column:2;grid-row:1 / span 99;margin:0;position:sticky;top:12px}
     }
@@ -1030,7 +1042,9 @@ body.drawer-open .bdrawer{display:block;position:fixed;right:0;bottom:0;width:39
   box-shadow:0 14px 26px -16px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.06)}
 .bdrawer.anim .mb-card{animation:tkIn .5s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(.15s + var(--i, 0) * 80ms)}
 @keyframes tkIn{from{opacity:0;transform:perspective(900px) rotateX(-40deg) translateY(-14px)}to{opacity:1;transform:none}}
-@media (min-width:1700px){body.drawer-open main.grid{padding-right:412px}}
+/* 1400, not 1700: a 1690-wide laptop had the drawer sitting on top of the page
+   instead of beside it. */
+@media (min-width:1400px){body.drawer-open main.grid{padding-right:412px}}
 .nav.betsnav.on{color:var(--gold);border-color:rgba(255,209,102,.45)}
 @media (prefers-reduced-motion:reduce){.bdrawer.anim,.bdrawer.anim .mb-card{animation:none}}
 /* (only four page buttons now, so their names always fit) */
@@ -3521,14 +3535,14 @@ function partRow(pt, actions) {
   return `<div class="leg card tilt3d apart3d fcard ${started ? "gone" : ""} ${S.flipped.has(fid) ? "flipped" : ""}" data-fid="${esc(fid)}"><div class="fin"><div class="fa">
     <div class="sc-head"><div class="pcrests">${crest(pt.homeCrest)}${crest(pt.awayCrest)}</div>
       <div class="sc-name"><div class="lb">${esc(pt.home)} <span class="muted" style="font-weight:500">v</span> ${esc(pt.away)}${upsetFlag(pt)}</div>
-        <div class="mk">${esc(pt.league)} · ${esc(fmtKick(pt.kickoff))}${started ? ' · <span class="badge live">STARTED</span>' : ""}</div></div>
+        <div class="mk">${esc(pt.league)}${pt.kickoff ? ` · ${esc(fmtKick(pt.kickoff))}` : ""}${started ? ' · <span class="badge live">STARTED</span>' : ""}</div></div>
       <span class="verdict ${vd.tone}" title="${esc(vd.why)}">${vd.label}</span></div>
     <div class="plegs">${pt.legs.map(legRow).join("")}</div>
     <div class="tiles">
       <div class="tile"><div class="tk">Chance</div><div class="tv">${pct(pt.p, pt.p < 0.1 ? 1 : 0)}</div><div class="ts">${single ? "this leg" : `${pt.legs.length} legs together`}</div></div>
       <div class="tile ${tone}"><div class="tk">Bet365</div><div class="tv">${price ? odds(price) : "—"}</div>
         <div class="ts">${price ? (ev >= 0.02 ? `value +${(100 * ev).toFixed(0)}%` : ev >= -0.02 ? "fair price" : `${(100 * -ev).toFixed(0)}% under fair`) : "Bet365 prices the builder"}</div></div>
-      <div class="tile"><div class="tk">Fair odds</div><div class="tv">${odds(pt.fair)}</div>
+      <div class="tile"><div class="tk">Fair odds</div><div class="tv">${odds(pt.fair || (pt.p > 0 ? 1 / pt.p : null))}</div>
         <div class="ts">${moved ? `<span class="${pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "dn" : "up"}">${pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "▼" : "▲"} from ${odds(pt.legs[0].bookOpen)}</span>` : "HAWK's price"}</div></div>
     </div>
     </div>
@@ -3869,7 +3883,7 @@ function renderScores() {
   const days = [-3, -2, -1, 0, 1, 2, 3].map(k => { const d = new Date(today); d.setDate(d.getDate() + k); return [localDay(d), k === 0 ? "Today" : k === -1 ? "Yesterday" : k === 1 ? "Tomorrow" : d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })]; });
   $("#match").innerHTML = `
     <div class="section" style="border-top:0">
-      <h3 style="display:flex;align-items:center;gap:10px">⚽ Scores
+      <h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">⚽ Scores
         <button class="ghost" id="goalToggle" style="width:auto;margin:0 0 0 auto;padding:4px 10px;font-size:12px;text-transform:none;letter-spacing:0"
           title="A goal pops up for matches you have a HAWK bet on, a lineup alert on, or open in the live view — and as a PC / phone notification while HAWK is open in the background">${goalToggleText()}</button>
         <button class="ghost" style="width:auto;margin:0;padding:4px 10px;font-size:12px;text-transform:none;letter-spacing:0" onclick="testNotify()"
@@ -4422,7 +4436,8 @@ function myDayCard(games) {
   const clockOf = (id) => { const g = (games || []).find((x) => String(x.id) === String(id)); return g && g.status === 3 ? (g.clock || "live") : g && g.status === 4 ? "FT" : null; };
   const rows = mine.map((b) => {
     const legs = (b.legs || []).flatMap((l) => (l.hawk && l.hawk.legs || []).map((h) => ({ ...h, game: l.hawk.game })));
-    const chips = legs.map((h) => {
+    // A leg with no readable label would just be an empty pill.
+    const chips = legs.filter((h) => String(h.label || "").trim().length > 1).map((h) => {
       const st = h.result === "won" || h.userDone ? "won" : h.result === "lost" ? "lost" : "";
       const clock = clockOf(h.game);
       return `<span class="myleg ${st}">${esc(String(h.label || "").slice(0, 34))}${clock && !st ? ` · ${esc(clock)}` : ""}</span>`;

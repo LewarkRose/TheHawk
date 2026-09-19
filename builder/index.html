@@ -1246,7 +1246,12 @@ function foldFixtures(fold) {
 function loadPref(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } }
 function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
-            target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), auto: loadPref("hawk.auto", false), priced: loadPref("hawk.priced", false), favourite: true, result: null, tab: "players", q: "",
+            target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), auto: loadPref("hawk.auto", false),
+            // On by default since 20 Sep: measured blind on twelve builders, a leg
+            // Bet365 doesn't publish a price for costs about 20% of the ticket's
+            // value. Builds made only of markets Bet365 prices came in at 0.924
+            // of fair; ones with a player prop in them, 0.741.
+            priced: loadPref("hawk.priced", true), favourite: true, result: null, tab: "players", q: "",
             chk: { price: "", boost: "", stake: "5" }, moreOpen: false, radarOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
@@ -2471,7 +2476,8 @@ function renderSlip() {
       <button data-cyc="focus" title="What the builder is made of">${{ Mix: "Mix of markets", Players: "Player props", Match: "Match stats" }[S.focus]}</button>
       <button data-cyc="picks" title="How HAWK chooses between legs">${S.picks === "value" ? "Best value" : "Most likely"}</button>
       <button data-cyc="max" title="The most legs HAWK will use">Max ${S.maxLegs} legs</button>
-      <button data-cyc="priced" class="${S.priced ? "on" : ""}" title="Only legs with a real bookmaker price behind them — HAWK's expected builder price is then much closer to what Bet365 shows">Real prices only</button>
+      <button data-cyc="priced" class="${S.priced ? "on" : ""}" title="Only legs Bet365 publishes a price for. Measured on twelve builders: those come in at 0.924 of fair, while a build with a player prop in it comes in at 0.741 — the prop costs about a fifth of the ticket.">${
+        S.priced ? "Bet365-priced legs" : "⚠️ props on (−20%)"}</button>
       <button data-cyc="fav" class="${S.favourite ? "on" : ""}" title="Start every builder with the favourite to win (or the double chance)">Favourite first</button>
     </div>
     <details class="rmore" ${S.moreOpen ? "open" : ""} id="rmore"><summary>Bet365 extras — ${[S.ep, S.subOn, S.extras].filter(Boolean).length} on</summary>
@@ -2544,7 +2550,8 @@ function renderSlip() {
       case "picks": S.picks = S.picks === "value" ? "likely" : "value"; savePref("hawk.picks", S.picks); break;
       case "max": S.maxLegs = next([3, 4, 5, 6, 8, 10, 12], S.maxLegs); savePref("hawk.maxLegs", S.maxLegs); break;
       case "priced": S.priced = !S.priced; savePref("hawk.priced", S.priced);
-        toast(S.priced ? "Only legs with a real bookmaker price — HAWK's expected price gets much closer" : "Legs HAWK has to price itself are back in"); break;
+        toast(S.priced ? "Only legs Bet365 publishes a price for — builds like these came in at 0.924 of fair"
+                       : "Player props are back in. Measured at 0.741 of fair: the prop costs about a fifth of the ticket", 6000); break;
       case "fav": S.favourite = !S.favourite; savePref("hawk.fav", S.favourite); break;
     }
     renderSlip();
@@ -2594,7 +2601,19 @@ function renderSlip() {
 // first Torino v Roma slip: 3.27 fair, 2.70 at Bet365, 4 legs) and moves to
 // your own prices as they come in.
 const B365_K0 = 0.05, B365_K0_WEIGHT = 3, B365_KEEP = 60;
-const AIM_PRIOR = -0.105, AIM_PRIOR_W = 4;   // Bet365's builder cut per leg before HAWK has your prices
+// Bet365's builder cut, before HAWK has any of your prices. Measured blind on
+// 20 Sep: ten 2-leg builders chosen BEFORE their prices were looked up.
+//   with a player prop in it   Bet365 paid 0.741 of fair
+//   both legs Bet365-priced    Bet365 paid 0.924 of fair
+// So almost none of the cut is "per leg" — it sits on the legs Bet365 doesn't
+// publish. Two of the priced builds (Man City 2.20, Fiorentina 2.35) paid at or
+// above the two singles multiplied together: no combining charge at all.
+// Fitted on those ten, HAWK's guess now lands within 5% on seven of them.
+// The Vault's 37 checked builds implied 5.1% a leg and that number is a trap:
+// they are builds that were PLACED, so their prices looked acceptable at the
+// time. The ones Bet365 priced at 1.53 never became bets. Only blind samples
+// measure this, which is why these ten outrank those thirty-seven.
+const AIM_PRIOR = -0.029, AIM_PRIOR_W = 4;
 function recordB365Price() {
   const r = S.result, m = S.match, price = checkerInputs().price;
   if (!m || !r || !r.fair || !(price > 1) || !S.slip.length) return;
@@ -2621,7 +2640,10 @@ function recordB365Price() {
 // prices you've typed, each pulled towards a sensible prior so a handful of
 // builders can't send it silly. Roma v Inter, 19 Sep: guess 4.54, Bet365 4.00
 // — four legs, two of them guessed, which is exactly what `gl` is for.
-const AIM_GUESS_PRIOR = -0.02, AIM_GUESS_W = 6;
+// -0.221, not -0.02: the blind ten put nearly the whole builder cut here rather
+// than on leg count. A prop leg costs about 20% of the ticket's value, which is
+// why every builder with one in it reads skip and always will.
+const AIM_GUESS_PRIOR = -0.221, AIM_GUESS_W = 6;
 function applyAim() {
   const rows = loadPref("hawk.b365prices", []).filter(x => x.model > 1 && x.price > 1 && x.legs > 0).slice(-30)
     .map(x => ({ y: Math.log(x.price / x.model), n: x.legs,
@@ -2638,7 +2660,9 @@ function applyAim() {
   let cl = AIM_PRIOR, gl = AIM_GUESS_PRIOR;
   if (Math.abs(det) > 1e-9) { cl = (b1 * a22 - b2 * a12) / det; gl = (a11 * b2 - a12 * b1) / det; }
   cl = Math.max(-0.25, Math.min(0.08, cl));
-  gl = Math.max(-0.15, Math.min(0.05, gl));
+  // The floor was -0.15, which silently clipped the prior itself: the blind ten
+  // measured -0.221 on a guessed leg and the fit could never reach it.
+  gl = Math.max(-0.35, Math.min(0.05, gl));
   S.aim = { c: 0, cl, gl, n: rows.length };
   HAWK.setAim({ c: 0, cl, gl });
 }
@@ -3199,6 +3223,9 @@ function renderScan() {
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Only show a match when HAWK would actually back the builder \u2014 the price it expects from Bet365 beats what the ticket is worth. Most matches won't have one.">
           <input type="checkbox" id="scanWorthOnly" ${sc.onlyWorth ? "checked" : ""}> Only ones worth backing</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="scanConf" ${sc.confirmed ? "checked" : ""}> Lineups confirmed only</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Only legs Bet365 publishes a price for: result, double chance, goals, cards, corners, shots on target. Measured blind on twelve builders — these come in at 0.924 of fair, while a build containing a player prop comes in at 0.741. The prop costs about a fifth of the ticket, every time.">
+          <input type="checkbox" id="scanPriced" ${S.priced ? "checked" : ""}> Bet365-priced legs only${
+            S.priced ? "" : ` <b style="color:var(--gold)">· props cost ~20%</b>`}</label>
       </div>
       </details>
       <div id="scanProg"></div>
@@ -3278,6 +3305,8 @@ function renderScan() {
   $("#scanRes").addEventListener("click", (e) => { if (!e.target.closest("[data-showbet]")) return;
     e.stopPropagation(); S.scan.showBet = !S.scan.showBet; savePref("hawk.scanShowBet", S.scan.showBet); updateScan(); }, true);
   $("#scanConf").onchange = (e) => { sc.confirmed = e.target.checked; savePref("hawk.scanConfirmed", sc.confirmed); updateScan(); };
+  $("#scanPriced").onchange = async (e) => { S.priced = e.target.checked; savePref("hawk.priced", S.priced);
+    renderScan(); await rescan(); };
   $("#scanGo").onclick = toggleScan;
   $("#scanRes").onclick = (e) => {
     // A tap on "other ways to build this match" opens the list, not the match.
@@ -3426,7 +3455,7 @@ function theLeg(results) {
       <div class="tl-price"><div class="n">${Math.round(100 * top.p)}<small>%</small></div><div class="k">LANDS</div></div>
     </div>
     <div class="tl-facts">
-      <span>HAWK expects <b>${odds(price)}</b></span>
+      <span>${guessed ? "Floor" : "HAWK expects"} <b>${odds(price)}</b></span>
       <span>Back it at <b style="color:var(--gold)">${odds(need.need)}+</b></span>
       ${S.scan.minOdds && price < S.scan.minOdds ? `<span style="color:var(--blue)">clears your ${
         odds(S.scan.minOdds)} only if Bet365 pays over the guess — it did on 1 in 3</span>` : ""}

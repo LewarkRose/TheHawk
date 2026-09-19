@@ -4132,8 +4132,19 @@ async function refreshInPlay() {
 const HT_TYPES = new Set([1, 14, 15, 3, 12]);
 const isHalfTime = (x) => /half.?time|^ht$|break/i.test((x && x.statusText) || "");
 S.ht = {};
+// A line the score has already settled isn't a tip. At 2–1 "Over 2.5 goals"
+// has landed: the 75% and the 1.44 beside it came from a snapshot taken before
+// the third goal, and nobody pays 1.44 for a bet that's already won.
+function htSettled(r, d) {
+  const s = d.score || [], hg = s[0] || 0, ag = s[1] || 0;
+  const m = /^(Over|Under) ([\d.]+) Goals/.exec(r.label || "");
+  if (m) return hg + ag > +m[2];                       // Over: landed · Under: gone
+  if (/^Both Teams to Score/.test(r.label || "")) return hg > 0 && ag > 0;
+  return false;
+}
 function htTips(d) {
-  return (d.rows || []).filter(r => HT_TYPES.has(r.type) && r.p >= 0.4 && r.p < 0.97 && r.price >= 1.2 && r.edge >= 0.02)
+  return (d.rows || []).filter(r => HT_TYPES.has(r.type) && r.p >= 0.4 && r.p < 0.97 && r.price >= 1.2 && r.edge >= 0.02
+                                    && !htSettled(r, d))
     .sort((a, b) => b.edge - a.edge).slice(0, 2);
 }
 // What the 1st half looked like, in one line.
@@ -4146,8 +4157,10 @@ function htStatsLine(d) {
 function htTipLabel(r, d) {
   const m = /^(Over|Under) ([\d.]+) Goals/.exec(r.label), now = (d.score[0] || 0) + (d.score[1] || 0);
   if (!m) return r.label;
-  const need = Math.floor(+m[2]) + 1 - now;
-  return `${r.label} — ${m[1] === "Over" ? `${need} more goal${need > 1 ? "s" : ""}${isHalfTime(d) ? " in the 2nd half" : ""}` : `no more than ${Math.max(0, Math.ceil(+m[2]) - 1 - now)} more`}`;
+  const need = Math.floor(+m[2]) + 1 - now, spare = Math.max(0, Math.ceil(+m[2]) - 1 - now);
+  return `${r.label} — ${m[1] === "Over"
+    ? (need <= 0 ? "already landed" : `${need} more goal${need > 1 ? "s" : ""}${isHalfTime(d) ? " in the 2nd half" : ""}`)
+    : (spare === 0 ? "no more goals" : `no more than ${spare} more`)}`;
 }
 // Checked all match long, not just once: every live match in HAWK's competitions,
 // every 30 s at half-time and every 2 minutes while the ball's rolling (from the

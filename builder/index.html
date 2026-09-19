@@ -3359,7 +3359,12 @@ function updateScan() {
   // number that settles it: the price you read off Bet365. Counted whether or
   // not HAWK had to guess a leg, because even an estimate built from real
   // prices multiplied is still an estimate, out by about 10% either way.
-  const toCheck = shown.filter(r => !S.scan.prices[scanKey(r)]).length;
+  // Only the ones a real price could actually turn. HAWK's estimate is out by
+  // about 10% either way, so a build already within reach of its bar is worth
+  // walking to Bet365 for; one at 0.80 of fair is not, and saying "20 to check"
+  // sends you to check nineteen tickets that cannot come back green.
+  const CHECK_REACH = 0.92;
+  const toCheck = shown.filter(r => !S.scan.prices[scanKey(r)] && (isGuess(r) || r.worth >= CHECK_REACH)).length;
   const guessing = shown.filter(r => isGuess(r)).length;
   if (!res.length && hidden) {
     $("#scanRes").innerHTML = betNote + `<div class="note">No match with confirmed lineups yet (${hidden} still predicted). Lineups come out about an hour before kick-off — ⚡ Scan again then, or untick <b>Lineups confirmed only</b>.</div>`;
@@ -3370,7 +3375,9 @@ function updateScan() {
   // One leg, at the top, every scan: the thing you actually came for.
   const leg = shown.length && !d.running ? theLeg(shown) : "";
   $("#scanRes").innerHTML = betNote + leg + singles + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "check"}" style="margin:0 0 12px">${
-      [good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`, toCheck && `👀 ${toCheck} to check on Bet365`].filter(Boolean).join(" · ") || "Nothing to check"}<small>${
+      [good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`,
+       toCheck && `👀 ${toCheck} worth checking on Bet365`].filter(Boolean).join(" · ")
+      || `Nothing close enough to check — the best of ${shown.length} is short of its price`}<small>${
       guessing
         ? "HAWK can't see Bet365's builder prices — it can only say what each one has to beat. That's a target, not a verdict."
         : "Every leg here has Bet365's own price behind it, so the estimate is those prices multiplied rather than a guess — but it's still out by about 10% either way, which is the difference between a fair price and a good one."}

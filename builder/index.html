@@ -1057,9 +1057,9 @@ a.nav{text-decoration:none}
       <span class="wordmark"><b>HAWK</b><small>BET BUILDER</small></span>
     </a>
     <nav class="mainnav" id="mainnav">
+      <button class="nav" id="navToday" data-nav="today" onclick="showToday()" title="The day's plan: what to back, what's running, what it's done">📅 <span>Today</span></button>
       <button class="nav" id="scanBtn" data-nav="scan" title="Tonight's picks: HAWK's best builder for every match">🏆 <span>Picks</span></button>
       <button class="nav" id="scoresBtn" data-nav="live" title="Live scores, half-time tips, your bets live and cash-out">🔴 <span>Live</span></button>
-      <button class="nav" id="navToday" data-nav="today" onclick="showToday()" title="The day's plan: what to bet, what's running, what it's done">📅 <span>Today</span></button>
       <button class="nav betsnav" id="navBets" onclick="openMyBets()" title="Your bets from the Vault: the ones still running and the last settled">🎟 <span>My bets</span><b class="jn" id="navBetsN" hidden></b></button>
       <button class="nav morenav" id="moreBtn" data-nav="more" title="Builder, Value, Acca and the Vault">☰ <span>More</span></button>
     </nav>
@@ -1108,7 +1108,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },   // perMatch is always 1: one Bet365-priced leg per match, so the acca has no builder cut
-            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", confirmed: loadPref("hawk.scanConfirmed", false), setOpen: false, onlyWorth: loadPref("hawk.onlyWorth", false), showBet: loadPref("hawk.scanShowBet", false), minOdds: loadPref("hawk.minOdds", 2), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
+            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: "worth", confirmed: loadPref("hawk.scanConfirmed", false), setOpen: false, onlyWorth: loadPref("hawk.onlyWorth", true), showBet: loadPref("hawk.scanShowBet", false), minOdds: loadPref("hawk.minOdds", 2), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null,
                      tab: "value", minMove: 0.1 },
             watch: [] };
@@ -1251,8 +1251,9 @@ async function init() {
 // finished → match report.
 async function openFromUrl() {
   const q = new URLSearchParams(location.search), id = q.get("match"), view = q.get("view");
-  // Home page: tonight's picks on a phone; on a PC the Builder, as before.
-  if (!id && !view && matchMedia("(max-width:820px)").matches) return showScan();
+  // Home page: the day's plan. What to back, what's running, what it's done —
+  // the builder and everything else are a tap away when you want them.
+  if (!id && !view) return showToday();
   // App shortcuts (long-press the HAWK icon): builder/?view=scores | value | acca | scan
   const views = { scores: showScores, value: showValue, acca: showAcca, scan: showScan, today: showToday };
   if (view && views[view]) { history.replaceState(null, "", location.pathname); return views[view](); }
@@ -4153,6 +4154,16 @@ function dayPicks() {
     out.push({ key: `s:${row.game}:${row.id}`, kind: "single", label: row.label, where: `${row.home} v ${row.away}`,
                price: row.price, p: row.p, kickoff: row.kickoff, game: String(row.game), league: row.league });
   }
+  // Builders HAWK would actually back: the price it expects from Bet365 beats
+  // what the ticket is worth. Usually only a couple on a whole card.
+  for (const r of res) {
+    if (out.length >= PLAN_MAX - 1 || seen.has(String(r.id)) || !(r.worth >= 1.02)) continue;
+    const price = r.b365 || r.fair; if (!(price > 1)) continue;
+    seen.add(String(r.id));
+    out.push({ key: `b:${r.id}`, kind: "builder", label: r.legs.map((l) => l.label).join(" + "),
+               where: `${r.home} v ${r.away} \u00b7 ${r.legs.length} legs`, price: +price.toFixed(2), p: r.p,
+               kickoff: r.kickoff, game: String(r.id), league: r.league });
+  }
   const mo = S.monster.data;
   if (mo && !mo.running && typeof monsterPick === "function") {
     const { picked } = monsterPick();
@@ -4164,7 +4175,7 @@ function dayPicks() {
                  kickoff: parts.map((r) => r.kickoff).sort()[0] || null });
     }
   }
-  return out;
+  return out.sort((a, b) => (b.p * b.price) - (a.p * a.price));
 }
 function showToday() {
   S.view = "today";

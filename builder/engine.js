@@ -1970,30 +1970,52 @@
   // The scan's cheap version of 🎯 Auto: one build per target in your own style,
   // best of the three (worth it at Bet365 first, then the likeliest). Scanning
   // dozens of matches can't afford the builder's full search.
-  function autoBest(e, params) {
+  // It builds one per target anyway and used to throw all but the best away.
+  // Those are the other options for the match — a different price, a different
+  // shape — so they're kept and ranked instead.
+  function autoTop(e, params, count = 1) {
     const maxLegs = +params.maxLegs || 6, banned = new Set(params.banned || []), known = new Set(params.known || []);
     const min = +params.minOdds || 0;   // "at least these odds": a bigger payout, still the likeliest that pays it
     const onlyWorth = !!params.onlyWorth;
     const exact = Math.min(12, Math.max(0, +params.exactLegs || 0));
-    let best = null, bestKey = null;
+    const found = new Map();
     // Worth-it hunting needs more than three tries: the ticket that clears the
     // cut is usually two legs, not the one that happens to hit a round target.
-    const targets = exact ? [999]   // no price to aim at: stack until there are `exact` legs
-                  : onlyWorth ? [1.6, 2, 2.5, 3, 3.75, 5].filter((t) => !min || t >= min).concat(min ? minTargets(min) : [])
-                  : (min ? minTargets(min) : AUTO_TARGETS);
-    for (const target of targets) {
+    let targets = exact ? [999]   // no price to aim at: stack until there are `exact` legs
+                : onlyWorth ? [1.6, 2, 2.5, 3, 3.75, 5].filter((t) => !min || t >= min).concat(min ? minTargets(min) : [])
+                : (min ? minTargets(min) : AUTO_TARGETS);
+    // Asked for more than one? Look at more prices and build the other way round
+    // as well (likeliest legs / legs with value) — otherwise every try comes
+    // back with the same ticket and there's nothing to choose between.
+    const base = params.picks === "value" ? "value" : "likely";
+    const modes = count > 1 ? [base, base === "value" ? "likely" : "value"] : [base];
+    if (count > 1 && !exact) targets = [...new Set([...targets, ...targets.map((t) => +(t * 1.7).toFixed(2))])];
+    for (const target of targets) for (const picks of modes) {
       const t = autoBuild(e.legs, target, params.style, exact || maxLegs, params.locked || [], banned,
-                          params.favourite !== false, params.focus || "Mix", !!params.extras, params.picks === "value" ? "value" : "likely", known);
+                          params.favourite !== false, params.focus || "Mix", !!params.extras, picks, known);
       if (!t.legs.length || !(t.p >= (exact ? 0 : minChance(min)))) continue;
       if (exact && t.legs.length !== exact) continue;      // not the number of legs you asked for
       if (!exact && min && !((t.b365 || t.fair) >= min)) continue;   // below the odds you asked for
       const w = worthOf(t);
       if (onlyWorth && w < 1.02) continue;   // not one HAWK would back: don't offer it
-      const key = min && !onlyWorth ? [0, t.p] : [w >= 1.02 ? 2 : w >= 0.95 ? 1 : 0, w + 0.5 * t.p];
-      if (!bestKey || key[0] > bestKey[0] || (key[0] === bestKey[0] && key[1] > bestKey[1])) { best = { ...t, worth: +w.toFixed(3), autoTarget: target }; bestKey = key; }
+      const k = t.legs.map((l) => l.id).sort().join("|");
+      if (found.has(k)) continue;            // the same ticket from another target
+      found.set(k, { ...t, worth: +w.toFixed(3), autoTarget: target,
+                     rank: min && !onlyWorth ? [0, t.p] : [w >= 1.02 ? 2 : w >= 0.95 ? 1 : 0, w + 0.5 * t.p] });
     }
-    return best;
+    const pool = [...found.values()].sort((a, b) => b.rank[0] - a.rank[0] || b.rank[1] - a.rank[1]);
+    const chosen = [];
+    for (const t of pool) {
+      if (chosen.length >= count) break;
+      // One ticket sitting inside another isn't a second option — but sharing
+      // the result leg and going a different way after it is.
+      if (chosen.some((c) => t.legs.filter((l) => c.legs.some((x) => x.id === l.id)).length
+                             >= Math.max(2, Math.min(t.legs.length, c.legs.length)))) continue;
+      chosen.push(t);
+    }
+    return chosen.map(({ rank, ...t }) => t);
   }
+  const autoBest = (e, params) => autoTop(e, params, 1)[0] || null;
   function buildOptions(body, count = 5) {
     if (body.auto) { const e0 = entryFor(body.id); return { options: autoOptions(e0, withPriced(e0, body), count, 0) }; }
     const e = entryFor(body.id);
@@ -2078,15 +2100,22 @@
     const params = { ...windowParams(body), target: Math.min(Math.max(+body.target || 3, 1.2), 50),
                      style: STYLES[body.style] ? body.style : "Balanced", focus: FOCUS[body.focus] ? body.focus : "Mix",
                      maxLegs: Math.min(Math.max(+body.maxLegs || 10, 2), 12), extras: !!body.extras, picks: body.picks === "value" ? "value" : "likely", auto: !!body.auto, priced: !!body.priced,
-                     minOdds: Math.min(Math.max(+body.minOdds || 0, 0), 20), onlyWorth: !!body.onlyWorth, exactLegs: +body.exactLegs || 0, typed: body.typed || [] };
+                     minOdds: Math.min(Math.max(+body.minOdds || 0, 0), 20), onlyWorth: !!body.onlyWorth, exactLegs: +body.exactLegs || 0, typed: body.typed || [],
+                     options: Math.min(4, Math.max(1, +body.options || 1)) };
     Object.assign(scan, newJob(), { running: true, params });
     runFixtureJob(scan, (league, f, json, e) => {
       // The best ticket for this match (worth betting at Bet365 first), from a quicker search than the builder's.
       const p2 = withPriced(e, { ...params, favourite: true, known: params.known || [] });
-      const t = params.auto ? autoBest(e, p2) : searchOptions(e, p2, 1, 1)[0];
+      // More than one when you've asked for options: the same match, built a
+      // different way, so there's something to choose between.
+      const list = params.auto ? autoTop(e, p2, params.options) : searchOptions(e, p2, params.options, 1);
+      const t = list[0];
       if (!t) return;   // 🎯 Auto: nothing here lands 1 in 4 or better
       scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair, b365: t.b365 || null, b365raw: t.b365raw || null, check: t.check || 1, worth: +worthOf(t).toFixed(3), guessed: t.guessed || 0,
         legs: t.legs.map((r) => legSummary(e, json, r.id)),
+        alts: list.slice(1).map((x) => ({ p: x.p, fair: x.fair, b365: x.b365 || null, b365raw: x.b365raw || null, check: x.check || 1,
+                                          worth: +worthOf(x).toFixed(3), guessed: x.guessed || 0,
+                                          legs: x.legs.map((r) => legSummary(e, json, r.id)) })),
         value: json.value.legs.slice(0, 4).map((v) => ({ label: v.label, price: v.price, edge: v.edge })),
         // Single bets at Bet365's own price that beat HAWK's chance — no builder
         // cut, nothing to guess. Only ones that land often enough to be real.

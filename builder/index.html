@@ -5215,7 +5215,41 @@ const GOALS_MS = 10 * 1000, FAST_MS = 5 * 1000;
 // A phone shows one alert at a time over the page you're reading, so it gets
 // out of the way sooner; on a PC the cards sit in the corner and can linger.
 const GOAL_SHOW_MS = matchMedia("(max-width:560px)").matches ? 8000 : 15000;
-const goalState = { last: {}, fast: {}, ok: {}, games: [], busy: false, on: loadPref("hawk.goalAlerts", true) };
+const goalState = { last: {}, fast: {}, ok: {}, games: [], busy: false, on: loadPref("hawk.goalAlerts", true),
+                    src: {}, said: {}, told: {}, pending: {} };
+// Two feeds report the same match and they don't agree by the second: Unibet
+// is usually first, 365Scores catches up. Each one is compared against its own
+// last reading, never the other's — otherwise the lagging feed looks like a
+// goal being taken off, and the pair flip-flop, alerting every time.
+//  · a goal off has to be seen twice by the same feed before it's believed
+//  · the same change is never announced twice within ten minutes
+const GOAL_OFF_CONFIRM_MS = 3 * 60e3, GOAL_SAID_MS = 10 * 60e3;
+const scoreKey = (s) => `${s[0]}-${s[1]}`;
+function goalMove(src, id, now, clock) {
+  const key = `${src}|${id}`, was = goalState.src[key], at = Date.now();
+  const take = () => { goalState.src[key] = now; delete goalState.pending[key]; };
+  if (!was) { take(); return null; }                                    // first look: just remember it
+  if (was[0] === now[0] && was[1] === now[1]) { delete goalState.pending[key]; return null; }
+  const side = now[0] > was[0] ? "home" : now[1] > was[1] ? "away"
+             : now[0] < was[0] ? "home-off" : now[1] < was[1] ? "away-off" : null;
+  if (!side) { take(); return null; }
+  const move = `${id}|${scoreKey(was)}>${scoreKey(now)}`;
+  // This feed is reporting the score the other one has already moved on from:
+  // that's the lag catching up, not a goal being taken off.
+  const said = goalState.said[id];
+  if (said && at - said.at < GOAL_OFF_CONFIRM_MS && said.from === scoreKey(now)) { take(); return null; }
+  // Believe a goal off only when the same feed still says so on its next look,
+  // so the reading isn't committed until then — that's how it sees it twice.
+  if (side.endsWith("-off")) {
+    const p = goalState.pending[key];
+    if (!p || p.move !== move) { goalState.pending[key] = { move, at }; return null; }
+  }
+  take();
+  if (goalState.told[move] && at - goalState.told[move] < GOAL_SAID_MS) return null;   // said that already
+  goalState.told[move] = at;
+  goalState.said[id] = { from: scoreKey(was), to: scoreKey(now), at };
+  return { side, clock };
+}
 // 🔔 on a live match (live view, Scores): goal and red-card alerts for it,
 // even after you leave its page. A match you have a bet on is always followed.
 function followState(id) {
@@ -5271,12 +5305,13 @@ async function fastGoals() {
       const k = live[g.id], was = goalState.last[g.id];
       if (!k || !was) continue;
       const now = k.score;
-      if (now[0] === was[0] && now[1] === was[1]) { goalState.ok[g.id] = true; continue; }
+      if (now[0] === was[0] && now[1] === was[1]) { goalState.ok[g.id] = true; goalState.src[`fast|${g.id}`] = now; continue; }
       if (!goalState.ok[g.id]) continue;
+      const move = goalMove("fast", g.id, now, k.minute);
+      if (!move) continue;
       goalState.last[g.id] = now;
       goalState.fast[g.id] = { score: now, at: Date.now() };
-      const side = now[0] > was[0] ? "home" : now[1] > was[1] ? "away" : now[0] < was[0] ? "home-off" : "away-off";
-      goalAlert({ ...g, score: now, clock: k.minute != null ? `${k.minute}'` : g.clock }, side, now, true).catch(e => console.warn("[hawk] goal alert:", e.message));
+      goalAlert({ ...g, score: now, clock: k.minute != null ? `${k.minute}'` : g.clock }, move.side, now, true).catch(e => console.warn("[hawk] goal alert:", e.message));
     }
   } catch (e) { console.warn("[hawk] fast lane:", e.message); }
   finally { fastBusy = false; }
@@ -5301,9 +5336,9 @@ async function checkGoals() {
         continue;
       }
       goalState.last[g.id] = now;
-      if (!was || g.status === 4 && was[0] === now[0] && was[1] === now[1]) continue;   // first look: just remember it
-      const side = now[0] > was[0] ? "home" : now[1] > was[1] ? "away" : now[0] < was[0] ? "home-off" : now[1] < was[1] ? "away-off" : null;
-      if (side) goalAlert(g, side, now).catch(e => console.warn("[hawk] goal alert:", e.message));
+      if (!was || g.status === 4 && was[0] === now[0] && was[1] === now[1]) { goalState.src[`s365|${g.id}`] = now; continue; }   // first look: just remember it
+      const move = goalMove("s365", g.id, now, null);
+      if (move) goalAlert(g, move.side, now).catch(e => console.warn("[hawk] goal alert:", e.message));
     }
     await matchAlerts(games);
   } catch (e) { console.warn("[hawk] goal check:", e.message); }

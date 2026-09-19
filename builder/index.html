@@ -746,6 +746,17 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       body[data-view="scan"] #scanRes > .co-card{grid-column:1/-1}
       body[data-view="scan"] .scard{margin-bottom:0}
     }
+    /* A big monitor gets more cards, not wider ones: a card past about 700px
+       is mostly empty space with the numbers marooned at the edges. */
+    /* 1560 rather than 1700: a 1707-wide laptop (a 2560 panel at 150%) sits
+       right on the line, and two columns there means 800px cards. */
+    @media (min-width:1560px){
+      body[data-view="scan"] #scanRes{grid-template-columns:repeat(3,minmax(0,1fr))}
+    }
+    @media (min-width:1900px){
+      body[data-view="scan"] main.grid, body[data-view="today"] main.grid,
+      body[data-view="scores"] main.grid{max-width:1860px;margin:0 auto}
+    }
     /* paper mode: following a pick with no money on it */
     .tdrow .follow{flex:none;width:auto;margin:0;padding:6px 10px;font-size:11.5px;font-weight:700;border-radius:9px;min-height:36px}
     .tdrow .follow.on{border-color:rgba(74,168,255,.5);background:rgba(74,168,255,.12);color:var(--blue)}

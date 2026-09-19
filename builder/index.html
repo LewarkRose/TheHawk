@@ -698,6 +698,37 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .tdrow input[type=checkbox]{width:18px;height:18px;flex:none}
     .tdrow > div:first-of-type{flex:1;min-width:0}
     .tdrow .px{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:20px;line-height:1;font-weight:700;color:var(--gold)}
+    .tdcols{display:flex;flex-direction:column;gap:11px}
+    .tdcol{display:flex;flex-direction:column;gap:11px;min-width:0}
+    /* On a PC the day reads left to right: the plan, what to back, what's running. */
+    @media (min-width:1251px){
+      .tdcols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+      .tdcol .tdrow{margin-bottom:0}
+    }
+    /* Today and Picks are full-width pages: the league list and the builder
+       column are for the builder, so they step aside and the content gets the room. */
+    @media (min-width:821px){
+      body[data-view="today"] main.grid, body[data-view="scan"] main.grid{grid-template-columns:minmax(0,1fr)}
+      body[data-view="today"] #fxPanel, body[data-view="scan"] #fxPanel,
+      body[data-view="today"] .slipcol, body[data-view="scan"] .slipcol{display:none}
+    }
+    /* Live on a PC: the day down the left, your own money down the right,
+       so you never switch between watching and checking. */
+    @media (min-width:1251px){
+      body[data-view="scores"] main.grid{grid-template-columns:minmax(0,1fr)}
+      body[data-view="scores"] #fxPanel, body[data-view="scores"] .slipcol{display:none}
+      body[data-view="scores"] #scList{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:18px;align-items:start}
+      body[data-view="scores"] #scList > *{grid-column:1}
+      body[data-view="scores"] #scList > .myday{grid-column:2;grid-row:1 / span 99;margin:0;position:sticky;top:12px}
+    }
+    /* Picks tiles its cards once there's room for two. */
+    @media (min-width:1251px){
+      body[data-view="scan"] #scanRes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+      body[data-view="scan"] #scanRes > .note,
+      body[data-view="scan"] #scanRes > .call,
+      body[data-view="scan"] #scanRes > .co-card{grid-column:1/-1}
+      body[data-view="scan"] .scard{margin-bottom:0}
+    }
     /* paper mode: following a pick with no money on it */
     .tdrow .follow{flex:none;width:auto;margin:0;padding:6px 10px;font-size:11.5px;font-weight:700;border-radius:9px;min-height:36px}
     .tdrow .follow.on{border-color:rgba(74,168,255,.5);background:rgba(74,168,255,.12);color:var(--blue)}
@@ -721,6 +752,16 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     /* the weak link: the leg least likely to land, so you know which to swap */
     .lchip.weak{border-color:rgba(255,209,102,.55);background:rgba(255,209,102,.08)}
     .lchip.weak b{color:var(--gold)}
+    /* and the same leg, named, in the slip */
+    /* My bets: the three counters, and HAWK's record against reality */
+    .mb-sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:0 0 12px}
+    .mb-tile{text-align:center;padding:10px 4px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+    .mb-tile .n,.mb-rec .n{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:25px;line-height:1;font-weight:700}
+    .mb-tile .k,.mb-rec .k{margin-top:3px;font-size:10px;letter-spacing:.11em;color:var(--muted);text-transform:uppercase}
+    .mb-rec{display:flex;align-items:center;gap:12px;padding:11px 13px;margin:0 0 12px;border:1px solid var(--line);border-radius:13px;background:var(--panel2)}
+    .weaktag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:800;
+      letter-spacing:.04em;text-transform:uppercase;color:var(--gold);background:rgba(255,209,102,.1);border:1px solid rgba(255,209,102,.45)}
+    .leg.weakleg [data-swap]{border-color:rgba(255,209,102,.5);color:var(--gold)}
 .vline{font-size:12px;color:var(--accent);margin-top:6px}
 .bigodds{font-size:24px;font-weight:900;color:var(--gold)}
 .sprice{display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:12px;color:var(--muted);margin:4px 0;cursor:text}
@@ -2292,6 +2333,10 @@ function b365Line(l) {
 }
 function renderSlip() {
   const r = S.result, m = S.match;
+  // The leg least likely to land. With two or more legs it's the one worth
+  // swapping first, so it's named rather than left for you to work out.
+  const weakId = S.slip.length > 1
+    ? S.slip.filter((i) => S.legs[i]).reduce((w, i) => (!w || (S.legs[i].p || 1) < (S.legs[w].p || 1) ? i : w), null) : null;
   const legRows = S.slip.map((id, n) => {
     const l = S.legs[id]; if (!l) return "";
     const row = r && r.legs ? r.legs.find(x => x.id === id) : null;
@@ -2301,9 +2346,11 @@ function renderSlip() {
     // On a phone the card flips (tap it): the front has the numbers, the back
     // the reasoning. On a bigger screen both show, one under the other.
     const src = l.bookPrice > 1 || typedLegIds().includes(id) ? "priced" : l.refBooks >= 2 ? "ref" : "guess";
-    return `<div class="leg card tilt3d fcard ${src} ${S.flipped.has(id) ? "flipped" : ""}" data-fid="${id}" style="animation-delay:${n * 60}ms"><div class="fin">
+    return `<div class="leg card tilt3d fcard ${src}${id === weakId ? " weakleg" : ""} ${S.flipped.has(id) ? "flipped" : ""}" data-fid="${id}" style="animation-delay:${n * 60}ms"><div class="fin">
       <div class="fa">
-        <div class="sc-head">${legFace(l)}<div class="sc-name"><div class="lb">${esc(l.label)}</div><div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}</div></div>
+        <div class="sc-head">${legFace(l)}<div class="sc-name"><div class="lb">${esc(l.label)}${
+          id === weakId ? ` <span class="weaktag" title="The leg least likely to land \u2014 swap this one first">weak link</span>` : ""}</div>
+          <div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}</div></div>
           <span class="verdict ${vd.tone}" title="${esc(vd.why)}">${vd.label}</span></div>
         ${l.b365 ? `<div class="b365" title="Bet365's corners and cards lines are 3-way (Over / Exactly / Under): its &quot;Over 3&quot; means 4 or more">On Bet365 pick: <b>${esc(l.b365)}</b></div>` : ""}
         ${legTiles(l, row, n)}
@@ -3480,12 +3527,17 @@ function renderAccaBody() {
   }
   const t = accaTotals(), c = S.accaChk;
   const builders = S.acca.filter(pt => pt.legs.length > 1).length;
-  el.innerHTML = S.acca.map((pt, i) => partRow(pt, `<div><button class="linkbtn" data-aopen="${i}">edit</button> <button class="linkbtn" data-arm="${i}">remove</button></div>`)).join("") + `
+  // The part least likely to land: with Bet365's own prices on every leg, this
+  // is the one to drop if you want the acca to come in.
+  const weakPt = S.acca.length > 1 ? S.acca.reduce((w, pt) => (!w || (pt.p || 1) < (w.p || 1) ? pt : w), null) : null;
+  el.innerHTML = S.acca.map((pt, i) => partRow(pt, `<div>${pt === weakPt ? `<span class="weaktag">weak link</span> ` : ""}<button class="linkbtn" data-aopen="${i}">edit</button> <button class="linkbtn" data-arm="${i}">remove</button></div>`)).join("") + `
     <div class="tiles" style="margin-top:12px">
       <div class="tile"><div class="k">Legs</div><div class="v">${t.legs} <span class="muted" style="font-size:12px">in ${S.acca.length} match${S.acca.length === 1 ? "" : "es"}</span></div></div>
       <div class="tile"><div class="k">Chance to land</div><div class="v">${pct(t.p, t.p < 0.1 ? 2 : 1)}</div></div>
       <div class="tile"><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${odds(t.fair)}</div></div>
       <div class="tile"><div class="k">Bet365 price</div><div class="v">${t.known ? odds(t.known) : "–"}</div></div>
+      <div class="tile" title="What this acca returns per €1 staked over many bets like it: its chance times the price."><div class="k">Keeps per €1</div>
+        <div class="v" style="color:${t.known && t.p * t.known >= 1 ? "var(--accent)" : "var(--gold)"}">${t.known && t.p ? "€" + (t.p * t.known).toFixed(2) : "–"}</div></div>
     </div>
     <div class="check"><div class="row">
       <div><label>Acca price</label><input id="aPrice" inputmode="decimal" placeholder="${t.known ? odds(t.known) : "e.g. 25.00"}" value="${esc(c.price)}"></div>
@@ -4191,6 +4243,8 @@ function renderToday() {
       <div class="tdhead"><div style="flex:1;min-width:0"><h3 style="margin:0">📅 Today</h3>
         <div class="muted" style="font-size:11.5px">${esc(new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }))}</div></div>
         <div class="bank"><div class="muted" style="font-size:10px;letter-spacing:.13em">BANKROLL</div><div class="n">€${bank.toFixed(2)}</div></div></div>
+      <div class="tdcols">
+      <div class="tdcol">
       ${fit.length ? `<div class="tdplan">
         <div style="display:flex;align-items:center;gap:10px">
           <div style="font-family:'Barlow Condensed','Segoe UI Semibold',system-ui,sans-serif;font-size:22px;font-weight:700;letter-spacing:.04em;text-transform:uppercase">Today's plan</div>
@@ -4205,6 +4259,9 @@ function renderToday() {
           : `These are the best HAWK can see right now, but they still lose about <b style="color:var(--text)">${Math.round(-100 * sums.edge)}%</b> over time. Scan again nearer kick-off.`}</div>
       </div>` : `<div class="note">${scanned ? "Nothing worth backing in the last scan. Change the settings on Picks and scan again."
           : "Run a scan on Picks (and the Monster acca, if you want one) and today's plan builds itself here."}</div>`}
+      ${paperCard()}
+      </div>
+      <div class="tdcol">
       ${fit.map((x) => { const on = placed.includes(x.key); return `<div class="tdrow ${on ? "done" : ""}">
         <input type="checkbox" data-plan="${esc(x.key)}" ${on ? "checked" : ""} aria-label="Placed">
         <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(x.label)}</div>
@@ -4216,14 +4273,16 @@ function renderToday() {
         ${x.game ? `<button class="ghost iconbtn" data-plango="${esc(x.game)}|${esc(x.league || "")}" title="Open the match">›</button>` : ""}
       </div>`; }).join("")}
       ${fit.length ? `<div class="note" style="margin-top:10px">Tick each one as you place it. Your bankroll and settled bets come from the Vault.</div>` : ""}
+      </div>
+      <div class="tdcol" id="tdDay"></div>
+      </div>
       <div class="opts" style="margin-top:12px;gap:8px">
         <button class="ghost" style="width:auto;padding:9px 15px" onclick="showScan()">🏆 Picks</button>
         <button class="ghost" style="width:auto;padding:9px 15px" onclick="showAcca()">👹 Monster acca</button>
         <button class="ghost" style="width:auto;padding:9px 15px" onclick="showScores()">📺 Live</button>
       </div>
     </div>
-    ${paperCard()}
-    <div class="section" id="tdDay"></div>`;
+    `;
   $("#match").querySelectorAll("[data-plan]").forEach((cb) => cb.onchange = () => {
     const list = loadPref(dayKey(), []).filter((k) => k !== cb.dataset.plan);
     if (cb.checked) list.push(cb.dataset.plan);
@@ -4241,7 +4300,8 @@ function renderToday() {
     const [id, lg] = b.dataset.plango.split("|");
     if (id) goToMatch(lg || undefined, id);
   });
-  const day = $("#tdDay"); if (day) day.innerHTML = myDayCard((S.scores && S.scores.data) || []);
+  const day = $("#tdDay"); if (day) day.innerHTML = myDayCard((S.scores && S.scores.data) || []) ||
+    `<div class="note" style="margin:0">Nothing running. Bets you log show up here as they play.</div>`;
   scorePaper();
 }
 function myDayCard(games) {
@@ -5612,6 +5672,30 @@ function jumpLabel() {
 // 🎟 My bets: a popup on phones and tablets; on a wide screen a drawer on the
 // right that stays open beside the builder (it swings in, and its tickets lean
 // towards the mouse like the slip's cards).
+// Running / won / lost, then what HAWK said would happen against what did.
+// The second one is the only honest way to judge whether to trust its numbers.
+function betsSummary(bets) {
+  const pend = bets.filter((b) => b.status === "PENDING");
+  const done = bets.filter((b) => b.status !== "PENDING");
+  const won = done.filter((b) => b.status === "WON");
+  const back = done.reduce((a, b) => a + (b.status === "WON" ? +b.potentialReturn || 0
+    : b.status === "CASHED_OUT" ? +b.cashOutAmount || 0 : 0), 0);
+  const staked = done.reduce((a, b) => a + (+b.stake || 0), 0);
+  const graded = done.filter((b) => b.hawkP > 0);
+  const said = graded.reduce((a, b) => a + b.hawkP, 0), got = graded.filter((b) => b.status === "WON").length;
+  const tile = (n, k, colour) => `<div class="mb-tile"><div class="n" ${colour ? `style="color:${colour}"` : ""}>${n}</div><div class="k">${k}</div></div>`;
+  return `<div class="mb-sum">
+    ${tile(pend.length, "running")}${tile(won.length, "won", "var(--accent)")}${tile(done.length - won.length, "lost", "var(--red)")}
+  </div>
+  ${done.length ? `<div class="mb-rec">
+    <div style="flex:1;min-width:0"><div class="k">HAWK'S CHANCES vs REALITY</div>
+      <div class="muted" style="font-size:12px;margin-top:2px">${graded.length
+        ? `expected <b style="color:var(--text)">${said.toFixed(1)}</b> winners from ${graded.length} &middot; got <b style="color:var(--text)">${got}</b>`
+        : "not enough graded bets yet"}</div></div>
+    <div style="text-align:right;flex:none"><div class="k">ALL TIME</div>
+      <div class="n" style="color:${back - staked >= 0 ? "var(--accent)" : "var(--red)"}">${back - staked >= 0 ? "+" : "\u2212"}\u20ac${Math.abs(back - staked).toFixed(2)}</div></div>
+  </div>` : ""}`;
+}
 function myBetsHTML(drawer = false) {
   const bets = vaultBets(), pend = bets.filter(b => b.status === "PENDING"), done = bets.filter(b => b.status !== "PENDING").slice(0, 8);
   const mark = (h) => h.userDone || h.result === "won" ? `<span class="mb-m won">✓</span>` : h.result === "lost" ? `<span class="mb-m lost">✗</span>`
@@ -5640,6 +5724,7 @@ function myBetsHTML(drawer = false) {
     : ["lost", "❌", `−€${b.stake.toFixed(2)}`];
   return `<div class="mhead" style="justify-content:space-between"><h2 style="margin:0">🎟 My bets</h2><button class="ghost" ${drawer ? "data-drclose" : "data-close"} style="width:auto;padding:6px 12px" title="Close">✕</button></div>
     <div style="margin-top:14px">${slipBtn}
+    ${betsSummary(bets)}
     <h3 class="mb-h">Still running (${pend.length})</h3>
     ${pend.length ? pend.map((b, i) => `<div class="mb-card tilt3d" style="--i:${i}">
         <div class="mb-top"><span><b>€${b.stake.toFixed(2)}</b> @ <b>${odds(b.odds)}</b></span><span class="muted">returns <b style="color:var(--gold)">€${b.potentialReturn.toFixed(2)}</b></span></div>

@@ -5920,12 +5920,11 @@ async function goalAlert(g, side, score, fast = false) {
       }
     })();
   }
-  box.prepend(card);
-  while (box.children.length > 3) box.lastElementChild.remove();
-  // Away from HAWK when it happened? The card waits for you to come back.
-  const hideLater = () => { setTimeout(() => card.classList.add("bye"), GOAL_SHOW_MS); setTimeout(() => card.remove(), GOAL_SHOW_MS + 600); };
-  if (document.hidden) document.addEventListener("visibilitychange", function once() { if (!document.hidden) { document.removeEventListener("visibilitychange", once); hideLater(); } });
-  else hideLater();
+  // Through the same queue as every other alert. This function had its own copy
+  // of the prepend / cap / countdown logic and so never got the fix the others
+  // did: on a phone a goal could time out unseen behind another card, and goal
+  // alerts behaved differently from bet and lineup alerts for no reason.
+  feedAdd(card);
   logAlert(off ? "❌" : "⚽", off ? "Goal ruled out" : "GOAL!", `${g.home} ${score[0]}-${score[1]} ${g.away}${team ? ` · ${team}` : ""}`);
   if (!off) { beep(); flashTitle("⚽ GOAL!"); }
   // A PC / phone notification when HAWK isn't the window you're looking at.

@@ -2660,8 +2660,13 @@ function recordB365Price() {
 const AIM_GUESS_PRIOR = -0.321, AIM_GUESS_W = 6;
 function applyAim() {
   const rows = loadPref("hawk.b365prices", []).filter(x => x.model > 1 && x.price > 1 && x.legs > 0).slice(-30)
+    // `g` counts PLAYER PROPS without a Bet365 price — d.k is the prop key, so
+    // it is null for match markets. It used to count every leg with no price in
+    // our feed, which is a different set from the one gl is charged to: a
+    // corners line would have its cut attributed to the prop term here and then
+    // never charged it, so every price typed pulled the fit further out.
     .map(x => ({ y: Math.log(x.price / x.model), n: x.legs,
-                 g: (x.detail || []).filter(d => !(d.b > 1)).length }))
+                 g: (x.detail || []).filter(d => d.k && !(d.b > 1)).length }))
     .filter(x => Math.abs(x.y / x.n) < 0.5);
   // Ridge regression on [legs, guessed legs], with both priors as extra rows:
   // sum over rows of (y - cl*n - gl*g)^2, plus the priors' pull.

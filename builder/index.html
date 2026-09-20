@@ -1909,7 +1909,7 @@ const liveIcons = (r) => r ? "⚽".repeat(Math.min(r.goals, 3)) + (r.og ? "🥅o
 function myBetPlayers(gameId) {
   const out = new Set();
   try {
-    for (const b of JSON.parse(localStorage.getItem("hawk_bets")) || [])
+    for (const b of vaultBets())
       if (b.status === "PENDING") for (const l of b.legs || []) if (l.hawk && String(l.hawk.game) === String(gameId))
         for (const h of l.hawk.legs || []) if (h.player) out.add(pName(h.player));
   } catch { /* no Vault data */ }
@@ -2856,7 +2856,7 @@ function saveToVault(legs, stake, price, extra = {}) {
   let bankroll, bets;
   try {
     bankroll = parseFloat(localStorage.getItem("hawk_bankroll")) || 1000.0;
-    bets = JSON.parse(localStorage.getItem("hawk_bets")) || [];
+    bets = vaultBets();   // one door to the bets, same as everywhere else
   } catch { toast("Couldn't open the Vault's storage in this browser."); return false; }
   if (bankroll < stake) { toast(`Not enough in your Vault bankroll (€${bankroll.toFixed(2)}).`); return false; }
   if (stake / bankroll >= STAKE_BAD && !confirm(`€${stake.toFixed(2)} is ${Math.round(100 * stake / bankroll)}% of your €${bankroll.toFixed(2)} bankroll.\n\nBuilders land far less than half the time — this size empties the Vault on a normal bad run.\n\nLog it anyway?`)) return false;
@@ -4138,7 +4138,7 @@ const localDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
 function myBetGames() {   // games you have a HAWK bet on (from the Vault)
   try {
     const out = {};
-    for (const b of JSON.parse(localStorage.getItem("hawk_bets")) || [])
+    for (const b of vaultBets())
       for (const l of b.legs || []) if (l.hawk && l.hawk.game) out[l.hawk.game] = b.status;
     return out;
   } catch { return {}; }
@@ -4777,7 +4777,7 @@ function renderToday() {
 }
 function myDayCard(games) {
   let bets = [];
-  try { bets = JSON.parse(localStorage.getItem("hawk_bets")) || []; } catch { return ""; }
+  bets = vaultBets();
   const today = localDay(new Date());
   const onToday = (b) => (b.legs || []).some((l) => l.hawk && l.hawk.kickoff && localDay(new Date(l.hawk.kickoff)) === today);
   const mine = bets.filter((b) => b.status === "PENDING" && onToday(b));
@@ -4830,7 +4830,7 @@ document.addEventListener("click", (e) => { const t = e.target.closest("[data-ht
 // on average right now, and whether Bet365's cash-out offer beats that.
 async function myLiveTickets(gameId) {
   let bets = [];
-  try { bets = JSON.parse(localStorage.getItem("hawk_bets")) || []; } catch { return []; }
+  bets = vaultBets();
   const out = [];
   for (const b of bets) {
     if (b.status !== "PENDING" || !(b.legs || []).some(l => l.hawk && String(l.hawk.game) === String(gameId))) continue;
@@ -4892,7 +4892,7 @@ function bindCashOut() {
   document.querySelectorAll("[data-done]").forEach(b => b.onclick = async () => {
     const [betId, legId] = b.dataset.done.split("|");
     let bets;
-    try { bets = JSON.parse(localStorage.getItem("hawk_bets")) || []; } catch { return; }
+    bets = vaultBets();
     const bet = bets.find(x => x.id === betId);
     const h = bet && (bet.legs || []).filter(l => l.hawk && String(l.hawk.game) === S.inplay.id).flatMap(l => l.hawk.legs || []).find(x => x.id === legId);
     if (!h) return toast("Couldn't find that leg in your Vault.");
@@ -5118,7 +5118,7 @@ const LEARN_MIN = 30, LEARN_SHRINK = 60, LEARN_CAP = 0.6;
 const lg = (p) => Math.log(p / (1 - p)), ilg = (x) => 1 / (1 + Math.exp(-x));
 function computeLearning() {
   let bets = [];
-  try { bets = JSON.parse(localStorage.getItem("hawk_bets")) || []; } catch { /* no Vault data */ }
+  bets = vaultBets();
   const by = {};
   for (const b of bets) for (const l of b.legs || []) for (const h of (l.hawk && l.hawk.legs) || []) {
     const p = h.pRaw != null ? h.pRaw : h.p, key = HAWK.learnKey(h.id, h.market);
@@ -5563,7 +5563,7 @@ document.addEventListener("click", (e) => { const b = e.target.closest("[data-fo
 function followedGames() {
   const ids = new Set();
   try {
-    for (const b of JSON.parse(localStorage.getItem("hawk_bets")) || [])
+    for (const b of vaultBets())
       if (b.status === "PENDING") for (const l of b.legs || []) if (l.hawk && l.hawk.game) ids.add(String(l.hawk.game));
   } catch { /* no Vault data */ }
   for (const w of S.watch || []) ids.add(String(w.id));
@@ -5646,7 +5646,7 @@ function firstTime(key) {
   return true;
 }
 function pendingBetsOn(gameId) {
-  try { return (JSON.parse(localStorage.getItem("hawk_bets")) || []).filter(b => b.status === "PENDING" && (b.legs || []).some(l => l.hawk && String(l.hawk.game) === String(gameId))); }
+  try { return vaultBets().filter(b => b.status === "PENDING" && (b.legs || []).some(l => l.hawk && String(l.hawk.game) === String(gameId))); }
   catch { return []; }
 }
 // A bet that can't land any more: marked LOST in the Vault straight away (not at
@@ -5654,7 +5654,7 @@ function pendingBetsOn(gameId) {
 // the 🎟 on Scores and the alerts. (The stake already came off your bankroll.)
 function settleLost(betId, label, gameId, rows) {
   let bets;
-  try { bets = JSON.parse(localStorage.getItem("hawk_bets")) || []; } catch { return; }
+  bets = vaultBets();
   const b = bets.find(x => x.id === betId);
   if (!b || b.status !== "PENDING") return;
   const st = Object.fromEntries(rows.map(r => [r.id, r.state]));
@@ -6158,6 +6158,10 @@ function closeModal() { document.querySelectorAll(".modal-bg").forEach(x => x.re
 /* ---------- 🎟 My bets (the floating button) ---------- */
 // Your Vault tickets without leaving the builder: the ones still running first
 // (🔴 when a match is on — tap for the live view), then the last few settled.
+// THE one place the bets store is read. Nine other places used to parse it by
+// hand with their own try/catch — Today's card, the drawer, the learning, the
+// alerts — which is nine chances for them to disagree about what's running.
+// Everything goes through here now; it's hoisted, so it works above this line.
 function vaultBets() { try { return JSON.parse(localStorage.getItem("hawk_bets")) || []; } catch { return []; } }
 // Bets you typed into the Vault yourself (not sent from here) have just the
 // fixture's name and the selections as text. HAWK finds the match (yesterday,

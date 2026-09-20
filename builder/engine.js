@@ -2034,13 +2034,17 @@
         const k = t.legs.map((l) => l.id).sort().join("|");
         if (!t.legs.length || !(t.p >= (exact ? 0 : minChance(min))) || found.has(k)) continue;
         if (exact && t.legs.length !== exact) continue;      // not the number of legs you asked for
+        if (!exact && t.legs.length < 2) continue;           // it's a builder: a single isn't one
         if (min && !((t.b365 || t.fair) >= min * B365_GUESS_LOW)) continue;   // below the odds you asked for, allowing for the guess being out
         if (onlyWorth && worthOf(t) < 1.02) continue;          // not one HAWK would back
         found.set(k, { ...t, autoTarget: target });
       }
-    const tier = (t) => (t.worth >= 1.02 ? 2 : t.worth >= 0.95 ? 1 : 0);
-    return [...found.values()].sort((a, b) => min ? b.p - a.p
-      : tier(b) - tier(a) || (b.worth + 0.5 * b.p) - (a.worth + 0.5 * a.p)).slice(0, count);
+    const tier = (t) => { const w = worthOf(t); return w >= 1.02 ? 2 : w >= 0.95 ? 1 : 0; };
+    // Option 1 is the one you'd actually want: of the builders that Bet365 pays
+    // for, the likeliest. Ranking on chance alone used to hand you a ticket that
+    // underpaid just because it landed one point more often.
+    return [...found.values()].sort((a, b) => tier(b) - tier(a) || (min ? b.p - a.p
+      : (worthOf(b) + 0.5 * b.p) - (worthOf(a) + 0.5 * a.p))).slice(0, count);
   }
   // "Only legs Bet365 prices": leave out every leg whose price HAWK has to guess
   // (player props — no free feed has Bet365's). What's left are legs 365Scores
@@ -2085,6 +2089,7 @@
                           params.favourite !== false, params.focus || "Mix", !!params.extras, picks, known);
       if (!t.legs.length || !(t.p >= (exact ? 0 : minChance(min)))) continue;
       if (exact && t.legs.length !== exact) continue;      // not the number of legs you asked for
+      if (!exact && t.legs.length < 2) continue;           // it's a builder: a single isn't one
       // "At least 2.00" is about the price Bet365 ends up showing, and HAWK's
       // guess at that is its weakest number — out by up to a third either way.
       // Throwing a build out on the guess hides the likeliest tickets that do

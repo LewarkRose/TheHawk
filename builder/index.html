@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -711,6 +711,14 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       color:var(--text);font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
     .rchips button:hover{border-color:var(--accent)}
     .rchips button.on{border-color:rgba(20,227,161,.45);background:rgba(20,227,161,.1);color:var(--accent)}
+    /* the dials, folded away: one quiet line under the Build button */
+    .tune{margin-top:10px}
+    .tune>summary{display:flex;align-items:center;gap:7px;flex-wrap:wrap;list-style:none;cursor:pointer;
+      font-size:12px;color:var(--muted);padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel2)}
+    .tune>summary::-webkit-details-marker{display:none}
+    .tune>summary:hover{border-color:var(--accent);color:var(--text)}
+    .tune>summary span{margin-left:auto;color:var(--accent);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:10px}
+    .tune[open]>summary{border-color:var(--accent);color:var(--text);margin-bottom:10px}
     .rmore{margin-top:11px;border-top:1px solid var(--line);padding-top:9px}
     .rmore summary{font-size:12.5px;font-weight:700;color:var(--muted);cursor:pointer;list-style:none;padding:3px 0}
     .rmore summary::-webkit-details-marker{display:none}
@@ -1254,8 +1262,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260920c"></script>
-<script src="hawk-settle.js?v=20260920c"></script>
+<script src="engine.js?v=20260920d"></script>
+<script src="hawk-settle.js?v=20260920d"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -1293,7 +1301,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             // the card, not to take the legs away. Tick the box for a clean
             // match-market build.
             priced: loadPref("hawk.priced", false), favourite: true, result: null, tab: "players", q: "",
-            chk: { price: "", boost: "", stake: "5" }, moreOpen: false, radarOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
+            chk: { price: "", boost: "", stake: "5" }, moreOpen: false, tuneOpen: loadPref("hawk.tuneOpen", false), radarOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
@@ -2503,8 +2511,13 @@ function renderSlip() {
         <button data-no365="${id}" title="Not on Bet365? HAWK stops using ${esc(l.market)} in this league and puts the next best leg in">🚫</button></div></div>`;
   }).join("");
   const predicted = m && Object.values(m.lineups).some(lu => lu.status !== "Confirmed");
+  // One button, then everything else out of the way. You came here to build,
+  // not to set six dials — the dials are one tap away for when you want them.
   $("#slip").innerHTML = `
-    <div class="seg" id="autoSeg" style="margin-top:0" title="Auto: HAWK picks the odds and legs for you">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
+    <button class="build" id="go" style="margin-top:0" ${m ? "" : "disabled"}>${sameOptions() && S.options.list.length > 1
+      ? `🔄 BUILD AGAIN — option ${(S.options.at + 1) % S.options.list.length + 1} of ${S.options.list.length}` : "⚡ BUILD MY BET BUILDER"}</button>
+    <details class="tune" id="tune" ${S.auto && !S.tuneOpen ? "" : "open"}><summary>${tuneSummary()}</summary>
+    <div class="seg" id="autoSeg" title="Auto: HAWK picks the odds and legs for you">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
     ${S.auto ? `<div class="hint" style="margin-top:0">${S.scan.minOdds
       ? `You've asked Picks for <b>${S.scan.minOdds.toFixed(2)}+</b>, so HAWK stacks legs (up to your max, below) until Bet365's likely price gets there, likeliest build first. Change it on Picks, or use 🎚 My odds here.`
       : "HAWK tries odds from about 2 to 4 with up to your max legs (below) and only keeps builders that land at least 1 time in 4 — worth-it ones at Bet365 first."}</div>` : ""}
@@ -2529,8 +2542,7 @@ function renderSlip() {
       <div class="opts" style="margin-top:6px"><label title="Bet365's Sub On Play On: if your player is subbed off before his leg lands, the bet moves to the player who comes on for him. HAWK counts the replacement's chances too.">
         <input type="checkbox" id="subOn" ${S.subOn ? "checked" : ""}> Bet365 Sub On Play On for player legs</label></div>
     </details>
-    <button class="build" id="go" ${m ? "" : "disabled"}>${sameOptions() && S.options.list.length > 1
-      ? `🔄 BUILD AGAIN — option ${(S.options.at + 1) % S.options.list.length + 1} of ${S.options.list.length}` : "⚡ BUILD MY BET BUILDER"}</button>
+    </details>
     ${S.slip.length ? `
     ${sameOptions() && S.options.list.length > 1 ? `<div class="optbar" id="optbar"><span class="muted">Options</span>${S.options.list.map((o, i) =>
       `<button class="${i === S.options.at ? "on" : ""}" data-opt="${i}" title="${o.legs.length} legs · ${pct(o.p, 1)} to land · Bet365 ≈ ${odds(o.b365 || o.fair)} · fair ${odds(o.fair)}${o.guessed ? ` · ${o.guessed} guessed price${o.guessed > 1 ? "s" : ""}` : " · all priced"}${o.worth >= 1.02 ? " · worth it at Bet365" : ""}">${o.worth >= 1.02 ? "✅ " : o.worth >= 0.95 ? "🤏 " : ""}${i + 1}<small>${o.legs.length} legs · ${odds(o.b365 || o.fair)}${o.guessed ? "" : " ✓"}</small></button>`).join("")}</div>` : ""}
@@ -2598,6 +2610,8 @@ function renderSlip() {
     renderSlip();
   };
   const rmore = $("#rmore"); if (rmore) rmore.ontoggle = () => { S.moreOpen = rmore.open; };
+  // Remember whether you like the dials open — closed by default, so Build is the first thing you see.
+  const tune = $("#tune"); if (tune) tune.ontoggle = () => { S.tuneOpen = tune.open; savePref("hawk.tuneOpen", tune.open); };
   const upDet = $("#upDet"); if (upDet) upDet.ontoggle = () => { S.radarOpen = upDet.open; };
   $("#xtra").onchange = (e) => { S.extras = e.target.checked; };
   $("#epOn").onchange = (e) => {
@@ -2996,6 +3010,15 @@ function bindStakeAdvice(root, useStake) {
 // Build again (same settings) moves to the next one; the numbered buttons on
 // the ticket jump straight to one. Changing a setting, or locking/removing a
 // leg, starts a fresh set.
+// The whole recipe squashed into the one line you see before you open anything.
+// Enough to know what Build will hand you; tap it only if you want it different.
+function tuneSummary() {
+  const aim = !S.auto ? `${S.target.toFixed(2)}` : S.scan.exactLegs ? `${S.scan.exactLegs} legs exactly`
+    : S.scan.minOdds ? `${S.scan.minOdds.toFixed(2)}+` : "2–4";
+  const of = { Mix: "mix", Players: "player props", Match: "match stats" }[S.focus] || "mix";
+  return `⚙️ ${aim} · max ${S.maxLegs} legs · ${of} · ${S.picks === "value" ? "best value" : "likeliest"}${
+    S.priced ? " · Bet365-priced only" : ""}<span>change</span>`;
+}
 // What HAWK is about to build, as one line. The chips under it change a word each.
 const STYLE_RANGE = { Banker: "72% and 95%", Balanced: "55% and 90%", Punchy: "35% and 78%" };
 function recipeLine() {

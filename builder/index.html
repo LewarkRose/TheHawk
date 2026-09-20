@@ -1252,7 +1252,24 @@ function foldFixtures(fold) {
   const lg = document.getElementById("fxLeague"); if (lg) lg.textContent = S.league || "Leagues";
 }
 function loadPref(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } }
-function savePref(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } }
+// A full store used to fail silently here, which is the worst way for it to
+// fail: everything keeps working and nothing is saved. A browser gives a site
+// about 5 MB; your bets are the only thing that grows without a cap (about
+// 1.8 KB each), so a few thousand of them would quietly stop recording.
+let storageFull = false;
+function savePref(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); storageFull = false; }
+  catch (e) {
+    // A private window refuses every write — that isn't a full store, and
+    // warning about it on every keystroke would be nonsense.
+    const quota = e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014);
+    if (quota && !storageFull) {
+      storageFull = true;
+      try { toast("⚠️ This browser's storage is full — new bets and prices aren't being saved. Export your Vault, then clear old bets.", 12000); } catch { /* toast not ready yet */ }
+      console.warn("[hawk] localStorage full, not saving", key);
+    }
+  }
+}
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
             target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), auto: loadPref("hawk.auto", false),
             // On by default since 20 Sep: measured blind on twelve builders, a leg

@@ -844,6 +844,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     /* the weak link: the leg least likely to land, so you know which to swap */
     .lchip.weak{border-color:rgba(255,209,102,.55);background:rgba(255,209,102,.08)}
     .lchip.weak b{color:var(--gold)}
+    /* a leg Bet365 doesn't publish — marked up about 27% inside a builder */
+    .lchip.prop{border-color:rgba(255,138,138,.42);background:rgba(255,138,138,.07)}
+    .lchip.prop b{color:var(--red)}
     /* and the same leg, named, in the slip */
     /* My bets: the three counters, and HAWK's record against reality */
     .mb-sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:0 0 12px}
@@ -1273,11 +1276,14 @@ function savePref(key, value) {
 }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
             target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), auto: loadPref("hawk.auto", false),
-            // On by default since 20 Sep: measured blind on twelve builders, a leg
-            // Bet365 doesn't publish a price for costs about 20% of the ticket's
-            // value. Builds made only of markets Bet365 prices came in at 0.924
-            // of fair; ones with a player prop in them, 0.741.
-            priced: loadPref("hawk.priced", true), favourite: true, result: null, tab: "players", q: "",
+            // Open by default: every market Bet365 offers, props included. It was
+            // on for a few hours on 20 Sep and that was too blunt — 365Scores
+            // carries no Bet365 price for ANY player prop, so "priced legs only"
+            // silently removed all 340 of them from a match. The 27% a prop costs
+            // is real and measured; the answer to that is to put the number on
+            // the card, not to take the legs away. Tick the box for a clean
+            // match-market build.
+            priced: loadPref("hawk.priced", false), favourite: true, result: null, tab: "players", q: "",
             chk: { price: "", boost: "", stake: "5" }, moreOpen: false, radarOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
@@ -2503,7 +2509,7 @@ function renderSlip() {
       <button data-cyc="picks" title="How HAWK chooses between legs">${S.picks === "value" ? "Best value" : "Most likely"}</button>
       <button data-cyc="max" title="The most legs HAWK will use">Max ${S.maxLegs} legs</button>
       <button data-cyc="priced" class="${S.priced ? "on" : ""}" title="Only legs Bet365 publishes a price for. Measured on twelve builders: those come in at 0.924 of fair, while a build with a player prop in it comes in at 0.741 — the prop costs about a fifth of the ticket.">${
-        S.priced ? "Bet365-priced legs" : "⚠️ props on (−20%)"}</button>
+        S.priced ? "Bet365-priced legs" : "Open market · props on"}</button>
       <button data-cyc="fav" class="${S.favourite ? "on" : ""}" title="Start every builder with the favourite to win (or the double chance)">Favourite first</button>
     </div>
     <details class="rmore" ${S.moreOpen ? "open" : ""} id="rmore"><summary>Bet365 extras — ${[S.ep, S.subOn, S.extras].filter(Boolean).length} on</summary>
@@ -3661,9 +3667,13 @@ function scanOption(o, params, ref, n) {
         // if you want the ticket to come in.
         const weak = o.legs.length > 1 ? o.legs.reduce((a, l) => (!a || (l.p || 1) < (a.p || 1) ? l : a), null) : null;
         return o.legs.map(l => { const isWeak = weak && l.id === weak.id;
-          return `<span class="lchip ${l.kind === "player" ? "pl" : ""}${isWeak ? " weak" : ""}"${
-            isWeak ? ` title="The weak link — least likely to land. Swap this one first."` : ""}>${esc(l.label)}${
-            isWeak && l.p ? ` <b>${Math.round(100 * l.p)}%</b>` : ""}</span>`; }).join(""); })()}
+          // A prop carries a measured 27% markup: say so on the leg itself
+          // rather than only in the total, so it's visible while you read it.
+          const prop = legIsProp(l) && !(l.bookPrice > 1);
+          return `<span class="lchip ${l.kind === "player" ? "pl" : ""}${isWeak ? " weak" : ""}${prop ? " prop" : ""}"${
+            prop ? ` title="Bet365 doesn't publish a price for this one and marks it up about 27% inside a builder — measured blind on 20 Sep."`
+                 : isWeak ? ` title="The weak link — least likely to land. Swap this one first."` : ""}>${esc(l.label)}${
+            prop ? ` <b>−27%</b>` : isWeak && l.p ? ` <b>${Math.round(100 * l.p)}%</b>` : ""}</span>`; }).join(""); })()}
         <span class="muted" style="font-size:11.5px">${o.legs.length} legs${short ? " · short of target" : ""}</span></div>
       ${o.value && o.value.length ? `<div class="vline">Bet365 value: ${o.value.map(v => `${esc(v.label)} @ ${odds(v.price)} (+${(100 * v.edge).toFixed(1)}%)`).join(" · ")}</div>` : ""}
       <div class="sfoot">

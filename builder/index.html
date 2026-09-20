@@ -711,6 +711,19 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       color:var(--text);font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
     .rchips button:hover{border-color:var(--accent)}
     .rchips button.on{border-color:rgba(20,227,161,.45);background:rgba(20,227,161,.1);color:var(--accent)}
+    /* the heavy analysis, folded to one line each (see mFold) */
+    .mfold{border:1px solid var(--line);border-radius:14px;background:var(--panel);margin:10px 0;overflow:hidden}
+    .mfold>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .mfold>summary::-webkit-details-marker{display:none}
+    .mfold>summary b{font-size:13.5px;font-weight:700;color:var(--text)}
+    .mfold>summary .mhint{font-size:11.5px;color:var(--muted);min-width:0;flex:1}
+    .mfold>summary i{margin-left:auto;font-style:normal;font-size:10px;font-weight:800;letter-spacing:.09em;color:var(--accent);flex:none}
+    .mfold>summary i::after{content:"OPEN ▸"}
+    .mfold[open]>summary i::after{content:"HIDE ▾"}
+    .mfold>summary:hover{background:var(--panel2)}
+    .mfold[open]>summary{border-bottom:1px solid var(--line)}
+    .mfold .section{border:0;margin:0}
+    @media (max-width:560px){ .mfold>summary .mhint{flex-basis:100%;order:3} }
     /* the dials, folded away: one quiet line under the Build button */
     .tune{margin-top:10px}
     .tune>summary{display:flex;align-items:center;gap:7px;flex-wrap:wrap;list-style:none;cursor:pointer;
@@ -1262,8 +1275,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260920h"></script>
-<script src="hawk-settle.js?v=20260920h"></script>
+<script src="engine.js?v=20260920i"></script>
+<script src="hawk-settle.js?v=20260920i"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -1665,26 +1678,31 @@ function renderMatch() {
     ${upsetCard(m)}
     ${lineupCard(m)}
     ${teamNews(m)}
-    <div class="section"><div class="tiles">
-      <div class="tile"><div class="k">Expected goals</div><div class="v">${e.goals[0].toFixed(2)} – ${e.goals[1].toFixed(2)}</div></div>
-      <div class="tile"><div class="k">Shots on target</div><div class="v">${e.sot[0].toFixed(1)} – ${e.sot[1].toFixed(1)}</div></div>
-      <div class="tile"><div class="k">Corners</div><div class="v">${e.corners.toFixed(1)}</div></div>
-      <div class="tile"><div class="k">Cards</div><div class="v">${(e.cards[0] + e.cards[1]).toFixed(1)}</div></div>
-    </div></div>
-    <div class="section two">
-      <div><h3>Correct score</h3>
-        <div class="cs"><div></div>${[0,1,2,3,"4+"].map(j => `<div class="hd">${j}</div>`).join("")}
-          ${m.grid.map((row, i) => `<div class="hd">${i === 4 ? "4+" : i}</div>${row.map(cell).join("")}`).join("")}</div>
-        <div class="note">Rows: ${esc(m.home)} goals · columns: ${esc(m.away)} goals</div></div>
-      <div><h3>Market value check</h3>${valueCard(m.value)}</div>
-    </div>
-    <div class="section" id="h2h"><h3>⚔️ Head to head</h3><div class="note">Loading the last meetings…</div></div>
+    ${mFold("numbers", "📊 Match numbers", `xG ${e.goals[0].toFixed(2)}–${e.goals[1].toFixed(2)} · ${e.sot[0].toFixed(1)}–${e.sot[1].toFixed(1)} on target · ${e.corners.toFixed(1)} corners · ${(e.cards[0] + e.cards[1]).toFixed(1)} cards`,
+      `<div class="section"><div class="tiles">
+        <div class="tile"><div class="k">Expected goals</div><div class="v">${e.goals[0].toFixed(2)} – ${e.goals[1].toFixed(2)}</div></div>
+        <div class="tile"><div class="k">Shots on target</div><div class="v">${e.sot[0].toFixed(1)} – ${e.sot[1].toFixed(1)}</div></div>
+        <div class="tile"><div class="k">Corners</div><div class="v">${e.corners.toFixed(1)}</div></div>
+        <div class="tile"><div class="k">Cards</div><div class="v">${(e.cards[0] + e.cards[1]).toFixed(1)}</div></div>
+      </div></div>`)}
+    ${mFold("score", "🎯 Correct score &amp; value check", topScore(m),
+      `<div class="section two">
+        <div><h3>Correct score</h3>
+          <div class="cs"><div></div>${[0,1,2,3,"4+"].map(j => `<div class="hd">${j}</div>`).join("")}
+            ${m.grid.map((row, i) => `<div class="hd">${i === 4 ? "4+" : i}</div>${row.map(cell).join("")}`).join("")}</div>
+          <div class="note">Rows: ${esc(m.home)} goals · columns: ${esc(m.away)} goals</div></div>
+        <div><h3>Market value check</h3>${valueCard(m.value)}</div>
+      </div>`)}
+    ${mFold("h2h", "⚔️ Head to head", "their last meetings, with corners, cards and shots",
+      `<div class="section" id="h2h"><div class="note">Loading the last meetings…</div></div>`)}
     <div class="section">
       <div class="tabs"><div class="tab ${S.tab === "players" ? "on" : ""}" data-t="players">Players</div>
         <div class="tab ${S.tab === "legs" ? "on" : ""}" data-t="legs">All legs (${m.legs.length})</div></div>
       <div id="tabbody"></div>
     </div>`;
   $("#match").querySelector(".tabs").onclick = (ev) => { const t = ev.target.closest(".tab"); if (t) { S.tab = t.dataset.t; renderMatch(); } };
+  // Leave a section open and it stays open on the next match you look at.
+  $("#match").querySelectorAll("[data-foldkey]").forEach((d) => { d.ontoggle = () => savePref(d.dataset.foldkey, d.open); });
   if ($("#lineups")) $("#lineups").onclick = (ev) => { const p = ev.target.closest("[data-lp]"); if (p) openPlayer(p.dataset.lp, p.dataset.name); };
   renderTab();
   renderLive();
@@ -2138,6 +2156,25 @@ function pct100(ps) {
   const missing = 100 - out.reduce((s, v) => s + v, 0);   // counted once, before adding them back
   for (let k = 0; k < missing; k++) out[order[k % order.length][1]]++;
   return out;
+}
+// The heavy analysis, folded. Correct score and head to head alone were 770px —
+// nearly half the page — sitting between you and the Build button, and neither
+// decides anything: you build with the tune line and check the price on Bet365.
+// Each summary carries the one line worth having at a glance, so folding costs
+// you nothing you were actually reading. Whether each is open is remembered.
+// The key is passed in, never derived from the label: a derived key would quietly
+// forget which sections you keep open the moment a heading is reworded.
+function mFold(id, label, hint, body) {
+  const key = "hawk.fold." + id;
+  const open = loadPref(key, false);
+  return `<details class="mfold" ${open ? "open" : ""} data-foldkey="${esc(key)}">
+    <summary><b>${label}</b><span class="mhint">${esc(hint)}</span><i></i></summary>${body}</details>`;
+}
+// The scoreline HAWK rates highest, for the folded summary.
+function topScore(m) {
+  let best = 0, bi = 0, bj = 0;
+  (m.grid || []).forEach((row, i) => row.forEach((v, j) => { if (v > best) { best = v; bi = i; bj = j; } }));
+  return best ? `most likely ${bi === 4 ? "4+" : bi}–${bj === 4 ? "4+" : bj} at ${(100 * best).toFixed(0)}%` : "every scoreline, and what the market pays";
 }
 // ⚡ Upset radar (engine: upsetRadar): how likely the underdog is to win, and
 // the evidence for and against an upset that the odds alone don't show.
@@ -6159,19 +6196,19 @@ async function loadH2H(m) {
   if (!el) return;
   let d = S.h2h && S.h2h.id === m.id ? S.h2h.d : null;   // the tabs re-render the page: don't fetch twice
   if (!d) {
-    try { d = await api(`/api/h2h?id=${m.id}`); } catch (err) { el.innerHTML = `<h3>⚔️ Head to head</h3><div class="note">Couldn't load the head to head (${esc(err.message)}).</div>`; return; }
+    try { d = await api(`/api/h2h?id=${m.id}`); } catch (err) { el.innerHTML = `<div class="note">Couldn't load the head to head (${esc(err.message)}).</div>`; return; }
     S.h2h = { id: m.id, d };
   }
   if (!S.match || S.match.id !== m.id || !$("#h2h")) return;
   const games = d.games || [];
-  if (!games.length) { el.innerHTML = `<h3>⚔️ Head to head</h3><div class="note">These two haven't met recently.</div>`; return; }
+  if (!games.length) { el.innerHTML = `<div class="note">These two haven't met recently.</div>`; return; }
   const us = (g) => (g.sameVenue ? [g.score[0], g.score[1]] : [g.score[1], g.score[0]]);   // [today's home, today's away]
   const wins = games.filter(g => us(g)[0] > us(g)[1]).length, draws = games.filter(g => us(g)[0] === us(g)[1]).length, n = games.length;
   const goals = games.map(g => g.score[0] + g.score[1]);
   const withStat = (k) => games.filter(g => g[k]);
   const avgOf = (k) => { const l = withStat(k); return l.length ? (l.reduce((s, g) => s + g[k][0] + g[k][1], 0) / l.length).toFixed(1) : "–"; };
   const date = (iso) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" });
-  el.innerHTML = `<h3>⚔️ Head to head · last ${n}</h3>
+  el.innerHTML = `
     <div class="h2h-sum"><span><b>${esc(m.home)}</b> ${wins}W</span><span>${draws}D</span><span><b>${esc(m.away)}</b> ${n - wins - draws}W</span>
       <span>⚽ ${(goals.reduce((s, x) => s + x, 0) / n).toFixed(1)} goals/g</span><span>Over 2.5: ${goals.filter(x => x > 2.5).length}/${n}</span>
       <span>BTTS: ${games.filter(g => g.score[0] > 0 && g.score[1] > 0).length}/${n}</span>

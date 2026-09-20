@@ -59,7 +59,13 @@
   const POSITIONS = { Goalkeeper: "G", Defender: "D", Midfielder: "M", Attacker: "F" };
   const DEFAULT_RATES = { F: [2.6, 1.0, 0.40, 0.15], M: [1.2, 0.40, 0.12, 0.20], D: [0.6, 0.18, 0.05, 0.20], G: [0, 0, 0, 0.05] };
   const STYLES = { Banker: [0.72, 0.95], Balanced: [0.55, 0.90], Punchy: [0.35, 0.78] };
-  const FOCUS = { Mix: [2, 4], Players: [4, 2], Match: [0, 99] };
+  // "Stats" is Match without the result market. Result and double chance are
+  // short and likely, so they win the leg scoring every time — 49 builds out of
+  // 49 had one, even with "start with the favourite" turned off. That makes
+  // every ticket the same shape: a favourite, then an under. Stats bans the
+  // group outright so goals, cards, corners and shots have to carry the ticket.
+  const FOCUS = { Mix: [2, 4], Players: [4, 2], Match: [0, 99], Stats: [0, 99] };
+  const NO_RESULT = new Set(["Stats"]);
   const MAX_LEGS_PER_PLAYER = 3, MIN_LEG_P = 0.04, MAX_LEG_P = 0.97, MIN_AUTO_MINUTES = 270;
   const MATCH_TTL = 10 * 60 * 1000;
   // Extra player stats, per 90 (position averages until the data says
@@ -1552,8 +1558,9 @@
     const all = Object.values(legs);
     if (!all.length) return evaluate(legs, []);
     const n = all[0].arr.length;
+    const noResult = NO_RESULT.has(focus);
     let chosen = locked.filter((i) => legs[i]);
-    if (favourite && !chosen.some((i) => legs[i].group === "result")) {
+    if (favourite && !noResult && !chosen.some((i) => legs[i].group === "result")) {
       const side = ["home", "away"].sort((a, b) => ((legs[`res:${b}`] || {}).p || 0) - ((legs[`res:${a}`] || {}).p || 0))[0];
       for (const [id, floor] of [[`res:${side}`, 0.5], [`dc:${side}`, 0.6]]) if (legs[id] && !banned.has(id) && legs[id].p >= floor) { chosen.unshift(id); break; }
     }
@@ -1587,6 +1594,7 @@
         bestPass++;
         for (const leg of all) {
           if (chosen.includes(leg.id) || banned.has(leg.id) || groups.has(leg.group) || leg.low_data || (leg.extra && !extras)) continue;
+          if (noResult && leg.group === "result") continue;   // Stats: the match has to carry it
           if (!hasPrice(leg) && !allowed(leg)) continue;
           if (want && leg.kind !== want) continue;
           // Filler: a leg Bet365 pays 1.10 or less for (1+ tackles, 1+ shots, 2+ saves…) barely moves the

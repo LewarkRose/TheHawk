@@ -1287,7 +1287,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null,
                      tab: "value", minMove: 0.1 },
             watch: [] };
-const FOCUS_LABELS = { Mix: "Mix", Players: "Player props", Match: "Match stats" };
+const FOCUS_LABELS = { Mix: "Mix", Players: "Player props", Match: "Match stats", Stats: "no result leg" };
 // Display names for the builder styles (the keys are what the server expects).
 const STYLES = {
   Banker: { label: "Safe legs", hint: "Lots of very likely legs (72–95% each) — takes more legs to reach your odds." },
@@ -2572,7 +2572,7 @@ function renderSlip() {
     const next = (list, cur) => list[(list.indexOf(cur) + 1) % list.length];
     switch (b.dataset.cyc) {
       case "style": S.style = next(Object.keys(STYLES), S.style); savePref("hawk.style", S.style); break;
-      case "focus": S.focus = next(["Mix", "Players", "Match"], S.focus); savePref("hawk.focus", S.focus); break;
+      case "focus": S.focus = next(["Mix", "Players", "Match", "Stats"], S.focus); savePref("hawk.focus", S.focus); break;
       case "picks": S.picks = S.picks === "value" ? "likely" : "value"; savePref("hawk.picks", S.picks); break;
       case "max": S.maxLegs = next([3, 4, 5, 6, 8, 10, 12], S.maxLegs); savePref("hawk.maxLegs", S.maxLegs); break;
       case "priced": S.priced = !S.priced; savePref("hawk.priced", S.priced);
@@ -3241,7 +3241,7 @@ function renderScan() {
         <label>Kick-off <select id="hrs">${KICKOFF_WINDOWS.filter(([h]) => h !== 72).map(([h, t]) =>
           `<option value="${h}" ${h === sc.hours ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label title="Mix keeps player legs in every builder. Match stats drops them for goals, corners, cards and shots on target. Player props goes the other way.">Made of <select id="scanFocus">${
-          [["Mix", "\ud83d\udd00 Mix"], ["Match", "\u26bd Match stats"], ["Players", "\ud83d\udc5f Player props"]].map(([v, t]) =>
+          [["Mix", "\ud83d\udd00 Mix"], ["Match", "\u26bd Match stats"], ["Stats", "\ud83d\udcca No result leg"], ["Players", "\ud83d\udc5f Player props"]].map(([v, t]) =>
           `<option value="${v}" ${v === S.focus ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Every builder opens with the favourite to win (or their double chance). Off, HAWK is free to build without a result leg at all.">
           <input type="checkbox" id="scanFav" ${S.favourite ? "checked" : ""}> Start with the favourite</label>
@@ -3287,7 +3287,7 @@ function renderScan() {
   $("#scanSingles").onchange = (e) => { sc.showSingles = e.target.checked; savePref("hawk.showSingles", sc.showSingles); updateScan(); };
   $("#scanWorthOnly").onchange = async (e) => { sc.onlyWorth = e.target.checked; savePref("hawk.onlyWorth", sc.onlyWorth);
     renderScan(); await rescan(); };
-  $("#scanFocus").onchange = async (e) => { S.focus = ["Mix", "Match", "Players"].includes(e.target.value) ? e.target.value : "Mix";
+  $("#scanFocus").onchange = async (e) => { S.focus = ["Mix","Match","Stats","Players"].includes(e.target.value) ? e.target.value : "Mix";
     savePref("hawk.focus", S.focus); renderScan(); await rescan(); };
   $("#scanFav").onchange = async (e) => { S.favourite = e.target.checked; savePref("hawk.fav", S.favourite);
     renderScan(); await rescan(); };
@@ -3586,7 +3586,7 @@ function scanSummary() {
   const when = (KICKOFF_WINDOWS.find(([h]) => h === sc.hours) || [0, "24 hours"])[1];
   const odds = sc.minOdds ? `${sc.minOdds.toFixed(2)}+` : S.auto ? "any odds" : `target ${S.target.toFixed(2)}`;
   const n = (S.scan.data && (S.scan.data.results || []).length) || 0, total = (S.scan.data && S.scan.data.total) || 0;
-  const made = { Mix: null, Match: "match stats", Players: "player props" }[S.focus];
+  const made = { Mix: null, Match: "match stats", Stats: "no result leg", Players: "player props" }[S.focus];
   return [String(when).toLowerCase(), sc.exactLegs ? `${sc.exactLegs} legs` : odds, made, `${sc.leagues.size} leagues`, sc.onlyWorth ? "worth backing only" : null,
           sc.confirmed ? "XI confirmed" : null, S.priced ? "priced legs" : null,
           total ? `${n} of ${total} matches` : null].filter(Boolean).join(" · ");

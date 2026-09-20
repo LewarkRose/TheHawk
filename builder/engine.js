@@ -907,6 +907,41 @@
     do { k++; p *= rng(); } while (p > L);
     return k - 1;
   }
+  // Corners and cards are overdispersed: their variance runs above their mean,
+  // which a plain Poisson cannot represent (Poisson forces variance = mean).
+  // The literature fits them with negative binomial / compound Poisson instead.
+  // A negative binomial is a Poisson whose RATE varies, which is also the honest
+  // description of the thing — some matches are scrappy and some are not, and
+  // that is largely settled before a card is shown.
+  // The fitted mean is untouched, so everything calibrated to the bookmakers'
+  // lines stays put; only the tails widen. Understating the tails makes the far
+  // lines look rarer than they are and the middle lines commoner, which is
+  // exactly the shape of leg the "no result leg" builds are made of.
+  const OVERDISP = { corners: 1.30, cards: 1.25 };   // variance ÷ mean
+  // Marsaglia-Tsang gamma, shape >= 1, using the same seeded rng.
+  function gamma(rng, shape) {
+    if (shape < 1) return gamma(rng, shape + 1) * Math.pow(rng() || 1e-12, 1 / shape);
+    const d = shape - 1 / 3, c = 1 / Math.sqrt(9 * d);
+    for (let i = 0; i < 64; i++) {
+      let x, w;
+      do { const u1 = rng() || 1e-12, u2 = rng() || 1e-12;
+           x = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+           w = 1 + c * x; } while (w <= 0);
+      const v = w * w * w, u = rng() || 1e-12;
+      if (u < 1 - 0.0331 * x * x * x * x) return d * v;
+      if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+    }
+    return shape;   // gave up: fall back to the mean
+  }
+  // One multiplier per MATCH, not per team: a scrappy game produces cards at
+  // both ends and a stretched one produces corners at both ends. Drawing them
+  // independently would lose that, and it's the home/away association the card
+  // papers reach for a copula to describe. Mean 1, variance (v-1)/lam.
+  const dispMult = (rng, lam, v) => {
+    if (!(v > 1) || !(lam > 0)) return 1;
+    const k = lam / (v - 1);
+    return gamma(rng, k) / k;
+  };
   function teamExpectations(an) {
     const M = an.M;
     let gh = 0, ga = 0;
@@ -1017,8 +1052,19 @@
       first[s] = fs;
     }
     const cornersTeam = { home: new Int16Array(n), away: new Int16Array(n) }, corners = new Int16Array(n);
+    // How stretched this particular match is, drawn once and applied to both
+    // teams — see dispMult. Poisson alone can't produce the fat tails corners
+    // and cards really have, so the far lines came out rarer than they are.
+    const cornerLam = exp.cornersTeam[0] + exp.cornersTeam[1];
+    const cardLam = exp.cards[0] + exp.cards[1];
+    const cornerMult = new Float64Array(n), cardMult = new Float64Array(n);
     for (let s = 0; s < n; s++) {
-      cornersTeam.home[s] = poisson(rng, exp.cornersTeam[0]); cornersTeam.away[s] = poisson(rng, exp.cornersTeam[1]);
+      cornerMult[s] = dispMult(rng, cornerLam, OVERDISP.corners);
+      cardMult[s] = dispMult(rng, cardLam, OVERDISP.cards);
+    }
+    for (let s = 0; s < n; s++) {
+      cornersTeam.home[s] = poisson(rng, exp.cornersTeam[0] * cornerMult[s]);
+      cornersTeam.away[s] = poisson(rng, exp.cornersTeam[1] * cornerMult[s]);
       corners[s] = cornersTeam.home[s] + cornersTeam.away[s];
     }
     const teamSot = {}, teamShots = {}, teamCards = {};
@@ -1027,7 +1073,7 @@
       for (let s = 0; s < n; s++) {
         sot[s] = g[s] + poisson(rng, Math.max(exp.sot[t] - exp.goals[t], 0.4));
         shots[s] = sot[s] + poisson(rng, Math.max(exp.shots[t] - exp.sot[t], 0.8));
-        cards[s] = poisson(rng, exp.cards[t]);
+        cards[s] = poisson(rng, exp.cards[t] * cardMult[s]);
       }
       teamSot[side] = sot; teamShots[side] = shots; teamCards[side] = cards;
     });

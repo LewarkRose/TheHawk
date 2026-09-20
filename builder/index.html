@@ -711,6 +711,28 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       color:var(--text);font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
     .rchips button:hover{border-color:var(--accent)}
     .rchips button.on{border-color:rgba(20,227,161,.45);background:rgba(20,227,161,.1);color:var(--accent)}
+    /* Picks: the board as rows, the card behind a tap (see scanRow) */
+    .srow{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:7px;overflow:hidden}
+    .srow>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:11px 14px}
+    .srow>summary::-webkit-details-marker{display:none}
+    .srow>summary:hover{background:var(--panel2)}
+    .srow[open]>summary{border-bottom:1px solid var(--line);background:var(--panel2)}
+    .srow .m{flex:1;min-width:0}
+    .srow .m b{display:block;font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .srow .m span{font-size:10.5px;color:var(--muted)}
+    .srow .n{flex:none;width:58px;text-align:right}
+    .srow .n b{display:block;font-size:15px;font-weight:800;line-height:1.1;
+      font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif}
+    .srow .n span{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+    .sgap{flex:none;width:76px;text-align:right;font-size:11.5px;font-weight:800}
+    .sgap.ok{color:var(--accent)} .sgap.mid{color:var(--gold)} .sgap.no{color:var(--muted)}
+    .srow .scard{border:0;margin:0;border-radius:0}
+    .srow .scard .stop{display:none}   /* the row already says who and what it lands */
+    @media (max-width:560px){
+      .srow>summary{flex-wrap:wrap;gap:8px}
+      .srow .m{flex-basis:100%}
+      .sgap{margin-left:auto}
+    }
     /* the heavy analysis, folded to one line each (see mFold) */
     .mfold{border:1px solid var(--line);border-radius:14px;background:var(--panel);margin:10px 0;overflow:hidden}
     .mfold>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -1275,8 +1297,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260920i"></script>
-<script src="hawk-settle.js?v=20260920i"></script>
+<script src="engine.js?v=20260920j"></script>
+<script src="hawk-settle.js?v=20260920j"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -1319,7 +1341,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },   // perMatch is always 1: one Bet365-priced leg per match, so the acca has no builder cut
-            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: loadPref("hawk.scanSort", "lands"), confirmed: loadPref("hawk.scanConfirmed", false), setOpen: false, autoAt: null, onlyWorth: loadPref("hawk.onlyWorth", false), exactLegs: loadPref("hawk.exactLegs", 0), options: loadPref("hawk.scanOpts", 1), showSingles: loadPref("hawk.showSingles", false), showBet: loadPref("hawk.scanShowBet", false), minOdds: loadPref("hawk.minOdds", 2), prices: loadPref("hawk.scanPrices", {}), data: null, timer: null },
+            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: loadPref("hawk.scanSort", "lands"), confirmed: loadPref("hawk.scanConfirmed", false), setOpen: false, autoAt: null, onlyWorth: loadPref("hawk.onlyWorth", false), exactLegs: loadPref("hawk.exactLegs", 0), options: loadPref("hawk.scanOpts", 1), showSingles: loadPref("hawk.showSingles", false), showBet: loadPref("hawk.scanShowBet", false), minOdds: loadPref("hawk.minOdds", 2), prices: loadPref("hawk.scanPrices", {}), openRows: new Set(), data: null, timer: null },
             value: { leagues: null, hours: 48, book: "All", market: "All", minP: 0.25, minEdge: 0.02, bestOnly: true, data: null, timer: null,
                      tab: "value", minMove: 0.1 },
             watch: [] };
@@ -3421,7 +3443,23 @@ function renderScan() {
     if (r && S.scan.prices[scanKey(r)]) { learnScanPrice(r, S.scan.prices[scanKey(r)]); updateScan(); }
   };
   $("#scanRes").addEventListener("toggle", (e) => { if (e.target.id === "pickBoard") S.scan.picksOpen = e.target.open;
-    if (e.target.classList.contains("salts")) S.scan.optsOpen = e.target.open; }, true);
+    if (e.target.classList.contains("salts")) S.scan.optsOpen = e.target.open;
+    // A row opens: remember it, and draw the card now rather than with every render.
+    if (e.target.classList.contains("srow")) {
+      const k = e.target.dataset.rowkey;
+      if (e.target.open) {
+        S.scan.openRows.add(k);
+        if (!e.target.querySelector(".scard")) {
+          const r = ((S.scan.data || {}).results || []).find((x) => scanKey(x) === k);
+          if (r) e.target.insertAdjacentHTML("beforeend", scanCard(r, (S.scan.data || {}).params));
+        }
+      } else S.scan.openRows.delete(k);
+    } }, true);
+  // The standing explanation, shown once you ask for it and remembered after that.
+  $("#scanRes").addEventListener("click", (e) => { if (!e.target.closest("[data-why]")) return;
+    e.stopPropagation(); const w = $("#scanWhy"); if (!w) return;
+    w.hidden = !w.hidden; savePref("hawk.scanWhy", !w.hidden);
+    e.target.closest("[data-why]").textContent = w.hidden ? "why? ▸" : "why? ▾"; }, true);
   $("#scanRes").addEventListener("click", (e) => { if (!e.target.closest("[data-showbet]")) return;
     e.stopPropagation(); S.scan.showBet = !S.scan.showBet; savePref("hawk.scanShowBet", S.scan.showBet); updateScan(); }, true);
   $("#scanConf").onchange = (e) => { sc.confirmed = e.target.checked; savePref("hawk.scanConfirmed", sc.confirmed); updateScan(); };
@@ -3486,17 +3524,20 @@ function updateScan() {
   }
   // Single bets are off unless you ask for them — you build, you don't bet singles.
   const singles = S.scan.showSingles ? pickBoard(shown) + singlesBoard(shown) : "";
-  // One leg, at the top, every scan: the thing you actually came for.
-  const leg = shown.length && !d.running ? theLeg(shown) : "";
-  $("#scanRes").innerHTML = betNote + leg + singles + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "check"}" style="margin:0 0 12px">${
+  // The headline pick used to sit here at 313px — but it is the top row's build all
+  // over again in longer words, so the board showed you the same ticket twice.
+  // The standing explanation sits behind "why?": it is the same 45 words every scan.
+  $("#scanRes").innerHTML = betNote + singles + (res.length ? (shown.length ? `<div class="call ${good || fair ? "good" : "check"}" style="margin:0 0 12px">${
       [good && `✅ ${good} worth it`, fair && `🤏 ${fair} fair price`,
        toCheck && `👀 ${toCheck} worth checking on Bet365`].filter(Boolean).join(" · ")
-      || `Nothing close enough to check — the best of ${shown.length} is short of its price`}<small>${
+      || `Nothing close enough to check — the best of ${shown.length} is short of its price`}
+      <button class="linkbtn" data-why style="margin-left:8px">why? ▸</button>
+      <small id="scanWhy" ${loadPref("hawk.scanWhy", false) ? "" : "hidden"}>${
       guessing
         ? "HAWK can't see Bet365's builder prices — it can only say what each one has to beat. That's a target, not a verdict."
         : "Every leg here has Bet365's own price behind it, so the estimate is those prices multiplied rather than a guess — but it's still out by about 10% either way, which is the difference between a fair price and a good one."}
       Build the top one on Bet365, type the real price in its box, and the card answers for real.</small></div>` : "")
-    + res.map(r => scanCard(r, d.params)).join("") : `<div class="note">${d.running
+    + res.map(r => scanRow(r, d.params)).join("") : `<div class="note">${d.running
     ? "Results appear here as each match is analysed…"
     : d.total === 0 && d.params ? "No fixtures kick off in that window — try a longer one."
     : betOn.size && !open.length ? "Nothing new — you've already bet on every match scanned."
@@ -3783,6 +3824,29 @@ function scanOption(o, params, ref, n) {
           inAcca ? "✓ In acca" : "➕ Acca"}</button>
         <button class="ghost iconbtn" data-open="${esc(ref)}" aria-label="Open this builder" title="Open this builder">${CHEVRON}</button>
       </div></div>`;
+}
+// The board, one row per match: who, how many legs, what it lands, what the price
+// needs and the gap between them. Ten matches used to be ~3,200px of cards, so you
+// could never see the board you came to compare. The full card is one tap away and
+// unchanged — this only decides whether it's on screen.
+function scanRow(r, params) {
+  const key = scanKey(r), open = S.scan.openRows.has(key);
+  const { need } = scanNeed(r);
+  const x = S.scan.prices[key], price = x || r.b365 || r.fair;
+  const lands = (r.p || 0) * (r.check || 1), needs = price > 1 ? 1 / price : 0;
+  const pts = Math.round(100 * (lands - needs));
+  const tone = pts >= 2 ? "ok" : pts >= -2 ? "mid" : "no";
+  return `<details class="srow" data-rowkey="${esc(key)}" ${open ? "open" : ""}>
+    <summary>
+      <div class="m"><b>${esc(r.home)} v ${esc(r.away)}</b>
+        <span>${r.legs.length} legs · ${esc(fmtKick(r.kickoff))} · ${r.confirmed ? "XI confirmed" : "XI predicted"}${
+          x ? ` · your price ${odds(x)}` : ""}</span></div>
+      <div class="n"><b>${Math.round(100 * lands)}%</b><span>lands</span></div>
+      <div class="n"><b class="muted">${Math.round(100 * needs)}%</b><span>needed</span></div>
+      <div class="sgap ${tone}">${pts > 0 ? `+${pts} clear` : pts === 0 ? "level" : `${-pts} short`}</div>
+    </summary>
+    ${open ? scanCard(r, params) : ""}
+  </details>`;
 }
 function scanCard(r, params) {
   const alts = (r.alts || []).map((a, i) => ({ ...a, id: r.id, league: r.league, home: r.home, away: r.away,

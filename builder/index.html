@@ -1262,8 +1262,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260920f"></script>
-<script src="hawk-settle.js?v=20260920f"></script>
+<script src="engine.js?v=20260920g"></script>
+<script src="hawk-settle.js?v=20260920g"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -4844,7 +4844,7 @@ function renderToday() {
   });
   $("#match").querySelectorAll("[data-plango]").forEach((b) => b.onclick = () => {
     const [id, lg] = b.dataset.plango.split("|");
-    if (id) goToMatch(lg || undefined, id);
+    if (id) openPick(id, lg);   // same rule as the Picks cards: builder if it's still to come, live if not
   });
   const day = $("#tdDay"); if (day) day.innerHTML = myDayCard((S.scores && S.scores.data) || []) ||
     `<div class="note" style="margin:0">Nothing running. Bets you log show up here as they play.</div>`;
@@ -4896,12 +4896,21 @@ function htStrip(games) {
       <span>${esc(g.home)} ${g.score[0]}–${g.score[1]} ${esc(g.away)} <span class="muted">${esc(h.ht ? "half-time" : g.clock || "")}</span></span>
       <span class="muted">👀 ${esc(h.tips[0].text || h.tips[0].label)} · <b style="color:var(--text)">lands ${pct(h.tips[0].p, 0)}</b> · bet at ${odds(h.tips[0].fair * 1.02)}+ · Bet365 live ≈ ${odds(h.tips[0].price)}</span></div>`).join("")}</div>`;
 }
-// Picks are mostly pre-match, so open the match: goToMatch sends the ones already
-// kicked off to the live view by itself. Sending every pick straight to the live
-// view meant a match that hadn't started opened on "Not in play right now" — a
-// dead end on every card on the Picks page. data-livego is for cards that really
-// are in play (the live tips), where the live view is the point.
-document.addEventListener("click", (e) => { const t = e.target.closest("[data-htgo]"); if (t) { const [id, lg] = t.dataset.htgo.split("|"); goToMatch(lg || undefined, id); } });
+// Opening a pick: the builder when the match is still to come, the live view
+// otherwise. Sending every pick straight to the live view left a match that
+// hadn't kicked off on "Not in play right now" — a dead end on every Picks card.
+// Sending every pick to the builder instead breaks it the other way: a fixture
+// that has dropped off its league's list can't be analysed and throws "fixture
+// not found", where the live view would still have shown it. So look first, and
+// only take the builder when the fixture is there and hasn't started.
+// data-livego is for cards that really are in play, where live is the point.
+async function openPick(id, league) {
+  const lg = league && S.allLeagues.includes(league) ? league : null;
+  if (lg && S.league !== lg) await selectLeague(lg);
+  const fx = S.fixtures.find((f) => String(f.id) === String(id));
+  return fx && !fx.started ? openMatch(id) : goToLive(lg, id);
+}
+document.addEventListener("click", (e) => { const t = e.target.closest("[data-htgo]"); if (t) { const [id, lg] = t.dataset.htgo.split("|"); openPick(id, lg); } });
 document.addEventListener("click", (e) => { const t = e.target.closest("[data-livego]"); if (t) { const [id, lg] = t.dataset.livego.split("|"); goToLive(lg, id); } });
 
 /* ---------- cash-out helper ---------- */

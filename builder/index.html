@@ -646,6 +646,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .sbar .track i.bad{background:linear-gradient(90deg,#3c4a54,#4d5f6b)}
     .sbar .track b{position:absolute;top:-3px;width:2px;height:16px;background:#fff;border-radius:1px}
     .sbar .bnote{display:flex;justify-content:space-between;gap:10px;margin-top:5px;font-size:11px;color:var(--muted)}
+    /* How much the legs move together — the builder's only exploitable number */
+    .agree{font-size:11.5px;font-weight:700;padding:5px 9px;border-radius:9px;border:1px solid;align-self:flex-start}
+    .agree.same{color:var(--gold);background:rgba(255,209,102,.09);border-color:rgba(255,209,102,.35)}
+    .agree.apart{color:var(--blue);background:rgba(74,168,255,.09);border-color:rgba(74,168,255,.35)}
     /* Tonight's bet: the one card you came for, above everything else */
     .theleg{position:relative;margin:0 0 14px;padding:15px 17px 14px;border-radius:17px;border:1px solid rgba(20,227,161,.42);
       background:linear-gradient(140deg,rgba(20,227,161,.09),var(--panel) 58%);box-shadow:0 16px 34px -22px rgba(0,0,0,.9)}
@@ -3588,6 +3592,19 @@ function scanOption(o, params, ref, n) {
         typed ? "" : tone === "check"
           ? `<span class="muted" style="font-weight:600"> · check Bet365 — about 1 in 3 pays more than HAWK expects</span>`
           : `<span class="muted" style="font-weight:600"> · HAWK expects ≈ ${odds(o.b365 || o.fair)}</span>`}</div>
+      ${(() => {
+        // Legs that say the same thing pay less than their prices multiplied,
+        // and Bet365 prices exactly that in — the discount is the part of its
+        // model it gets most right. Legs that pull against each other are the
+        // only place a builder can be mispriced your way, because how they move
+        // together is the one quantity 12,000 simulated matches read better
+        // than a parametric rule.
+        const a = o.agree;
+        if (!(a > 0) || o.legs.length < 2) return "";
+        if (a >= 1.15) return `<div class="agree same" title="All of them landing is ${(100 * (a - 1)).toFixed(0)}% likelier than their chances multiplied, so the ticket is worth less than the singles suggest — and Bet365 prices that in.">⛓ these legs agree · worth ${(100 * (1 - 1 / a)).toFixed(0)}% less than the singles multiplied</div>`;
+        if (a <= 0.92) return `<div class="agree apart" title="All of them landing is rarer than their chances multiplied, so the ticket is worth more than the singles suggest — the one thing a simulation reads better than a bookmaker's formula.">↔ these legs pull apart · worth ${(100 * (1 / a - 1)).toFixed(0)}% more than the singles multiplied</div>`;
+        return "";
+      })()}
       <div class="schips">${(() => {
         // The weak link: whichever leg is least likely to land — the one to swap
         // if you want the ticket to come in.

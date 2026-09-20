@@ -1515,7 +1515,18 @@
     // Market check: how much of p stays if each leg counts as at most 12% likelier than its bookie price says.
     const check = chosen.reduce((k, id) => { const l = legs[id], ref = l.refPrice || l.bookPrice;
       return ref > 1 && l.p ? k * Math.min(1, 1.12 / ref / l.p) : k; }, 1);
-    return { p, fair: p > 0 ? 1 / p : null, legs: rows, b365: raw && raw * aimOf(chosen.length), b365raw: raw, price: priceOf(legs, chosen, p) || null,
+    // How much the legs move together: the joint chance against the chances
+    // multiplied as if they were independent. Above 1 the legs agree, so the
+    // ticket is worth LESS than its singles multiplied and the bookmaker
+    // discounts it. Below 1 they pull apart and it is worth more.
+    const pp = chosen.reduce((a, id) => a * legs[id].p, 1);
+    const agree = pp > 0 ? p / pp : null;
+    // aimOf needs the guessed-leg count, same as b365Of: without it the slip
+    // left out the 27% a leg Bet365 doesn't publish costs, so the same ticket
+    // priced one way on the slip and another on the scan.
+    const guessedHere = chosen.filter((id) => !(legs[id].bookPrice > 1)).length;
+    return { p, fair: p > 0 ? 1 / p : null, legs: rows, b365: raw && raw * aimOf(chosen.length, guessedHere), b365raw: raw,
+             price: priceOf(legs, chosen, p) || null, agree,
              guessed: chosen.filter((id) => !hasPrice(legs[id])).length, check };
   }
   function pruneImplied(legs, chosen, keep, n) {
@@ -2135,10 +2146,16 @@
       const list = params.auto ? autoTop(e, p2, params.options) : searchOptions(e, p2, params.options, 1);
       const t = list[0];
       if (!t) return;   // 🎯 Auto: nothing here lands 1 in 4 or better
+      // How much the legs move together — the one quantity a 12,000-match
+      // simulation can read better than a bookmaker's parametric rule, and so
+      // the only place a builder could be mispriced in your favour.
+      const agreeOf = (x) => { const pp = x.legs.reduce((a, r) => a * (e.legs[r.id] || { p: 1 }).p, 1);
+                               return pp > 0 ? +(x.p / pp).toFixed(3) : null; };
       scan.results.push({ ...fixtureInfo(league, f, json), p: t.p, fair: t.fair, b365: t.b365 || null, b365raw: t.b365raw || null, check: t.check || 1, worth: +worthOf(t).toFixed(3), guessed: t.guessed || 0,
+        agree: agreeOf(t),
         legs: t.legs.map((r) => legSummary(e, json, r.id)),
         alts: list.slice(1).map((x) => ({ p: x.p, fair: x.fair, b365: x.b365 || null, b365raw: x.b365raw || null, check: x.check || 1,
-                                          worth: +worthOf(x).toFixed(3), guessed: x.guessed || 0,
+                                          worth: +worthOf(x).toFixed(3), guessed: x.guessed || 0, agree: agreeOf(x),
                                           legs: x.legs.map((r) => legSummary(e, json, r.id)) })),
         value: json.value.legs.slice(0, 4).map((v) => ({ label: v.label, price: v.price, edge: v.edge })),
         // Single bets at Bet365's own price that beat HAWK's chance — no builder

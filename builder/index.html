@@ -3142,7 +3142,10 @@ function markOnBet365() {
   if (!S.match || !S.slip.length) return;
   const on = onBet365(), off = notOn365();
   for (const id of S.slip) { const l = S.legs[id]; if (l) { on.add(no365Key(l)); off.delete(no365Key(l)); } }
-  savePref("hawk.onBet365", [...on].slice(-500)); savePref("hawk.notOn365", [...off]);
+  // Both capped. notOn365 had no slice while its sibling did, and it's the one
+  // that grows fastest — a key for every market checked and not found, every
+  // match, for ever.
+  savePref("hawk.onBet365", [...on].slice(-500)); savePref("hawk.notOn365", [...off].slice(-500));
 }
 // Legs you've given Bet365's own price for (price check / ✎), for this match.
 const typedLegIds = () => propPrices().filter(x => x.match === String(S.match && S.match.id) && x.price > 1).map(x => x.leg);
@@ -3154,7 +3157,8 @@ function unofferedLegIds() {
 async function notOnBet365(id) {
   const l = S.legs[id];
   if (!l || !S.match) return;
-  const set = notOn365(); set.add(no365Key(l)); savePref("hawk.notOn365", [...set]);
+  // Capped like its sibling: this is the one that only ever grows.
+  const set = notOn365(); set.add(no365Key(l)); savePref("hawk.notOn365", [...set].slice(-500));
   toast(`🚫 Got it: no ${l.market} at Bet365 in ${S.match.league} — HAWK leaves it out there`);
   await swapLeg(id);
 }

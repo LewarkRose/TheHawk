@@ -20,7 +20,7 @@
 <style>
 :root{
   --bg:#0d1114; --panel:#151b1f; --panel2:#1b2328; --line:#25313a; --text:#e8eff3; --muted:#8797a3;
-  --accent:#38bdf8; --accent-d:#0284c7; --gold:#ffd166; --red:#ff5d73; --blue:#a78bfa; --shadow:0 10px 30px rgba(0,0,0,.35);
+  --accent:#38bdf8; --accent-d:#0284c7; --gold:#ffd166; --red:#ff5d73; --blue:#2dd4bf; --shadow:0 10px 30px rgba(0,0,0,.35);
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -28,12 +28,12 @@
 .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 .bg-glow i{position:absolute;width:70vmax;height:70vmax;border-radius:50%;filter:blur(40px);will-change:transform}
 .bg-glow i:nth-child(1){background:radial-gradient(closest-side,rgba(56,189,248,.15),transparent);left:-22vmax;top:-32vmax;animation:bgDrift1 24s ease-in-out infinite alternate}
-.bg-glow i:nth-child(2){background:radial-gradient(closest-side,rgba(167,139,250,.09),transparent);right:-26vmax;top:-12vmax;animation:bgDrift2 30s ease-in-out infinite alternate}
+.bg-glow i:nth-child(2){background:radial-gradient(closest-side,rgba(45,212,191,.09),transparent);right:-26vmax;top:-12vmax;animation:bgDrift2 30s ease-in-out infinite alternate}
 .bg-glow i:nth-child(3){background:radial-gradient(closest-side,rgba(56,189,248,.10),transparent);left:18vmax;bottom:-46vmax;animation:bgDrift3 34s ease-in-out infinite alternate}
 @keyframes bgDrift1{to{transform:translate(18vmax,12vmax)}}
 @keyframes bgDrift2{to{transform:translate(-16vmax,18vmax)}}
 @keyframes bgDrift3{to{transform:translate(-14vmax,-10vmax)}}
-.bg-hawk{position:absolute;left:50%;top:56%;width:min(92vh,960px);transform:translate(-30%,-50%) rotate(-8deg);fill:#7cf7cf;opacity:.05}
+.bg-hawk{position:absolute;left:50%;top:56%;width:min(92vh,960px);transform:translate(-30%,-50%) rotate(-8deg);fill:#bae6fd;opacity:.05}
 .bg-vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55))}
 @media (prefers-reduced-motion:reduce){.bg-glow i{animation:none}}
 main.grid{position:relative;z-index:1}
@@ -54,7 +54,7 @@ img{max-width:100%}
 .brand:hover .logo{transform:rotate(-4deg) scale(1.05)}
 .wordmark{display:flex;flex-direction:column;line-height:1}
 .wordmark b{font-size:20px;font-weight:900;letter-spacing:.22em;
-  background:linear-gradient(180deg,#f2fffa,#7cf7cf 70%,#38bdf8);-webkit-background-clip:text;background-clip:text;color:transparent}
+  background:linear-gradient(180deg,#f2fffa,#bae6fd 70%,#38bdf8);-webkit-background-clip:text;background-clip:text;color:transparent}
 .wordmark small{font-size:9.5px;font-weight:700;letter-spacing:.32em;color:var(--muted);margin-top:4px}
 .mainnav{display:flex;gap:4px;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:14px;margin:0 auto;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
@@ -168,7 +168,7 @@ img{max-width:100%}
 .section h3{margin:0 0 12px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .bar3{display:flex;height:34px;border-radius:10px;overflow:hidden;font-weight:800;font-size:13px}
 .bar3 div{display:flex;align-items:center;justify-content:center;min-width:34px;transition:flex .6s}
-.bar3 .h{background:var(--accent);color:#04222e}.bar3 .d{background:#34424c}.bar3 .a{background:var(--blue);color:#1b1030}
+.bar3 .h{background:var(--accent);color:#04222e}.bar3 .d{background:#34424c}.bar3 .a{background:var(--blue);color:#042f2b}
 .bar3.sm{height:22px;font-size:11.5px;border-radius:7px;flex:1}.bar3.sm div{min-width:28px}
 .ng-box{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
 .ng-head{font-weight:800;margin-bottom:8px}
@@ -317,7 +317,7 @@ img{max-width:100%}
 .ip-scorers{margin-top:6px;display:flex;flex-direction:column;gap:2px;font-size:12.5px;font-weight:700;color:var(--text)}
 .ip-tabs{display:inline-flex;gap:4px;padding:3px;text-transform:none;letter-spacing:0}.ip-tabs button{padding:4px 10px;font-size:12px}
 .ip-teams{display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;color:var(--muted);margin:0 0 4px}
-.ip-teams span:first-child{color:var(--accent)}.ip-teams span:last-child{color:#a78bfa}
+.ip-teams span:first-child{color:var(--accent)}.ip-teams span:last-child{color:#2dd4bf}
 .lp-sec{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:14px 0 6px}
 .lp-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}.lp-row small{display:block;color:var(--muted);font-size:11px}
 .lp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
@@ -423,14 +423,14 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .lface{position:relative;flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;
   background:radial-gradient(circle at 35% 30%,#2b3d3a,#131b1d);border:2px solid var(--accent);
   box-shadow:0 6px 12px -4px rgba(0,0,0,.7),0 0 0 3px rgba(56,189,248,.12)}
-.lface.away{border-color:var(--blue);box-shadow:0 6px 12px -4px rgba(0,0,0,.7),0 0 0 3px rgba(167,139,250,.12)}
+.lface.away{border-color:var(--blue);box-shadow:0 6px 12px -4px rgba(0,0,0,.7),0 0 0 3px rgba(45,212,191,.12)}
 .lface img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:top}
 .lface.crest img{inset:6px;width:calc(100% - 12px);height:calc(100% - 12px);border-radius:0;object-fit:contain}
 .lface.ball{border-color:#3a4a55}
 .lface .ini{font-size:13px;font-weight:900;color:var(--muted)}
 .lface .no{position:absolute;right:-7px;bottom:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;display:grid;place-items:center;
   font-size:10px;font-weight:900;background:var(--accent);color:#04222e;border:2px solid #151d20;box-shadow:0 2px 4px rgba(0,0,0,.5)}
-.lface.away .no{background:var(--blue);color:#1b1030}
+.lface.away .no{background:var(--blue);color:#042f2b}
 .verdict{flex:none;align-self:flex-start;font-size:11px;font-weight:800;letter-spacing:.02em;padding:3px 9px;border-radius:999px;white-space:nowrap;
   color:var(--muted);background:linear-gradient(180deg,#26333a,#1c262c);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 3px 6px -3px rgba(0,0,0,.6)}
 .verdict.good{color:#04222e;background:linear-gradient(180deg,#3cf0b6,#12c58c);border-color:#0284c7;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px -4px rgba(56,189,248,.6)}
@@ -580,7 +580,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .goal-card.t-bad .g-word{color:#ff6b7f;text-shadow:0 0 16px rgba(255,93,115,.5)}.goal-card.t-bad .g-bar i{background:#ff6b7f}
 .goal-card.t-warn{border-color:rgba(255,209,102,.6);background:linear-gradient(135deg,#2a2412 0%,#141b22 60%);box-shadow:0 18px 40px rgba(0,0,0,.5),0 0 26px rgba(255,209,102,.2)}
 .goal-card.t-warn .g-word{color:var(--gold);text-shadow:0 0 16px rgba(255,209,102,.5)}.goal-card.t-warn .g-bar i{background:var(--gold)}
-.goal-card.t-info{border-color:rgba(167,139,250,.55);background:linear-gradient(135deg,#12202e 0%,#141b22 60%)}
+.goal-card.t-info{border-color:rgba(45,212,191,.55);background:linear-gradient(135deg,#12202e 0%,#141b22 60%)}
 .goal-card.t-info .g-word{color:var(--blue);text-shadow:none}.goal-card.t-info .g-bar i{background:var(--blue)}
 @keyframes goalIn{from{opacity:0;transform:translateX(60px) scale(.9)}to{opacity:1;transform:none}}
 @keyframes goalOut{to{opacity:0;transform:translateX(60px)}}
@@ -629,10 +629,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .scard .rail.fair{background:linear-gradient(180deg,var(--gold),#b8975a);opacity:1}
     .scard .rail.bad{background:linear-gradient(180deg,#3c4a54,#2b363e);opacity:1}
     /* price not known yet: neither good nor bad until Bet365 says */
-    .scard .rail.check{background:linear-gradient(180deg,var(--blue),#6d5bbd);opacity:1}
-    .badge.check{background:rgba(167,139,250,.14);color:var(--blue)}
+    .scard .rail.check{background:linear-gradient(180deg,var(--blue),#0f9e8c);opacity:1}
+    .badge.check{background:rgba(45,212,191,.14);color:var(--blue)}
     .sdo.check{color:var(--blue)}
-    .theleg.check{border-color:rgba(167,139,250,.42);background:linear-gradient(140deg,rgba(167,139,250,.09),var(--panel) 58%)}
+    .theleg.check{border-color:rgba(45,212,191,.42);background:linear-gradient(140deg,rgba(45,212,191,.09),var(--panel) 58%)}
     .theleg.check .tl-price .n{color:var(--blue)}
     .scard .sbody{flex:1;min-width:0;padding:12px 14px;display:flex;flex-direction:column;gap:9px}
     .scard .stop{display:flex;align-items:flex-start;gap:12px}
@@ -659,7 +659,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     /* How much the legs move together — the builder's only exploitable number */
     .agree{font-size:11.5px;font-weight:700;padding:5px 9px;border-radius:9px;border:1px solid;align-self:flex-start}
     .agree.same{color:var(--gold);background:rgba(255,209,102,.09);border-color:rgba(255,209,102,.35)}
-    .agree.apart{color:var(--blue);background:rgba(167,139,250,.09);border-color:rgba(167,139,250,.35)}
+    .agree.apart{color:var(--blue);background:rgba(45,212,191,.09);border-color:rgba(45,212,191,.35)}
     /* Tonight's bet: the one card you came for, above everything else */
     .theleg{position:relative;margin:0 0 14px;padding:15px 17px 14px;border-radius:17px;border:1px solid rgba(56,189,248,.42);
       background:linear-gradient(140deg,rgba(56,189,248,.09),var(--panel) 58%);box-shadow:0 16px 34px -22px rgba(0,0,0,.9)}
@@ -765,6 +765,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .mfold[open]>summary{border-bottom:1px solid var(--line)}
     .mfold .section{border:0;margin:0}
     @media (max-width:560px){ .mfold>summary .mhint{flex-basis:100%;order:3} }
+    /* Home is ice, away is teal — near neighbours in hue. A hairline between the
+       segments keeps the boundary readable on a 6px bar without altering either. */
+    .bar3 > div + div{box-shadow:-1px 0 0 rgba(0,0,0,.6)}
+    .bar i + i, .ip-stat .bar i + i{box-shadow:-1px 0 0 rgba(0,0,0,.55)}
     /* the two Bet365 rules, as switches on the slip (see b365Switches) */
     .bswrow{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
     .bsw{flex:1;min-width:150px;display:flex;align-items:center;gap:9px;padding:9px 11px;cursor:pointer;
@@ -922,7 +926,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     }
     /* paper mode: following a pick with no money on it */
     .tdrow .follow{flex:none;width:auto;margin:0;padding:6px 10px;font-size:11.5px;font-weight:700;border-radius:9px;min-height:36px}
-    .tdrow .follow.on{border-color:rgba(167,139,250,.5);background:rgba(167,139,250,.12);color:var(--blue)}
+    .tdrow .follow.on{border-color:rgba(45,212,191,.5);background:rgba(45,212,191,.12);color:var(--blue)}
     .paper{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
     .paper .n{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:24px;line-height:1;font-weight:700}
     .prow{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:12.5px}
@@ -939,7 +943,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .scard .teams{display:flex;align-items:center;gap:7px;font-weight:800;flex-wrap:wrap}
 .scard .teams img{width:20px;height:20px}
 .lchip{display:inline-block;font-size:11.5px;padding:3px 9px;border-radius:7px;background:#22303a;border:1px solid #2e3e49;margin:0}
-.lchip.pl{border-color:rgba(167,139,250,.45)}
+.lchip.pl{border-color:rgba(45,212,191,.45)}
     /* the weak link: the leg least likely to land, so you know which to swap */
     .lchip.weak{border-color:rgba(255,209,102,.55);background:rgba(255,209,102,.08)}
     .lchip.weak b{color:var(--gold)}
@@ -973,7 +977,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .mhead .ph.lp-face img{width:100%;height:100%;border-radius:50%;object-position:top}
 .mhead .ph.lp-face .no{position:absolute;right:-8px;bottom:-4px;min-width:24px;height:24px;padding:0 4px;border-radius:12px;display:grid;place-items:center;
   font-size:12px;font-weight:900;background:var(--accent);color:#04222e;border:2px solid var(--panel)}
-.mhead .ph.lp-face.away .no{background:var(--blue);color:#1b1030}
+.mhead .ph.lp-face.away .no{background:var(--blue);color:#042f2b}
 .mhead .x{margin-left:auto;border:1px solid var(--line);background:transparent;border-radius:10px;width:34px;height:34px;cursor:pointer;color:var(--muted)}
 .chart{display:flex;align-items:flex-end;gap:8px;height:210px;margin:18px 0 6px;padding:0 4px;border-bottom:1px solid var(--line)}
 .chart .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
@@ -1015,7 +1019,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .call small.risk{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.1);color:var(--text);opacity:1}
 .call.good{color:var(--accent);background:rgba(56,189,248,.1);border-color:rgba(56,189,248,.4)}
 .call.warn{color:var(--gold);background:rgba(255,209,102,.1);border-color:rgba(255,209,102,.4)}
-.call.check{color:var(--blue);background:rgba(167,139,250,.1);border-color:rgba(167,139,250,.4)}
+.call.check{color:var(--blue);background:rgba(45,212,191,.1);border-color:rgba(45,212,191,.4)}
 .call.bad{color:#ff8a9a;background:rgba(255,93,115,.1);border-color:rgba(255,93,115,.4)}
 .up-level{font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px}
 .up-level.low{background:rgba(56,189,248,.12);color:var(--accent)}
@@ -1057,7 +1061,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .pm .shirt{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:11.5px;border:2px solid rgba(255,255,255,.75);
   box-shadow:0 2px 6px rgba(0,0,0,.45)}
 .pm.home .shirt{background:var(--accent);color:#04222e}
-.pm.away .shirt{background:var(--blue);color:#1b1030}
+.pm.away .shirt{background:var(--blue);color:#042f2b}
 /* faces: the photo in a team-coloured ring, the shirt number as a badge */
 .pm .shirt{position:relative}
 .pm .shirt.face{width:36px;height:36px;background:#0d1a16;border-width:2.5px}
@@ -1065,7 +1069,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .pm .shirt.face img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:top}
 .pm .shirt.face .no{position:absolute;right:-7px;bottom:-4px;min-width:17px;height:17px;padding:0 3px;border-radius:9px;display:grid;place-items:center;
   font-size:9.5px;font-weight:900;border:1.5px solid #0d1114;box-shadow:0 1px 3px rgba(0,0,0,.5)}
-.pm.home .shirt.face .no{background:var(--accent);color:#04222e}.pm.away .shirt.face .no{background:var(--blue);color:#1b1030}
+.pm.home .shirt.face .no{background:var(--accent);color:#04222e}.pm.away .shirt.face .no{background:var(--blue);color:#042f2b}
 .pm.subon .shirt.face,.pm.subon .shirt{border-color:var(--gold)}
 .pm .nm{font-size:10.5px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pm .tg{font-size:9.5px;font-weight:800;color:#fff;background:rgba(4,12,10,.62);padding:0 5px;border-radius:6px;white-space:nowrap}
@@ -1125,7 +1129,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .tb{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:8px;letter-spacing:0;text-transform:none;vertical-align:1px;cursor:help;white-space:nowrap}
 .tb.ok{background:rgba(56,189,248,.14);color:var(--accent)}
 .tb.hi{background:rgba(255,209,102,.14);color:var(--gold)}
-.tb.lo{background:rgba(167,139,250,.14);color:var(--blue)}
+.tb.lo{background:rgba(45,212,191,.14);color:var(--blue)}
 /* head to head */
 .h2h-sum{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;margin-bottom:10px}
 .h2h-sum span{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
@@ -1296,15 +1300,20 @@ a.nav{text-decoration:none}
 <header class="top">
   <div class="topbar">
     <a class="brand" href="./" title="HAWK bet builder">
-      <!-- HAWK logo: a hawk in flight, feathered wings spread (same as hawk-logo.svg) -->
+      <!-- HAWK crest: a thin shield holding a solid one, the hawk cut from the
+           middle (same as hawk-logo.svg). -->
       <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
         <defs>
-          <linearGradient id="hawkG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7cf7cf"/><stop offset="1" stop-color="#0fb884"/></linearGradient>
-          <linearGradient id="tileG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2226"/><stop offset="1" stop-color="#0b1013"/></linearGradient>
+          <linearGradient id="hawkG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset="1" stop-color="#0284c7"/></linearGradient>
+          <linearGradient id="tileG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16212a"/><stop offset="1" stop-color="#0a1016"/></linearGradient>
         </defs>
         <rect x="1" y="1" width="62" height="62" rx="15" fill="url(#tileG)"/>
         <rect x="1.5" y="1.5" width="61" height="61" rx="14.5" fill="none" stroke="#fff" stroke-opacity=".08"/>
-        <g fill="url(#hawkG)">
+        <path d="M32 9 L52 15 V33 C52 43 42 51 32 55 C22 51 12 43 12 33 V15 Z" fill="none" stroke="url(#hawkG)" stroke-width="2" stroke-opacity=".5"/>
+        <g transform="translate(32 33.5) scale(.82) translate(-32 -33)">
+          <path d="M32 9 L52 15 V33 C52 43 42 51 32 55 C22 51 12 43 12 33 V15 Z" fill="url(#hawkG)"/>
+        </g>
+        <g transform="translate(32 33) scale(.5) translate(-32 -32)" fill="#0a1016">
           <path d="M32 14.5L35.2 18.5L34 22.5L32 25L30 22.5L28.8 18.5Z"/>
           <path d="M29.5 27.5L4 15L9 21.5L4.5 22.5L11 28L6.5 29.5L14 34L10.5 35.5L20 38.5L29.5 41.5Z"/>
           <path d="M34.5 27.5L60 15L55 21.5L59.5 22.5L53 28L57.5 29.5L50 34L53.5 35.5L44 38.5L34.5 41.5Z"/>
@@ -1349,8 +1358,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260921e"></script>
-<script src="hawk-settle.js?v=20260921e"></script>
+<script src="engine.js?v=20260921g"></script>
+<script src="hawk-settle.js?v=20260921g"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -4637,7 +4646,7 @@ async function showReport(id) {
     ${r.stats.length ? `<h3 style="margin:16px 0 6px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Match stats</h3>
       ${r.stats.map(s => { const a = parseFloat(s.home) || 0, b = parseFloat(s.away) || 0, t = a + b || 1;
         return `<div class="ip-stat"><div class="nm">${esc(s.label)}</div><div style="text-align:right;font-weight:700">${esc(s.home)}</div>
-          <div class="bar"><i style="width:${(100 * a / t).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / t).toFixed(1)}%;background:#a78bfa"></i></div>
+          <div class="bar"><i style="width:${(100 * a / t).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / t).toFixed(1)}%;background:#2dd4bf"></i></div>
           <div style="font-weight:700">${esc(s.away)}</div></div>`; }).join("")}` : ""}`);
 }
 
@@ -5407,7 +5416,7 @@ function renderInPlay() {
     const v = st[name]; if (!v || (v[0] == null && v[1] == null)) return "";
     const a = v[0] || 0, b = v[1] || 0, tot = a + b || 1;
     return `<div class="ip-stat"><div class="nm">${label}</div><div style="text-align:right;font-weight:700">${fmt(a)}</div>
-      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:#a78bfa"></i></div>
+      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:#2dd4bf"></i></div>
       <div style="font-weight:700">${fmt(b)}</div></div>`;
   };
   const p = d.probs || {};
@@ -5437,7 +5446,7 @@ function renderInPlay() {
     return `<div class="ip-stat" title="Booking points, the way Bet365 settles card markets: a yellow is 1 and a red is 2.">
       <div class="nm">Cards <span class="muted" style="font-size:10px">booking pts</span></div>
       <div style="text-align:right;font-weight:700">${a}</div>
-      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:#a78bfa"></i></div>
+      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:#2dd4bf"></i></div>
       <div style="font-weight:700">${b}</div></div>`;
   })();
   // One price table, not two. "Live value" was "All live prices" with a filter on

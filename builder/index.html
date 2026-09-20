@@ -1237,8 +1237,12 @@ a.nav{text-decoration:none}
 <div id="toast"></div>
 <div id="goalfeed" aria-live="polite"></div>
 
-<script src="engine.js"></script>
-<script src="hawk-settle.js"></script>
+<!-- Versioned so a fresh page can never run a cached old engine. Bump this
+     whenever engine.js or hawk-settle.js changes: without it the browser keeps
+     the old file and the page quietly disagrees with itself. That cost an
+     evening of tests that were checking stale code. -->
+<script src="engine.js?v=20260920b"></script>
+<script src="hawk-settle.js?v=20260920b"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -3442,7 +3446,10 @@ function learnScanPrice(r, price) {
 const legMinOdds = () => S.scan.minOdds || 2;
 const legPriceOf = (o) => o.b365 || o.fair;
 // How much of the ticket HAWK had to guess at: 0 = every leg is Bet365-priced.
-const legGuessed = (o) => (o.legs || []).filter(l => !(l.bookPrice > 1)).length;
+// Only props count as guessed: a match market our feed lacks a price for is an
+// ordinary price HAWK can't read, not one Bet365 is marking up.
+const legGuessed = (o) => (o.legs || []).filter(l => legIsProp(l) && !(l.bookPrice > 1)).length;
+const legUnseen = (o) => (o.legs || []).filter(l => !legIsProp(l) && !(l.bookPrice > 1)).length;
 function theLeg(results) {
   // Every builder found tonight — the headline one per match and its alternatives.
   const all = [];
@@ -3484,7 +3491,8 @@ function theLeg(results) {
       <span>Back it at <b style="color:var(--gold)">${odds(need.need)}+</b></span>
       ${S.scan.minOdds && price < S.scan.minOdds ? `<span style="color:var(--blue)">clears your ${
         odds(S.scan.minOdds)} only if Bet365 pays over the guess — it did on 1 in 3</span>` : ""}
-      <span class="muted">${guessed ? `${guessed} of ${top.legs.length} leg prices are HAWK's guess`
+      <span class="muted">${guessed ? `${guessed} player prop${guessed > 1 ? "s" : ""} — Bet365 marks those up about 27%`
+        : legUnseen(top) ? `no props · ${legUnseen(top)} leg price${legUnseen(top) > 1 ? "s" : ""} our feed can't see, so check it`
         : `every leg at Bet365's own price — nothing guessed`}</span>
     </div>
     <div class="tl-check">
@@ -3562,7 +3570,13 @@ function scanOpt(ref) {
 // price HAWK had to estimate is "unknown", not "skip" — on the record, Bet365
 // paid MORE than HAWK expected on 30% of the builds that were actually checked.
 // Marking those red before checking them was hiding the green ones.
-const isGuess = (o) => !S.scan.prices[scanKey(o)] && (o.legs || []).some(l => !(l.bookPrice > 1));
+// A player prop with no Bet365 price is the expensive kind of unknown — Bet365
+// marks those up 27%. A corners or cards line our feed doesn't carry is the
+// cheap kind: an ordinary market at an ordinary price that HAWK simply can't
+// read. Only the first makes the estimate untrustworthy enough to withhold a
+// verdict over.
+const legIsProp = (l) => !!(l && (l.player || String(l.id || "").startsWith("p:")));
+const isGuess = (o) => !S.scan.prices[scanKey(o)] && (o.legs || []).some(l => legIsProp(l) && !(l.bookPrice > 1));
 const optTone = (o) => { const x = S.scan.prices[scanKey(o)];
   return +x > 1 ? (+x >= scanNeed(o).need ? "ok" : +x >= o.fair * 0.95 ? "fair" : "bad")
        : isGuess(o) ? "check"

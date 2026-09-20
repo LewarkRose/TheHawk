@@ -1378,7 +1378,14 @@
   // n legs, of which `guessed` are ones HAWK had to price itself: Bet365 cuts
   // those harder, so they get their own term.
   const aimOf = (n, guessed = 0) => (aim ? Math.exp(aim.c + aim.cl * n + (aim.gl || 0) * guessed) : 1);
-  const guessedCount = (legs, ids) => ids.reduce((k, id) => k + (legs[id] && legs[id].bookPrice > 1 ? 0 : 1), 0);
+  // The 27% is what Bet365 charges for a PLAYER PROP — that is what it was
+  // measured on. A corners or cards line our feed happens not to carry is still
+  // an ordinary match market to Bet365, priced at the usual few percent; HAWK
+  // just can't see the number. Charging those the prop rate priced them out of
+  // existence, and one of them (Under 9.5 Corners at 1.49) was the first
+  // genuinely green bet in the record.
+  const isProp = (leg) => !!(leg && (leg.player || String(leg.id || "").startsWith("p:")));
+  const guessedCount = (legs, ids) => ids.reduce((k, id) => k + (isProp(legs[id]) && !(legs[id].bookPrice > 1) ? 1 : 0), 0);
   const UNPRICED_CUT = 0.05;   // a leg nobody prices: about 5% under HAWK's fair odds
   const hasPrice = (leg) => leg.bookPrice > 1 || (leg.refPrice > 1 && !refOff(leg));
   const legB365 = (leg) => (leg.bookPrice > 1 ? leg.bookPrice : propEstimate(leg) || Math.max(1.01, Math.exp(-UNPRICED_CUT) / leg.p));
@@ -1524,7 +1531,7 @@
     // aimOf needs the guessed-leg count, same as b365Of: without it the slip
     // left out the 27% a leg Bet365 doesn't publish costs, so the same ticket
     // priced one way on the slip and another on the scan.
-    const guessedHere = chosen.filter((id) => !(legs[id].bookPrice > 1)).length;
+    const guessedHere = guessedCount(legs, chosen);
     return { p, fair: p > 0 ? 1 / p : null, legs: rows, b365: raw && raw * aimOf(chosen.length, guessedHere), b365raw: raw,
              price: priceOf(legs, chosen, p) || null, agree,
              guessed: chosen.filter((id) => !hasPrice(legs[id])).length, check };
@@ -1985,13 +1992,15 @@
   // (player props — no free feed has Bet365's). What's left are legs 365Scores
   // carries Bet365's own price for, so HAWK's expected builder price is built
   // from real numbers and lands far closer to what you'll see on Bet365.
-  // Priced = Bet365's OWN price (365Scores), or a price you typed in yourself.
-  // It used to count a leg as priced when two or more of the close-to-Bet365
-  // books carried it. That let player props straight back in — a reference
-  // price makes HAWK's estimate better, but Bet365 still marks the leg up about
-  // 27% (measured blind, 20 Sep), which is the whole reason for this option.
+  // What this option is really for is keeping PLAYER PROPS out, because Bet365
+  // marks those up about 27% a leg (measured blind, 20 Sep). It is not for
+  // keeping out every leg our feed lacks a price for: 365Scores doesn't carry
+  // some corners and cards lines that Bet365 prices perfectly normally, and
+  // excluding those threw away good match markets — including the Under 9.5
+  // Corners leg at 1.49 that made the first green bet in the record.
+  // So: props go, match markets stay even when HAWK has to estimate the leg.
   const unpricedIds = (e, typed) => Object.values(e.legs)
-    .filter((l) => !(l.bookPrice > 1) && !typed.has(l.id)).map((l) => l.id);
+    .filter((l) => isProp(l) && !(l.bookPrice > 1) && !typed.has(l.id)).map((l) => l.id);
   const withPriced = (e, body) => (body.priced
     ? { ...body, banned: [...(body.banned || []), ...unpricedIds(e, new Set(body.typed || []))] } : body);
   // The scan's cheap version of 🎯 Auto: one build per target in your own style,

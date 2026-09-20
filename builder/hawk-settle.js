@@ -65,8 +65,36 @@
     }
     const pair = (name) => (team[name] && team[name][0] != null && team[name][1] != null ? team[name] : null);
     const yellow = pair("Yellow Cards"), red = pair("Red Cards") || [0, 0];
-    const cards = yellow ? [yellow[0] + red[0], yellow[1] + red[1]]
-      : [homeId, awayId].map((id) => cardEvents.filter((e) => e.competitorId === id).length);
+    // Card markets settle in BOOKING POINTS, not card events: a yellow is 1 and a
+    // red is 2, and no player can be charged more than 3 (his first yellow, then
+    // 2 for the red — the second yellow itself adds nothing). The feed hands back
+    // a plain count, so a red used to score 1 here and every match with a sending
+    // off was graded a card short; "Over" legs that won were settled as losers.
+    // Second yellows are found from the events: a player with two yellows AND a
+    // red is one of them, so a point comes back off that side's total.
+    const secondYellow = [homeId, awayId].map((id) => {
+      const per = new Map();
+      for (const e of cardEvents) {
+        if (e.competitorId !== id || e.playerId == null) continue;
+        const v = per.get(e.playerId) || { y: 0, r: 0 };
+        /red/i.test(e.eventType.name || "") ? v.r++ : v.y++;
+        per.set(e.playerId, v);
+      }
+      return [...per.values()].filter((v) => v.r > 0 && v.y >= 2).length;
+    });
+    const cards = yellow
+      ? [0, 1].map((k) => yellow[k] + 2 * red[k] - secondYellow[k])
+      : [homeId, awayId].map((id, k) => {
+          const per = new Map();
+          for (const e of cardEvents) {
+            if (e.competitorId !== id) continue;
+            const key = e.playerId == null ? `x${per.size}` : e.playerId;
+            const v = per.get(key) || { y: 0, r: 0 };
+            /red/i.test(e.eventType.name || "") ? v.r++ : v.y++;
+            per.set(key, v);
+          }
+          return [...per.values()].reduce((a, v) => a + Math.min(3, v.y + 2 * v.r), 0);
+        });
     const names = Object.fromEntries((game.members || []).map((m) => [m.id, m.name]));
     const bookedIds = new Set(cardEvents.map((e) => e.playerId));
     const players = {};

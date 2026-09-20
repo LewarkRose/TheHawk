@@ -1262,8 +1262,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260920g"></script>
-<script src="hawk-settle.js?v=20260920g"></script>
+<script src="engine.js?v=20260920h"></script>
+<script src="hawk-settle.js?v=20260920h"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -4694,11 +4694,15 @@ async function scorePaper() {
       for (const leg of legs) {
         if (leg.close === undefined) { const c = HawkSettle.closingPrice(leg, f); if (c) { leg.close = c; changed = true; } }
       }
+      // Every leg is graded, not just up to the first loser: one leg's result is
+      // one data point for "does 60% mean 60%", and stopping early threw away
+      // most of them. The board is the only place with the volume to answer that.
       let out = "won";
       for (const leg of legs) {
         const r = HawkSettle.legResult(leg, f, { earlyPayout: true });
-        if (r === "lost") { out = "lost"; break; }
-        if (r !== "won") { out = null; break; }   // can't read it: leave it open
+        if ((r === "won" || r === "lost") && leg.result !== r) { leg.result = r; changed = true; }
+        if (r === "lost") out = out === null ? null : "lost";
+        else if (r !== "won") out = null;          // can't read this one: the ticket stays open
       }
       if (out) { x.result = out; x.score = f.score || null; changed = true; }
     }

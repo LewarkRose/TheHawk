@@ -51,6 +51,14 @@
   const OPTION_TOTAL = { 14: 2.0 };
   const DEEP_MARKET_SOURCES = 5, DEEP_MARKET_WEIGHT = 0.85, MAX_LOGIT_GAP = 0.5;
   const STAT_TYPES = { 137: "corners", 141: "cards", 139: "sot" };
+  // A card market settles in booking points — a yellow is 1, a red is 2 — but the
+  // team data counts cards, so a red is one there. The bookmakers' own card lines
+  // are already in points, so only HAWK's side of the blend needs the difference
+  // added: the extra point a sending-off brings, times how often one happens
+  // (about a quarter of matches across the big leagues). Without it the model
+  // aims at a smaller number than the one the bet is settled on, and for matches
+  // where no card line is published it is the ONLY number, so nothing corrects it.
+  const RED_POINTS = 0.25;
   // sim.py
   const N_SIMS = 12000, SCAN_SIMS = 4000, PRIOR_MINUTES = 450, REST_SHARE = 0.05, XG_WEIGHT = 0.6;
   const START_PROB = { true: { Starting: 1.0, Substitute: 0.0 }, false: { Starting: 1.0, Substitute: 0.08 } };
@@ -709,7 +717,7 @@
     for (const [t, stat] of Object.entries(STAT_TYPES)) {
       const pair = profH && profA ? expectedPair(profH, fdH, profA, fdA, stat) : null;
       let total = pair ? pair[0] + pair[1] : null;
-      if (total && stat === "cards") total *= refFactor;
+      if (total && stat === "cards") total = total * refFactor + RED_POINTS;
       statModel[stat] = total;
       const lines = Object.entries(cons).filter(([k, c]) => k.startsWith(`${t}|`) && halfLine(k.split("|")[1]) != null && "Over" in c.probs)
         .map(([k, c]) => [parseFloat(k.split("|")[1]), c.probs.Over]);
@@ -2143,7 +2151,8 @@
                // true when today's home side was at home in that meeting
                sameVenue: x.homeCompetitor.id === g.homeCompetitor.id,
                score: [Math.trunc(x.homeCompetitor.score), Math.trunc(x.awayCompetitor.score)],
-               corners: pair("Corners"), cards: yellow ? [yellow[0] + red[0], yellow[1] + red[1]] : null, sot: pair("Shots On Target") };
+               // Booking points, the way a card market settles: yellow 1, red 2.
+               corners: pair("Corners"), cards: yellow ? [yellow[0] + 2 * red[0], yellow[1] + 2 * red[1]] : null, sot: pair("Shots On Target") };
     }));
     return { home: g.homeCompetitor.name, away: g.awayCompetitor.name, games };
   }
@@ -2644,7 +2653,9 @@
     const { M, sh, sa, rem, elapsed, stats, game } = st, [rh, ra] = st.rates;
     const hc = game.homeCompetitor, ac = game.awayCompetitor;
     const pair = (name) => (stats[name] || [0, 0]).map((v) => v || 0);
-    const now = { corners: pair("Corners"), sot: pair("Shots On Target"), cards: pair("Yellow Cards").map((v, k) => v + pair("Red Cards")[k]) };
+    // Cards in booking points (yellow 1, red 2) so the live count matches what a
+    // card market actually settles on — see the same rule in hawk-settle.js.
+    const now = { corners: pair("Corners"), sot: pair("Shots On Target"), cards: pair("Yellow Cards").map((v, k) => v + 2 * pair("Red Cards")[k]) };
     const w = elapsed / (elapsed + 40);
     const lamStat = (stat, k) => rem * (w * (elapsed > 0 ? now[stat][k] / elapsed : 0) + (1 - w) * TYPICAL_90[stat] / 90);
     // Half-time and first goal.

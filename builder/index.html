@@ -1297,8 +1297,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260920j"></script>
-<script src="hawk-settle.js?v=20260920j"></script>
+<script src="engine.js?v=20260920k"></script>
+<script src="hawk-settle.js?v=20260920k"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -5176,6 +5176,18 @@ function nextGoalBox(d) {
       scorers.map(s => `<span class="ng-p">${esc(s.name)} <b>${pct(s.p, s.p < 0.1 ? 1 : 0)}</b></span>`).join("")}</div>` : ""}
   </div>`;
 }
+// What the stats say in one line, for when the section is folded: the four numbers
+// you'd actually glance at mid-match, so folding costs you nothing.
+function liveStatLine(st, d) {
+  const n = (k, f = (x) => x) => { const v = st[k]; return v && v[0] != null ? `${f(v[0])}–${f(v[1] || 0)}` : null; };
+  const reds = (d.reds || [0, 0]).reduce((a, b) => a + b, 0);
+  const bits = [n("Expected Goals", (x) => (+x).toFixed(2)) && `xG ${n("Expected Goals", (x) => (+x).toFixed(2))}`,
+                n("Shots On Target") && `${n("Shots On Target")} on target`,
+                n("Corners") && `${n("Corners")} corners`,
+                st.Possession && st.Possession[0] != null ? `${st.Possession[0]}% ball` : null,
+                reds ? `${reds} red${reds > 1 ? "s" : ""}` : null].filter(Boolean);
+  return bits.length ? bits.join(" · ") : "no live stats yet";
+}
 function renderInPlay() {
   const ip = S.inplay, d = ip.data;
   if (!d) { $("#match").innerHTML = `<div class="empty"><h2>Couldn't read this match</h2>${esc(ip.error || "")}</div>`; return; }
@@ -5237,28 +5249,65 @@ function renderInPlay() {
       <div>${k && k.stake ? `<b style="color:var(--gold)">€${k.stake.toFixed(2)}</b>` : '<span class="muted">—</span>'}</div></div>`;
   };
   const headRow = `<div class="ip-row head"><div>Bet</div><div>Bet365</div><div class="hide-sm">Fair</div><div class="hide-sm">Chance</div><div>Edge</div><div>Stake</div></div>`;
-  $("#match").innerHTML = head + htSection(d) + cashOutSection() + `
+  // Cards in booking points, the way the card markets are priced and settled:
+  // yellow 1, red 2. The feed's raw "Yellow Cards" left this row saying 1–2 on a
+  // match HAWK was pricing at 5 points, so an Over 4.5 Cards bet already landed
+  // looked a long way short. Reds come from d.reds, as in the scoreline.
+  const cardsRow = (() => {
+    const y = st["Yellow Cards"], r = (tab === "all" && d.reds) || [0, 0];
+    if (!y || (y[0] == null && y[1] == null)) return "";
+    const a = (y[0] || 0) + 2 * (r[0] || 0), b = (y[1] || 0) + 2 * (r[1] || 0), tot = a + b || 1;
+    return `<div class="ip-stat" title="Booking points, the way Bet365 settles card markets: a yellow is 1 and a red is 2.">
+      <div class="nm">Cards <span class="muted" style="font-size:10px">booking pts</span></div>
+      <div style="text-align:right;font-weight:700">${a}</div>
+      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:#7aa2ff"></i></div>
+      <div style="font-weight:700">${b}</div></div>`;
+  })();
+  // One price table, not two. "Live value" was "All live prices" with a filter on
+  // it, so your value bets were drawn twice and the pair ran to 850px.
+  const showAll = !!S.inplay.priceAll, list = showAll ? [...value, ...rest] : value;
+  const priceToggle = `<span class="seg ip-tabs" id="ipPrices" style="margin:0 0 0 auto">${
+    [[false, `Value${value.length ? ` (${value.length})` : ""}`], [true, `All${rows.length ? ` (${rows.length})` : ""}`]]
+      .map(([k, t]) => `<button class="${showAll === k ? "on" : ""}" data-pall="${k ? 1 : 0}">${t}</button>`).join("")}</span>`;
+  $("#match").innerHTML = head + cashOutSection() + `
     <div class="section"><h3>Live win chances <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:600">— 🦅 HAWK LIVE</span></h3>
       ${liveHawk(d)}</div>
+    ${mFold("ipPrice", "💰 Live prices", value.length ? `${value.length} beating Bet365 right now` : "nothing beats Bet365's prices right now",
+      `<div class="section"><h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">At Bet365${priceToggle}</h3>
+        ${list.length ? headRow + list.map(row).join("")
+          : `<div class="note">${rows.length ? "Nothing at Bet365 beats HAWK's live chances by 2%+ right now. That's normal — in-play prices are sharp. Checking again every 15 seconds."
+             : "Bet365 has no live prices for this match right now (often suspended just after a goal or a chance)."}</div>`}
+        <div class="note">Stake = ${KELLY_FRACS.find(([f]) => f === S.kellyFrac)[1]} Kelly on your Vault bankroll, max 5%. Prices move every few seconds and get suspended after chances, so check it's still there.
+          <b>Losing a bet on this match? Don't chase it.</b>
+          <details style="margin-top:5px"><summary style="cursor:pointer;color:var(--accent);font-weight:600">What's left out, and why</summary>
+            Only selections with a 20%+ chance count as value — longshot "edges" are mostly an artefact of how bookmaker margins are removed.
+            Asian handicaps aren't listed (in play they settle on goals scored after you bet), and nor are corners and cards, because bookmakers
+            update those live lines too unevenly to compare.</details></div></div>`)}
+    ${(() => {
+      // The half-time / live check folds like the rest, but its summary says whether
+      // there is anything in it, so folding never hides a tip you'd have acted on.
+      const body = htSection(d); if (!body) return "";
+      const t = (htTips(d) || []).length;
+      return mFold("ipCheck", isHalfTime(d) ? "⏸ Half-time check" : "👀 Live check",
+        t ? `${t} worth a look · type Bet365's price to check one` : "nothing worth betting at the moment", body);
+    })()}
     ${S.inplay.m ? lineupCard(S.inplay.m, d) : ""}
-    <div class="section"><h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Live stats
-        <span class="seg ip-tabs" id="ipHalf" style="margin:0 0 0 auto">${[["all", "Match"], ["h1", "1st half"], ["h2", "2nd half"]].map(([k, t]) =>
-          `<button class="${tab === k ? "on" : ""}" data-half="${k}">${t}</button>`).join("")}</span></h3>
-      <div class="ip-teams"><span>${esc(d.home)}</span><span>${esc(d.away)}</span></div>
-      ${statRow("Expected Goals", "Expected goals (xG)", (x) => x.toFixed(2))}${statRow("Shots On Target", "Shots on target")}${statRow("Total Shots", "Shots")}
-      ${statRow("Big Chances Created", "Big chances")}${statRow("Corners", "Corners")}${statRow("Possession", "Possession", (x) => x + "%")}
-      ${statRow("Fouls", "Fouls")}${statRow("Yellow Cards", "Yellow cards")}${statRow("Offsides", "Offsides")}${statRow("Goalkeeper Saves", "Saves")}
-      ${!Object.keys(st).length ? `<div class="note">${tab === "all" ? "No live stats yet." : tab === "h2" && /1st/i.test(d.statusText || "") ? "The 2nd half hasn't started yet." : "Loading…"}</div>` : ""}</div>
-    <div class="section"><h3>💰 Live value at Bet365</h3>
-      ${value.length ? headRow + value.map(row).join("") : `<div class="note">Nothing at Bet365 beats HAWK's live chances by 2%+ right now. That's normal — in-play prices are sharp. Checking again every 15 seconds.</div>`}
-    </div>
-    <div class="section"><h3>All live prices</h3>${rest.length ? headRow + rest.map(row).join("") : '<div class="note">Bet365 has no live prices for this match right now (often suspended just after a goal or a chance).</div>'}
-      <div class="note">Stake = ${KELLY_FRACS.find(([f]) => f === S.kellyFrac)[1]} Kelly on your Vault bankroll, max 5%. In-play prices change every few seconds and get suspended after chances, so check the price is still there.
-        Only selections with a 20%+ chance count as value. Asian handicaps aren't listed (in play they're settled on goals scored after you bet),
-        and nor are corners and cards (bookmakers update those live lines too unevenly to compare).
-        <b>Losing a bet on this match? Don't chase it</b> — only bet what shows as value, at the stake shown.</div></div>`;
+    ${mFold("ipStats", "📊 Live stats", liveStatLine(st, d),
+      `<div class="section"><h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">${esc(d.home)} v ${esc(d.away)}
+          <span class="seg ip-tabs" id="ipHalf" style="margin:0 0 0 auto">${[["all", "Match"], ["h1", "1st half"], ["h2", "2nd half"]].map(([k, t]) =>
+            `<button class="${tab === k ? "on" : ""}" data-half="${k}">${t}</button>`).join("")}</span></h3>
+        <div class="ip-teams"><span>${esc(d.home)}</span><span>${esc(d.away)}</span></div>
+        ${statRow("Expected Goals", "Expected goals (xG)", (x) => x.toFixed(2))}${statRow("Shots On Target", "Shots on target")}${statRow("Total Shots", "Shots")}
+        ${statRow("Big Chances Created", "Big chances")}${statRow("Corners", "Corners")}${statRow("Possession", "Possession", (x) => x + "%")}
+        ${statRow("Fouls", "Fouls")}${cardsRow}${statRow("Offsides", "Offsides")}${statRow("Goalkeeper Saves", "Saves")}
+        ${!Object.keys(st).length ? `<div class="note">${tab === "all" ? "No live stats yet." : tab === "h2" && /1st/i.test(d.statusText || "") ? "The 2nd half hasn't started yet." : "Loading…"}</div>` : ""}</div>`)}`;
   bindCashOut();
-  $("#ipHalf").onclick = async (e) => {
+  $("#match").querySelectorAll("[data-foldkey]").forEach((f) => { f.ontoggle = () => savePref(f.dataset.foldkey, f.open); });
+  if ($("#ipPrices")) $("#ipPrices").onclick = (e) => {
+    const b = e.target.closest("[data-pall]"); if (!b) return;
+    S.inplay.priceAll = b.dataset.pall === "1"; renderInPlay();
+  };
+  if ($("#ipHalf")) $("#ipHalf").onclick = async (e) => {
     const b = e.target.closest("[data-half]"); if (!b) return;
     const ip = S.inplay; ip.statTab = b.dataset.half; renderInPlay();
     if (ip.statTab !== "all") { await loadHalfStats(ip); if (S.view === "inplay" && S.inplay === ip) renderInPlay(); }

@@ -676,6 +676,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .tl-ak{font-size:9.5px;font-weight:800;letter-spacing:.13em;color:var(--muted)}
     .tl-ap{color:var(--gold)}
     .tl-no{margin-top:7px;font-size:15px;font-weight:700}
+    .tl-none-note{margin-top:7px;font-size:11.5px;line-height:1.5;color:var(--gold)}
     .tl-near,.tl-note{margin-top:8px;font-size:11.5px;line-height:1.5;color:var(--muted)}
     .tl-near b{color:var(--text)}
     /* One buildable option inside a match card, and the other ways to build it */
@@ -3494,17 +3495,27 @@ function theLeg(results) {
         so does the cut Bet365 takes for them.</div>` : ""}
     </div>`;
   }
+  // A card headed "tonight's bet" that hands you a skip is the app arguing with
+  // itself. So: if anything at your odds is actually worth backing, the
+  // likeliest of THOSE is the bet. If nothing is, it still shows the likeliest
+  // — that's useful — but it says so in the heading instead of pretending.
+  const legWorth = (o) => o.p * (o.b365 || o.fair) * (o.check || 1);
+  const clears = all.filter(o => legWorth(o) >= 1.02);
+  const pool = clears.length ? clears : all;
   // Likeliest to land, and among near-equal chances the one with less guesswork
   // in its price. That is the whole ask: biggest % that still pays 2.00+.
-  all.sort((a, b) => (b.p - a.p) || (legGuessed(a) - legGuessed(b)));
-  const top = all[0];
+  pool.sort((a, b) => (b.p - a.p) || (legGuessed(a) - legGuessed(b)));
+  const top = pool[0], nothingClears = !clears.length;
   const runner = all.find(o => o.id !== top.id);
   const need = scanNeed(top), price = legPriceOf(top), guessed = legGuessed(top);
   const tone = top.worth >= 1.02 ? "ok" : top.worth >= 0.95 ? "fair" : "bad";
   const chip = (l) => `<span class="lchip ${l.kind === "player" ? "pl" : ""}">${esc(l.label)}${
     l.bookPrice > 1 ? ` <b class="tl-real">${odds(l.bookPrice)}</b>` : ""}</span>`;
   return `<div class="theleg ${tone}">
-    <div class="tl-k">TONIGHT'S BET · LIKELIEST AT ${odds(legMinOdds())}+</div>
+    <div class="tl-k">${nothingClears
+      ? `LIKELIEST AT ${odds(legMinOdds())}+ · NONE WORTH BACKING TODAY`
+      : `TONIGHT'S BET · WORTH BACKING AT ${odds(legMinOdds())}+`}</div>
+    ${nothingClears ? `<div class="tl-none-note">Nothing on the board beats its price today. This is the likeliest ticket at your odds, not a recommendation — check it if you like, but HAWK would leave it.</div>` : ""}
     <div class="tl-main" data-htgo="${esc(top.id)}|${esc(top.league)}">
       <div style="flex:1;min-width:0">
         <div class="tl-where">${esc(top.home)} v ${esc(top.away)} · ${esc(top.league)} · ${esc(fmtKick(top.kickoff))}</div>

@@ -2,9 +2,9 @@
 // Network first for everything of HAWK's own, so a new version (or new data)
 // shows straight away; the last copy is used only when there's no connection.
 // Requests to other sites (365Scores, Polymarket, …) are left alone.
-const CACHE = "hawk-v1";
+const CACHE = "hawk-v2";
 const SHELL = ["./", "./index.html", "./builder/", "./builder/index.html", "./builder/engine.js", "./builder/hawk-settle.js",
-               "./hawk-logo.svg", "./builder/hawk-logo.svg", "./icon-192.png", "./icon-512.png", "./manifest.webmanifest"];
+               "./hawk-logo.svg", "./builder/hawk-logo.svg", "./icon.svg", "./favicon.svg", "./manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => { /* first visit offline: fine */ }));

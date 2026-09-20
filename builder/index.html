@@ -1262,8 +1262,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260920d"></script>
-<script src="hawk-settle.js?v=20260920d"></script>
+<script src="engine.js?v=20260920e"></script>
+<script src="hawk-settle.js?v=20260920e"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -4541,20 +4541,36 @@ function htVerdict(r) {
 // sized to your bankroll, and the headline is the one number you asked for —
 // the chance the day ends up green.
 const PLAN_MAX = 6;
-function planUnit(bank) { return Math.max(0.5, Math.floor((bank / 7) * 10) / 10); }
+// What to stake on each pick: Kelly on your Vault bankroll, at the same fraction
+// (¼ by default) the checker and the live page use, and never more than 5% on one
+// bet. The whole day is then capped at DAY_CAP of the bankroll.
+// It used to be a flat bankroll ÷ 7 a bet, which on a four-bet card came to about
+// EIGHT times full Kelly. Past roughly twice Kelly your bankroll shrinks over time
+// even when every chance HAWK gives is exactly right, so that rule lost money by
+// construction — and it contradicted the ¼ Kelly the rest of the app recommends.
+const DAY_CAP = 0.15, MIN_STAKE = 0.10;
+function planStakes(picks, bank) {
+  // No edge, no stake. An edge with a tiny Kelly share (a small bankroll) gets the
+  // smallest stake worth placing rather than being dropped off the plan entirely.
+  const sized = picks.map((x) => { const k = kellyStake(x.p, x.price);
+    return { ...x, stake: k && k.stake > 0 ? Math.max(MIN_STAKE, k.stake) : 0 }; }).filter((x) => x.stake >= MIN_STAKE);
+  const total = sized.reduce((a, x) => a + x.stake, 0), cap = bank * DAY_CAP;
+  if (total > cap && cap > 0) for (const x of sized) x.stake = Math.floor(x.stake * (cap / total) * 100) / 100;
+  return sized.filter((x) => x.stake >= MIN_STAKE);
+}
 function dayKey() { return "hawk.plan." + localDay(new Date()); }
 function bankNow() { const b = parseFloat(localStorage.getItem("hawk_bankroll")); return isFinite(b) ? b : 0; }
 // Every combination of win/lose across the day's bets: the expected return, and
 // how often the day finishes ahead. Fine up to ~14 bets.
-function dayOdds(picks, unit) {
-  const n = picks.length, stake = n * unit;
+function dayOdds(picks) {
+  const n = picks.length, stake = picks.reduce((a, x) => a + x.stake, 0);
   let ev = 0, green = 0;
   for (let mask = 0; mask < (1 << n); mask++) {
     let pr = 1, ret = 0;
     for (let i = 0; i < n; i++) {
       const hit = (mask >> i) & 1;
       pr *= hit ? picks[i].p : 1 - picks[i].p;
-      if (hit) ret += unit * picks[i].price;
+      if (hit) ret += picks[i].stake * picks[i].price;
     }
     ev += pr * ret;
     if (ret > stake) green += pr;
@@ -4566,6 +4582,18 @@ function dayPicks() {
   const out = [];
   const seen = new Set();
   const res = (S.scan.data && S.scan.data.results) || [];
+  // Builders first \u2014 this is a bet builder, and you've said you don't want
+  // singles. These are the ones HAWK would actually back: the price it expects
+  // from Bet365 beats what the ticket is worth. Usually only a couple on a card.
+  for (const r of res) {
+    if (out.length >= PLAN_MAX - 1 || seen.has(String(r.id)) || !(r.worth >= 1.02)) continue;
+    const price = r.b365 || r.fair; if (!(price > 1)) continue;
+    seen.add(String(r.id));
+    out.push({ key: `b:${r.id}`, kind: "builder", label: r.legs.map((l) => l.label).join(" + "),
+               where: `${r.home} v ${r.away} \u00b7 ${r.legs.length} legs`, price: +price.toFixed(2), p: r.p,
+               kickoff: r.kickoff, game: String(r.id), league: r.league });
+  }
+  // Then singles, only to fill what's left \u2014 Bet365's own price, so no builder cut.
   const rows = [];
   for (const r of res) for (const sg of r.singles || [])
     if (sg.price >= SINGLE_MIN_ODDS && sg.edge > 0) rows.push({ ...sg, home: r.home, away: r.away, game: r.id, league: r.league, kickoff: r.kickoff });
@@ -4575,16 +4603,6 @@ function dayPicks() {
     seen.add(String(row.game));
     out.push({ key: `s:${row.game}:${row.id}`, kind: "single", label: row.label, where: `${row.home} v ${row.away}`,
                price: row.price, p: row.p, kickoff: row.kickoff, game: String(row.game), league: row.league });
-  }
-  // Builders HAWK would actually back: the price it expects from Bet365 beats
-  // what the ticket is worth. Usually only a couple on a whole card.
-  for (const r of res) {
-    if (out.length >= PLAN_MAX - 1 || seen.has(String(r.id)) || !(r.worth >= 1.02)) continue;
-    const price = r.b365 || r.fair; if (!(price > 1)) continue;
-    seen.add(String(r.id));
-    out.push({ key: `b:${r.id}`, kind: "builder", label: r.legs.map((l) => l.label).join(" + "),
-               where: `${r.home} v ${r.away} \u00b7 ${r.legs.length} legs`, price: +price.toFixed(2), p: r.p,
-               kickoff: r.kickoff, game: String(r.id), league: r.league });
   }
   const mo = S.monster.data;
   if (mo && !mo.running && typeof monsterPick === "function") {
@@ -4597,7 +4615,9 @@ function dayPicks() {
                  kickoff: parts.map((r) => r.kickoff).sort()[0] || null });
     }
   }
-  return out.sort((a, b) => (b.p * b.price) - (a.p * a.price));
+  // Builders (and the acca) lead the plan, each group by what a euro comes back as.
+  // Sorting on value alone put singles back on top after they'd been picked last.
+  return out.sort((a, b) => (a.kind === "single") - (b.kind === "single") || (b.p * b.price) - (a.p * a.price));
 }
 /* ---------- paper mode: follow a pick, no money on it ---------- */
 // Everything you follow is stored with the price and the chance HAWK gave it at
@@ -4753,9 +4773,9 @@ function paperCard() {
     <span style="flex:1;min-width:0"><b>${esc(x.label)}</b>
       <span class="muted" style="font-size:11px">· ${esc(x.where || "")}</span></span>
     <span class="muted" style="flex:none">${odds(x.price)}</span></div>`).join("");
-  const yours = mine.length ? paperBlock(mine, "FOLLOWED, NO MONEY ON IT", "", rows)
-    : `<div class="paper"><div class="muted" style="font-size:12.5px"><b style="color:var(--text)">Following without betting.</b>
-        Tap ⊙ Follow on any pick and HAWK settles it from the final score — no money on it.</div></div>`;
+  // The manual Follow button is gone — every scan is graded automatically below,
+  // which is where the volume comes from. Ones you followed by hand still show.
+  const yours = mine.length ? paperBlock(mine, "FOLLOWED, NO MONEY ON IT", "", rows) : "";
   const board = auto.length ? paperBlock(auto, "HAWK'S OWN BOARD, GRADED",
     "Taken from every scan whether you back them or not, at the price HAWK expects Bet365 to show. Volume is the point — your own bets will never reach a number that proves anything.", "") : "";
   return yours + board;
@@ -4766,9 +4786,8 @@ function showToday() {
   renderToday();
 }
 function renderToday() {
-  const bank = bankNow(), picks = dayPicks(), unit = planUnit(bank);
-  const fit = picks.slice(0, Math.max(0, Math.min(picks.length, Math.floor((bank * 0.85) / unit))));
-  const sums = fit.length ? dayOdds(fit, unit) : null;
+  const bank = bankNow(), fit = planStakes(dayPicks(), bank);
+  const sums = fit.length ? dayOdds(fit) : null;
   const placed = loadPref(dayKey(), []);
   const scanned = !!(S.scan.data && S.scan.data.total);
   $("#match").innerHTML = `
@@ -4781,7 +4800,8 @@ function renderToday() {
       ${fit.length ? `<div class="tdplan">
         <div style="display:flex;align-items:center;gap:10px">
           <div style="font-family:'Barlow Condensed','Segoe UI Semibold',system-ui,sans-serif;font-size:22px;font-weight:700;letter-spacing:.04em;text-transform:uppercase">Today's plan</div>
-          <span style="flex:1"></span><span class="muted" style="font-size:11px">${fit.length} bet${fit.length === 1 ? "" : "s"} · €${unit.toFixed(2)} each</span></div>
+          <span style="flex:1"></span><span class="muted" style="font-size:11px">${fit.length} bet${fit.length === 1 ? "" : "s"} · ${
+            KELLY_FRACS.find(([f]) => f === S.kellyFrac)[1]} Kelly</span></div>
         <div class="tdstats">
           <div><div class="k">STAKE</div><div class="v">€${sums.stake.toFixed(2)}</div></div>
           <div><div class="k">EXPECTED BACK</div><div class="v" style="color:var(--gold)">€${sums.ev.toFixed(2)}</div></div>
@@ -4800,12 +4820,12 @@ function renderToday() {
         <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(x.label)}</div>
           <div class="muted" style="font-size:11px">${esc(x.where)}${x.kickoff ? ` · ${esc(fmtKick(x.kickoff))}` : ""}</div></div>
         <div style="text-align:right;flex:none"><div class="px">${odds(x.price)}</div>
-          <div class="muted" style="font-size:11px">${pct(x.p, 0)} · €${unit.toFixed(2)}</div></div>
-        <button class="ghost follow ${paperHas(x.key) ? "on" : ""}" data-follow="${esc(x.key)}" title="Follow it with no money on it — HAWK settles it from the final score">${
-          paperHas(x.key) ? "⊙ Following" : "⊙ Follow"}</button>
+          <div class="muted" style="font-size:11px">${pct(x.p, 0)} · <b style="color:var(--gold)">€${x.stake.toFixed(2)}</b></div></div>
         ${x.game ? `<button class="ghost iconbtn" data-plango="${esc(x.game)}|${esc(x.league || "")}" title="Open the match">›</button>` : ""}
       </div>`; }).join("")}
-      ${fit.length ? `<div class="note" style="margin-top:10px">Tick each one as you place it. Your bankroll and settled bets come from the Vault.</div>` : ""}
+      ${fit.length ? `<div class="note" style="margin-top:10px">Tick each one as you place it. Your bankroll and settled bets come from the Vault.
+        Each stake is ${KELLY_FRACS.find(([f]) => f === S.kellyFrac)[1]} Kelly on €${bank.toFixed(2)} — the size that grows the bankroll fastest if HAWK's chances are right —
+        with the whole day held under ${Math.round(100 * DAY_CAP)}% of it (€${(bank * DAY_CAP).toFixed(2)}). Betting bigger than this loses money over time even when the chances are correct.</div>` : ""}
       </div>
       <div class="tdcol" id="tdDay"></div>
       </div>
@@ -4821,13 +4841,6 @@ function renderToday() {
     if (cb.checked) list.push(cb.dataset.plan);
     savePref(dayKey(), list);
     cb.closest(".tdrow").classList.toggle("done", cb.checked);
-  });
-  $("#match").querySelectorAll("[data-follow]").forEach((b) => b.onclick = () => {
-    const pick = fit.find((x) => x.key === b.dataset.follow); if (!pick) return;
-    const on = paperToggle(pick);
-    b.classList.toggle("on", on); b.textContent = on ? "⊙ Following" : "⊙ Follow";
-    toast(on ? "Following it — no money on it. HAWK settles it at full time." : "Stopped following it.");
-    const card = $("#match").querySelector(".paper"); if (card) card.outerHTML = paperCard();
   });
   $("#match").querySelectorAll("[data-plango]").forEach((b) => b.onclick = () => {
     const [id, lg] = b.dataset.plango.split("|");

@@ -1262,8 +1262,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260920e"></script>
-<script src="hawk-settle.js?v=20260920e"></script>
+<script src="engine.js?v=20260920f"></script>
+<script src="hawk-settle.js?v=20260920f"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -4892,11 +4892,17 @@ function htStrip(games) {
   const rows = Object.entries(S.ht).filter(([, h]) => h.tips.length && Date.now() - h.at < 5 * 60e3)
     .map(([id, h]) => [games.find(g => String(g.id) === String(id)), h]).filter(([g]) => g && g.status === 3);
   if (!rows.length) return "";
-  return `<div class="co-card" style="margin:0 0 12px"><b>👀 Live tips right now</b>${rows.map(([g, h]) => `<div class="sc-ht" data-htgo="${esc(g.id)}|${esc(g.league)}">
+  return `<div class="co-card" style="margin:0 0 12px"><b>👀 Live tips right now</b>${rows.map(([g, h]) => `<div class="sc-ht" data-livego="${esc(g.id)}|${esc(g.league)}">
       <span>${esc(g.home)} ${g.score[0]}–${g.score[1]} ${esc(g.away)} <span class="muted">${esc(h.ht ? "half-time" : g.clock || "")}</span></span>
       <span class="muted">👀 ${esc(h.tips[0].text || h.tips[0].label)} · <b style="color:var(--text)">lands ${pct(h.tips[0].p, 0)}</b> · bet at ${odds(h.tips[0].fair * 1.02)}+ · Bet365 live ≈ ${odds(h.tips[0].price)}</span></div>`).join("")}</div>`;
 }
-document.addEventListener("click", (e) => { const t = e.target.closest("[data-htgo]"); if (t) { const [id, lg] = t.dataset.htgo.split("|"); goToLive(lg, id); } });
+// Picks are mostly pre-match, so open the match: goToMatch sends the ones already
+// kicked off to the live view by itself. Sending every pick straight to the live
+// view meant a match that hadn't started opened on "Not in play right now" — a
+// dead end on every card on the Picks page. data-livego is for cards that really
+// are in play (the live tips), where the live view is the point.
+document.addEventListener("click", (e) => { const t = e.target.closest("[data-htgo]"); if (t) { const [id, lg] = t.dataset.htgo.split("|"); goToMatch(lg || undefined, id); } });
+document.addEventListener("click", (e) => { const t = e.target.closest("[data-livego]"); if (t) { const [id, lg] = t.dataset.livego.split("|"); goToLive(lg, id); } });
 
 /* ---------- cash-out helper ---------- */
 // Your pending HAWK tickets on the match in play: the live chance of each leg

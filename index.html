@@ -1134,10 +1134,26 @@
             // legs: one match brings hundreds of legs but they all share a referee,
             // two teams and one afternoon, so legs alone would wave a league through
             // on a single game's worth of evidence.
-            let leagueHtml;
+            // Prefer the running per-league tally (every match ever graded). Until that
+            // has filled, the last 40 graded matches each carry their league, so the
+            // table can still work today off those — just with far fewer matches behind it.
+            let leagueSrc = null, leagueNote = '';
             if (G && G.byLeague && Object.keys(G.byLeague).length) {
-                const rows = Object.entries(G.byLeague).map(([k, b]) => ({ k, ...b }))
-                    .sort((a, b) => (b.matches || 0) - (a.matches || 0));
+                leagueSrc = Object.entries(G.byLeague).map(([k, b]) => ({ k, ...b }));
+                leagueNote = `Every one of HAWK's ${G.matches} graded matches.`;
+            } else if (G && (G.recent || []).length) {
+                const by = {};
+                for (const r of G.recent) {
+                    const k = r.league || '—';
+                    (by[k] ||= { n: 0, p: 0, won: 0, matches: 0 });
+                    by[k].matches++; by[k].n += r.n; by[k].p += r.said * r.n; by[k].won += r.got * r.n;
+                }
+                leagueSrc = Object.entries(by).map(([k, b]) => ({ k, ...b }));
+                leagueNote = `The last ${G.recent.length} graded matches only — the running per-league count starts on the next grading run and will go much deeper than this.`;
+            }
+            let leagueHtml;
+            if (leagueSrc && leagueSrc.length) {
+                const rows = leagueSrc.sort((a, b) => (b.matches || 0) - (a.matches || 0));
                 const ready = rows.filter(x => (x.matches || 0) >= SC_MIN_MATCHES);
                 const waiting = rows.filter(x => (x.matches || 0) < SC_MIN_MATCHES);
                 leagueHtml = (ready.length
@@ -1149,11 +1165,11 @@
                             <div class="flex-1 h-1.5 rounded-full bg-zinc-950 overflow-hidden"><div class="h-full bg-zinc-700 rounded-full" style="width:${Math.min(100, 100 * (x.matches || 0) / SC_MIN_MATCHES).toFixed(0)}%"></div></div>
                             <span class="text-[10px] text-zinc-600 tabular-nums">${x.matches || 0}/${SC_MIN_MATCHES} matches</span></div>`).join('')}</div>` : '');
             } else {
-                leagueHtml = `<p class="text-xs text-zinc-500">The every-match file doesn't carry leagues yet — it starts recording them on the next grading run, then fills in on its own as matches finish. <b class="text-zinc-400">You don't need to bet for this.</b></p>`;
+                leagueHtml = `<p class="text-xs text-zinc-500">No graded matches yet. <b class="text-zinc-400">You don't need to bet for this</b> — HAWK grades every match on its own.</p>`;
             }
             document.getElementById('sc-splits').innerHTML = scCard(
                 scH('🗂️', 'By league',
-                    `From every match HAWK grades, not from your bets — nothing here needs you to stake a penny. A league gets its number after ${SC_MIN_MATCHES} graded matches: legs alone would let one afternoon's game speak for a whole league.`) + leagueHtml);
+                    `From every match HAWK grades, not from your bets — nothing here needs you to stake a penny. A league gets its number after ${SC_MIN_MATCHES} graded matches: one match brings hundreds of legs, but they share two teams and a referee, so counting legs would let a single afternoon speak for a whole league. ${leagueNote}`) + leagueHtml);
 
             // ---- the caveat, in plain words ----
             document.getElementById('sc-note').innerHTML = scCard(

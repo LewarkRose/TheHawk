@@ -934,8 +934,9 @@
            Nothing is shown before there are enough legs to support it: a league
            with five legs has no number, and printing one anyway would be worse
            than printing nothing, because you would act on it. */
-        const SC_MIN = 96;        // legs before one slice gets its own verdict (catches a 10%/leg bias)
-        const SC_MIN_BAND = 25;   // legs before a calibration row is worth reading
+        const SC_MIN = 96;         // legs before one slice of YOUR bets gets a verdict
+        const SC_MIN_BAND = 25;    // legs before a calibration row is worth reading
+        const SC_MIN_MATCHES = 15; // graded matches before a league gets one (legs within a match aren't independent)
 
         function scLegs() {
             const out = [];
@@ -1129,8 +1130,30 @@
                             <th class="text-right pb-1 pr-3">Landed</th><th class="text-right pb-1">Gap</th></tr></thead><tbody>${readyRows}</tbody></table></div>` : '')
                     + (waitRows ? `<div class="space-y-1.5 pt-1">${readyRows ? '<p class="text-[10px] text-zinc-600 uppercase tracking-wider">Still collecting</p>' : ''}${waitRows}</div>` : ''));
             };
-            document.getElementById('sc-splits').innerHTML =
-                split('By league — your bets only', `HAWK's every-match file doesn't carry the league yet, so this can only use the ${all.n} legs you bet. A league gets a verdict at ${SC_MIN} legs and not before: below that the number swings so wildly it would mislead you — five legs can read "+2 SD" on pure chance.`, x => x.league);
+            // By league, from every match — no betting needed. Gated on MATCHES, not
+            // legs: one match brings hundreds of legs but they all share a referee,
+            // two teams and one afternoon, so legs alone would wave a league through
+            // on a single game's worth of evidence.
+            let leagueHtml;
+            if (G && G.byLeague && Object.keys(G.byLeague).length) {
+                const rows = Object.entries(G.byLeague).map(([k, b]) => ({ k, ...b }))
+                    .sort((a, b) => (b.matches || 0) - (a.matches || 0));
+                const ready = rows.filter(x => (x.matches || 0) >= SC_MIN_MATCHES);
+                const waiting = rows.filter(x => (x.matches || 0) < SC_MIN_MATCHES);
+                leagueHtml = (ready.length
+                        ? scTable('League', ready.map(x => scRow(`${escHtml(x.k)} <span class="text-zinc-600">· ${x.matches} matches</span>`, x.n, x.p / x.n, x.won / x.n, false)).join(''))
+                        : '')
+                    + (waiting.length ? `<div class="space-y-1.5 pt-1">${ready.length ? '<p class="text-[10px] text-zinc-600 uppercase tracking-wider">Still collecting</p>' : ''}${
+                        waiting.slice(0, 14).map(x => `<div class="flex items-center gap-2">
+                            <span class="text-[11px] text-zinc-400 w-36 truncate">${escHtml(x.k)}</span>
+                            <div class="flex-1 h-1.5 rounded-full bg-zinc-950 overflow-hidden"><div class="h-full bg-zinc-700 rounded-full" style="width:${Math.min(100, 100 * (x.matches || 0) / SC_MIN_MATCHES).toFixed(0)}%"></div></div>
+                            <span class="text-[10px] text-zinc-600 tabular-nums">${x.matches || 0}/${SC_MIN_MATCHES} matches</span></div>`).join('')}</div>` : '');
+            } else {
+                leagueHtml = `<p class="text-xs text-zinc-500">The every-match file doesn't carry leagues yet — it starts recording them on the next grading run, then fills in on its own as matches finish. <b class="text-zinc-400">You don't need to bet for this.</b></p>`;
+            }
+            document.getElementById('sc-splits').innerHTML = scCard(
+                scH('🗂️', 'By league',
+                    `From every match HAWK grades, not from your bets — nothing here needs you to stake a penny. A league gets its number after ${SC_MIN_MATCHES} graded matches: legs alone would let one afternoon's game speak for a whole league.`) + leagueHtml);
 
             // ---- the caveat, in plain words ----
             document.getElementById('sc-note').innerHTML = scCard(

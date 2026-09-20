@@ -33,7 +33,7 @@ for (const f of ["builder/engine.js", "builder/hawk-settle.js"])
 const { HAWK, HawkSettle } = globalThis;
 HAWK.setLearning({});   // grade HAWK's own chances, not adjusted ones
 
-const newTotals = () => ({ matches: 0, legs: 0, byMarket: {}, byKey: {}, recent: [],
+const newTotals = () => ({ matches: 0, legs: 0, byMarket: {}, byKey: {}, byLeague: {}, recent: [],
                            bands: BANDS.map(([lo, hi]) => ({ lo, hi, n: 0, p: 0, won: 0 })) });
 // Upset radar record, per level (Low … Very high): how often the favourite
 // really failed to win / the underdog won, against what the radar said.
@@ -98,8 +98,15 @@ for (const [id, pr] of Object.entries(state.pending)) {
     if (key) tally(T.byKey[key] ||= { n: 0, p: 0, won: 0 }, leg.p, w);
     const band = T.bands.find((b) => leg.p >= b.lo && leg.p < b.hi);
     if (band) tally(band, leg.p, w);
+    // Per league, so "is HAWK better in Serie A than in La Liga" can be answered
+    // from every match rather than from the handful you happened to bet on.
+    if (pr.league) tally((T.byLeague ||= {})[pr.league] ||= { n: 0, p: 0, won: 0, matches: 0 }, leg.p, w);
   }
   if (!n) continue;
+  // Matches as well as legs: one match brings hundreds of legs and they share a
+  // referee, two teams and one afternoon, so they are nowhere near independent.
+  // A league needs MATCHES behind it before its number is worth reading.
+  if (pr.league && T.byLeague && T.byLeague[pr.league]) T.byLeague[pr.league].matches++;
   T.matches++; T.legs += n; graded++;
   // Week by week (Monday to Sunday, by kick-off) for the Vault's weekly report.
   const W = ((T.weeks ||= {})[mondayKey(pr.kickoff)] ||= { matches: 0, legs: 0, said: 0, won: 0, bigCalls: 0, bigRight: 0 });
@@ -146,7 +153,8 @@ await mkdir(path.dirname(STATE_FILE), { recursive: true });
 await writeFile(STATE_FILE, JSON.stringify(state));
 await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   updated: new Date().toISOString(), matches: T.matches, legs: T.legs, waiting: Object.keys(state.pending).length,
-  byMarket: T.byMarket, byKey: T.byKey, bands: T.bands, recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets, weeks: T.weeks || {},
+  byMarket: T.byMarket, byKey: T.byKey, byLeague: T.byLeague || {}, bands: T.bands,
+  recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets, weeks: T.weeks || {},
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
 process.exit(0);   // the engine's timers shouldn't keep the job alive

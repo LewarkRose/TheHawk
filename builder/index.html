@@ -212,6 +212,7 @@ img{max-width:100%}
 .search{width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);margin-bottom:10px}
 .lg{margin-bottom:14px}
 .lg h4{margin:0 0 6px;font-size:12px;color:var(--muted)}
+.lmkt{font-size:10.5px;color:var(--muted);margin-top:1px}
 .lrow{display:grid;grid-template-columns:1fr 64px 56px 64px 30px;gap:8px;align-items:center;padding:7px 10px;border-radius:9px}
 .lhead{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:0 10px 4px}
 .lrow:hover{background:var(--panel2)}
@@ -841,6 +842,19 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .tdrow input[type=checkbox]{width:18px;height:18px;flex:none}
     .tdrow > div:first-of-type{flex:1;min-width:0}
     .tdrow .px{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:20px;line-height:1;font-weight:700;color:var(--gold)}
+    /* the front door: greeting, bankroll, one sentence, and the day in numbers */
+    .thero{border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:14px;
+      background:radial-gradient(120% 140% at 0% 0%, rgba(20,227,161,.10), transparent 60%), var(--panel)}
+    .thead{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+    .tgreet{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:27px;
+      font-weight:700;letter-spacing:.02em;line-height:1.05}
+    .tdate{font-size:11.5px;color:var(--muted);margin-top:2px}
+    .tsay{font-size:13.5px;color:var(--text);margin-top:11px}
+    .tsay b{color:var(--accent);font-size:16px;font-family:"Barlow Condensed",system-ui,sans-serif}
+    .hchips{display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}
+    .hchip{flex:1;min-width:86px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:9px 11px}
+    .hchip .n{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:21px;font-weight:700;line-height:1}
+    .hchip .k{font-size:9px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin-top:3px}
     .tdcols{display:flex;flex-direction:column;gap:11px}
     .tdcol{display:flex;flex-direction:column;gap:11px;min-width:0}
     /* On a PC the day reads left to right: the plan and HAWK's board, then the bets
@@ -1322,8 +1336,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260921b"></script>
-<script src="hawk-settle.js?v=20260921b"></script>
+<script src="engine.js?v=20260921d"></script>
+<script src="hawk-settle.js?v=20260921d"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -1361,7 +1375,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             // the card, not to take the legs away. Tick the box for a clean
             // match-market build.
             priced: loadPref("hawk.priced", false), favourite: true, result: null, tab: "players", q: "",
-            chk: { price: "", boost: "", stake: "5" }, moreOpen: false, tuneOpen: loadPref("hawk.tuneOpen", false), radarOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
+            chk: { price: "", boost: "", stake: "5" }, moreOpen: false, tuneOpen: loadPref("hawk.tuneOpen", false), radarOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", legsMore: false, ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaOpen: new Set(), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
@@ -1872,11 +1886,12 @@ function renderTab() {
   } else {
     body.innerHTML = `<input class="search" id="q" placeholder="Search legs — player, corners, goals…" value="${esc(S.q)}">
       <div class="qchips" id="lgcats" style="margin:0 0 12px"></div><div id="lglist"></div>`;
-    $("#q").oninput = (e) => { S.q = e.target.value; renderLegList(); };
-    $("#lgcats").onclick = (e) => { const c = e.target.closest("[data-cat]"); if (c) { S.cat = c.dataset.cat; renderLegList(); } };
+    $("#q").oninput = (e) => { S.q = e.target.value; S.legsMore = false; renderLegList(); };
+    $("#lgcats").onclick = (e) => { const c = e.target.closest("[data-cat]"); if (c) { S.cat = c.dataset.cat; S.legsMore = false; renderLegList(); } };
     renderLegList();
   }
   body.onclick = (e) => {
+    if (e.target.closest("[data-legsmore]")) { S.legsMore = true; return renderLegList(); }
     const st = e.target.closest("[data-star]"); if (st) return toggleStar(st.dataset.star);
     const hi = e.target.closest("[data-hist]"); if (hi) return openLegHistory(hi.dataset.hist);
     const b = e.target.closest("[data-add]"); if (b) return addLeg(b.dataset.add);
@@ -2274,6 +2289,9 @@ function upsetFlag(pt) {
   return ` <span class="badge upset" title="${esc(`${u.label} upset risk: ${u.dogName} ${pct(u.dogWin)} to win. ` + u.signals.filter(s => s.dir === "up").map(s => s.text).join(" "))}">⚡ ${esc(u.label.toLowerCase())} upset risk${backsFav ? " — you're backing the favourite" : ""}</span>`;
 }
 
+// How many legs the flat list shows before "show them all": a screenful, then
+// more once a chip or a search has already narrowed it.
+const LEG_PAGE = 25, LEG_PAGE_FILTERED = 60;
 function renderLegList() {
   const q = S.q.trim().toLowerCase();
   const all = Object.values(S.legs);
@@ -2288,14 +2306,23 @@ function renderLegList() {
     <div style="text-align:right">${esc(book)}</div><div></div></div>`;
   const cats = ["All", ...Object.keys(CATEGORIES).filter(c => counts[c])];
   $("#lgcats").innerHTML = cats.map(c => `<span class="qc ${S.cat === c ? "in" : ""}" data-cat="${esc(c)}">${esc(c)} ${c === "All" ? all.length : counts[c]}</span>`).join("");
-  $("#lglist").innerHTML = Object.entries(groups).sort((a, b) => rank(a[0]) - rank(b[0])).map(([g, ls]) => `<div class="lg"><h4>${esc(g)} ${trustBadge(g)}</h4>${head}${ls.slice(0, 40).map(l => `
-    <div class="lrow"><div>${esc(l.label)}${l.low_data ? ' <span class="badge warn">low data</span>' : ""}${hitChip(l)}${moveLine(l)}<div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div></div>
+  // One flat list, likeliest first, instead of 21 market sections all open — that
+  // was 8,799px on a normal match, with Team Corners alone taking 1,474px. The
+  // market moves under each leg's name so nothing is lost by dropping the
+  // headings, and the chips and the search box above do the narrowing.
+  const flat = Object.values(groups).flat().sort((a, b) => b.p - a.p);
+  const show = (q || S.cat !== "All") ? LEG_PAGE_FILTERED : (S.legsMore ? flat.length : LEG_PAGE);
+  const shown = flat.slice(0, show);
+  $("#lglist").innerHTML = shown.length ? `${head}${shown.map(l => `
+    <div class="lrow"><div><b>${esc(l.label)}</b>${l.low_data ? ' <span class="badge warn">low data</span>' : ""}${hitChip(l)}${moveLine(l)}
+      <div class="lmkt">${esc(l.market)} ${trustBadge(l.market)}</div><div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div></div>
       <div style="text-align:right;font-weight:700">${pct(l.p, 1)}</div><div class="muted" style="text-align:right">${odds(l.fair)}</div>
       <div style="text-align:right;font-weight:700;color:${l.bookPrice ? (l.bookPrice > l.fair ? "var(--accent)" : "var(--text)") : "var(--muted)"}">${l.bookPrice ? odds(l.bookPrice) : "–"}${moveMark(l)}${
         l.bookPrice ? `<span class="star ${isStarred(S.match.id, l.id) ? "on" : ""}" data-star="${l.id}" title="${isStarred(S.match.id, l.id) ? "Price alert on — click to stop" : `Alert me when Bet365 pays ${odds(l.fair * VALUE_EDGE)}+`}">★</span>` : ""}</div>
       <button class="add" data-add="${l.id}" title="Add to slip">${S.slip.includes(l.id) ? "✓" : "+"}</button></div>`).join("")}
-      ${ls.length > 40 ? `<div class="note" style="margin:4px 0 0">+ ${ls.length - 40} more — search a player or team to find them.</div>` : ""}</div>`).join("")
-    || `<div class="note">No legs match.</div>`;
+    ${flat.length > shown.length ? `<div class="note" style="margin:8px 0 0">${flat.length - shown.length} more —
+      <button class="linkbtn" data-legsmore>show them all</button>, pick a chip above, or search a player or market.</div>` : ""}`
+    : `<div class="note">No legs match.</div>`;
 }
 
 /* ---------- slip ---------- */
@@ -4962,6 +4989,44 @@ function showToday() {
   document.querySelectorAll(".fx").forEach((f) => f.classList.remove("on"));
   renderToday();
 }
+// The front door. Today is the page HAWK opens on, so it answers the question you
+// arrived with — what is there to do right now — before any card does.
+function todayHero(bank, fit, sums, scanned) {
+  const bets = vaultBets();
+  const running = bets.filter((b) => b.status === "PENDING");
+  const atRisk = running.reduce((a, b) => a + (+b.stake || 0), 0);
+  const res = (S.scan.data && S.scan.data.results) || [];
+  const live = (S.scores && S.scores.data || []).filter((g) => g.status === 3).length;
+  const placed = loadPref(dayKey(), []);
+  const left = fit.filter((x) => !placed.includes(x.key)).length;
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  // One sentence, in the order you'd want to hear it: live first, then bets to
+  // place, then whether the board has even been looked at.
+  const say = live ? `<b>${live}</b> match${live === 1 ? "" : "es"} in play right now`
+    : left ? `<b>${left}</b> bet${left === 1 ? "" : "s"} still to place, ${sums ? `€${sums.stake.toFixed(2)}` : ""} in total`
+    : fit.length ? "every bet on today's plan is placed"
+    : scanned ? "nothing on the board is worth its price today"
+    : "no scan yet — run one on Picks and the day builds itself";
+  const chip = (n, k, tone) => `<div class="hchip"><div class="n" ${tone ? `style="color:${tone}"` : ""}>${n}</div><div class="k">${k}</div></div>`;
+  return `<div class="thero">
+    <div class="thead">
+      <div style="flex:1;min-width:0">
+        <div class="tgreet">${greet}</div>
+        <div class="tdate">${esc(new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }))}</div>
+      </div>
+      <div class="bank"><div class="muted" style="font-size:10px;letter-spacing:.13em">BANKROLL</div><div class="n">€${bank.toFixed(2)}</div></div>
+    </div>
+    <div class="tsay">${say}</div>
+    <div class="hchips">
+      ${chip(left, left === 1 ? "to place" : "to place", left ? "var(--accent)" : "")}
+      ${chip(running.length, "running", running.length ? "var(--gold)" : "")}
+      ${chip(atRisk ? "€" + atRisk.toFixed(2) : "€0", "at risk")}
+      ${chip(res.length, "matches scanned")}
+      ${live ? chip(live, "in play", "#ff6b6b") : ""}
+    </div>
+  </div>`;
+}
 function renderToday() {
   const bank = bankNow(), fit = planStakes(dayPicks(), bank);
   const sums = fit.length ? dayOdds(fit) : null;
@@ -4969,9 +5034,7 @@ function renderToday() {
   const scanned = !!(S.scan.data && S.scan.data.total);
   $("#match").innerHTML = `
     <div class="section" style="border-top:0">
-      <div class="tdhead"><div style="flex:1;min-width:0"><h3 style="margin:0">📅 Today</h3>
-        <div class="muted" style="font-size:11.5px">${esc(new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }))}</div></div>
-        <div class="bank"><div class="muted" style="font-size:10px;letter-spacing:.13em">BANKROLL</div><div class="n">€${bank.toFixed(2)}</div></div></div>
+      ${todayHero(bank, fit, sums, scanned)}
       <div class="tdcols">
       <div class="tdcol">
       ${fit.length ? `<div class="tdplan">

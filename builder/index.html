@@ -1132,6 +1132,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* 🎟 My bets */
 .mb-h{margin:16px 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .mb-card{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:var(--panel2)}
+/* running tickets sit level with each other whether they carry two legs or five */
+.bdrawer .mb-card, .modal-bg[data-mybets] .mb-card{min-height:140px;display:flex;flex-direction:column}
+.bdrawer .mb-card .mb-part:last-child, .modal-bg[data-mybets] .mb-card .mb-part:last-child{margin-top:auto}
+.mb-link{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
+.mb-link:hover{border-color:rgba(20,227,161,.7)}
 .mb-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:14px;padding-bottom:6px}
 .mb-part{border-top:1px solid var(--line);padding:7px 0 3px}
 .mb-fx{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;margin-bottom:3px}
@@ -1315,8 +1320,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260920l"></script>
-<script src="hawk-settle.js?v=20260920l"></script>
+<script src="engine.js?v=20260921a"></script>
+<script src="hawk-settle.js?v=20260921a"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -6538,13 +6543,18 @@ function betsSummary(bets) {
     ${tile(pend.length, "running")}${tile(won.length, "won", "var(--accent)")}${tile(done.length - won.length, "lost", "var(--red)")}
   </div>
   ${done.length ? `<div class="mb-rec">
+    <div style="flex:1;min-width:0"><div class="k">ALL TIME</div>
+      <div class="muted" style="font-size:12px;margin-top:2px">${done.length} settled &middot; &euro;${staked.toFixed(2)} staked</div></div>
+    <div style="text-align:right;flex:none">
+      <div class="n" style="color:${back - staked >= 0 ? "var(--accent)" : "var(--red)"}">${back - staked >= 0 ? "+" : "\u2212"}\u20ac${Math.abs(back - staked).toFixed(2)}</div></div>
+  </div>
+  <a class="mb-rec mb-link" href="../index.html#scorecard" title="HAWK graded on every match, not just the ones you bet">
     <div style="flex:1;min-width:0"><div class="k">HAWK'S CHANCES vs REALITY</div>
       <div class="muted" style="font-size:12px;margin-top:2px">${graded.length
-        ? `expected <b style="color:var(--text)">${said.toFixed(1)}</b> winners from ${graded.length} &middot; got <b style="color:var(--text)">${got}</b>`
-        : "not enough graded bets yet"}</div></div>
-    <div style="text-align:right;flex:none"><div class="k">ALL TIME</div>
-      <div class="n" style="color:${back - staked >= 0 ? "var(--accent)" : "var(--red)"}">${back - staked >= 0 ? "+" : "\u2212"}\u20ac${Math.abs(back - staked).toFixed(2)}</div></div>
-  </div>` : ""}`;
+        ? `${graded.length} of your bets &middot; and every match HAWK grades`
+        : "every match HAWK grades, in the Vault"}</div></div>
+    <span style="flex:none;color:var(--accent);font-size:11px;font-weight:700;letter-spacing:.06em">OPEN \u25b8</span>
+  </a>` : ""}`;
 }
 function myBetsHTML(drawer = false) {
   const bets = vaultBets(), pend = bets.filter(b => b.status === "PENDING"), done = bets.filter(b => b.status !== "PENDING").slice(0, 8);
@@ -6593,10 +6603,23 @@ function myBetsClick(e, close) {
 }
 const WIDE = () => matchMedia("(min-width:1251px)").matches;
 function openMyBets() {
-  if (WIDE()) return toggleDrawer();
+  if (WIDE()) { closeMyBetsModal(); return toggleDrawer(); }
+  toggleDrawer(false);   // never both at once
   modal(myBetsHTML(false));
-  document.querySelector(".modal-bg").addEventListener("click", (e) => myBetsClick(e, closeModal));
+  const bg = document.querySelector(".modal-bg");
+  bg.dataset.mybets = "1";
+  bg.addEventListener("click", (e) => myBetsClick(e, closeModal));
 }
+// My bets is a drawer on a wide screen and a modal on a narrow one. Resizing the
+// window across that line used to strand whichever one you had open — a modal
+// showing "0 running, 0 won, 0 lost" could sit beside a drawer showing the real
+// numbers. Whichever form no longer applies is closed on the way through.
+const closeMyBetsModal = () => { const bg = document.querySelector('.modal-bg[data-mybets]');
+  if (bg && typeof closeModal === "function") closeModal(); };
+addEventListener("resize", () => {
+  if (WIDE()) closeMyBetsModal();
+  else if (document.body.classList.contains("drawer-open")) toggleDrawer(false);
+});
 function toggleDrawer(open = !document.body.classList.contains("drawer-open")) {
   let dr = $("#betsDrawer");
   if (!dr) {

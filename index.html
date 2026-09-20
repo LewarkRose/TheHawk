@@ -451,19 +451,18 @@
                 <div id="pl-chart" class="w-full"></div>
             </div>
 
-            <div class="bg-zinc-900/60 p-4 rounded-2xl border border-[#d9b571]/30 space-y-2">
-                <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">💹</span> Am I beating Bet365?</h3>
-                <p class="text-[10px] text-zinc-500">After each match HAWK compares the Bet365 price you got on each leg with Bet365's last price before kick-off (the "closing price"). If you keep getting better prices than the close, you're betting before the market moves your way — the surest early sign of a real edge, long before wins and losses even out.</p>
-                <div id="beat-bet365-container" class="pt-1"></div>
-            </div>
-
-            <!-- One line (do HAWK's chances come true?); tap for the full record -->
-            <details class="tr-fold bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
-                <summary class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🎯</span><span id="track-record-line" class="min-w-0">HAWK Track Record</span>
-                    <span class="text-[11px] text-[#d9b571] font-semibold ml-auto shrink-0"><span class="tr-show">details ▸</span><span class="tr-hide">hide ▾</span></span></summary>
-                <p class="text-[10px] text-zinc-500">Bets sent from the HAWK builder settle themselves after the match. This checks whether HAWK's chances come true — its 70% legs should land about 70% of the time. HAWK also grades its own predictions on every match. 🧠 Once a market has 30+ graded legs, the builder corrects that market's chances by what actually happened.</p>
-                <div id="track-record-container" class="space-y-2 pt-1"></div>
-            </details>
+            <!-- "Am I beating Bet365?" and the HAWK Track Record used to live here.
+                 Both answer "how good are HAWK's chances", not "how is my money doing",
+                 and both are now in the How good is HAWK tab where they belong together
+                 and where the track record gets the whole page instead of a fold. -->
+            <a href="#" onclick="event.preventDefault();switchView('scorecard')" class="block bg-zinc-900/60 p-4 rounded-2xl border border-[#d9b571]/30 hover:border-[#d9b571]/70 transition">
+                <div class="flex items-center gap-2">
+                    <span class="icon-gold">🎯</span>
+                    <span id="track-record-line" class="text-sm font-bold text-white min-w-0">HAWK Track Record</span>
+                    <span class="text-[11px] text-[#d9b571] font-semibold ml-auto shrink-0">open ▸</span>
+                </div>
+                <p class="text-[10px] text-zinc-500 mt-1">Whether HAWK's chances come true, how it scores against Bet365's closing prices, and which markets it is off on — all in <b class="text-zinc-400">How good is HAWK</b>.</p>
+            </a>
 
             <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
                 <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🌍</span> Performance by League</h3>
@@ -499,6 +498,7 @@
             <div id="sc-headline"></div>
             <div id="sc-calibration"></div>
             <div id="sc-market"></div>
+            <div id="sc-mine"></div>
             <div id="sc-splits"></div>
             <div id="sc-note"></div>
         </div>
@@ -969,64 +969,85 @@
             sub ? `<p class="text-[11px] text-zinc-500 leading-relaxed">${sub}</p>` : ''}`;
         const scTone = (z) => Math.abs(z) < 1.5 ? 'text-zinc-200' : Math.abs(z) < 2.5 ? 'text-[#d9b571]' : 'text-red-400';
 
+        // One calibration row, shared by the big graded set and your own bets.
+        function scRow(label, n, said, got, thin) {
+            const gap = 100 * (got - said);
+            const tone = thin ? 'text-zinc-500' : Math.abs(gap) < 2 ? 'text-zinc-200' : Math.abs(gap) < 5 ? 'text-[#d9b571]' : 'text-red-400';
+            return `<tr class="border-t border-zinc-800/70">
+                <td class="py-2 pr-3 text-zinc-300">${label}</td>
+                <td class="py-2 pr-3 text-right text-zinc-500 tabular-nums">${n.toLocaleString()}</td>
+                <td class="py-2 pr-3 text-right text-zinc-400 tabular-nums">${scPct(said)}</td>
+                <td class="py-2 pr-3 text-right font-bold ${tone} tabular-nums">${scPct(got)}</td>
+                <td class="py-2 pr-3 text-right text-[11px] ${tone} tabular-nums">${gap >= 0 ? '+' : ''}${gap.toFixed(1)}</td>
+                <td class="py-2 w-1/4 min-w-[90px]">
+                    <div class="relative h-2.5 rounded-full bg-zinc-950 overflow-hidden">
+                        <div class="absolute inset-y-0 left-0 rounded-full ${thin ? 'bg-zinc-700' : 'bg-[#d9b571]'}" style="width:${Math.min(100, 100 * got).toFixed(1)}%"></div>
+                        <div class="absolute inset-y-0 w-0.5 bg-white/70" style="left:${Math.min(100, 100 * said).toFixed(1)}%"></div>
+                    </div>${thin ? '<span class="text-[9px] text-zinc-600">too few to read</span>' : ''}</td></tr>`;
+        }
+        const scTable = (head, rows) => `<div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-[10px] text-zinc-500 uppercase tracking-wider">
+                <th class="text-left pb-1">${head}</th><th class="text-right pb-1 pr-3">Legs</th><th class="text-right pb-1 pr-3">Said</th>
+                <th class="text-right pb-1 pr-3">Landed</th><th class="text-right pb-1 pr-3">Gap</th><th class="pb-1"></th>
+            </tr></thead><tbody>${rows}</tbody></table></div>`;
+
         function renderScorecard() {
             const legs = scLegs();
             const all = scStat(legs);
             const mine = legs.filter(x => x.src === 'bet').length;
+            const G = gradedAll && gradedAll.legs ? gradedAll : null;   // HAWK graded on EVERY match, built on GitHub
 
-            // ---- headline ----
-            const verdict = all.n < SC_MIN
-                ? { t: 'Still collecting', c: 'text-zinc-300',
-                    d: `${all.n} graded legs. Around ${SC_MIN} are needed before even a big bias would show, and about 1,000 for a small one. Keep scanning — the board fills itself.` }
-                : Math.abs(all.z) < 2
-                ? { t: 'Honest so far', c: 'text-emerald-400',
-                    d: `Across ${all.n} legs HAWK said ${all.e.toFixed(1)} would land and ${all.a} did. That is inside what chance alone produces, which is what you want: the numbers mean what they say.` }
-                : { t: all.z > 0 ? 'Running cautious' : 'Running hot', c: 'text-[#d9b571]',
-                    d: `Across ${all.n} legs HAWK said ${all.e.toFixed(1)} and ${all.a} landed — ${all.z > 0 ? 'more' : 'fewer'} than it expected, by more than chance comfortably explains. Worth a look at which markets are doing it.` };
+            // ---- headline: the big set decides it, because it is the only one with the volume ----
+            let verdict;
+            if (G) {
+                const worst = Math.max(...G.bands.filter(b => b.n >= 500).map(b => Math.abs(b.won - b.p) / b.n));
+                const pts = (100 * worst).toFixed(1);
+                verdict = worst <= 0.03
+                    ? { t: 'HAWK\'s chances come true', c: 'text-emerald-400',
+                        d: `Across <b class="text-zinc-200">${G.legs.toLocaleString()}</b> graded legs from ${G.matches} matches, no chance band is more than <b class="text-zinc-200">${pts}</b> points away from what actually landed. At this many legs that is not luck — the percentages mean what they say.` }
+                    : { t: `Off by up to ${pts} points`, c: 'text-[#d9b571]',
+                        d: `Across <b class="text-zinc-200">${G.legs.toLocaleString()}</b> graded legs from ${G.matches} matches, one band is ${pts} points out. See which below — the builder corrects a market once it has 30+ graded legs.` };
+            } else {
+                verdict = { t: 'Waiting for the graded file', c: 'text-zinc-300',
+                    d: 'HAWK grades its chances on every match, not just the ones you bet. That file has not loaded — the numbers below are from your own bets only, which is a far smaller sample.' };
+            }
             document.getElementById('sc-headline').innerHTML = `
                 <div class="bg-zinc-900/60 p-5 rounded-2xl border border-[#d9b571]/40 space-y-2">
                     <div class="flex flex-wrap items-baseline justify-between gap-2">
                         <h2 class="text-lg font-bold ${verdict.c}">${verdict.t}</h2>
-                        <span class="text-[10px] text-zinc-500 uppercase tracking-wider">${all.n} graded legs · ${mine} from your bets · ${all.n - mine} from HAWK's board</span>
+                        <span class="text-[10px] text-zinc-500 uppercase tracking-wider">${G ? `${G.legs.toLocaleString()} legs on every match` : 'every-match file not loaded'} · ${all.n} from your own bets${G && G.waiting ? ` · ${G.waiting} waiting` : ''}</span>
                     </div>
                     <p class="text-xs text-zinc-400 leading-relaxed">${verdict.d}</p>
-                    <p class="text-[11px] text-zinc-500">Could still be hiding a bias of up to <b class="text-zinc-300">${scPct(all.band)}</b> per leg either way.</p>
                 </div>`;
 
-            // ---- 1. calibration ----
-            const BANDS = [[0, .3, 'under 30%'], [.3, .45, '30–45%'], [.45, .55, '45–55%'],
-                           [.55, .65, '55–65%'], [.65, .75, '65–75%'], [.75, 1.01, '75%+']];
-            const rows = BANDS.map(([lo, hi, label]) => {
-                const g = legs.filter(x => x.p >= lo && x.p < hi);
-                if (!g.length) return '';
-                const s = scStat(g), pred = s.e / s.n, act = s.a / s.n;
-                const thin = s.n < SC_MIN_BAND;
-                return `<tr class="border-t border-zinc-800/70">
-                    <td class="py-2 pr-3 text-zinc-300">${label}</td>
-                    <td class="py-2 pr-3 text-right text-zinc-500">${s.n}</td>
-                    <td class="py-2 pr-3 text-right text-zinc-400">${scPct(pred)}</td>
-                    <td class="py-2 pr-3 text-right font-bold ${thin ? 'text-zinc-500' : scTone(s.z)}">${scPct(act)}</td>
-                    <td class="py-2 w-1/3">
-                        <div class="relative h-2.5 rounded-full bg-zinc-950 overflow-hidden">
-                            <div class="absolute inset-y-0 left-0 rounded-full ${thin ? 'bg-zinc-700' : 'bg-[#d9b571]'}" style="width:${Math.min(100, 100 * act).toFixed(1)}%"></div>
-                            <div class="absolute inset-y-0 w-0.5 bg-white/70" style="left:${Math.min(100, 100 * pred).toFixed(1)}%"></div>
-                        </div>
-                        ${thin ? '<span class="text-[9px] text-zinc-600">too few to read</span>' : ''}
-                    </td></tr>`;
-            }).join('');
+            // ---- 1. calibration, on every match ----
+            const label = (b) => b.lo === 0 ? `under ${Math.round(100 * b.hi)}%` : b.hi > 1 ? `${Math.round(100 * b.lo)}%+` : `${Math.round(100 * b.lo)}–${Math.round(100 * b.hi)}%`;
+            const bigRows = G ? G.bands.filter(b => b.n).map(b => scRow(label(b), b.n, b.p / b.n, b.won / b.n, b.n < 500)).join('') : '';
             document.getElementById('sc-calibration').innerHTML = scCard(
                 scH('📏', 'Does 60% mean 60%?',
-                    'The bar is what actually happened; the white line is what HAWK predicted. They should sit on top of each other. This is the measure that matters most — a chance that means what it says is the whole product.') +
-                `<div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-[10px] text-zinc-500 uppercase tracking-wider">
-                    <th class="text-left pb-1">HAWK says</th><th class="text-right pb-1 pr-3">Legs</th>
-                    <th class="text-right pb-1 pr-3">Predicted</th><th class="text-right pb-1 pr-3">Landed</th><th class="pb-1"></th>
-                </tr></thead><tbody>${rows || '<tr><td class="py-3 text-zinc-500">Nothing graded yet.</td></tr>'}</tbody></table></div>`);
+                    'HAWK saves its chances for every match before kick-off and marks them afterwards — so this fills up whether you bet or not. The bar is what happened; the white line is what HAWK said. They should sit on top of each other.') +
+                (bigRows ? scTable('HAWK says', bigRows) : '<p class="text-xs text-zinc-500">No graded matches yet — the first appear within a day of kick-off.</p>'));
 
-            // ---- 2. against the closing line ----
+            // ---- 2. where it is off: markets with a real gap ----
+            let marketHtml = '<p class="text-xs text-zinc-500">Needs the every-match file.</p>';
+            if (G && G.byMarket) {
+                const mk = Object.entries(G.byMarket).map(([m, b]) => ({ m, n: b.n, said: b.p / b.n, got: b.won / b.n }))
+                    .filter(x => x.n >= 500).map(x => ({ ...x, gap: x.got - x.said }));
+                const off = mk.filter(x => Math.abs(x.gap) >= 0.03).sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+                const ok = mk.filter(x => Math.abs(x.gap) < 0.03).sort((a, b) => b.n - a.n);
+                marketHtml = (off.length
+                        ? `<p class="text-[11px] text-zinc-400">${off.length} market${off.length > 1 ? 's are' : ' is'} more than 3 points away from what HAWK says. With ${off[0].n.toLocaleString()}+ legs behind ${off.length > 1 ? 'the biggest' : 'it'}, that is real and worth knowing before you put a leg like it in a builder.</p>`
+                            + scTable('Market', off.map(x => scRow(escHtml(x.m), x.n, x.said, x.got, false)).join(''))
+                        : '<p class="text-[11px] text-emerald-400">Every market with 500+ legs is inside 3 points of what HAWK says.</p>')
+                    + (ok.length ? `<details class="pt-1"><summary class="text-[11px] text-[#d9b571] cursor-pointer">The ${ok.length} markets that are in line ▸</summary>${
+                        scTable('Market', ok.map(x => scRow(escHtml(x.m), x.n, x.said, x.got, false)).join(''))}</details>` : '');
+            }
+            document.getElementById('sc-market').innerHTML = scCard(scH('🔍', 'Where HAWK is off', 'Only markets with 500+ graded legs, because anything smaller swings too much to act on. A gap here is a market to be careful with — the builder also corrects a market\'s chances once it has 30+ legs of its own.') + marketHtml);
+
+            // ---- 3. against the closing line (your bets only — the only place a closing price is stored) ----
             const paired = legs.filter(x => x.close > 1);
-            let marketHtml;
+            let closeHtml;
             if (paired.length < 30) {
-                marketHtml = `<p class="text-xs text-zinc-500">Needs about 30 legs with Bet365's closing price stored. You have <b class="text-zinc-300">${paired.length}</b>.</p>`;
+                closeHtml = `<p class="text-xs text-zinc-500">Needs about 30 legs with Bet365's closing price stored. You have <b class="text-zinc-300">${paired.length}</b>.</p>`;
             } else {
                 const ys = paired.map(x => x.won ? 1 : 0);
                 const hawkB = scBrier(paired.map(x => x.p), ys);
@@ -1039,7 +1060,7 @@
                     : diff > 0
                     ? ['Ahead of the closing line', 'text-emerald-400', 'HAWK scored better than Bet365\'s own closing price on these legs. Worth trusting only once the sample is a few hundred.']
                     : ['Behind the closing line', 'text-zinc-300', 'Bet365\'s closing price scored better. Normal — it is the sharpest number in the market.'];
-                marketHtml = `<div class="grid grid-cols-2 gap-3">
+                closeHtml = `<div class="grid grid-cols-2 gap-3">
                         <div class="bg-zinc-950/60 p-3 rounded-xl"><span class="text-[10px] text-zinc-500 uppercase tracking-wider block">HAWK</span><b class="text-lg ${call[1]}">${hawkB.toFixed(4)}</b></div>
                         <div class="bg-zinc-950/60 p-3 rounded-xl"><span class="text-[10px] text-zinc-500 uppercase tracking-wider block">Bet365 close</span><b class="text-lg text-zinc-300">${bookB.toFixed(4)}</b></div>
                     </div>
@@ -1062,13 +1083,26 @@
                                  : 'The price moved against HAWK after it picked — worth investigating.')
                         : 'No signal either way. This is the number that separates skill from luck fastest, so it is the one to watch as the board fills.'}</p>`;
             }
-            document.getElementById('sc-market').innerHTML =
+            // ---- 4. your own bets: the small sample, kept separate and labelled ----
+            const BANDS = [[0, .3, 'under 30%'], [.3, .45, '30–45%'], [.45, .55, '45–55%'],
+                           [.55, .65, '55–65%'], [.65, .75, '65–75%'], [.75, 1.01, '75%+']];
+            const mineRows = BANDS.map(([lo, hi, lab]) => {
+                const g = legs.filter(x => x.p >= lo && x.p < hi);
+                if (!g.length) return '';
+                const s = scStat(g);
+                return scRow(lab, s.n, s.e / s.n, s.a / s.n, s.n < SC_MIN_BAND);
+            }).join('');
+            document.getElementById('sc-mine').innerHTML =
                 `<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    ${scCard(scH('🎯', 'Against Bet365\'s closing line', 'The closing price is the market after everyone\'s money is in. Beating it is the professional test.') + marketHtml)}
+                    ${scCard(scH('🎯', 'Against Bet365\'s closing line', 'The closing price is the market after everyone\'s money is in. Beating it is the professional test. Only your own bets store a closing price, so this is the small sample.') + closeHtml)}
                     ${scCard(scH('📈', 'Closing line value', 'Did the price drift your way between HAWK picking it and kick-off?') + clvHtml)}
-                </div>`;
+                </div>
+                <div class="h-6"></div>
+                ${scCard(scH('🎟', 'Your own bets', `Just the ${all.n} legs you actually had money on, ${mine} from the Vault and ${all.n - mine} from HAWK's board. Far too few to judge HAWK by — the table above is the one for that — but it is your record.`)
+                    + (mineRows ? scTable('HAWK says', mineRows) : '<p class="text-xs text-zinc-500">Nothing settled yet.</p>')
+                    + `<p class="text-[11px] text-zinc-500">Across all ${all.n}: HAWK said <b class="text-zinc-300">${all.e.toFixed(1)}</b> would land and <b class="text-zinc-300">${all.a}</b> did. Could still be hiding a bias of up to <b class="text-zinc-300">${scPct(all.band)}</b> per leg.</p>`)}`;
 
-            // ---- 4. splits, gated ----
+            // ---- 5. splits, gated ----
             const split = (title, sub, keyOf) => {
                 const by = {};
                 for (const x of legs) (by[keyOf(x)] ||= []).push(x);
@@ -1096,9 +1130,7 @@
                     + (waitRows ? `<div class="space-y-1.5 pt-1">${readyRows ? '<p class="text-[10px] text-zinc-600 uppercase tracking-wider">Still collecting</p>' : ''}${waitRows}</div>` : ''));
             };
             document.getElementById('sc-splits').innerHTML =
-                split('By league', `A league gets its own verdict at ${SC_MIN} legs and not before. Below that the number swings so wildly it would mislead you — five legs can read "+2 SD" on pure chance.`, x => x.league) +
-                '<div class="h-6"></div>' +
-                split('By market', 'Where HAWK is guessing (player props) against where it has Bet365\'s own price to work from.', x => x.prop ? 'Player props' : x.market);
+                split('By league — your bets only', `HAWK's every-match file doesn't carry the league yet, so this can only use the ${all.n} legs you bet. A league gets a verdict at ${SC_MIN} legs and not before: below that the number swings so wildly it would mislead you — five legs can read "+2 SD" on pure chance.`, x => x.league);
 
             // ---- the caveat, in plain words ----
             document.getElementById('sc-note').innerHTML = scCard(
@@ -2099,6 +2131,10 @@
 
         // --- HAWK TRACK RECORD: do HAWK's chances come true? ---
         function renderTrackRecord() {
+            // The full record moved to the How good is HAWK tab; what is left on the
+            // History page is the one-line summary that links to it.
+            const line = document.getElementById('track-record-line');
+            if (line) line.innerHTML = trackLine();
             const el = document.getElementById('track-record-container');
             if (!el) return;
             const legs = bets.flatMap(b => (b.legs || []).flatMap(l => (l.hawk && l.hawk.legs) || []))
@@ -2122,8 +2158,6 @@
                 ${tickets.length ? `<div class="text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 mt-2">Tickets: HAWK expected
                     <b>${expWins.toFixed(1)}</b> of your ${tickets.length} settled HAWK tickets to win — <b class="${wins >= expWins ? 'text-emerald-400' : 'text-red-400'}">${wins}</b> did.</div>` : ''}`;
             el.innerHTML = gradedBlock() + `<div class="text-xs font-bold text-white pt-4">🎟 Your HAWK bets</div>` + yours;
-            const line = document.getElementById('track-record-line');
-            if (line) line.innerHTML = trackLine();
         }
         // The folded one-liner: across every graded match, how far HAWK's chances
         // were from what landed (the worst chance band with 50+ legs).
@@ -2802,7 +2836,8 @@
         loadAllFixtures();                        // fills the fixture search box for every league
         fetch('data/graded.json').then(r => (r.ok ? r.json() : null)).then(g => {   // HAWK graded on every match
             gradedAll = g;
-            if (!document.getElementById('view-history').classList.contains('hidden')) { renderTrackRecord(); renderWeekly(); }
+            if (!document.getElementById('view-history').classList.contains('hidden')) { renderWeekly(); }
+            if (!document.getElementById('view-scorecard').classList.contains('hidden')) renderScorecard();
         }).catch(() => { /* not built yet */ });
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { /* not over https */ });
         receiveSync();                            // opened from a 📲 Sync link?

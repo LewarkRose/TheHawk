@@ -843,9 +843,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .tdrow .px{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:20px;line-height:1;font-weight:700;color:var(--gold)}
     .tdcols{display:flex;flex-direction:column;gap:11px}
     .tdcol{display:flex;flex-direction:column;gap:11px;min-width:0}
-    /* On a PC the day reads left to right: the plan, what to back, what's running. */
+    /* On a PC the day reads left to right: the plan and HAWK's board, then the bets
+       to place with whatever is running under them. Two columns, not three — the
+       third held one line ("Nothing running") for most of the day. */
     @media (min-width:1251px){
-      .tdcols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+      .tdcols{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;align-items:start}
       .tdcol .tdrow{margin-bottom:0}
     }
     /* Today and Picks are full-width pages: the league list and the builder
@@ -1320,8 +1322,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260921a"></script>
-<script src="hawk-settle.js?v=20260921a"></script>
+<script src="engine.js?v=20260921b"></script>
+<script src="hawk-settle.js?v=20260921b"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -4945,17 +4947,15 @@ function paperBlock(list, title, note, rows) {
 }
 function paperCard() {
   const list = paperList(), mine = list.filter((x) => !x.auto), auto = list.filter((x) => x.auto);
-  const rows = mine.slice().reverse().slice(0, 5).map((x) => `<div class="prow">
-    <span class="tick ${x.result || "open"}">${x.result === "won" ? "✓" : x.result === "lost" ? "✕" : "·"}</span>
-    <span style="flex:1;min-width:0"><b>${esc(x.label)}</b>
-      <span class="muted" style="font-size:11px">· ${esc(x.where || "")}</span></span>
-    <span class="muted" style="flex:none">${odds(x.price)}</span></div>`).join("");
-  // The manual Follow button is gone — every scan is graded automatically below,
-  // which is where the volume comes from. Ones you followed by hand still show.
-  const yours = mine.length ? paperBlock(mine, "FOLLOWED, NO MONEY ON IT", "", rows) : "";
-  const board = auto.length ? paperBlock(auto, "HAWK'S OWN BOARD, GRADED",
+  // "Followed, no money on it" used to sit above the board, fed by the Follow
+  // button on each pick. That button is gone — the board records every scan
+  // whether you back it or not — so the card could only ever show the handful of
+  // old hand-followed picks and never grow again. Those entries are still in
+  // hawk.paper and still graded; they just no longer take 142px on the first page
+  // you open. mine is kept here only so the count is available if it's wanted.
+  void mine;
+  return auto.length ? paperBlock(auto, "HAWK'S OWN BOARD, GRADED",
     "Taken from every scan whether you back them or not, at the price HAWK expects Bet365 to show. Volume is the point — your own bets will never reach a number that proves anything.", "") : "";
-  return yours + board;
 }
 function showToday() {
   S.view = "today";
@@ -5003,8 +5003,8 @@ function renderToday() {
       ${fit.length ? `<div class="note" style="margin-top:10px">Tick each one as you place it. Your bankroll and settled bets come from the Vault.
         Each stake is ${KELLY_FRACS.find(([f]) => f === S.kellyFrac)[1]} Kelly on €${bank.toFixed(2)} — the size that grows the bankroll fastest if HAWK's chances are right —
         with the whole day held under ${Math.round(100 * DAY_CAP)}% of it (€${(bank * DAY_CAP).toFixed(2)}). Betting bigger than this loses money over time even when the chances are correct.</div>` : ""}
+      <div id="tdDay"></div>
       </div>
-      <div class="tdcol" id="tdDay"></div>
       </div>
       <div class="opts" style="margin-top:12px;gap:8px">
         <button class="ghost" style="width:auto;padding:9px 15px" onclick="showScan()">🏆 Picks</button>

@@ -646,6 +646,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .sbar .track i.bad{background:linear-gradient(90deg,#3c4a54,#4d5f6b)}
     .sbar .track b{position:absolute;top:-3px;width:2px;height:16px;background:#fff;border-radius:1px}
     .sbar .bnote{display:flex;justify-content:space-between;gap:10px;margin-top:5px;font-size:11px;color:var(--muted)}
+    /* The legs multiplied against what Bet365 pays: the correlation tax, as a
+       fact rather than a model output */
+    .tax{font-size:11.5px;color:var(--muted)}
+    .tax > b{color:var(--text)}
     /* How much the legs move together — the builder's only exploitable number */
     .agree{font-size:11.5px;font-weight:700;padding:5px 9px;border-radius:9px;border:1px solid;align-self:flex-start}
     .agree.same{color:var(--gold);background:rgba(255,209,102,.09);border-color:rgba(255,209,102,.35)}
@@ -3649,6 +3653,25 @@ function scanOption(o, params, ref, n) {
         typed ? "" : tone === "check"
           ? `<span class="muted" style="font-weight:600"> · check Bet365 — about 1 in 3 pays more than HAWK expects</span>`
           : `<span class="muted" style="font-weight:600"> · HAWK expects ≈ ${odds(o.b365 || o.fair)}</span>`}</div>
+      ${(() => {
+        // The legs multiplied, which needs no model at all — it's Bet365's own
+        // single prices, times each other. Against Bet365's builder price it
+        // gives the correlation tax as a plain fact rather than an opinion.
+        // Borrowed from OddsIndex's SGP calculator; HAWK adds the half they
+        // can't do, which is whether that tax is deserved.
+        const known = (o.legs || []).filter(l => l.bookPrice > 1);
+        if (known.length !== (o.legs || []).length || known.length < 2) return "";
+        const prod = known.reduce((a, l) => a * l.bookPrice, 1);
+        const real = S.scan.prices[scanKey(o)];
+        const tax = real > 1 ? 1 - real / prod : null;
+        return `<div class="tax">Legs multiplied <b>${odds(prod)}</b>${
+          tax == null ? `<span class="muted"> · type Bet365's builder price to see what it keeps for combining</span>`
+          : `<span class="muted"> · Bet365 pays ${odds(real)}, keeping <b style="color:${
+              tax <= 0 ? "var(--accent)" : tax > 0.12 ? "var(--red)" : "var(--gold)"}">${
+              tax <= 0 ? `nothing — it pays OVER the singles` : `${(100 * tax).toFixed(0)}%`}</b> for combining${
+              o.agree > 1.15 ? `, and your legs do agree, so some of that is fair`
+              : o.agree && o.agree <= 0.92 ? `, on legs that pull APART — it should be paying you more, not less` : ""}</span>`}</div>`;
+      })()}
       ${(() => {
         // Legs that say the same thing pay less than their prices multiplied,
         // and Bet365 prices exactly that in — the discount is the part of its

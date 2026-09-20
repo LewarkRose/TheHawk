@@ -648,6 +648,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .sbar .bnote{display:flex;justify-content:space-between;gap:10px;margin-top:5px;font-size:11px;color:var(--muted)}
     /* The legs multiplied against what Bet365 pays: the correlation tax, as a
        fact rather than a model output */
+    /* The two percentages that decide it, in place of an instruction */
+    .chances{display:flex;align-items:baseline;gap:5px;flex-wrap:wrap;line-height:1.1}
+    .chances b{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:22px;font-weight:700}
+    .chances span{font-size:10px;letter-spacing:.09em;color:var(--muted);text-transform:uppercase}
+    .chances i{font-style:normal;font-size:11px;color:var(--muted);margin:0 1px}
     .tax{font-size:11.5px;color:var(--muted)}
     .tax > b{color:var(--text)}
     /* How much the legs move together — the builder's only exploitable number */
@@ -914,7 +919,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* upset radar */
 .up-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
 .up-who{font-size:13.5px;margin:-2px 0 10px;color:var(--muted)}.up-who b{color:var(--text)}
-/* the slip's one-line answer: bet it or skip it */
+/* the slip's one-line answer: what it lands, against what the price needs */
 .call{margin:10px 14px 4px;padding:11px 14px;border-radius:12px;font-weight:900;font-size:15px;letter-spacing:.02em;border:1px solid}
 .call small{display:block;margin-top:3px;font-weight:600;font-size:12.5px;letter-spacing:0;opacity:.9}
 .call small.risk{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.1);color:var(--text);opacity:1}
@@ -2750,8 +2755,8 @@ function b365Guess(fair, legs) {
   const at = (kk) => Math.max(1.01, fair * Math.exp(-kk * legs));
   return { mid: at(k), lo: at(k + Math.max(sd, 0.008)), hi: at(Math.max(0, k - Math.max(sd, 0.008))), n, cut: 1 - Math.exp(-k) };
 }
-// The slip's answer in one line: BET IT / FAIR PRICE / SKIP IT, and the
-// Bet365 price it needs. Uses the price you typed, or else the one HAWK expects.
+// The slip's answer in one line: what it lands, against what the price needs.
+// Uses the price you typed, or else the one HAWK expects Bet365 to show.
 function easyCall(r) {
   if (!r || !(r.fair > 1) || !r.p) return "";
   const { price, boost, eff } = checkerInputs();
@@ -2765,19 +2770,23 @@ function easyCall(r) {
   // The Bet365 boost that would make a price worth it (a winnings boost multiplies the profit part).
   const boostFor = (x) => x > 1 && need > x ? Math.ceil(((need - 1) / (x - 1) - 1) * 100) : 0;
   if (eff > 1) {
-    if (eff >= need) return call("good", "✅ BET IT", `${odds(price)}${boost ? ` + ${boost}% boost` : ""} is worth it — HAWK needs ${odds(needQuoted)} or more.`);
-    if (eff >= fair * 0.95) return call("warn", "🤏 FAIR PRICE", `${odds(price)} is close to what it's worth (${odds(fair)}) — Bet365's cut is small. Fine to bet if you like it${boostFor(eff) ? `; a ${boostFor(eff)}%+ boost makes it ✅` : ""}.`);
-    return call("bad", "❌ SKIP IT", `${odds(price)} is too low — it needs ${odds(needQuoted)} or more${boostFor(eff) && boostFor(eff) <= 50 ? ` (or a ${boostFor(eff)}% boost)` : ""}. Tap Build again for another option.`);
+    // The number, not an order — what a euro on it comes back as. Same
+    // information, and it leaves the decision where it belongs.
+    const twin = `${pct(r.p * (r.check || 1), 0)} lands vs ${pct(1 / eff, 0)} needed`;
+    if (eff >= need) return call("good", twin, `${odds(price)}${boost ? ` + ${boost}% boost` : ""} clears the ${odds(needQuoted)} it needs.`);
+    if (eff >= fair * 0.95) return call("warn", twin, `${odds(price)} is close to what it's worth (${odds(fair)}) — Bet365's cut is small${boostFor(eff) ? `; a ${boostFor(eff)}%+ boost clears it` : ""}.`);
+    return call("bad", twin, `${odds(price)} against the ${odds(needQuoted)} it needs${boostFor(eff) && boostFor(eff) <= 50 ? ` (or a ${boostFor(eff)}% boost)` : ""}. Tap Build again for another option.`);
   }
   // A leg price that says HAWK's chance pays nearly double is a data mix-up, not a bargain: don't build a "bet it" on it.
   const odd = S.slip.map(id => S.legs[id]).find(l => { const pr = l && legPrice(l); return pr && pr.price && pr.price * l.p > 1.8; });
   if (odd) return call("warn", `⚠️ CHECK ${esc(odd.label)} ON BET365 FIRST`, `HAWK's price for it (${odds(legPrice(odd).price)}) looks wrong. Type Bet365's builder price below and HAWK tells you if it's worth it — it needs ${odds(needQuoted)}+.`);
   const g = r.b365 > 1 ? null : b365Guess(r.fair, S.slip.length), expect = r.b365 > 1 ? r.b365 : g ? g.mid : null;
-  if (!expect) return call("warn", `👉 BET IT if Bet365 shows ${odds(needQuoted)} or more`);
-  if (expect >= need) return call("good", `✅ BET IT if Bet365 shows ${odds(needQuoted)} or more`, `HAWK expects about ${odds(expect)} there.`);
-  if (expect >= fair * 0.95) return call("warn", `🤏 FAIR PRICE — bet at ${odds(1 + (fair * 0.95 - 1) / (1 + boost / 100))} or more`, `HAWK expects about ${odds(expect)}, close to what it's worth (${odds(fair)}). ✅ from ${odds(needQuoted)}${boostFor(expect) ? `, or with a ${boostFor(expect)}%+ boost` : ""}.`);
-  return call("bad", `❌ PROBABLY SKIP — needs ${odds(needQuoted)}, Bet365 should pay about ${odds(expect)}`,
-    `No worth-it builder here? <a href="#" onclick="event.preventDefault();showScan()" style="color:inherit;text-decoration:underline">⚡ Best builders</a> lists the matches that have one.`);
+  if (!expect) return call("warn", `${pct(r.p * (r.check || 1), 0)} lands`, `It needs ${odds(needQuoted)} or more on Bet365 to be worth the money.`);
+  // Same two numbers, against the price HAWK expects Bet365 to show rather than one you typed.
+  const guessTwin = `${pct(r.p * (r.check || 1), 0)} lands vs ${pct(1 / expect, 0)} needed`;
+  if (expect >= need) return call("good", guessTwin, `HAWK expects about ${odds(expect)} there, over the ${odds(needQuoted)} it needs.`);
+  if (expect >= fair * 0.95) return call("warn", guessTwin, `HAWK expects about ${odds(expect)}, close to what it's worth (${odds(fair)}); it needs ${odds(needQuoted)}${boostFor(expect) ? `, or a ${boostFor(expect)}%+ boost` : ""}.`);
+  return call("bad", guessTwin, `Bet365 should pay about ${odds(expect)}, against the ${odds(needQuoted)} it needs. Nothing worth it here? <a href="#" onclick="event.preventDefault();showScan()" style="color:inherit;text-decoration:underline">⚡ Best builders</a> lists the matches that have one.`);
 }
 // The price a builder is worth it from: HAWK's fair odds, raised where HAWK rates a
 // leg well above what its bookmaker price implies (the same number the call and the
@@ -2894,7 +2903,7 @@ function verdict() {
   const fairP = r.p * (r.check || 1), w = fairP * eff, worthQuoted = 1 + (1.02 / fairP - 1) / (1 + boost / 100);
   const ev = w - 1, own = r.p * eff - 1, checked = (r.check || 1) < 0.98;
   const boostNeed = eff > 1 && w < 1.02 ? Math.ceil(((1.02 / fairP - 1) / (price - 1) - 1) * 100) : 0;
-  const tier = w >= 1.02 ? "✅ BET IT" : w >= 0.95 ? "🤏 FAIR PRICE" : "❌ SKIP IT";
+  const tier = `${pct(fairP, 0)} lands vs ${pct(1 / eff, 0)} needed`;   // the numbers, not an order
   out.innerHTML = `<div class="verdict ${w >= 0.95 ? "good" : "bad"}">${tier} · ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}%
     ${boost ? `<small>With your ${boost}% boost, ${odds(price)} pays like <b>${odds(eff)}</b>.</small>` : ""}
     <small>That price implies a ${pct(1 / eff, 1)} chance — HAWK says ${pct(r.p, 1)}${checked ? `, or ${pct(fairP, 1)} after checking its legs against their bookmaker prices` : ""}.</small>
@@ -3454,9 +3463,16 @@ const scanNeed = (r) => ({ fair: r.fair / (r.check || 1), need: r.fair / (r.chec
 const scanWorth = (r) => { const x = S.scan.prices[scanKey(r)]; return x ? r.p * (r.check || 1) * x : (r.worth || 0) * 0.999; };
 function scanVerdict(r) {
   const { fair, need } = scanNeed(r), x = S.scan.prices[scanKey(r)];
-  if (x > 1) return x >= need ? `<div class="badge ok">✅ BET IT</div><div class="muted" style="font-size:12px">${odds(x)} beats ${odds(need)}</div>`
-    : x >= fair * 0.95 ? `<div class="badge ok">🤏 FAIR PRICE</div><div class="muted" style="font-size:12px">OK if you like it · ✅ from ${odds(need)}</div>`
-    : `<div class="badge warn">❌ SKIP IT</div><div class="muted" style="font-size:12px">${odds(x)} is under ${odds(need)}</div>`;
+  // No instructions, and no new numbers either — just the two percentages that
+  // decide it: how often it lands, and how often it would have to land for the
+  // price to be worth taking. Green when the first beats the second.
+  if (x > 1) {
+    const lands = (r.p || 0) * (r.check || 1), needs = 1 / x;
+    const tier = x >= need ? "ok" : x >= fair * 0.95 ? "fair" : "bad";
+    const colour = tier === "ok" ? "var(--accent)" : tier === "fair" ? "var(--gold)" : "var(--muted)";
+    return `<div class="chances"><b style="color:${colour}">${(100 * lands).toFixed(0)}%</b>
+      <span>lands</span><i>vs</i><b>${(100 * needs).toFixed(0)}%</b><span>needed at ${odds(x)}</span></div>`;
+  }
   // No real price yet. HAWK's estimate is the worst guide there is to Bet365's
   // builder price, so it doesn't get to pass judgement — it just says what the
   // number has to beat. Roughly one in three comes back green once checked.
@@ -3535,7 +3551,7 @@ function theLeg(results) {
     </div>
     <div class="tl-facts">
       <span>${guessed ? "Floor" : "HAWK expects"} <b>${odds(price)}</b></span>
-      <span>Back it at <b style="color:var(--gold)">${odds(need.need)}+</b></span>
+      <span>Worth it from <b style="color:var(--gold)">${odds(need.need)}+</b></span>
       ${S.scan.minOdds && price < S.scan.minOdds ? `<span style="color:var(--blue)">clears your ${
         odds(S.scan.minOdds)} only if Bet365 pays over the guess — it did on 1 in 3</span>` : ""}
       <span class="muted">${guessed ? `${guessed} player prop${guessed > 1 ? "s" : ""} — Bet365 marks those up about 27%`
@@ -3649,7 +3665,7 @@ function scanOption(o, params, ref, n) {
           <span style="color:${gap >= 1 ? "var(--accent)" : gap >= -1 ? "var(--gold)" : "var(--muted)"};font-weight:700">${
             Math.abs(gap) < 1 ? "about level" : `${Math.abs(gap).toFixed(0)} point${Math.abs(gap) < 1.5 ? "" : "s"} ${gap > 0 ? "clear" : "short"}`}</span></div>
       </div>
-      <div class="sdo ${tone}">${typed ? "" : `${tone === "bad" ? "Only back it at" : "Back it at"} ${odds(scanNeed(o).need)}+`}${
+      <div class="sdo ${tone}">${typed ? "" : `Worth it from ${odds(scanNeed(o).need)}+`}${
         typed ? "" : tone === "check"
           ? `<span class="muted" style="font-weight:600"> · check Bet365 — about 1 in 3 pays more than HAWK expects</span>`
           : `<span class="muted" style="font-weight:600"> · HAWK expects ≈ ${odds(o.b365 || o.fair)}</span>`}</div>
@@ -3968,10 +3984,10 @@ function accaVerdict() {
   const ev = a.p * a.eff - 1, good = ev > 0;
   // The boost that would make this price fair (Bet365 runs acca boosts on 3+ legs).
   const boostNeeded = a.price > 1 && a.fair > a.price ? 100 * ((a.fair - 1) / (a.price - 1) - 1) : 0;
-  out.innerHTML = `<div class="verdict ${good ? "good" : "bad"}">${ev >= 0.02 ? "✅ BET IT" : good ? "🤏 JUST OK" : "❌ SKIP IT"} · ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}%
+  out.innerHTML = `<div class="verdict ${good ? "good" : "bad"}">${pct(a.p, a.p < 0.1 ? 1 : 0)} lands vs ${pct(1 / a.eff, a.p < 0.1 ? 1 : 0)} needed · ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}%
     ${!a.typed ? `<small>Using Bet365's price: ${a.legs} singles multiplied = ${odds(a.price)}.</small>` : ""}
     ${a.boost ? `<small>With your ${a.boost}% boost, ${odds(a.price)} pays like <b>${odds(a.eff)}</b>.</small>` : ""}
-    <small>HAWK: lands ${pct(a.p, a.p < 0.1 ? 2 : 1)} of the time — about 1 in ${Math.round(1 / a.p)}. Pays €${(a.eff * a.stake).toFixed(2)} on €${a.stake.toFixed(2)}.</small>
+    <small>About 1 in ${Math.round(1 / a.p)}. Pays €${(a.eff * a.stake).toFixed(2)} on €${a.stake.toFixed(2)}.</small>
     <small>${good ? `Expected profit ≈ €${(ev * a.stake).toFixed(2)} per €${a.stake.toFixed(2)} over many accas like it — most will still lose.`
       : `Bet365's margin adds up over ${a.legs} legs: you'd lose ≈ €${(-ev * a.stake).toFixed(2)} per €${a.stake.toFixed(2)} on average.${boostNeeded && !a.boost ? ` An acca boost of ${Math.ceil(boostNeeded)}%+ would make it fair.` : ""}`}</small></div>
     ${stakeAdvice(a.p, a.eff)}`;
@@ -4476,21 +4492,21 @@ function htSection(d) {
     const key = r.label, need = r.fair * 1.02;
     return `<div class="co-card" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center">
       <div><b>👀 ${esc(htTipLabel(r, d))}</b><div class="muted" style="font-size:12px;margin-top:3px">HAWK: lands ${pct(r.p, 0)} · Bet365 live ≈ ${odds(r.price)} (can lag a little)</div></div>
-      <div style="text-align:right"><div class="muted" style="font-size:12px">Bet it at</div><div class="bigodds">${odds(need)}+</div>
+      <div style="text-align:right"><div class="muted" style="font-size:12px">Worth it from</div><div class="bigodds">${odds(need)}+</div>
         <label class="sprice">Bet365 price <input data-htprice="${esc(key)}" inputmode="decimal" placeholder="${odds(r.price)}" value="${esc(S.inplay.htPrices[key] || "")}"></label>
         <div class="sverdict" data-htverdict="${esc(key)}">${htVerdict(r)}</div></div></div>`;
   };
   return `<div class="section"><h3>${ht ? "⏸ Half-time check" : "👀 Live check"}</h3>
     <div class="note" style="margin-top:0">${ht ? `1st half: ${esc(htStatsLine(d) || "no stats yet")}` : `So far: ${esc(htStatsLine(d) || "no stats yet")}`}</div>
     ${tips.length ? tips.map(card).join("") : `<div class="note">Nothing worth betting right now — Bet365's live prices are in line with HAWK's read. HAWK keeps checking every 15 seconds while this page is open, and every 2 minutes in the background (30 s at half-time).</div>`}
-    <div class="note">Prices move fast and get suspended after chances and goals. Only bet if the price you see is at or above "Bet it at".</div></div>`;
+    <div class="note">Prices move fast and get suspended after chances and goals. The price you see has to be at or above "Worth it from" for the bet to pay its way.</div></div>`;
 }
 function htVerdict(r) {
   const x = parseFloat(String((S.inplay.htPrices || {})[r.label] || "").replace(",", ".")), need = r.fair * 1.02;
   if (!(x > 1)) return `<div class="muted" style="font-size:12px">Type Bet365's price to check</div>`;
-  return x >= need ? `<div class="badge ok">✅ BET IT</div><div class="muted" style="font-size:12px">${odds(x)} beats ${odds(need)}</div>`
-    : x >= r.fair * 0.95 ? `<div class="badge ok">🤏 FAIR PRICE</div><div class="muted" style="font-size:12px">OK if you like it · ✅ from ${odds(need)}</div>`
-    : `<div class="badge warn">❌ SKIP IT</div><div class="muted" style="font-size:12px">${odds(x)} is under ${odds(need)}</div>`;
+  // The two percentages, as on the Picks cards — lands against what the price needs.
+  const tone = x >= need ? "var(--accent)" : x >= r.fair * 0.95 ? "var(--gold)" : "var(--muted)";
+  return `<div class="chances" style="justify-content:flex-end;font-size:13px"><b style="color:${tone};font-size:17px">${pct(r.p, 0)}</b><span>lands</span><i>vs</i><b style="font-size:17px">${pct(1 / x, 0)}</b><span>needed at ${odds(x)}</span></div>`;
 }
 
 // Live page: the tips from HAWK's latest check of each live match (tap one for its live card).
@@ -5313,7 +5329,7 @@ function checkVerdict() {
   const x = parseFloat(String(($("#cmPrice") || {}).value || "").replace(",", "."));
   const need = x > 1 ? 1 / x : 0, w = fairP * (x > 1 ? x : 0);
   const tier = !(x > 1) ? null : w >= 1.02 ? "ok" : w >= 0.95 ? "fair" : "bad";
-  const label = { ok: "Bet it", fair: "Fair price", bad: "Skip it" }[tier];
+  const label = !(x > 1) ? null : `\u20ac${(fairP * x).toFixed(2)} per \u20ac1`;   // the number, not an order
   const wid = (v) => Math.max(1.5, Math.min(100, 100 * v)).toFixed(1);
   out.innerHTML = !(x > 1)
     ? `<div class="muted" style="margin-top:11px;font-size:12px">Type the price and HAWK tells you straight away.</div>`

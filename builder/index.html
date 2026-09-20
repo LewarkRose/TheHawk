@@ -711,6 +711,24 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       color:var(--text);font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
     .rchips button:hover{border-color:var(--accent)}
     .rchips button.on{border-color:rgba(20,227,161,.45);background:rgba(20,227,161,.1);color:var(--accent)}
+    /* Acca: one row per part, the full card behind a tap (see accaRow) */
+    .arows{margin-top:12px}
+    .arow{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:7px;overflow:hidden}
+    .arow>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:11px;padding:10px 13px}
+    .arow>summary::-webkit-details-marker{display:none}
+    .arow>summary:hover{background:var(--panel2)}
+    .arow[open]>summary{border-bottom:1px solid var(--line);background:var(--panel2)}
+    .arow .arm{flex:none;font-size:13px;line-height:1;padding:2px 4px}
+    .arow .m{flex:1;min-width:0}
+    .arow .m b{display:block;font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .arow .m span{font-size:10.5px;color:var(--muted)}
+    .arow .c{flex:none;width:44px;text-align:right;font-size:11.5px;color:var(--muted)}
+    .arow .o{flex:none;width:50px;text-align:right;font-size:14px;font-weight:800;
+      font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif}
+    .arow .fcard{border:0;margin:0;border-radius:0}
+    /* the weak-link tag is sized for a card; in a row it must sit on the one line */
+    .arow .m b.weaktag{display:inline;font-size:9px;font-weight:800;padding:1px 5px;border-radius:5px;
+      vertical-align:baseline;white-space:nowrap;overflow:visible}
     /* Picks: the board as rows, the card behind a tap (see scanRow) */
     .srow{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:7px;overflow:hidden}
     .srow>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:11px 14px}
@@ -1297,8 +1315,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260920k"></script>
-<script src="hawk-settle.js?v=20260920k"></script>
+<script src="engine.js?v=20260920l"></script>
+<script src="hawk-settle.js?v=20260920l"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -1337,7 +1355,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             // match-market build.
             priced: loadPref("hawk.priced", false), favourite: true, result: null, tab: "players", q: "",
             chk: { price: "", boost: "", stake: "5" }, moreOpen: false, tuneOpen: loadPref("hawk.tuneOpen", false), radarOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
-            acca: loadPref("hawk.acca", []), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
+            acca: loadPref("hawk.acca", []), accaOpen: new Set(), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },   // perMatch is always 1: one Bet365-priced leg per match, so the acca has no builder cut
@@ -3960,16 +3978,22 @@ function renderAcca() {
       <div class="note" style="margin-top:0">HAWK checks every fixture in the window and takes the best leg — or a small builder — from each match.
         With <b>1 leg per match</b> it only uses legs Bet365 prices, picking the ones where Bet365 pays closest to (or more than) HAWK's fair odds,
         so you see the acca's real Bet365 price and whether it's worth it.</div>
-      ${leaguePicker("monLeagues", mo.leagues)}
-      <div class="opts" style="justify-content:flex-start;gap:14px;flex-wrap:wrap">
-        <label>Legs ${sel("mLegs", [6, 8, 10, 12, 15, 20].map(n => [n, n]), mo.legs)}</label>
-        <label>Kick-off ${sel("mHrs", KICKOFF_WINDOWS, mo.hours)}</label>
-      </div>
-      <div class="seg" id="mStyle" style="max-width:420px">${Object.entries(STYLES).map(([s, st]) => `<button class="${mo.style === s ? "on" : ""}" data-s="${s}">${st.label}</button>`).join("")}</div>      <div class="opts" style="justify-content:flex-start"><button class="build" id="monGo" style="width:auto;margin:0;padding:10px 20px"></button></div>
+      ${mFold("monSet", "⚙️ What to build from",
+        `${mo.legs} legs · ${monLeagueLabel(mo.leagues)} · ${(KICKOFF_WINDOWS.find(([v]) => v === mo.hours) || [, "24 hours"])[1]} · ${(STYLES[mo.style] || {}).label || mo.style}`,
+        `<div style="padding:0 2px 4px">
+          ${leaguePicker("monLeagues", mo.leagues)}
+          <div class="opts" style="justify-content:flex-start;gap:14px;flex-wrap:wrap">
+            <label>Legs ${sel("mLegs", [6, 8, 10, 12, 15, 20].map(n => [n, n]), mo.legs)}</label>
+            <label>Kick-off ${sel("mHrs", KICKOFF_WINDOWS, mo.hours)}</label>
+          </div>
+          <div class="seg" id="mStyle" style="max-width:420px">${Object.entries(STYLES).map(([s, st]) => `<button class="${mo.style === s ? "on" : ""}" data-s="${s}">${st.label}</button>`).join("")}</div>
+        </div>`)}
+      <div class="opts" style="justify-content:flex-start"><button class="build" id="monGo" style="width:auto;margin:0;padding:10px 20px"></button></div>
       <div id="monProg"></div>
     </div>
     <div class="section" id="monRes"></div>`;
   bindLeaguePicker("monLeagues", mo.leagues, "hawk.monsterLeagues");
+  $("#match").querySelectorAll("[data-foldkey]").forEach((f) => { f.ontoggle = () => savePref(f.dataset.foldkey, f.open); });
   $("#mLegs").onchange = (e) => { mo.legs = +e.target.value; updateMonster(); };
   $("#mHrs").onchange = (e) => { mo.hours = windowValue(e.target.value); updateMonster(); };  $("#mStyle").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; mo.style = b.dataset.s;
     $("#mStyle").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); updateMonster(); };
@@ -4049,6 +4073,33 @@ function accaInputs() {
   const boost = Math.max(0, num(c.boost) || 0), stake = num(c.stake) || 0;
   return { ...t, price, typed: typed > 1, boost, stake, eff: price > 1 ? 1 + (price - 1) * (1 + boost / 100) : NaN };
 }
+// One part of the acca as a row: what it is, which match, its chance and its price,
+// with the full card behind a tap. A single leg used to cost 269px and a same-match
+// builder 530px, so a ten-leg acca was unreadable before you reached the total.
+// Which leagues the Monster is set to, in a few words for the folded summary.
+function monLeagueLabel(sel) {
+  const on = sel instanceof Set ? [...sel] : Array.isArray(sel) ? sel : Object.keys(sel || {}).filter((k) => sel[k]);
+  if (!on.length) return "all leagues";
+  if (on.length <= 2) return on.join(" + ");
+  return `${on.length} leagues`;
+}
+function accaRow(pt, i, weak) {
+  const l = pt.legs[0], many = pt.legs.length > 1;
+  const price = partPrice(pt) || (many ? pt.fair : l.bookPrice);
+  const label = many ? `${esc(l.label)} <span class="muted">+ ${pt.legs.length - 1} more</span>` : esc(l.label);
+  const open = S.accaOpen.has(i);
+  return `<details class="arow" data-arowkey="${i}" ${open ? "open" : ""}>
+    <summary>
+      <button class="linkbtn arm" data-arm="${i}" title="Take it out of the acca">✕</button>
+      <div class="m"><b>${label}</b>
+        <span>${esc(pt.home)} v ${esc(pt.away)} · ${esc(pt.league || "")}${many ? ` · builder, ${pt.legs.length} legs` : ""}${
+          weak ? ` · <b class="weaktag">weak link</b>` : ""}</span></div>
+      <div class="c">${pct(pt.p, 0)}</div>
+      <div class="o">${price > 1 ? odds(price) : "–"}</div>
+    </summary>
+    ${open ? partRow(pt, `<div><button class="linkbtn" data-aopen="${i}">edit in the builder</button></div>`) : ""}
+  </details>`;
+}
 function renderAccaBody() {
   const el = $("#accaBody"); if (!el) return;
   if (!S.acca.length) {
@@ -4061,8 +4112,12 @@ function renderAccaBody() {
   // The part least likely to land: with Bet365's own prices on every leg, this
   // is the one to drop if you want the acca to come in.
   const weakPt = S.acca.length > 1 ? S.acca.reduce((w, pt) => (!w || (pt.p || 1) < (w.p || 1) ? pt : w), null) : null;
-  el.innerHTML = S.acca.map((pt, i) => partRow(pt, `<div>${pt === weakPt ? `<span class="weaktag">weak link</span> ` : ""}<button class="linkbtn" data-aopen="${i}">edit</button> <button class="linkbtn" data-arm="${i}">remove</button></div>`)).join("") + `
-    <div class="tiles" style="margin-top:12px">
+  // An acca IS its combined price, so that goes first: add or drop a leg and the
+  // number that changed is in front of you. It used to sit below every leg card,
+  // which on a ten-leg acca was 2,700px away from the leg you just touched.
+  // Each part is a row now; its full card is one tap away, as on Picks.
+  el.innerHTML = `
+    <div class="tiles">
       <div class="tile"><div class="k">Legs</div><div class="v">${t.legs} <span class="muted" style="font-size:12px">in ${S.acca.length} match${S.acca.length === 1 ? "" : "es"}</span></div></div>
       <div class="tile"><div class="k">Chance to land</div><div class="v">${pct(t.p, t.p < 0.1 ? 2 : 1)}</div></div>
       <div class="tile"><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${odds(t.fair)}</div></div>
@@ -4076,6 +4131,7 @@ function renderAccaBody() {
       <div id="accaVerdict"></div></div>
     <div class="abtns"><button class="ghost" id="aCopy">📋 Copy acca</button><button class="ghost vault" id="aVault">🦅 Send to Vault</button>
       <button class="ghost" id="aClear">🗑 Clear</button></div>
+    <div class="arows">${S.acca.map((pt, i) => accaRow(pt, i, pt === weakPt)).join("")}</div>
     <div class="note">${builders ? `${builders} of these ${builders === 1 ? "is a" : "are"} same-match builder${builders === 1 ? "" : "s"}: Bet365 prices each builder itself, so type the acca price Bet365 shows. ` : ""}
       Bet365 prices on single legs are re-checked every 3 minutes while HAWK is open. ▲/▼ = moved since you added it.</div>`;
   for (const [id, key] of [["aPrice", "price"], ["aStake", "stake"]])
@@ -4083,9 +4139,20 @@ function renderAccaBody() {
   $("#aCopy").onclick = copyAcca; $("#aVault").onclick = sendAccaToVault;
   bindFlips(el, S.flipped);
   $("#aClear").onclick = () => { if (confirm("Clear your acca?")) { S.acca = []; S.accaChk.price = ""; saveAcca(); renderAccaBody(); } };
+  el.addEventListener("toggle", (e) => {
+    if (!e.target.classList.contains("arow")) return;
+    const i = +e.target.dataset.arowkey;
+    if (e.target.open) {
+      S.accaOpen.add(i);
+      if (!e.target.querySelector(".fcard")) e.target.insertAdjacentHTML("beforeend",
+        partRow(S.acca[i], `<div><button class="linkbtn" data-aopen="${i}">edit in the builder</button></div>`));
+    } else S.accaOpen.delete(i);
+  }, true);
   el.onclick = (e) => {
     const rm = e.target.closest("[data-arm]");
-    if (rm) { S.acca.splice(+rm.dataset.arm, 1); saveAcca(); renderAccaBody(); updateMonster(); return; }
+    // Removing shifts every index after it, so the open set is rebuilt, not patched.
+    if (rm) { e.preventDefault(); e.stopPropagation(); S.acca.splice(+rm.dataset.arm, 1);
+      S.accaOpen = new Set(); saveAcca(); renderAccaBody(); updateMonster(); return; }
     const op = e.target.closest("[data-aopen]");
     if (op) { const pt = S.acca[+op.dataset.aopen]; openPart(pt); }
   };

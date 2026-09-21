@@ -1,10 +1,10 @@
-// HAWK's service worker: lets the site install as an app and open fast.
+﻿// HAWK's service worker: lets the site install as an app and open fast.
 // Network first for everything of HAWK's own, so a new version (or new data)
 // shows straight away; the last copy is used only when there's no connection.
 // Requests to other sites (365Scores, Polymarket, …) are left alone.
-const CACHE = "hawk-v2";
+const CACHE = "hawk-v3";
 const SHELL = ["./", "./index.html", "./builder/", "./builder/index.html", "./builder/engine.js", "./builder/hawk-settle.js",
-               "./hawk-logo.svg", "./builder/hawk-logo.svg", "./icon.svg", "./favicon.svg", "./manifest.webmanifest"];
+               "./hawk-logo.svg", "./builder/hawk-logo.svg", "./icon.svg", "./favicon.svg", "./qr.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => { /* first visit offline: fine */ }));

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HAWK 🦅 - Pro Betting Vault & Ticket Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- QR encoder, vendored so the sync codes render with no network -->
+    <script src="qr.js?v=1"></script>
     <style>
         /* Emoji render as fixed-color glyphs from the OS font, not text that respects
            CSS color — this filter desaturates them then tints toward the gold accent
@@ -2488,15 +2490,26 @@
         const b64url = (bytes) => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
                                     return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
         const pipe = async (bytes, stream) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
-        function syncData() {
-            const data = { v: 1, at: new Date().toISOString(), bankroll, bets, bankrollLog, learn: {} };
-            for (const k of SYNC_LEARN) { try { const v = JSON.parse(localStorage.getItem(k)); if (v != null) data.learn[k] = v; } catch (e) { /* skip */ } }
+        // What went out last time, so the next sync can be only what changed since.
+        // A full Vault is ~28,000 characters — past what any messaging app carries
+        // intact and ten times what a QR code holds. Three new tickets is ~900.
+        const syncMark = () => { try { return JSON.parse(localStorage.getItem('hawk.syncMark')) || { ids: [], at: null }; } catch (e) { return { ids: [], at: null }; } };
+        const setSyncMark = (ids) => { try { localStorage.setItem('hawk.syncMark', JSON.stringify({ ids, at: new Date().toISOString() })); } catch (e) { /* private window */ } };
+        function syncNewCount() { const seen = new Set(syncMark().ids); return bets.filter(b => b && b.id && !seen.has(b.id)).length; }
+        // mode 'diff' sends only tickets the last sync did not include; 'full' sends
+        // everything. A diff never carries the learning tables — those only grow, and
+        // the whole point of a diff is that it stays small.
+        function syncData(mode = 'full') {
+            const seen = new Set(syncMark().ids);
+            const out = mode === 'diff' ? bets.filter(b => b && b.id && !seen.has(b.id)) : bets;
+            const data = { v: 1, mode, at: new Date().toISOString(), bankroll, bets: out, bankrollLog, learn: {} };
+            if (mode === 'full') for (const k of SYNC_LEARN) { try { const v = JSON.parse(localStorage.getItem(k)); if (v != null) data.learn[k] = v; } catch (e) { /* skip */ } }
             return data;
         }
         // The link says how long it should be ("y" + length + "."), so a link an app cut
         // short is told apart from one that got changed on the way.
-        async function packSync() {
-            const raw = new TextEncoder().encode(JSON.stringify(syncData()));
+        async function packSync(mode = 'full') {
+            const raw = new TextEncoder().encode(JSON.stringify(syncData(mode)));
             if (!('CompressionStream' in window)) return 'n.' + b64url(raw);
             const body = b64url(await pipe(raw, new CompressionStream('deflate-raw')));
             return 'y' + body.length.toString(36) + '.' + body;
@@ -2513,6 +2526,38 @@
             if (kind === 'z.') bytes = await pipe(bytes, new DecompressionStream('deflate-raw'));
             return JSON.parse(new TextDecoder().decode(bytes));
         }
+        /* ---------- sync by QR ----------
+           A Vault does not fit in one QR code (2,953 bytes at best; yours is about
+           28,000), so it is cut into frames and cycled. The phone collects them in
+           any order, over as many passes as it needs, and reassembles when the set
+           is complete. Nothing leaves the room and no app is involved. */
+        const QR_CHUNK = 900;                 // bytes per frame — small enough to scan from a phone at arm's length
+        const qrFrames = (code) => { const n = Math.ceil(code.length / QR_CHUNK);
+            return Array.from({ length: n }, (_, i) => `HWK1|${i + 1}|${n}|${code.slice(i * QR_CHUNK, (i + 1) * QR_CHUNK)}`); };
+        function qrSvg(text, px = 260) {
+            const q = qrcode(0, 'L'); q.addData(text); q.make();
+            const c = q.getModuleCount(), cell = Math.max(1, Math.floor(px / (c + 8)));
+            return q.createImgTag(cell, cell * 4);
+        }
+        // Collects frames as they are seen. Frames may arrive in any order and
+        // repeat freely; the code comes back only once every index is present.
+        function qrCollector() {
+            const parts = new Map(); let total = 0;
+            return {
+                take(text) {
+                    const m = /^HWK1\|(\d+)\|(\d+)\|([\s\S]*)$/.exec(text || '');
+                    if (!m) return false;
+                    const i = +m[1], n = +m[2];
+                    if (total && n !== total) return false;   // a frame from a different Vault
+                    total = n; parts.set(i, m[3]);
+                    return true;
+                },
+                have: () => parts.size, need: () => total,
+                missing: () => { const out = []; for (let i = 1; i <= total; i++) if (!parts.has(i)) out.push(i); return out; },
+                done: () => total > 0 && parts.size === total,
+                code: () => Array.from({ length: total }, (_, i) => parts.get(i + 1)).join(''),
+            };
+        }
         // Too long for some apps? The same thing as a file: it can't be cut short.
         async function sendSyncFile() {
             const name = `hawk-sync-${new Date().toISOString().slice(0, 10)}.json`;
@@ -2525,6 +2570,83 @@
             setTimeout(() => URL.revokeObjectURL(a.href), 5000);
             alert(`Saved as ${name} (in your Downloads). Send it to yourself, then on the other device: Vault → 📲 Sync → 📂 Add from a sync file.`);
         }
+        // Show the Vault as a cycling set of QR codes for the other device to read.
+        async function showSyncQR(mode) {
+            let code; try { code = await packSync(mode); }
+            catch (e) { alert("Couldn't build the codes in this browser — use “Send as a file” instead."); return; }
+            const frames = qrFrames(code);
+            const wrap = document.createElement('div');
+            wrap.className = 'fixed inset-0 z-50 flex items-center justify-center p-4';
+            wrap.style.background = 'rgba(0,0,0,.88)';
+            wrap.innerHTML = `<div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 w-full max-w-md space-y-3 text-center">
+                <div class="flex justify-between items-center"><h3 class="text-white font-bold">📷 Scan this on your phone</h3><button data-x class="text-zinc-400 px-2 text-lg">✕</button></div>
+                <div id="qrHost" style="background:#fff;border-radius:14px;padding:12px;display:inline-block;line-height:0"></div>
+                <div class="text-xs text-zinc-300">Frame <b id="qrI" class="text-white">1</b> of <b class="text-white">${frames.length}</b>
+                    · ${mode === 'diff' ? 'only what is new' : 'the whole Vault'}</div>
+                <div class="h-1.5 rounded-full bg-zinc-800 overflow-hidden"><i id="qrBar" class="block h-full" style="width:0%;background:var(--accent);transition:width .1s"></i></div>
+                <p class="text-[11px] text-zinc-400">On the phone open HAWK → <b class="text-zinc-200">📲 Sync → 📷 Scan</b> and hold it up. Let it run a full pass or two —
+                    the frames can arrive in any order.</p>
+                <div class="flex gap-2"><button data-slow class="flex-1 bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2 text-sm">Slower</button>
+                    <button data-fast class="flex-1 bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2 text-sm">Faster</button></div>
+            </div>`;
+            document.body.appendChild(wrap);
+            let i = 0, fps = 3, timer = null;
+            const host = wrap.querySelector('#qrHost');
+            const tick = () => { host.innerHTML = qrSvg(frames[i], 270);
+                wrap.querySelector('#qrI').textContent = i + 1;
+                wrap.querySelector('#qrBar').style.width = (100 * (i + 1) / frames.length).toFixed(0) + '%';
+                i = (i + 1) % frames.length; };
+            const run = () => { clearInterval(timer); timer = setInterval(tick, 1000 / fps); };
+            tick(); run();
+            wrap.onclick = (e) => {
+                if (e.target === wrap || e.target.closest('[data-x]')) { clearInterval(timer); wrap.remove(); return; }
+                if (e.target.closest('[data-slow]')) { fps = Math.max(1, fps - 1); run(); }
+                if (e.target.closest('[data-fast]')) { fps = Math.min(10, fps + 1); run(); }
+            };
+        }
+        // Read the other device's codes with the camera. Chrome on Android decodes QR
+        // natively, so there is no library on this side.
+        async function scanSyncQR() {
+            if (!('BarcodeDetector' in window)) {
+                alert("This browser can't read QR codes.\n\nUse 📲 Sync → “Send as a file instead” on the other device, then “Add from a sync file” here.\n\n(Chrome on Android can do it.)");
+                return;
+            }
+            let stream;
+            try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } }); }
+            catch (e) { alert("HAWK couldn't open the camera. Allow camera access for this site and try again."); return; }
+            const det = new BarcodeDetector({ formats: ['qr_code'] });
+            const col = qrCollector();
+            const wrap = document.createElement('div');
+            wrap.className = 'fixed inset-0 z-50 flex items-center justify-center p-4';
+            wrap.style.background = 'rgba(0,0,0,.92)';
+            wrap.innerHTML = `<div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 w-full max-w-md space-y-3">
+                <div class="flex justify-between items-center"><h3 class="text-white font-bold">📷 Point at the other screen</h3><button data-x class="text-zinc-400 px-2 text-lg">✕</button></div>
+                <video id="qrVid" playsinline muted style="width:100%;border-radius:12px;background:#000"></video>
+                <div class="text-sm text-center text-zinc-200"><b id="qrGot" class="text-white">0</b> of <b id="qrNeed" class="text-white">?</b> frames</div>
+                <div class="h-1.5 rounded-full bg-zinc-800 overflow-hidden"><i id="qrBar2" class="block h-full" style="width:0%;background:var(--accent);transition:width .2s"></i></div>
+                <p class="text-[11px] text-zinc-400" id="qrMiss">Hold steady — it collects them as they come round.</p>
+            </div>`;
+            document.body.appendChild(wrap);
+            const vid = wrap.querySelector('#qrVid');
+            vid.srcObject = stream; await vid.play().catch(() => {});
+            let stop = false;
+            const close = () => { stop = true; stream.getTracks().forEach(t => t.stop()); wrap.remove(); };
+            wrap.onclick = (e) => { if (e.target === wrap || e.target.closest('[data-x]')) close(); };
+            while (!stop) {
+                try {
+                    for (const b of await det.detect(vid)) col.take(b.rawValue);
+                } catch (e) { /* a frame the decoder disliked: keep going */ }
+                wrap.querySelector('#qrGot').textContent = col.have();
+                wrap.querySelector('#qrNeed').textContent = col.need() || '?';
+                wrap.querySelector('#qrBar2').style.width = col.need() ? (100 * col.have() / col.need()).toFixed(0) + '%' : '0%';
+                const miss = col.missing();
+                wrap.querySelector('#qrMiss').textContent = !col.need() ? 'Hold steady — it collects them as they come round.'
+                    : miss.length ? `Still to catch: ${miss.slice(0, 10).join(', ')}${miss.length > 10 ? '…' : ''}`
+                    : 'Got them all — reading…';
+                if (col.done()) { close(); await applySync(col.code()); return; }
+                await new Promise(r => setTimeout(r, 120));
+            }
+        }
         async function openSync() {
             let link;
             try { link = `${location.origin}${location.pathname}#sync=${await packSync()}`; }
@@ -2536,13 +2658,18 @@
                 <div class="flex justify-between items-center"><h3 class="text-white font-bold">📲 Send your Vault to your other device</h3><button data-x class="text-zinc-400 px-2 text-lg">✕</button></div>
                 <p class="text-sm text-zinc-300">Open this link on your phone (or PC) and your <b class="text-white">${bets.length} tickets</b>, your <b class="text-white">€${bankroll.toFixed(2)}</b> bankroll and HAWK's Bet365 price learning copy across.</p>
                 <p class="text-xs text-zinc-400">🔒 Everything is inside the link — nothing goes to any server. Keep it to yourself.</p>
-                <div class="flex gap-2">${navigator.share ? '<button data-share class="flex-1 bg-[#c99700] hover:bg-[#f5c518] text-black font-bold rounded-xl py-2.5 text-sm">Share…</button>' : ''}
+                <div class="grid grid-cols-2 gap-2">
+                    <button data-qr-full class="bg-[#c99700] hover:bg-[#f5c518] text-black font-bold rounded-xl py-2.5 text-sm">📷 Show QR — everything</button>
+                    <button data-qr-diff class="bg-zinc-900 border border-[#f5c518]/50 text-[#f5c518] font-bold rounded-xl py-2.5 text-sm" ${syncNewCount() ? '' : 'disabled style="opacity:.45"'}>📷 QR — ${syncNewCount()} new</button>
+                </div>
+                <div class="flex gap-2">${navigator.share ? '<button data-share class="flex-1 bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm">Share…</button>' : ''}
                     <button data-copy class="flex-1 bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm">Copy link</button></div>
                 <button data-file-out class="w-full bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm">📄 Send as a file instead</button>
                 <p class="text-[11px] text-zinc-500">Send it to yourself (WhatsApp “Message yourself”, email or notes). The link is a snapshot: after new bets, make a new one.
                     ${link.length > 4000 ? `<b class="text-amber-300">This link is long (${link.length.toLocaleString()} characters) — some apps cut long links short. If it doesn't work, use “Send as a file”.</b>` : ''}</p>
                 <div class="border-t border-zinc-800 pt-3 space-y-2">
-                    <div class="text-white text-sm font-bold">📥 Got a link from your other device?</div>
+                    <button data-scan class="w-full bg-[#c99700] hover:bg-[#f5c518] text-black font-bold rounded-xl py-2.5 text-sm">📷 Scan the other device's QR</button>
+                    <div class="text-white text-sm font-bold">📥 Or got a link from your other device?</div>
                     <p class="text-[11px] text-zinc-400">If tapping it opened the wrong browser (not the one you use HAWK in): long-press the link → <b class="text-zinc-200">Copy</b>, then paste it here.</p>
                     <textarea data-in rows="2" placeholder="Paste the sync link here" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white" style="font-size:16px"></textarea>
                     <div class="flex gap-2">${navigator.clipboard && navigator.clipboard.readText ? '<button data-clip class="flex-1 bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm">📋 Paste</button>' : ''}
@@ -2558,6 +2685,18 @@
                 }
                 if (e.target.closest('[data-add]')) { if (await pasteSync(wrap.querySelector('[data-in]').value)) wrap.remove(); return; }
                 if (e.target.closest('[data-file-out]')) { await sendSyncFile(); return; }
+                if (e.target.closest('[data-scan]')) { wrap.remove(); await scanSyncQR(); return; }
+                const qb = e.target.closest('[data-qr-full],[data-qr-diff]');
+                if (qb) {
+                    if (qb.disabled) return;
+                    const mode = qb.hasAttribute('data-qr-diff') ? 'diff' : 'full';
+                    wrap.remove();
+                    await showSyncQR(mode);
+                    // What has now been offered to the other device, so the next
+                    // "new" count starts from here.
+                    setSyncMark(bets.map(b => b.id).filter(Boolean));
+                    return;
+                }
                 const b = e.target.closest('[data-copy],[data-share]');
                 if (!b) return;
                 if (b.hasAttribute('data-share')) { try { await navigator.share({ title: 'My HAWK Vault', url: link }); } catch (err) { /* cancelled */ } return; }

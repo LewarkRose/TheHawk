@@ -12,30 +12,29 @@
 <link rel="icon" href="../icon.svg?v=5" sizes="any" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
 <link rel="manifest" href="../manifest.webmanifest?v=5">
-<meta name="theme-color" content="#0d1114">
+<meta name="theme-color" content="#0a0a0a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="HAWK">
 <style>
 :root{
-  --bg:#0d1114; --panel:#151b1f; --panel2:#1b2328; --line:#25313a; --text:#e8eff3; --muted:#8797a3;
-  --accent:#38bdf8; --accent-d:#0284c7; --gold:#ffd166; --red:#ff5d73; --blue:#2dd4bf; --shadow:0 10px 30px rgba(0,0,0,.35);
+  --bg:#0a0a0a; --panel:#141414; --panel2:#1c1c1c; --line:#2a2a2a; --text:#ededed; --muted:#8a8a8a;
+  --accent:#f5c518; --accent-d:#c99700; --gold:#fb923c; --red:#ff5d73; --blue:#e2e8f0; --shadow:0 10px 30px rgba(0,0,0,.35);
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-/* background: floodlight glows drifting slowly + a big faint hawk + vignette */
+/* Background: a mown pitch. Nothing moves — the drifting glows that used to sit
+   here were the only thing on screen animating for no reason, behind numbers
+   that mean money. Stripes, then markings, then an edge fade. */
 .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-.bg-glow i{position:absolute;width:70vmax;height:70vmax;border-radius:50%;filter:blur(40px);will-change:transform}
-.bg-glow i:nth-child(1){background:radial-gradient(closest-side,rgba(56,189,248,.15),transparent);left:-22vmax;top:-32vmax;animation:bgDrift1 24s ease-in-out infinite alternate}
-.bg-glow i:nth-child(2){background:radial-gradient(closest-side,rgba(45,212,191,.09),transparent);right:-26vmax;top:-12vmax;animation:bgDrift2 30s ease-in-out infinite alternate}
-.bg-glow i:nth-child(3){background:radial-gradient(closest-side,rgba(56,189,248,.10),transparent);left:18vmax;bottom:-46vmax;animation:bgDrift3 34s ease-in-out infinite alternate}
-@keyframes bgDrift1{to{transform:translate(18vmax,12vmax)}}
-@keyframes bgDrift2{to{transform:translate(-16vmax,18vmax)}}
-@keyframes bgDrift3{to{transform:translate(-14vmax,-10vmax)}}
-.bg-hawk{position:absolute;left:50%;top:56%;width:min(92vh,960px);transform:translate(-30%,-50%) rotate(-8deg);fill:#bae6fd;opacity:.05}
-.bg-vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55))}
-@media (prefers-reduced-motion:reduce){.bg-glow i{animation:none}}
+.bg-mow{position:absolute;inset:0;background:repeating-linear-gradient(90deg,
+  rgba(245,197,24,.038) 0 5%, transparent 5% 10%)}
+.bg-pitch{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:.20}
+.bg-pitch svg{width:112%;max-width:none;fill:none;stroke:#f5c518;stroke-width:.30}
+.bg-pitch .spot{fill:#f5c518;stroke:none}
+.bg-vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 22%,rgba(11,15,18,.88) 78%)}
+@media (max-width:700px){.bg-pitch svg{width:200%}.bg-mow{background-size:200% 100%}}
 main.grid{position:relative;z-index:1}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif}
 /* The tilted pitch paints a few pixels wider than it measures, which left the
@@ -50,32 +49,32 @@ img{max-width:100%}
   background:linear-gradient(180deg,rgba(18,26,30,.97),rgba(13,17,20,.95));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .topbar{display:flex;align-items:center;gap:18px;padding:10px 22px 8px}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);flex-shrink:0}
-.brand .logo{width:40px;height:40px;filter:drop-shadow(0 0 12px rgba(56,189,248,.35));transition:transform .2s}
+.brand .logo{width:54px;height:54px;filter:drop-shadow(0 0 12px rgba(245,197,24,.35));transition:transform .2s}
 .brand:hover .logo{transform:rotate(-4deg) scale(1.05)}
 .wordmark{display:flex;flex-direction:column;line-height:1}
 .wordmark b{font-size:20px;font-weight:900;letter-spacing:.22em;
-  background:linear-gradient(180deg,#f2fffa,#bae6fd 70%,#38bdf8);-webkit-background-clip:text;background-clip:text;color:transparent}
+  background:linear-gradient(180deg,#f2fffa,#ffeaa0 70%,#f5c518);-webkit-background-clip:text;background-clip:text;color:transparent}
 .wordmark small{font-size:9.5px;font-weight:700;letter-spacing:.32em;color:var(--muted);margin-top:4px}
 .mainnav{display:flex;gap:4px;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:14px;margin:0 auto;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
 .nav{border:0;background:transparent;color:var(--muted);padding:7px 14px;border-radius:10px;cursor:pointer;font-weight:700;white-space:nowrap;
   display:flex;align-items:center;gap:6px;transition:.15s}
 .nav:hover{color:var(--text);background:var(--panel2)}
-.nav.on{color:#04222e;background:linear-gradient(180deg,#7dd3fc,var(--accent));box-shadow:0 4px 14px -4px rgba(56,189,248,.6)}
+.nav.on{color:#1a1400;background:linear-gradient(180deg,#ffe066,var(--accent));box-shadow:0 4px 14px -4px rgba(245,197,24,.6)}
 .nav .count,.tool .count{font-style:normal;font-size:11px;font-weight:900;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
-  display:inline-grid;place-items:center;background:var(--gold);color:#241a00}
-.nav.on .count{background:#04222e;color:var(--accent)}
+  display:inline-grid;place-items:center;background:var(--gold);color:#2a1300}
+.nav.on .count{background:#1a1400;color:var(--accent)}
 .topright{display:flex;align-items:center;gap:8px;position:relative;flex-shrink:0}
-.empty .bigmark{width:72px;height:72px;filter:drop-shadow(0 0 18px rgba(56,189,248,.35))}
-.ghost.vault{color:#d9b571;border-color:#6b5530}
+.empty .bigmark{width:72px;height:72px;filter:drop-shadow(0 0 18px rgba(245,197,24,.35))}
+.ghost.vault{color:#f5c518;border-color:#6b5530}
 .ghost.vault:hover{background:rgba(217,181,113,.08)}
 .leagues{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:0 22px 10px}
 .leagues::-webkit-scrollbar{display:none}
 .pill{display:flex;align-items:center;gap:7px;padding:6px 12px 6px 8px;border-radius:999px;border:1px solid var(--line);background:var(--panel);
   cursor:pointer;white-space:nowrap;transition:.15s;font-weight:600;font-size:13px}
 .pill img{width:18px;height:18px;object-fit:contain;opacity:.85}
-.pill:hover{border-color:#3a4a55}
-.pill.on{background:var(--accent);color:#04222e;border-color:var(--accent);font-weight:800}
+.pill:hover{border-color:#3a3a3a}
+.pill.on{background:var(--accent);color:#1a1400;border-color:var(--accent);font-weight:800}
 .pill.on img{filter:brightness(0) opacity(.75)}
 /* left panel: league tree (groups open/close, ★ favourites) above the fixtures */
 .ltree{display:flex;flex-direction:column;gap:2px;padding-bottom:10px;margin-bottom:8px;border-bottom:1px solid var(--line)}
@@ -95,8 +94,8 @@ img{max-width:100%}
 .lt-lg .n{font-size:11px;font-weight:800;min-width:20px;padding:1px 6px;border-radius:8px;background:var(--panel2);color:var(--muted);text-align:center}
 .lt-lg.none{color:var(--muted)}
 .lt-lg.none .n{opacity:.6}
-.lt-lg.on{background:rgba(56,189,248,.1);border-color:rgba(56,189,248,.5);color:var(--text)}
-.lt-lg.on .n{background:var(--accent);color:#04222e}
+.lt-lg.on{background:rgba(245,197,24,.1);border-color:rgba(245,197,24,.5);color:var(--text)}
+.lt-lg.on .n{background:var(--accent);color:#1a1400}
 .lt-star{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;opacity:0;transition:.12s}
 .lt-lg:hover .lt-star,.lt-star.on{opacity:1}
 .lt-star.on{color:var(--gold)}
@@ -111,8 +110,8 @@ img{max-width:100%}
 @media (max-width:560px){.lprow{grid-template-columns:1fr}}
 .lpgroup{border:1px dashed var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:5px 11px;cursor:pointer;
   font-weight:800;font-size:12px;white-space:nowrap;text-align:left}
-.lpgroup:hover{color:var(--text);border-color:#3a4a55}
-.lpgroup.on{color:var(--accent);border:1px solid rgba(56,189,248,.55)}
+.lpgroup:hover{color:var(--text);border-color:#3a3a3a}
+.lpgroup.on{color:var(--accent);border:1px solid rgba(245,197,24,.55)}
 .lpgroup.part{color:var(--text);border-style:solid}
 .pill.sm{padding:4px 10px;font-size:12px}
 .lpsum{font-size:12px;color:var(--muted)}
@@ -126,8 +125,8 @@ img{max-width:100%}
   /* the slip and its settings belong to the builder page */
   body:not([data-view="match"]) .slipcol{display:none!important}
   .fixtures{position:static;max-height:none}
-  .fx-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:11px 12px;border-radius:12px;border:1px solid #22414f;cursor:pointer;
-    background:linear-gradient(180deg,#1b2a27,#151d20);color:var(--text);font:600 14px inherit;text-align:left;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+  .fx-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:11px 12px;border-radius:12px;border:1px solid #3a3000;cursor:pointer;
+    background:linear-gradient(180deg,#1b2a27,#151515);color:var(--text);font:600 14px inherit;text-align:left;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
   .fx-toggle span{color:var(--muted);font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fx-toggle i{font-style:normal;color:var(--accent);transition:transform .2s}
   .fixtures:not(.folded) .fx-toggle{margin-bottom:10px}.fixtures:not(.folded) .fx-toggle i{transform:rotate(180deg)}
   .fixtures.folded{padding:6px}.fixtures.folded .ltree,.fixtures.folded #fixtures{display:none}
@@ -143,19 +142,19 @@ img{max-width:100%}
 .fx .when{grid-row:1/3;grid-column:2;align-self:center;text-align:right;color:var(--muted);font-size:12px}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em}
 .badge.live{background:rgba(255,93,115,.15);color:var(--red)}
-.badge.ok{background:rgba(56,189,248,.14);color:var(--accent)}
-.badge.warn{background:rgba(255,209,102,.14);color:var(--gold)}
+.badge.ok{background:rgba(245,197,24,.14);color:var(--accent)}
+.badge.warn{background:rgba(251,146,60,.14);color:var(--gold)}
 .muted{color:var(--muted)}
 .empty{padding:60px 30px;text-align:center;color:var(--muted)}
 .empty h2{color:var(--text);margin:10px 0 6px;font-size:22px}
 .ip-bell{position:absolute;top:12px;right:12px;z-index:2;display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;cursor:pointer;
   font:700 12px inherit;color:var(--muted);background:linear-gradient(180deg,#25333a,#1a2328);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 4px 10px -4px rgba(0,0,0,.6)}
-.ip-bell.on{color:#2e2200;background:linear-gradient(180deg,#ffe08f,#f2b93b);border-color:#c8911f;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 12px -4px rgba(255,209,102,.6)}
+.ip-bell.on{color:#2a1300;background:linear-gradient(180deg,#ffe08f,#f2b93b);border-color:#c8911f;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 12px -4px rgba(251,146,60,.6)}
 .ip-bell:hover{filter:brightness(1.1)}
 @media (max-width:560px){.ip-bell{top:7px;right:7px;width:30px;height:30px;padding:0;justify-content:center;font-size:14px}.ip-bell span{display:none}}
 .hero{position:relative}
 .hero{padding:22px 24px;border-radius:16px 16px 0 0;
-  background:radial-gradient(1200px 200px at 50% -60px,rgba(56,189,248,.18),transparent),linear-gradient(180deg,#18242a,#151b1f)}
+  background:radial-gradient(1200px 200px at 50% -60px,rgba(245,197,24,.18),transparent),linear-gradient(180deg,#18242a,#141414)}
 .vs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px}
 .side{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
 .side img{width:64px;height:64px;filter:drop-shadow(0 6px 12px rgba(0,0,0,.4))}
@@ -168,7 +167,7 @@ img{max-width:100%}
 .section h3{margin:0 0 12px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .bar3{display:flex;height:34px;border-radius:10px;overflow:hidden;font-weight:800;font-size:13px}
 .bar3 div{display:flex;align-items:center;justify-content:center;min-width:34px;transition:flex .6s}
-.bar3 .h{background:var(--accent);color:#04222e}.bar3 .d{background:#34424c}.bar3 .a{background:var(--blue);color:#042f2b}
+.bar3 .h{background:var(--accent);color:#1a1400}.bar3 .d{background:#333333}.bar3 .a{background:var(--blue);color:#111111}
 .bar3.sm{height:22px;font-size:11.5px;border-radius:7px;flex:1}.bar3.sm div{min-width:28px}
 .ng-box{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
 .ng-head{font-weight:800;margin-bottom:8px}
@@ -194,7 +193,7 @@ img{max-width:100%}
 .team-head img{width:22px;height:22px}
 .pl{display:grid;grid-template-columns:40px 1fr;gap:10px;padding:10px;border-radius:12px;background:var(--panel2);
   border:1px solid var(--line);margin-bottom:8px}
-.pl .ph{width:40px;height:40px;border-radius:50%;background:#26323b center/cover;overflow:hidden}
+.pl .ph{width:40px;height:40px;border-radius:50%;background:#2a2a2a center/cover;overflow:hidden}
 .pl .ph img{width:40px;height:40px;object-fit:cover}
 .pl .top1{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 .pl .nm{font-weight:700}
@@ -204,9 +203,9 @@ img{max-width:100%}
 .spark i{display:block;width:5px;background:#35505e;border-radius:2px}
 .spark i.hit{background:var(--accent)}
 .qchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
-.qc{font-size:11.5px;padding:3px 8px;border-radius:999px;background:#22303a;border:1px solid #2e3e49;cursor:pointer;transition:.12s}
+.qc{font-size:11.5px;padding:3px 8px;border-radius:999px;background:#1f1f1f;border:1px solid #2e3e49;cursor:pointer;transition:.12s}
 .qc:hover{border-color:var(--accent);color:var(--accent)}
-.qc.in{background:rgba(56,189,248,.16);border-color:var(--accent);color:var(--accent)}
+.qc.in{background:rgba(245,197,24,.16);border-color:var(--accent);color:var(--accent)}
 .qc b{font-weight:800;opacity:.7;margin-left:2px}
 .qc.zero{opacity:.45}
 .search{width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);margin-bottom:10px}
@@ -232,8 +231,8 @@ img{max-width:100%}
 .bp.val b{color:var(--accent)}
 .live-odds{margin-top:6px;display:flex;align-items:center;justify-content:center;gap:5px;flex-wrap:wrap}
 .live-odds .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
-.live-odds .dot.on{background:var(--accent);box-shadow:0 0 0 0 rgba(56,189,248,.6);animation:livepulse 2s infinite}
-@keyframes livepulse{70%{box-shadow:0 0 0 6px rgba(56,189,248,0)}100%{box-shadow:0 0 0 0 rgba(56,189,248,0)}}
+.live-odds .dot.on{background:var(--accent);box-shadow:0 0 0 0 rgba(245,197,24,.6);animation:livepulse 2s infinite}
+@keyframes livepulse{70%{box-shadow:0 0 0 6px rgba(245,197,24,0)}100%{box-shadow:0 0 0 0 rgba(245,197,24,0)}}
 .linkbtn{background:none;border:0;padding:0 2px;color:var(--accent);cursor:pointer;font:inherit;text-decoration:underline}
 .sc-league{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;display:flex;align-items:center;gap:7px}
 .sc-league img{width:16px;height:16px;object-fit:contain}
@@ -248,7 +247,7 @@ img{max-width:100%}
 .sc-state{font-size:12px;font-weight:700}
 .sc-live{color:var(--red);font-weight:800}
 .sc-soon{color:var(--gold);font-weight:800;white-space:nowrap}
-.co-card{border:1px solid rgba(255,209,102,.35);border-radius:14px;padding:14px;margin-bottom:12px;background:rgba(255,209,102,.04)}
+.co-card{border:1px solid rgba(251,146,60,.35);border-radius:14px;padding:14px;margin-bottom:12px;background:rgba(251,146,60,.04)}
 .co-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
 .co-leg{display:grid;grid-template-columns:24px 1fr auto;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
 .co-leg small{display:block;color:var(--muted);font-size:11px}
@@ -259,10 +258,10 @@ img{max-width:100%}
 .co-offer{margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .co-offer label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 .co-offer input{width:120px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:#12181c;font-size:16px;font-weight:700}
-.badge.soon{background:rgba(255,209,102,.14);color:var(--gold)}
+.badge.soon{background:rgba(251,146,60,.14);color:var(--gold)}
 .kick-cd{margin-top:6px;font-size:13px;color:var(--gold);font-weight:600}
 .sc-tbl{margin-left:auto;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font:700 11.5px inherit;cursor:pointer;text-transform:none;letter-spacing:0}
-.sc-tbl:hover{color:var(--accent);border-color:rgba(56,189,248,.45)}
+.sc-tbl:hover{color:var(--accent);border-color:rgba(245,197,24,.45)}
 .tbl-open{width:auto!important;padding:4px 10px!important;margin-top:8px;font-size:12px}
 .ltable table{width:100%;border-collapse:collapse;font-size:13.5px}
 .ltable th{font-size:11px;color:var(--muted);font-weight:700;padding:6px 4px;text-align:center;border-bottom:1px solid var(--line)}
@@ -272,14 +271,14 @@ img{max-width:100%}
 .ltable .tnw img{width:18px;height:18px;flex-shrink:0}.ltable .tnw span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}
 .ltable td.tp{white-space:nowrap;position:relative;font-weight:700;color:var(--muted)}
 .ltable td.tpts{font-weight:900;color:var(--text)}
-.ltable tr.hl td{background:rgba(255,209,102,.1)}.ltable tr.hl td.tn span{color:var(--gold);font-weight:800}
+.ltable tr.hl td{background:rgba(251,146,60,.1)}.ltable tr.hl td.tn span{color:var(--gold);font-weight:800}
 .ltable .tdst{display:inline-block;width:4px;height:14px;border-radius:2px;margin-right:5px;vertical-align:-2px}
 .ltable .up{color:var(--accent);font-size:9px;margin-left:3px}.ltable .dn{color:var(--red);font-size:9px;margin-left:3px}
 .ltable .tl{font-style:normal;font-size:11.5px;font-weight:800;padding:1px 6px;border-radius:6px;white-space:nowrap;background:var(--panel2)}
 .ltable .tl.w{color:var(--accent)}.ltable .tl.l{color:#ff8a9a}.ltable .tl.d{color:var(--gold)}.ltable .tl small{font-weight:600;color:var(--muted)}
 .ltable .tleg{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 4px;font-size:11.5px;color:var(--muted)}
 @media (max-width:560px){.ltable .tw{display:none}.ltable table{font-size:12.5px}.ltable .tl small{display:none}}
-.tie{margin:8px auto 2px;max-width:440px;padding:8px 12px;border-radius:12px;border:1px solid rgba(255,209,102,.35);background:rgba(255,209,102,.07);font-size:12.5px;line-height:1.45}
+.tie{margin:8px auto 2px;max-width:440px;padding:8px 12px;border-radius:12px;border:1px solid rgba(251,146,60,.35);background:rgba(251,146,60,.07);font-size:12.5px;line-height:1.45}
 .tie b{color:var(--gold)}.tie small{display:block;margin-top:3px;font-size:12px;color:var(--text)}.tie small.muted{color:var(--muted)}
 .ip-agg{margin-top:4px;font-size:13px;color:var(--gold)}.ip-agg b{font-weight:900}
 .kick-cd b{font-weight:900}
@@ -292,8 +291,8 @@ img{max-width:100%}
 .sc-bell{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-size:14px;
   filter:grayscale(1);opacity:.55;transition:.12s}
 .sc-bell:hover{opacity:1;filter:none;border-color:var(--gold)}
-.sc-bell.on{opacity:1;filter:none;border-color:var(--gold);background:rgba(255,209,102,.12);box-shadow:0 0 12px rgba(255,209,102,.25)}
-.sc-xi{font-size:10.5px;font-weight:800;color:var(--accent);background:rgba(56,189,248,.12);padding:2px 6px;border-radius:6px;white-space:nowrap}
+.sc-bell.on{opacity:1;filter:none;border-color:var(--gold);background:rgba(251,146,60,.12);box-shadow:0 0 12px rgba(251,146,60,.25)}
+.sc-xi{font-size:10.5px;font-weight:800;color:var(--accent);background:rgba(245,197,24,.12);padding:2px 6px;border-radius:6px;white-space:nowrap}
 .dot-live{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:6px;animation:livepulse 2s infinite}
 .rp-evs{display:flex;flex-direction:column;gap:4px}
 .rp-ev{display:flex;gap:8px;font-size:13px;padding:4px 0}
@@ -317,7 +316,7 @@ img{max-width:100%}
 .ip-scorers{margin-top:6px;display:flex;flex-direction:column;gap:2px;font-size:12.5px;font-weight:700;color:var(--text)}
 .ip-tabs{display:inline-flex;gap:4px;padding:3px;text-transform:none;letter-spacing:0}.ip-tabs button{padding:4px 10px;font-size:12px}
 .ip-teams{display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;color:var(--muted);margin:0 0 4px}
-.ip-teams span:first-child{color:var(--accent)}.ip-teams span:last-child{color:#2dd4bf}
+.ip-teams span:first-child{color:var(--accent)}.ip-teams span:last-child{color:#e2e8f0}
 .lp-sec{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:14px 0 6px}
 .lp-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}.lp-row small{display:block;color:var(--muted);font-size:11px}
 .lp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
@@ -325,12 +324,12 @@ img{max-width:100%}
 .lp-grid span{color:var(--muted)}
 .ip-scorers span{color:var(--muted);font-weight:600}.ip-scorers .off{color:var(--muted);font-weight:600}
 .ip-stat{display:grid;grid-template-columns:48px 1fr 48px;gap:8px;align-items:center;font-size:12.5px;margin:5px 0}
-.ip-stat .bar{display:flex;height:7px;border-radius:5px;overflow:hidden;background:#22303a}
+.ip-stat .bar{display:flex;height:7px;border-radius:5px;overflow:hidden;background:#1f1f1f}
 .ip-stat .bar i{display:block;height:100%}
 .ip-stat .nm{grid-column:1/-1;text-align:center;color:var(--muted);font-size:11px;margin-bottom:-3px}
 .ip-row{display:grid;grid-template-columns:1fr 64px 60px 60px 64px 84px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
 .ip-row.head{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.ip-row.val{background:rgba(56,189,248,.06)}
+.ip-row.val{background:rgba(245,197,24,.06)}
 @media (max-width:640px){.ip-row{grid-template-columns:1fr 56px 56px 70px}.ip-row .hide-sm{display:none}}
 .tn{font-size:13px;padding:4px 0;display:flex;align-items:baseline;flex-wrap:wrap;gap:2px}
 .tn .tag{font-size:10px;font-weight:800;letter-spacing:.06em;padding:1px 6px;border-radius:5px;margin-right:6px}
@@ -338,7 +337,7 @@ img{max-width:100%}
 .tn.doubt .tag{background:rgba(255,196,0,.14);color:var(--gold)}
 .learn{margin-top:10px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}
 .learn b{color:var(--text)}
-.star{cursor:pointer;color:#3a4a55;margin-left:6px;font-size:13px}
+.star{cursor:pointer;color:#3a3a3a;margin-left:6px;font-size:13px}
 .star:hover{color:var(--gold)}
 .star.on{color:var(--gold)}
 .apart{display:grid;grid-template-columns:1fr auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
@@ -350,8 +349,8 @@ img{max-width:100%}
 @media (max-width:640px){.monhead{grid-template-columns:1fr}.apart{grid-template-columns:1fr}.apart>div:last-child{text-align:left!important}}
 .mvo{font-size:10.5px;font-weight:700;margin-left:6px;white-space:nowrap}
 .agree{font-size:9.5px;font-weight:800;margin-left:5px;padding:1px 5px;border-radius:5px;white-space:nowrap;letter-spacing:.02em}
-.agree.yes{background:rgba(56,189,248,.14);color:var(--accent)}
-.agree.no{background:rgba(255,209,102,.14);color:var(--gold)}
+.agree.yes{background:rgba(245,197,24,.14);color:var(--accent)}
+.agree.no{background:rgba(251,146,60,.14);color:var(--gold)}
 .agree.nv,.badge.nv{background:rgba(143,164,178,.14);color:#b3c1ca}
 .badge.nv small{font-weight:600;opacity:.8}
 /* the move since Bet365 opened, on its own line under a leg (never over the price column) */
@@ -374,8 +373,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .opts{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
 .opts select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px 6px}
 .build{width:100%;margin-top:12px;padding:13px;border:0;border-radius:12px;cursor:pointer;font-weight:900;letter-spacing:.06em;
-  color:#03261b;background:linear-gradient(90deg,#0ea5e9,#7dd3fc,#0ea5e9);background-size:200% 100%;animation:shine 3s linear infinite;
-  box-shadow:0 8px 24px rgba(56,189,248,.3)}
+  color:#03261b;background:linear-gradient(90deg,#e0a800,#ffe066,#e0a800);background-size:200% 100%;animation:shine 3s linear infinite;
+  box-shadow:0 8px 24px rgba(245,197,24,.3)}
 .build:disabled{opacity:.5;cursor:default}
 @keyframes shine{to{background-position:-200% 0}}
 .ticket{margin-top:14px;border-radius:14px;border:1px solid var(--accent);background:linear-gradient(180deg,#1a2a2c,#172024);overflow:hidden}
@@ -387,7 +386,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .tpct .num small{font-size:21px}
     .tpct .lab{font-size:10px;letter-spacing:.14em;color:var(--muted)}
     .tbar{flex:1;min-width:0}
-    .tbar .track{position:relative;height:8px;border-radius:4px;background:#22303a;overflow:hidden}
+    .tbar .track{position:relative;height:8px;border-radius:4px;background:#1f1f1f;overflow:hidden}
     .tbar .track i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--accent-d),var(--accent))}
     .tbar .track b{position:absolute;top:-3px;width:2px;height:14px;background:var(--red);border-radius:1px}
     .tbar .bnote{margin-top:5px;font-size:11px;color:var(--muted)}
@@ -400,7 +399,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .leg.priced,.leg.ref,.leg.guess{padding-left:25px;border-radius:3px}
     .leg.priced{border-left:3px solid var(--accent)}
     .leg.ref{border-left:3px solid var(--blue)}
-    .leg.guess{border-left:3px solid #4d5f6b}
+    .leg.guess{border-left:3px solid #4a4a4a}
     .legkey{display:flex;gap:12px;flex-wrap:wrap;padding:2px 14px 10px;font-size:11px;color:var(--muted)}
     .legkey i{display:inline-block;width:9px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
 .leg::before{content:"";position:absolute;left:8px;top:22px;bottom:-8px;width:2px;background:#2d4a44}
@@ -412,8 +411,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .leg .mk{font-size:12px;color:var(--muted)}
 .leg .b365{font-size:11.5px;color:var(--gold);margin-top:2px}.leg .b365 b{font-weight:800}
 /* scorecard leg: face + name + verdict, three tiles, a short why, icon buttons — raised, 3D */
-.leg.card{padding:12px;margin:0 0 10px;border-radius:14px;border:1px solid #22414f;
-  background:linear-gradient(180deg,#1b2a27 0%,#151d20 100%);
+.leg.card{padding:12px;margin:0 0 10px;border-radius:14px;border:1px solid #3a3000;
+  background:linear-gradient(180deg,#1b2a27 0%,#151515 100%);
   box-shadow:0 14px 26px -14px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.06),inset 0 -1px 0 rgba(0,0,0,.35)}
 .leg.card::before{display:none}
 .leg.card{animation-fill-mode:backwards}   /* (so the rise-in animation doesn't hold the transform the tilt needs) */
@@ -422,19 +421,19 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .leg.card .sc-name{flex:1;min-width:0}.leg.card .sc-head .lb{font-weight:800;line-height:1.25}
 .lface{position:relative;flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;
   background:radial-gradient(circle at 35% 30%,#2b3d3a,#131b1d);border:2px solid var(--accent);
-  box-shadow:0 6px 12px -4px rgba(0,0,0,.7),0 0 0 3px rgba(56,189,248,.12)}
-.lface.away{border-color:var(--blue);box-shadow:0 6px 12px -4px rgba(0,0,0,.7),0 0 0 3px rgba(45,212,191,.12)}
+  box-shadow:0 6px 12px -4px rgba(0,0,0,.7),0 0 0 3px rgba(245,197,24,.12)}
+.lface.away{border-color:var(--blue);box-shadow:0 6px 12px -4px rgba(0,0,0,.7),0 0 0 3px rgba(226,232,240,.12)}
 .lface img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:top}
 .lface.crest img{inset:6px;width:calc(100% - 12px);height:calc(100% - 12px);border-radius:0;object-fit:contain}
-.lface.ball{border-color:#3a4a55}
+.lface.ball{border-color:#3a3a3a}
 .lface .ini{font-size:13px;font-weight:900;color:var(--muted)}
 .lface .no{position:absolute;right:-7px;bottom:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;display:grid;place-items:center;
-  font-size:10px;font-weight:900;background:var(--accent);color:#04222e;border:2px solid #151d20;box-shadow:0 2px 4px rgba(0,0,0,.5)}
-.lface.away .no{background:var(--blue);color:#042f2b}
+  font-size:10px;font-weight:900;background:var(--accent);color:#1a1400;border:2px solid #151515;box-shadow:0 2px 4px rgba(0,0,0,.5)}
+.lface.away .no{background:var(--blue);color:#111111}
 .verdict{flex:none;align-self:flex-start;font-size:11px;font-weight:800;letter-spacing:.02em;padding:3px 9px;border-radius:999px;white-space:nowrap;
   color:var(--muted);background:linear-gradient(180deg,#26333a,#1c262c);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 3px 6px -3px rgba(0,0,0,.6)}
-.verdict.good{color:#04222e;background:linear-gradient(180deg,#3cf0b6,#12c58c);border-color:#0284c7;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px -4px rgba(56,189,248,.6)}
-.verdict.warn{color:#2e2200;background:linear-gradient(180deg,#ffe08f,#f2b93b);border-color:#c8911f;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px -4px rgba(255,209,102,.5)}
+.verdict.good{color:#1a1400;background:linear-gradient(180deg,#3cf0b6,#12c58c);border-color:#c99700;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px -4px rgba(245,197,24,.6)}
+.verdict.warn{color:#2a1300;background:linear-gradient(180deg,#ffe08f,#f2b93b);border-color:#c8911f;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px -4px rgba(251,146,60,.5)}
 .verdict.bad{color:#fff;background:linear-gradient(180deg,#ff7a8c,#e0455b);border-color:#b8324a;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 4px 10px -4px rgba(255,93,115,.55)}
 /* flip cards: on a bigger screen the front and back simply stack; on a phone
    the card turns over when you tap it (numbers on the front, the why on the back) */
@@ -456,7 +455,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   .fcard .fhint{display:inline-block;margin-left:auto;align-self:center;font-size:10.5px;font-weight:700;color:var(--accent);opacity:.85;order:9}
   .fcard .fhint .h2,.fcard.flipped .fhint .h1{display:none}.fcard.flipped .fhint .h2{display:inline}
   .leg.card .acts{display:flex;align-items:center}
-  .fcard.flipped{box-shadow:0 14px 26px -14px rgba(0,0,0,.85),0 0 0 1px rgba(56,189,248,.3)}
+  .fcard.flipped{box-shadow:0 14px 26px -14px rgba(0,0,0,.85),0 0 0 1px rgba(245,197,24,.3)}
   /* tighter on a phone */
   .leg.card{padding:10px}.leg .tiles{gap:5px}.leg .tile{padding:5px 6px}.leg .tile .tv{font-size:16px}
   .leg.card .sc-head .lb{font-size:13.5px}.lface{width:36px;height:36px}.verdict{font-size:10px;padding:2px 7px}
@@ -481,7 +480,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .tilt3d::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .2s;
   background:radial-gradient(380px circle at var(--mx,50%) var(--my,50%),rgba(160,255,220,.08),transparent 45%)}
 .tilt3d.tilting::after{opacity:1}
-.tilt3d.tilting{box-shadow:0 26px 44px -18px rgba(0,0,0,.9),0 0 0 1px rgba(56,189,248,.22),inset 0 1px 0 rgba(255,255,255,.08)}
+.tilt3d.tilting{box-shadow:0 26px 44px -18px rgba(0,0,0,.9),0 0 0 1px rgba(245,197,24,.22),inset 0 1px 0 rgba(255,255,255,.08)}
 @media (prefers-reduced-motion:reduce){.tilt3d,.tilt3d::after{transition:none}}
 .leg .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
 .leg .tile{border:1px solid var(--line);border-radius:10px;padding:6px 8px;background:rgba(255,255,255,.025);min-width:0}
@@ -489,9 +488,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .leg .tile .tv{font-size:18px;font-weight:900;line-height:1.25;white-space:nowrap}.leg .tile .tv small{font-size:10.5px;font-weight:700;color:var(--muted)}
 .leg .tile .tm{font-size:12px;color:var(--muted);margin-right:2px}
 .leg .tile .ts{font-size:10.5px;color:var(--muted);line-height:1.3;overflow:hidden;text-overflow:ellipsis}
-.leg .tile.good{border-color:rgba(56,189,248,.45);background:rgba(56,189,248,.07)}.leg .tile.good .ts{color:var(--accent)}
+.leg .tile.good{border-color:rgba(245,197,24,.45);background:rgba(245,197,24,.07)}.leg .tile.good .ts{color:var(--accent)}
 .leg .tile.ok .ts{color:var(--text)}
-.leg .tile.dead{border-color:rgba(255,209,102,.5);background:rgba(255,209,102,.07)}.leg .tile.dead .ts{color:var(--gold)}
+.leg .tile.dead{border-color:rgba(251,146,60,.5);background:rgba(251,146,60,.07)}.leg .tile.dead .ts{color:var(--gold)}
 .leg .tile.poor{border-color:rgba(255,93,115,.35)}.leg .tile.poor .ts{color:#ff8a8a}
 .leg .tile.form{cursor:pointer}.leg .tile .dn{color:var(--accent)}.leg .tile .up{color:#ff8a8a}
 .leg .tile .pp-in{width:52px;padding:1px 4px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:600 11px inherit}
@@ -501,11 +500,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .leg .lprice{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:6px;font-size:12.5px}
 .leg .lprice b{font-weight:800;color:var(--text)}
 .leg .lprice .vt{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--muted)}
-.leg .lprice .vt.good{background:rgba(56,189,248,.14);color:var(--accent)}.leg .lprice .vt.ok{color:var(--text)}
-.leg .lprice .vt.dead{background:rgba(255,209,102,.14);color:var(--gold)}
+.leg .lprice .vt.good{background:rgba(245,197,24,.14);color:var(--accent)}.leg .lprice .vt.ok{color:var(--text)}
+.leg .lprice .vt.dead{background:rgba(251,146,60,.14);color:var(--gold)}
 .leg .lprice .pp-in{width:62px;padding:2px 6px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:600 12px inherit}
 .leg .lprice .mvo,.leg .lprice .agree{font-size:11px}
-.leg .why{margin-top:5px;font-size:12px;line-height:1.45;color:#b9c6cf;background:rgba(255,255,255,.035);border-left:2px solid rgba(56,189,248,.45);padding:5px 8px;border-radius:0 8px 8px 0}
+.leg .why{margin-top:5px;font-size:12px;line-height:1.45;color:#b9c6cf;background:rgba(255,255,255,.035);border-left:2px solid rgba(245,197,24,.45);padding:5px 8px;border-radius:0 8px 8px 0}
 .epb{display:inline-block;font-size:9.5px;font-weight:900;font-style:italic;letter-spacing:.04em;padding:0 4px;border:1px solid currentColor;border-radius:3px;margin-right:2px}
 .leg .rt{text-align:right;white-space:nowrap}
 .leg .rt .pp{font-weight:800}
@@ -515,16 +514,16 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .leg .acts button.on{color:var(--gold);border-color:var(--gold)}
 .leg .pb{margin-top:6px}
 @keyframes in{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
-.sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 14px;border-top:1px solid #22414f;background:rgba(56,189,248,.05)}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 14px;border-top:1px solid #3a3000;background:rgba(245,197,24,.05)}
 .sum .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
-.guess{padding:8px 14px 11px;font-size:12.5px;background:rgba(56,189,248,.05)}.guess b{color:var(--text)}
+.guess{padding:8px 14px 11px;font-size:12.5px;background:rgba(245,197,24,.05)}.guess b{color:var(--text)}
 .sum .v{font-size:20px;font-weight:900}
 .check{margin-top:12px;padding:12px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}
 .check .row{display:grid;grid-template-columns:1.2fr .8fr .9fr;gap:8px}
 .check label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 .check input{width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--line);background:#12181c;font-size:16px;font-weight:700}
 .verdict{margin-top:10px;padding:10px 12px;border-radius:10px;font-weight:700}
-.verdict.good{background:rgba(56,189,248,.14);color:var(--accent)}
+.verdict.good{background:rgba(245,197,24,.14);color:var(--accent)}
 .verdict.bad{background:rgba(255,93,115,.12);color:var(--red)}
 .verdict small{display:block;font-weight:500;color:var(--text);opacity:.8;margin-top:2px}
 .pc-list{display:grid;gap:8px;margin-top:14px}
@@ -534,16 +533,16 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .pc-row input:disabled{opacity:.45}
 #verdict .verdict{white-space:normal;overflow-wrap:anywhere}   /* (the leg pills' .verdict doesn't wrap; this box must) */
 .ghost{width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1px solid var(--line);background:transparent;cursor:pointer;color:var(--muted)}
-.ghost:hover{color:var(--text);border-color:#3a4a55}
+.ghost:hover{color:var(--text);border-color:#3a3a3a}
 .note{font-size:12px;color:var(--muted);margin-top:10px}
-.warn{font-size:12.5px;color:var(--gold);background:rgba(255,209,102,.07);border:1px solid rgba(255,209,102,.25);border-radius:10px;padding:8px 10px;margin-top:10px}
+.warn{font-size:12.5px;color:var(--gold);background:rgba(251,146,60,.07);border:1px solid rgba(251,146,60,.25);border-radius:10px;padding:8px 10px;margin-top:10px}
 .vcard{margin-top:12px;padding:12px;border-radius:12px;border:1px dashed var(--line)}
 .vcard h4{margin:0 0 6px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .skel{padding:40px 24px}
 .skel .ln{height:14px;border-radius:7px;background:linear-gradient(90deg,#1c252b,#243039,#1c252b);background-size:200% 100%;
   animation:shine 1.4s linear infinite;margin:12px 0}
 .loading-msg{color:var(--accent);font-weight:700;margin-bottom:10px}
-#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#22303a;border:1px solid var(--line);
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1f1f1f;border:1px solid var(--line);
   padding:10px 16px;border-radius:12px;opacity:0;transition:.25s;pointer-events:none;box-shadow:var(--shadow)}
 #toast.show{opacity:1}
 /* goal alerts */
@@ -551,9 +550,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* With My bets open the alerts were landing on top of your own bets. */
 @media (min-width:1400px){body.drawer-open #goalfeed{right:412px}}
 .goal-card{pointer-events:auto;position:relative;overflow:hidden;cursor:pointer;padding:12px 14px 14px;border-radius:16px;
-  background:linear-gradient(135deg,#10251f 0%,#141b22 60%);border:1px solid rgba(56,189,248,.55);
-  box-shadow:0 18px 40px rgba(0,0,0,.5),0 0 0 1px rgba(56,189,248,.15),0 0 28px rgba(56,189,248,.25);animation:goalIn .55s cubic-bezier(.2,1.4,.4,1)}
-.goal-card.off{border-color:rgba(255,138,138,.55);background:linear-gradient(135deg,#2a1717 0%,#141b22 60%);box-shadow:0 18px 40px rgba(0,0,0,.5)}
+  background:linear-gradient(135deg,#10251f 0%,#121212 60%);border:1px solid rgba(245,197,24,.55);
+  box-shadow:0 18px 40px rgba(0,0,0,.5),0 0 0 1px rgba(245,197,24,.15),0 0 28px rgba(245,197,24,.25);animation:goalIn .55s cubic-bezier(.2,1.4,.4,1)}
+.goal-card.off{border-color:rgba(255,138,138,.55);background:linear-gradient(135deg,#2a1717 0%,#121212 60%);box-shadow:0 18px 40px rgba(0,0,0,.5)}
 .goal-card.bye{animation:goalOut .5s ease forwards}
 .goal-card::before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.12) 45%,transparent 60%);
   transform:translateX(-100%);animation:goalShine 1.4s .35s ease-out}
@@ -561,7 +560,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .goal-card .gx:hover{background:rgba(255,255,255,.08);color:var(--text)}
 .g-top{display:flex;align-items:center;gap:8px}
 .g-ball{font-size:24px;display:inline-block;animation:goalBall 1s ease-out}
-.g-word{font-weight:900;font-size:22px;letter-spacing:.06em;font-style:italic;color:var(--accent);text-shadow:0 0 18px rgba(56,189,248,.6)}
+.g-word{font-weight:900;font-size:22px;letter-spacing:.06em;font-style:italic;color:var(--accent);text-shadow:0 0 18px rgba(245,197,24,.6)}
 .goal-card.off .g-word{color:#ff8a8a;text-shadow:none}
 .g-min{margin-left:auto;margin-right:26px;font-weight:800;color:#ff5d73;font-size:13px}
 .g-score{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin:10px 0 6px}
@@ -576,17 +575,17 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .g-bar i{display:block;height:100%;background:var(--accent);animation:goalTimer 15s linear forwards}
 .goal-card.off .g-bar i{background:#ff8a8a}
 /* other alerts: green = good news, red = bad, gold = one to go / check, blue = half-time */
-.goal-card.t-bad{border-color:rgba(255,93,115,.6);background:linear-gradient(135deg,#2a1418 0%,#141b22 60%);box-shadow:0 18px 40px rgba(0,0,0,.5),0 0 26px rgba(255,93,115,.2)}
+.goal-card.t-bad{border-color:rgba(255,93,115,.6);background:linear-gradient(135deg,#2a1418 0%,#121212 60%);box-shadow:0 18px 40px rgba(0,0,0,.5),0 0 26px rgba(255,93,115,.2)}
 .goal-card.t-bad .g-word{color:#ff6b7f;text-shadow:0 0 16px rgba(255,93,115,.5)}.goal-card.t-bad .g-bar i{background:#ff6b7f}
-.goal-card.t-warn{border-color:rgba(255,209,102,.6);background:linear-gradient(135deg,#2a2412 0%,#141b22 60%);box-shadow:0 18px 40px rgba(0,0,0,.5),0 0 26px rgba(255,209,102,.2)}
-.goal-card.t-warn .g-word{color:var(--gold);text-shadow:0 0 16px rgba(255,209,102,.5)}.goal-card.t-warn .g-bar i{background:var(--gold)}
-.goal-card.t-info{border-color:rgba(45,212,191,.55);background:linear-gradient(135deg,#12202e 0%,#141b22 60%)}
+.goal-card.t-warn{border-color:rgba(251,146,60,.6);background:linear-gradient(135deg,#2a2412 0%,#121212 60%);box-shadow:0 18px 40px rgba(0,0,0,.5),0 0 26px rgba(251,146,60,.2)}
+.goal-card.t-warn .g-word{color:var(--gold);text-shadow:0 0 16px rgba(251,146,60,.5)}.goal-card.t-warn .g-bar i{background:var(--gold)}
+.goal-card.t-info{border-color:rgba(226,232,240,.55);background:linear-gradient(135deg,#12202e 0%,#121212 60%)}
 .goal-card.t-info .g-word{color:var(--blue);text-shadow:none}.goal-card.t-info .g-bar i{background:var(--blue)}
 @keyframes goalIn{from{opacity:0;transform:translateX(60px) scale(.9)}to{opacity:1;transform:none}}
 @keyframes goalOut{to{opacity:0;transform:translateX(60px)}}
 @keyframes goalShine{to{transform:translateX(100%)}}
 @keyframes goalBall{0%{transform:translateY(-30px) rotate(-200deg);opacity:0}60%{transform:translateY(4px) rotate(20deg);opacity:1}100%{transform:none}}
-@keyframes goalPulse{0%{text-shadow:0 0 0 rgba(56,189,248,0)}40%{text-shadow:0 0 14px rgba(56,189,248,.9)}100%{text-shadow:0 0 0 rgba(56,189,248,0)}}
+@keyframes goalPulse{0%{text-shadow:0 0 0 rgba(245,197,24,0)}40%{text-shadow:0 0 14px rgba(245,197,24,.9)}100%{text-shadow:0 0 0 rgba(245,197,24,0)}}
 @keyframes goalTimer{from{width:100%}to{width:0}}
 @media (max-width:560px){
       /* A phone screen is the page, not a noticeboard: one alert, compact, and
@@ -608,10 +607,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     }
 @media (prefers-reduced-motion:reduce){.goal-card,.goal-card::before,.g-ball,.g-team.hit{animation:none}}
 /* header tools */
-.tool{padding:7px 12px;border-radius:999px;border:1px solid var(--accent);background:rgba(56,189,248,.08);color:var(--accent);
+.tool{padding:7px 12px;border-radius:999px;border:1px solid var(--accent);background:rgba(245,197,24,.08);color:var(--accent);
   cursor:pointer;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:6px}
-.tool:hover{background:rgba(56,189,248,.16)}
-.tool.bell{border-color:var(--gold);color:var(--gold);background:rgba(255,209,102,.08)}
+.tool:hover{background:rgba(245,197,24,.16)}
+.tool.bell{border-color:var(--gold);color:var(--gold);background:rgba(251,146,60,.08)}
 .pop{position:absolute;right:0;top:44px;width:300px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;
   box-shadow:var(--shadow);padding:10px;z-index:10}
 .pop .row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 4px;font-size:13px}
@@ -629,10 +628,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .scard .rail.fair{background:linear-gradient(180deg,var(--gold),#b8975a);opacity:1}
     .scard .rail.bad{background:linear-gradient(180deg,#3c4a54,#2b363e);opacity:1}
     /* price not known yet: neither good nor bad until Bet365 says */
-    .scard .rail.check{background:linear-gradient(180deg,var(--blue),#0f9e8c);opacity:1}
-    .badge.check{background:rgba(45,212,191,.14);color:var(--blue)}
+    .scard .rail.check{background:linear-gradient(180deg,var(--blue),#94a3b8);opacity:1}
+    .badge.check{background:rgba(226,232,240,.14);color:var(--blue)}
     .sdo.check{color:var(--blue)}
-    .theleg.check{border-color:rgba(45,212,191,.42);background:linear-gradient(140deg,rgba(45,212,191,.09),var(--panel) 58%)}
+    .theleg.check{border-color:rgba(226,232,240,.42);background:linear-gradient(140deg,rgba(226,232,240,.09),var(--panel) 58%)}
     .theleg.check .tl-price .n{color:var(--blue)}
     .scard .sbody{flex:1;min-width:0;padding:12px 14px;display:flex;flex-direction:column;gap:9px}
     .scard .stop{display:flex;align-items:flex-start;gap:12px}
@@ -642,9 +641,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .spct .num small{font-size:22px}
     .spct .lab{font-size:10px;letter-spacing:.16em;color:var(--muted)}
     /* the bar: how often it lands, with the mark showing what the price needs */
-    .sbar .track{position:relative;height:10px;border-radius:5px;background:#22303a;overflow:hidden}
+    .sbar .track{position:relative;height:10px;border-radius:5px;background:#1f1f1f;overflow:hidden}
     .sbar .track i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:linear-gradient(90deg,var(--accent-d),var(--accent))}
-    .sbar .track i.bad{background:linear-gradient(90deg,#3c4a54,#4d5f6b)}
+    .sbar .track i.bad{background:linear-gradient(90deg,#3c4a54,#4a4a4a)}
     .sbar .track b{position:absolute;top:-3px;width:2px;height:16px;background:#fff;border-radius:1px}
     .sbar .bnote{display:flex;justify-content:space-between;gap:10px;margin-top:5px;font-size:11px;color:var(--muted)}
     /* The legs multiplied against what Bet365 pays: the correlation tax, as a
@@ -658,12 +657,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .tax > b{color:var(--text)}
     /* How much the legs move together — the builder's only exploitable number */
     .agree{font-size:11.5px;font-weight:700;padding:5px 9px;border-radius:9px;border:1px solid;align-self:flex-start}
-    .agree.same{color:var(--gold);background:rgba(255,209,102,.09);border-color:rgba(255,209,102,.35)}
-    .agree.apart{color:var(--blue);background:rgba(45,212,191,.09);border-color:rgba(45,212,191,.35)}
+    .agree.same{color:var(--gold);background:rgba(251,146,60,.09);border-color:rgba(251,146,60,.35)}
+    .agree.apart{color:var(--blue);background:rgba(226,232,240,.09);border-color:rgba(226,232,240,.35)}
     /* Tonight's bet: the one card you came for, above everything else */
-    .theleg{position:relative;margin:0 0 14px;padding:15px 17px 14px;border-radius:17px;border:1px solid rgba(56,189,248,.42);
-      background:linear-gradient(140deg,rgba(56,189,248,.09),var(--panel) 58%);box-shadow:0 16px 34px -22px rgba(0,0,0,.9)}
-    .theleg.fair{border-color:rgba(255,209,102,.42);background:linear-gradient(140deg,rgba(255,209,102,.08),var(--panel) 58%)}
+    .theleg{position:relative;margin:0 0 14px;padding:15px 17px 14px;border-radius:17px;border:1px solid rgba(245,197,24,.42);
+      background:linear-gradient(140deg,rgba(245,197,24,.09),var(--panel) 58%);box-shadow:0 16px 34px -22px rgba(0,0,0,.9)}
+    .theleg.fair{border-color:rgba(251,146,60,.42);background:linear-gradient(140deg,rgba(251,146,60,.08),var(--panel) 58%)}
     .theleg.bad,.theleg.none{border-color:var(--line);background:var(--panel)}
     .tl-k{font-size:10px;font-weight:800;letter-spacing:.15em;color:var(--muted);text-transform:uppercase}
     .tl-main{display:flex;align-items:flex-start;gap:14px;margin-top:8px;cursor:pointer}
@@ -682,7 +681,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .tl-alts{margin-top:9px}
     .tl-alt{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:var(--panel2);
       border:1px solid var(--line);font-size:12.5px;cursor:pointer}
-    .tl-alt:hover{border-color:#3a4a55}
+    .tl-alt:hover{border-color:#3a3a3a}
     .tl-ak{font-size:9.5px;font-weight:800;letter-spacing:.13em;color:var(--muted)}
     .tl-ap{color:var(--gold)}
     .tl-no{margin-top:7px;font-size:15px;font-weight:700}
@@ -711,7 +710,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .rchips button{min-height:36px;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);
       color:var(--text);font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
     .rchips button:hover{border-color:var(--accent)}
-    .rchips button.on{border-color:rgba(56,189,248,.45);background:rgba(56,189,248,.1);color:var(--accent)}
+    .rchips button.on{border-color:rgba(245,197,24,.45);background:rgba(245,197,24,.1);color:var(--accent)}
     /* Acca: one row per part, the full card behind a tap (see accaRow) */
     .arows{margin-top:12px}
     .arow{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:7px;overflow:hidden}
@@ -774,10 +773,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .bsw{flex:1;min-width:150px;display:flex;align-items:center;gap:9px;padding:9px 11px;cursor:pointer;
       border:1px solid var(--line);border-radius:12px;background:var(--panel2);color:var(--text);text-align:left;font:inherit}
     .bsw:hover{border-color:var(--accent)}
-    .bsw .tk{flex:none;width:32px;height:18px;border-radius:999px;background:#3a4a55;position:relative;transition:.16s}
+    .bsw .tk{flex:none;width:32px;height:18px;border-radius:999px;background:#3a3a3a;position:relative;transition:.16s}
     .bsw .tk i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--muted);transition:.16s}
     .bsw.on .tk{background:var(--accent)}
-    .bsw.on .tk i{left:16px;background:#04222e}
+    .bsw.on .tk i{left:16px;background:#1a1400}
     .bsw .bl{min-width:0}
     .bsw .bl b{display:block;font-size:12px;font-weight:700}
     .bsw .bl em{display:block;font-style:normal;font-size:10.5px;color:var(--muted);margin-top:1px}
@@ -808,7 +807,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .brain .bsay{padding:0 13px 11px;font-size:12.5px;color:var(--muted);line-height:1.5}
     .bchips{display:flex;flex-wrap:wrap;gap:6px;padding:0 13px 12px}
     .bchip{font-size:11.5px;padding:4px 10px;border-radius:7px;border:1px solid var(--line);color:var(--muted)}
-    .bchip.up{background:rgba(56,189,248,.1);border-color:rgba(56,189,248,.4);color:var(--accent)}
+    .bchip.up{background:rgba(245,197,24,.1);border-color:rgba(245,197,24,.4);color:var(--accent)}
     .bchip.dn{background:rgba(255,93,115,.09);border-color:rgba(255,93,115,.38);color:var(--red)}
     .brain .bfoot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 13px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
     /* check mode: the price box and verdict under the Bet365 list */
@@ -821,7 +820,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .cmv{display:flex;align-items:center;gap:11px;margin-top:12px}
     .cmv .tier{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:24px;line-height:1;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
     .cmv .tier.ok{color:var(--accent)} .cmv .tier.fair{color:var(--gold)} .cmv .tier.bad{color:var(--red)}
-    .cmbar{position:relative;height:9px;border-radius:5px;background:#22303a;overflow:hidden;margin-top:11px}
+    .cmbar{position:relative;height:9px;border-radius:5px;background:#1f1f1f;overflow:hidden;margin-top:11px}
     .cmbar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--accent-d),var(--accent))}
     .cmbar b{position:absolute;top:-3px;width:2px;height:15px;background:var(--red);border-radius:1px}
     .cmgo{display:flex;gap:9px;margin-top:12px}
@@ -843,8 +842,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .mybet{padding:11px 13px;border-top:1px solid var(--line)}
     .mybet:first-of-type{border-top:0}
     .mybet .top{display:flex;align-items:center;gap:10px}
-    .myleg{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:6px;background:#22303a;border:1px solid var(--line);color:var(--muted);margin:5px 5px 0 0}
-    .myleg.won{background:rgba(56,189,248,.1);border-color:rgba(56,189,248,.4);color:var(--accent)}
+    .myleg{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:6px;background:#1f1f1f;border:1px solid var(--line);color:var(--muted);margin:5px 5px 0 0}
+    .myleg.won{background:rgba(245,197,24,.1);border-color:rgba(245,197,24,.4);color:var(--accent)}
     .myleg.lost{background:rgba(255,93,115,.09);border-color:rgba(255,93,115,.38);color:var(--red)}
     /* Today: the day's plan */
     .tdhead{display:flex;align-items:center;gap:12px;margin-bottom:12px}
@@ -861,7 +860,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .tdrow .px{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:20px;line-height:1;font-weight:700;color:var(--gold)}
     /* the front door: greeting, bankroll, one sentence, and the day in numbers */
     .thero{border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:14px;
-      background:radial-gradient(120% 140% at 0% 0%, rgba(56,189,248,.10), transparent 60%), var(--panel)}
+      background:radial-gradient(120% 140% at 0% 0%, rgba(245,197,24,.10), transparent 60%), var(--panel)}
     .thead{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
     .tgreet{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:27px;
       font-weight:700;letter-spacing:.02em;line-height:1.05}
@@ -926,7 +925,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     }
     /* paper mode: following a pick with no money on it */
     .tdrow .follow{flex:none;width:auto;margin:0;padding:6px 10px;font-size:11.5px;font-weight:700;border-radius:9px;min-height:36px}
-    .tdrow .follow.on{border-color:rgba(45,212,191,.5);background:rgba(45,212,191,.12);color:var(--blue)}
+    .tdrow .follow.on{border-color:rgba(226,232,240,.5);background:rgba(226,232,240,.12);color:var(--blue)}
     .paper{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
     .paper .n{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:24px;line-height:1;font-weight:700}
     .prow{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:12.5px}
@@ -942,10 +941,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .sdo.ok{color:var(--accent)} .sdo.fair{color:var(--gold)} .sdo.bad{color:var(--muted)}
 .scard .teams{display:flex;align-items:center;gap:7px;font-weight:800;flex-wrap:wrap}
 .scard .teams img{width:20px;height:20px}
-.lchip{display:inline-block;font-size:11.5px;padding:3px 9px;border-radius:7px;background:#22303a;border:1px solid #2e3e49;margin:0}
-.lchip.pl{border-color:rgba(45,212,191,.45)}
+.lchip{display:inline-block;font-size:11.5px;padding:3px 9px;border-radius:7px;background:#1f1f1f;border:1px solid #2e3e49;margin:0}
+.lchip.pl{border-color:rgba(226,232,240,.45)}
     /* the weak link: the leg least likely to land, so you know which to swap */
-    .lchip.weak{border-color:rgba(255,209,102,.55);background:rgba(255,209,102,.08)}
+    .lchip.weak{border-color:rgba(251,146,60,.55);background:rgba(251,146,60,.08)}
     .lchip.weak b{color:var(--gold)}
     /* a leg Bet365 doesn't publish — marked up about 27% inside a builder */
     .lchip.prop{border-color:rgba(255,138,138,.42);background:rgba(255,138,138,.07)}
@@ -958,8 +957,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .mb-tile .k,.mb-rec .k{margin-top:3px;font-size:10px;letter-spacing:.11em;color:var(--muted);text-transform:uppercase}
     .mb-rec{display:flex;align-items:center;gap:12px;padding:11px 13px;margin:0 0 12px;border:1px solid var(--line);border-radius:13px;background:var(--panel2)}
     .weaktag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:800;
-      letter-spacing:.04em;text-transform:uppercase;color:var(--gold);background:rgba(255,209,102,.1);border:1px solid rgba(255,209,102,.45)}
-    .leg.weakleg [data-swap]{border-color:rgba(255,209,102,.5);color:var(--gold)}
+      letter-spacing:.04em;text-transform:uppercase;color:var(--gold);background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.45)}
+    .leg.weakleg [data-swap]{border-color:rgba(251,146,60,.5);color:var(--gold)}
 .vline{font-size:12px;color:var(--accent);margin-top:6px}
 .bigodds{font-size:24px;font-weight:900;color:var(--gold)}
 .sprice{display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:12px;color:var(--muted);margin:4px 0;cursor:text}
@@ -971,20 +970,20 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .modal{width:min(780px,94vw);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;
   box-shadow:var(--shadow);padding:20px 22px}
 .mhead{display:flex;align-items:center;gap:14px}
-.mhead .ph{width:64px;height:64px;border-radius:50%;background:#26323b;overflow:hidden;flex-shrink:0}
+.mhead .ph{width:64px;height:64px;border-radius:50%;background:#2a2a2a;overflow:hidden;flex-shrink:0}
 .mhead .ph img{width:64px;height:64px;object-fit:cover}
 .mhead .ph.lp-face{position:relative;overflow:visible;border:3px solid var(--accent);margin-right:12px}.mhead .ph.lp-face.away{border-color:var(--blue)}
 .mhead .ph.lp-face img{width:100%;height:100%;border-radius:50%;object-position:top}
 .mhead .ph.lp-face .no{position:absolute;right:-8px;bottom:-4px;min-width:24px;height:24px;padding:0 4px;border-radius:12px;display:grid;place-items:center;
-  font-size:12px;font-weight:900;background:var(--accent);color:#04222e;border:2px solid var(--panel)}
-.mhead .ph.lp-face.away .no{background:var(--blue);color:#042f2b}
+  font-size:12px;font-weight:900;background:var(--accent);color:#1a1400;border:2px solid var(--panel)}
+.mhead .ph.lp-face.away .no{background:var(--blue);color:#111111}
 .mhead .x{margin-left:auto;border:1px solid var(--line);background:transparent;border-radius:10px;width:34px;height:34px;cursor:pointer;color:var(--muted)}
 .chart{display:flex;align-items:flex-end;gap:8px;height:210px;margin:18px 0 6px;padding:0 4px;border-bottom:1px solid var(--line)}
 .chart .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
 .chart .marks{font-size:12px;height:16px;white-space:nowrap}
 .chart .num{font-size:12px;font-weight:800}
 .chart .bw{height:140px;width:100%;display:flex;align-items:flex-end;justify-content:center}
-.chart .bar{width:62%;max-width:34px;background:#3a4a55;border-radius:6px 6px 0 0;position:relative;min-height:2px}
+.chart .bar{width:62%;max-width:34px;background:#3a3a3a;border-radius:6px 6px 0 0;position:relative;min-height:2px}
 .chart .sotb{position:absolute;left:0;right:0;bottom:0;background:var(--accent);border-radius:6px 6px 0 0}
 .xlabels{display:flex;gap:8px;padding:0 4px}
 .xlabels div{flex:1;min-width:0;text-align:center;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -993,8 +992,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .hits{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
 /* hit-rate chips + the leg history chart */
 .hr{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:8px;cursor:pointer;vertical-align:1px;white-space:nowrap}
-.hr.g{background:rgba(56,189,248,.14);color:var(--accent)}
-.hr.a{background:rgba(255,209,102,.14);color:var(--gold)}
+.hr.g{background:rgba(245,197,24,.14);color:var(--accent)}
+.hr.a{background:rgba(251,146,60,.14);color:var(--gold)}
 .hr.r{background:rgba(255,93,115,.14);color:var(--red)}
 .hr:hover{filter:brightness(1.25);box-shadow:inset 0 0 0 1px currentColor}
 .chart.hist{position:relative}
@@ -1017,13 +1016,13 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .call{margin:10px 14px 4px;padding:11px 14px;border-radius:12px;font-weight:900;font-size:15px;letter-spacing:.02em;border:1px solid}
 .call small{display:block;margin-top:3px;font-weight:600;font-size:12.5px;letter-spacing:0;opacity:.9}
 .call small.risk{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.1);color:var(--text);opacity:1}
-.call.good{color:var(--accent);background:rgba(56,189,248,.1);border-color:rgba(56,189,248,.4)}
-.call.warn{color:var(--gold);background:rgba(255,209,102,.1);border-color:rgba(255,209,102,.4)}
-.call.check{color:var(--blue);background:rgba(45,212,191,.1);border-color:rgba(45,212,191,.4)}
+.call.good{color:var(--accent);background:rgba(245,197,24,.1);border-color:rgba(245,197,24,.4)}
+.call.warn{color:var(--gold);background:rgba(251,146,60,.1);border-color:rgba(251,146,60,.4)}
+.call.check{color:var(--blue);background:rgba(226,232,240,.1);border-color:rgba(226,232,240,.4)}
 .call.bad{color:#ff8a9a;background:rgba(255,93,115,.1);border-color:rgba(255,93,115,.4)}
 .up-level{font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px}
-.up-level.low{background:rgba(56,189,248,.12);color:var(--accent)}
-.up-level.med{background:rgba(255,209,102,.14);color:var(--gold)}
+.up-level.low{background:rgba(245,197,24,.12);color:var(--accent)}
+.up-level.med{background:rgba(251,146,60,.14);color:var(--gold)}
 .up-level.high{background:rgba(255,145,77,.18);color:#ff9d5c}
 .up-level.vhigh{background:rgba(255,93,115,.2);color:var(--red)}
 .up-nums{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -1033,9 +1032,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .up-nums .muted{font-size:11.5px}
 .up-signals{display:flex;flex-direction:column;gap:6px;margin-top:10px}
 .sig{display:grid;grid-template-columns:22px 1fr;align-items:start;font-size:13px;padding:7px 10px;border-radius:10px;border:1px solid var(--line)}
-.sig.up{background:rgba(56,189,248,.06)}
+.sig.up{background:rgba(245,197,24,.06)}
 .sig.down{background:rgba(143,164,178,.07);color:#c3cfd6}
-.sig.info{background:rgba(255,209,102,.07);color:#e8d9a8}
+.sig.info{background:rgba(251,146,60,.07);color:#e8d9a8}
 /* 👕 lineups: a pitch (lying down; standing up on phones) */
 .lu-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .pitch{position:relative;width:100%;aspect-ratio:16/10;border-radius:14px;overflow:hidden;
@@ -1051,7 +1050,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .stage3d.p3d .pm:hover{transform:translate(-50%,-100%) rotateZ(calc(var(--rz) * -1)) rotateX(calc(var(--rx) * -1)) scale(1.1)}
 .stage3d.p3d.grabbing .pitch,.stage3d.p3d.grabbing .pm{transition:none}
 .stage3d.p3d .pm .shirt{box-shadow:0 6px 10px -3px rgba(0,0,0,.6)}
-.stage3d.p3d .pm.star .shirt{box-shadow:0 0 0 3px rgba(255,209,102,.55),0 0 16px rgba(255,209,102,.7),0 6px 10px -3px rgba(0,0,0,.6)}
+.stage3d.p3d .pm.star .shirt{box-shadow:0 0 0 3px rgba(251,146,60,.55),0 0 16px rgba(251,146,60,.7),0 6px 10px -3px rgba(0,0,0,.6)}
 .p3d-ctl{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:6px 0 0;font-size:12px}
 .p3d-ctl .p3d-hint{margin-right:auto}
 .p3d-ctl button{width:auto;margin:0;padding:3px 10px;font-size:12px;text-transform:none;letter-spacing:0}
@@ -1060,16 +1059,16 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .pm:hover{transform:translate(-50%,-50%) scale(1.08);z-index:2}
 .pm .shirt{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:11.5px;border:2px solid rgba(255,255,255,.75);
   box-shadow:0 2px 6px rgba(0,0,0,.45)}
-.pm.home .shirt{background:var(--accent);color:#04222e}
-.pm.away .shirt{background:var(--blue);color:#042f2b}
+.pm.home .shirt{background:var(--accent);color:#1a1400}
+.pm.away .shirt{background:var(--blue);color:#111111}
 /* faces: the photo in a team-coloured ring, the shirt number as a badge */
 .pm .shirt{position:relative}
 .pm .shirt.face{width:36px;height:36px;background:#0d1a16;border-width:2.5px}
 .pm.home .shirt.face{border-color:var(--accent)}.pm.away .shirt.face{border-color:var(--blue)}
 .pm .shirt.face img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:top}
 .pm .shirt.face .no{position:absolute;right:-7px;bottom:-4px;min-width:17px;height:17px;padding:0 3px;border-radius:9px;display:grid;place-items:center;
-  font-size:9.5px;font-weight:900;border:1.5px solid #0d1114;box-shadow:0 1px 3px rgba(0,0,0,.5)}
-.pm.home .shirt.face .no{background:var(--accent);color:#04222e}.pm.away .shirt.face .no{background:var(--blue);color:#042f2b}
+  font-size:9.5px;font-weight:900;border:1.5px solid #0a0a0a;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.pm.home .shirt.face .no{background:var(--accent);color:#1a1400}.pm.away .shirt.face .no{background:var(--blue);color:#111111}
 .pm.subon .shirt.face,.pm.subon .shirt{border-color:var(--gold)}
 .pm .nm{font-size:10.5px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pm .tg{font-size:9.5px;font-weight:800;color:#fff;background:rgba(4,12,10,.62);padding:0 5px;border-radius:6px;white-space:nowrap}
@@ -1082,14 +1081,14 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .lu-row{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px;margin-bottom:5px}
 .lu-row>.muted{width:42px;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
 .lu-chip{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:2px 8px;cursor:pointer;white-space:nowrap}
-.lu-chip:hover{border-color:#3a4a55}
+.lu-chip:hover{border-color:#3a3a3a}
 .lu-chip.out{cursor:default;color:#ff9aa8;border-color:rgba(255,93,115,.3)}
 /* live pitch */
 .pm.gone{opacity:.45}
 .pm.subon .shirt{border-color:var(--gold)}
-.pm.star .shirt{box-shadow:0 0 0 3px rgba(255,209,102,.55),0 0 16px rgba(255,209,102,.7)}
+.pm.star .shirt{box-shadow:0 0 0 3px rgba(251,146,60,.55),0 0 16px rgba(251,146,60,.7)}
 .pm.mine .nm{color:var(--gold)}
-.lu-chip.on{color:var(--accent);border-color:rgba(56,189,248,.45)}
+.lu-chip.on{color:var(--accent);border-color:rgba(245,197,24,.45)}
 @media (max-width:560px){
   .pitch{aspect-ratio:10/15;background:repeating-linear-gradient(0deg,#1c5a39 0 6.25%,#195133 6.25% 12.5%)}
   .pitch .pl-h{display:none}.pitch .pl-v{display:block}
@@ -1098,15 +1097,15 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 }
 .up-record{margin-top:10px;font-size:12.5px;padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px dashed var(--line)}
 .up-verdict{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);font-size:13.5px}
-.up-verdict.hit{border-color:rgba(56,189,248,.5)}
+.up-verdict.hit{border-color:rgba(245,197,24,.5)}
 .up-verdict.miss{border-color:rgba(255,93,115,.45)}
 .optbar{display:flex;align-items:center;gap:6px;margin:12px 0 -4px;flex-wrap:wrap}
 .optbar .muted{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin-right:2px}
 .optbar button{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:10px;padding:5px 10px;cursor:pointer;
   font-weight:900;font-size:14px;display:flex;flex-direction:column;align-items:center;line-height:1.1;transition:.12s}
 .optbar button small{font-size:10px;font-weight:700;color:var(--muted)}
-.optbar button:hover{border-color:#3a4a55}
-.optbar button.on{border-color:var(--accent);background:rgba(56,189,248,.12);color:var(--accent)}
+.optbar button:hover{border-color:#3a3a3a}
+.optbar button.on{border-color:var(--accent);background:rgba(245,197,24,.12);color:var(--accent)}
 /* Bet365 checklist */
 .chk-list{display:flex;flex-direction:column;margin-top:8px}
 .chk-grp{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:12px 0 4px}
@@ -1114,22 +1113,22 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   margin-bottom:6px;cursor:pointer;font-weight:600;background:var(--panel2)}
 .chk-row input{width:18px;height:18px;accent-color:var(--accent)}
 .chk-row input.chk-pp{width:62px;height:auto;margin-left:6px;padding:3px 6px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:600 12px inherit}
-.chk-row.deadrow{border-color:rgba(255,209,102,.5)}
+.chk-row.deadrow{border-color:rgba(251,146,60,.5)}
 .pp-line{font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
 .pp-line input{width:58px;padding:2px 6px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:600 12px inherit}
 .pp-line.dead b{color:var(--gold);font-weight:700}
 .pp-line .est{color:var(--text);font-weight:700}.pp-line .linkbtn{font-size:11.5px}
 .chk-row .muted{font-size:12px;font-weight:500}
-.chk-row.done{border-color:rgba(56,189,248,.5);background:rgba(56,189,248,.08)}
+.chk-row.done{border-color:rgba(245,197,24,.5);background:rgba(245,197,24,.08)}
 .chk-row.done span:first-of-type{text-decoration:line-through;color:var(--muted)}
 .chk-price{margin-top:12px;font-size:14px}
 .dhealth{margin-top:10px;font-size:12px;border-top:1px solid var(--line);padding-top:8px;line-height:1.7}
 .dhealth .ok{color:var(--accent)}
 .dhealth .bad{color:var(--gold);font-weight:700}
 .tb{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:8px;letter-spacing:0;text-transform:none;vertical-align:1px;cursor:help;white-space:nowrap}
-.tb.ok{background:rgba(56,189,248,.14);color:var(--accent)}
-.tb.hi{background:rgba(255,209,102,.14);color:var(--gold)}
-.tb.lo{background:rgba(45,212,191,.14);color:var(--blue)}
+.tb.ok{background:rgba(245,197,24,.14);color:var(--accent)}
+.tb.hi{background:rgba(251,146,60,.14);color:var(--gold)}
+.tb.lo{background:rgba(226,232,240,.14);color:var(--blue)}
 /* head to head */
 .h2h-sum{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;margin-bottom:10px}
 .h2h-sum span{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
@@ -1137,8 +1136,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .h2h-row{display:grid;grid-template-columns:78px minmax(0,1fr) auto 120px;gap:10px;align-items:center;padding:7px 6px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer;border-radius:8px}
 .h2h-row:hover{background:var(--panel2)}
 .h2h-teams{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.h2h-sc{display:inline-block;min-width:44px;text-align:center;padding:1px 8px;border-radius:7px;margin:0 6px;background:#34424c}
-.h2h-sc.w{background:rgba(56,189,248,.2);color:var(--accent)}
+.h2h-sc{display:inline-block;min-width:44px;text-align:center;padding:1px 8px;border-radius:7px;margin:0 6px;background:#333333}
+.h2h-sc.w{background:rgba(245,197,24,.2);color:var(--accent)}
 .h2h-sc.l{background:rgba(255,93,115,.18);color:var(--red)}
 .h2h-comp{font-size:11.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:560px){.h2h-row{grid-template-columns:62px minmax(0,1fr) auto}.h2h-comp{display:none}}
@@ -1161,7 +1160,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   .vrow > div:nth-child(4),.vrow > div:nth-child(5){display:none}
 }
 /* the count on 🎟 My bets in the page menu */
-.nav.betsnav .jn{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:5px;border-radius:999px;background:var(--gold);color:#2e2200;font-size:11px}
+.nav.betsnav .jn{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:5px;border-radius:999px;background:var(--gold);color:#2a1300;font-size:11px}
 /* 🎟 My bets */
 .mb-h{margin:16px 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .mb-card{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:var(--panel2)}
@@ -1169,12 +1168,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .bdrawer .mb-card, .modal-bg[data-mybets] .mb-card{min-height:140px;display:flex;flex-direction:column}
 .bdrawer .mb-card .mb-part:last-child, .modal-bg[data-mybets] .mb-card .mb-part:last-child{margin-top:auto}
 .mb-link{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
-.mb-link:hover{border-color:rgba(56,189,248,.7)}
+.mb-link:hover{border-color:rgba(245,197,24,.7)}
 .mb-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:14px;padding-bottom:6px}
 .mb-part{border-top:1px solid var(--line);padding:7px 0 3px}
 .mb-fx{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;margin-bottom:3px}
 .mb-fx b{margin-right:auto}
-.mb-go{padding:3px 10px;border-radius:8px;border:1px solid rgba(56,189,248,.4);background:rgba(56,189,248,.08);color:var(--accent);font:700 12px inherit;cursor:pointer}
+.mb-go{padding:3px 10px;border-radius:8px;border:1px solid rgba(245,197,24,.4);background:rgba(245,197,24,.08);color:var(--accent);font:700 12px inherit;cursor:pointer}
 .mb-leg{display:flex;gap:7px;font-size:13px;padding:1px 0}
 .mb-m{width:12px;flex-shrink:0;color:var(--muted);font-weight:900}.mb-m.won{color:var(--accent)}.mb-m.lost{color:var(--red)}
 .mb-done{display:grid;grid-template-columns:22px minmax(0,1fr) auto auto;gap:8px;align-items:center;font-size:13px;padding:7px 2px;border-bottom:1px solid var(--line)}
@@ -1186,9 +1185,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 @media (min-width:821px){
   body:not([data-view="match"]) .slip-bar{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px;padding:0 4px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
   .slip-bar button{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;font-size:14px}
-  .slip-bar button:hover{color:var(--text);border-color:#3a4a55}
+  .slip-bar button:hover{color:var(--text);border-color:#3a3a3a}
   body.slip-away:not([data-view="match"]) .slipcol{display:none}
-  body.slip-away:not([data-view="match"]) .slip-back{display:block;position:fixed;right:0;top:45%;z-index:14;padding:12px 8px;border-radius:12px 0 0 12px;border:1px solid #22414f;border-right:0;
+  body.slip-away:not([data-view="match"]) .slip-back{display:block;position:fixed;right:0;top:45%;z-index:14;padding:12px 8px;border-radius:12px 0 0 12px;border:1px solid #3a3000;border-right:0;
     background:linear-gradient(180deg,#1d2b30,#152024);color:var(--accent);font-weight:800;font-size:12px;cursor:pointer;writing-mode:vertical-rl;box-shadow:-8px 0 20px -8px rgba(0,0,0,.7)}
   body.drawer-open .slip-back{right:390px}
 }
@@ -1202,19 +1201,19 @@ body.drawer-open .bdrawer{display:block;position:fixed;right:0;bottom:0;width:39
   background:linear-gradient(180deg,#18242a,#12191d);border-left:1px solid var(--line);box-shadow:-24px 0 48px -20px rgba(0,0,0,.8)}
 .bdrawer.anim{transform-origin:100% 50%;animation:bdIn .55s cubic-bezier(.2,.8,.2,1) both}
 @keyframes bdIn{from{opacity:0;transform:perspective(1400px) rotateY(-32deg) translateX(70px)}to{opacity:1;transform:none}}
-.bdrawer .mb-card{position:relative;background:linear-gradient(180deg,#223038,#19242a);border-color:#2c3c45;
+.bdrawer .mb-card{position:relative;background:linear-gradient(180deg,#202020,#171717);border-color:#2b2b2b;
   box-shadow:0 14px 26px -16px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.06)}
 .bdrawer.anim .mb-card{animation:tkIn .5s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(.15s + var(--i, 0) * 80ms)}
 @keyframes tkIn{from{opacity:0;transform:perspective(900px) rotateX(-40deg) translateY(-14px)}to{opacity:1;transform:none}}
 /* 1400, not 1700: a 1690-wide laptop had the drawer sitting on top of the page
    instead of beside it. */
 @media (min-width:1400px){body.drawer-open main.grid{padding-right:412px}}
-.nav.betsnav.on{color:var(--gold);border-color:rgba(255,209,102,.45)}
+.nav.betsnav.on{color:var(--gold);border-color:rgba(251,146,60,.45)}
 @media (prefers-reduced-motion:reduce){.bdrawer.anim,.bdrawer.anim .mb-card{animation:none}}
 /* (only four page buttons now, so their names always fit) */
 /* small phones: icon over a small label, so all five pages fit in one row */
 @media (max-width:560px){.nav{flex-direction:column;gap:1px;font-size:10.5px;padding:5px 2px}.nav span{display:block}.tool.bell span{display:none}}
-.tool.install{color:var(--accent);border-color:rgba(56,189,248,.45)}
+.tool.install{color:var(--accent);border-color:rgba(245,197,24,.45)}
 /* the Vault is the site's last page: a link in the menu, in its own gold */
 a.nav{text-decoration:none}
 /* More: a menu under the button (PC), a sheet above the tab bar (phones) */
@@ -1226,7 +1225,7 @@ a.nav{text-decoration:none}
 .mm .count{grid-row:1/3;grid-column:3}
 .mm:hover{background:var(--panel2)}
 .mm.on{color:var(--accent)}
-.mm.vaultnav{color:#d9b571}
+.mm.vaultnav{color:#f5c518}
 .scanset{margin:8px 0}
 .scanset summary{cursor:pointer;color:var(--muted);font-weight:700;font-size:13px;padding:6px 0}
 .scanset[open] summary{color:var(--text)}
@@ -1236,13 +1235,13 @@ a.nav{text-decoration:none}
   .mainnav .mm{display:flex;align-items:center;gap:6px;width:auto;padding:7px 14px;border-radius:10px;color:var(--muted);font-weight:700;white-space:nowrap;transition:.15s}
   .mainnav .mm small{display:none}
   .mainnav .mm:hover{color:var(--text);background:var(--panel2)}
-  .mainnav .mm.on{color:#04222e;background:linear-gradient(180deg,#7dd3fc,var(--accent));box-shadow:0 4px 14px -4px rgba(56,189,248,.6)}
-  .mainnav .mm.vaultnav{color:#d9b571}
+  .mainnav .mm.on{color:#1a1400;background:linear-gradient(180deg,#ffe066,var(--accent));box-shadow:0 4px 14px -4px rgba(245,197,24,.6)}
+  .mainnav .mm.vaultnav{color:#f5c518}
 }
 @media (max-width:1180px) and (min-width:821px){.mainnav .nav span,.mainnav .mm span{display:none}.mainnav .nav.on span,.mainnav .mm.on span{display:inline}}
 .sc-ht{display:flex;flex-direction:column;gap:2px;padding:8px 0;border-top:1px solid var(--line);cursor:pointer}
 .sc-ht:first-of-type{border-top:0}
-.nav.vaultnav{color:#d9b571}
+.nav.vaultnav{color:#f5c518}
 .nav.vaultnav:hover{color:#f3dca6;background:rgba(217,181,113,.1)}
 @media (max-width:560px){.tool.install span{display:none}}
 /* long page names get a short one on phones (6 pages across a phone screen) */
@@ -1292,9 +1291,24 @@ a.nav{text-decoration:none}
 </head>
 <body>
 <!-- Background: slow floodlight glows + a big faint hawk, behind everything -->
+<!-- Background: a mown pitch. Stripes first, then the markings to FIFA
+     proportions (105 x 68 — centre circle 9.15, penalty area 16.5 x 40.32),
+     then an edge fade so nothing competes with the numbers on top. -->
 <div class="bgfx" aria-hidden="true">
-  <div class="bg-glow"><i></i><i></i><i></i></div>
-  <svg class="bg-hawk" viewBox="0 0 64 64"><path d="M32 14.5L35.2 18.5L34 22.5L32 25L30 22.5L28.8 18.5Z"/><path d="M29.5 27.5L4 15L9 21.5L4.5 22.5L11 28L6.5 29.5L14 34L10.5 35.5L20 38.5L29.5 41.5Z"/><path d="M34.5 27.5L60 15L55 21.5L59.5 22.5L53 28L57.5 29.5L50 34L53.5 35.5L44 38.5L34.5 41.5Z"/><path d="M28.5 43.5L32 54.5L35.5 43.5L32 46Z"/></svg>
+  <div class="bg-mow"></div>
+  <div class="bg-pitch">
+    <svg viewBox="-3 -3 111 74" preserveAspectRatio="xMidYMid meet">
+      <rect x="0" y="0" width="105" height="68"/>
+      <line x1="52.5" y1="0" x2="52.5" y2="68"/>
+      <circle cx="52.5" cy="34" r="9.15"/><circle cx="52.5" cy="34" r=".6" class="spot"/>
+      <rect x="0" y="13.84" width="16.5" height="40.32"/><rect x="0" y="24.84" width="5.5" height="18.32"/>
+      <circle cx="11" cy="34" r=".6" class="spot"/><path d="M16.5 26.7 A9.15 9.15 0 0 1 16.5 41.3"/>
+      <rect x="88.5" y="13.84" width="16.5" height="40.32"/><rect x="99.5" y="24.84" width="5.5" height="18.32"/>
+      <circle cx="94" cy="34" r=".6" class="spot"/><path d="M88.5 26.7 A9.15 9.15 0 0 0 88.5 41.3"/>
+      <path d="M0 1 A1 1 0 0 0 1 0"/><path d="M104 0 A1 1 0 0 0 105 1"/>
+      <path d="M105 67 A1 1 0 0 0 104 68"/><path d="M1 68 A1 1 0 0 0 0 67"/>
+    </svg>
+  </div>
   <div class="bg-vig"></div>
 </div>
 <header class="top">
@@ -1304,8 +1318,8 @@ a.nav{text-decoration:none}
            middle (same as hawk-logo.svg). -->
       <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
         <defs>
-          <linearGradient id="hawkG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset="1" stop-color="#0284c7"/></linearGradient>
-          <linearGradient id="tileG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16212a"/><stop offset="1" stop-color="#0a1016"/></linearGradient>
+          <linearGradient id="hawkG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe066"/><stop offset="1" stop-color="#c99700"/></linearGradient>
+          <linearGradient id="tileG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#141414"/><stop offset="1" stop-color="#0a0a0a"/></linearGradient>
         </defs>
         <rect x="1" y="1" width="62" height="62" rx="15" fill="url(#tileG)"/>
         <rect x="1.5" y="1.5" width="61" height="61" rx="14.5" fill="none" stroke="#fff" stroke-opacity=".08"/>
@@ -1313,7 +1327,7 @@ a.nav{text-decoration:none}
         <g transform="translate(32 33.5) scale(.82) translate(-32 -33)">
           <path d="M32 9 L52 15 V33 C52 43 42 51 32 55 C22 51 12 43 12 33 V15 Z" fill="url(#hawkG)"/>
         </g>
-        <g transform="translate(32 33) scale(.5) translate(-32 -32)" fill="#0a1016">
+        <g transform="translate(32 33) scale(.5) translate(-32 -32)" fill="#0a0a0a">
           <path d="M32 14.5L35.2 18.5L34 22.5L32 25L30 22.5L28.8 18.5Z"/>
           <path d="M29.5 27.5L4 15L9 21.5L4.5 22.5L11 28L6.5 29.5L14 34L10.5 35.5L20 38.5L29.5 41.5Z"/>
           <path d="M34.5 27.5L60 15L55 21.5L59.5 22.5L53 28L57.5 29.5L50 34L53.5 35.5L44 38.5L34.5 41.5Z"/>
@@ -1358,8 +1372,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260921g"></script>
-<script src="hawk-settle.js?v=20260921g"></script>
+<script src="engine.js?v=20260921j"></script>
+<script src="hawk-settle.js?v=20260921j"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -1709,7 +1723,7 @@ function renderMatch() {
   // (a knockout tie: that table is the group / league phase, not a league table)
   const tbl = (side) => m.table[side] ? `${m.tie ? "Group stage: " : ""}${ord(m.table[side].position)} · ${Math.round(m.table[side].points)} pts` : "";
   const maxCell = Math.max(...m.grid.flat());
-  const cell = (v) => `<div class="c" style="background:rgba(56,189,248,${(0.08 + 0.75 * v / maxCell).toFixed(3)})">${(100 * v).toFixed(1)}%</div>`;
+  const cell = (v) => `<div class="c" style="background:rgba(245,197,24,${(0.08 + 0.75 * v / maxCell).toFixed(3)})">${(100 * v).toFixed(1)}%</div>`;
   // Rounded as a set so the three always add up to 100%.
   const three = (x) => pct100([x.home, x.draw, x.away]).map(v => v + "%").join(" · ");
   const hp = pct100([p.home, p.draw, p.away]);
@@ -2700,7 +2714,7 @@ function renderSlip() {
       <div class="legs">${legRows}</div>
       <div class="legkey"><span><i style="background:var(--accent)"></i>Bet365's price</span>
         <span><i style="background:var(--blue)"></i>close books' price</span>
-        <span><i style="background:#4d5f6b"></i>HAWK's estimate</span></div>
+        <span><i style="background:#4a4a4a"></i>HAWK's estimate</span></div>
       <div class="sum"><div><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${r && r.fair ? odds(r.fair) : "–"}</div></div>
         <div><div class="k">Worth it from</div><div class="v" style="color:var(--gold)">${worthFrom(r) ? odds(worthFrom(r)) : "–"}</div></div></div>
       ${guessLine(r)}
@@ -4646,7 +4660,7 @@ async function showReport(id) {
     ${r.stats.length ? `<h3 style="margin:16px 0 6px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Match stats</h3>
       ${r.stats.map(s => { const a = parseFloat(s.home) || 0, b = parseFloat(s.away) || 0, t = a + b || 1;
         return `<div class="ip-stat"><div class="nm">${esc(s.label)}</div><div style="text-align:right;font-weight:700">${esc(s.home)}</div>
-          <div class="bar"><i style="width:${(100 * a / t).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / t).toFixed(1)}%;background:#2dd4bf"></i></div>
+          <div class="bar"><i style="width:${(100 * a / t).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / t).toFixed(1)}%;background:#e2e8f0"></i></div>
           <div style="font-weight:700">${esc(s.away)}</div></div>`; }).join("")}` : ""}`);
 }
 
@@ -5416,7 +5430,7 @@ function renderInPlay() {
     const v = st[name]; if (!v || (v[0] == null && v[1] == null)) return "";
     const a = v[0] || 0, b = v[1] || 0, tot = a + b || 1;
     return `<div class="ip-stat"><div class="nm">${label}</div><div style="text-align:right;font-weight:700">${fmt(a)}</div>
-      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:#2dd4bf"></i></div>
+      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:#e2e8f0"></i></div>
       <div style="font-weight:700">${fmt(b)}</div></div>`;
   };
   const p = d.probs || {};
@@ -5446,7 +5460,7 @@ function renderInPlay() {
     return `<div class="ip-stat" title="Booking points, the way Bet365 settles card markets: a yellow is 1 and a red is 2.">
       <div class="nm">Cards <span class="muted" style="font-size:10px">booking pts</span></div>
       <div style="text-align:right;font-weight:700">${a}</div>
-      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:#2dd4bf"></i></div>
+      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:#e2e8f0"></i></div>
       <div style="font-weight:700">${b}</div></div>`;
   })();
   // One price table, not two. "Live value" was "All live prices" with a filter on
@@ -6551,8 +6565,8 @@ function openPlayer(side, name) {
           : `${p.sh90.toFixed(1)} shots · ${p.sot90.toFixed(1)} on target · ${p.g90.toFixed(2)} xG per 90${p.x ? ` · ${p.x.assists.toFixed(2)} assists · ${p.x.fouls.toFixed(1)} fouls · ${p.x.tackles.toFixed(1)} tackles` : ""} · ${Math.round(p.minutes)} min in his last 20 games`}</div></div>
       <button class="x" data-close title="Close">✕</button></div>
     ${n ? `<div class="chart">${cols}</div><div class="xlabels">${labels}</div>
-      <div class="legend">${keeper ? `<span><i style="background:#3a4a55"></i>saves</span>`
-          : `<span><i style="background:var(--accent)"></i>on target</span><span><i style="background:#3a4a55"></i>off target / blocked</span>`}
+      <div class="legend">${keeper ? `<span><i style="background:#3a3a3a"></i>saves</span>`
+          : `<span><i style="background:var(--accent)"></i>on target</span><span><i style="background:#3a3a3a"></i>off target / blocked</span>`}
         <span>⚽ goal · 🅰️ assist · 🟨 booked · hover a bar for details</span><span style="margin-left:auto">oldest → newest</span></div>
       <div class="hits">${keeper && games[0].saves !== undefined
           ? hit("2+ saves", count(g => g.saves >= 2)) + hit("3+ saves", count(g => g.saves >= 3)) + hit("4+ saves", count(g => g.saves >= 4)) + hit("Clean sheet", count(g => cleanSheet(g)))

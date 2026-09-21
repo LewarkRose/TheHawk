@@ -80,7 +80,7 @@
         /* header: brand · actions · bankroll, one height and one style */
         .vault-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
         .vault-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-        html body header .vault-logo { width: 62px; height: 62px; flex-shrink: 0; filter: drop-shadow(0 0 14px rgba(245,197,24,.45)); transition: transform .2s; }
+        html body header .vault-logo { width: 88px; height: 88px; flex-shrink: 0; filter: drop-shadow(0 0 14px rgba(245,197,24,.45)); transition: transform .2s; }
         .vault-brand:hover .vault-logo { transform: rotate(-4deg) scale(1.05); }
         .vault-wordmark { display: flex; flex-direction: column; line-height: 1; }
         .vault-wordmark b { font-size: 26px; font-weight: 900; letter-spacing: .2em;
@@ -999,6 +999,22 @@
             return { n, e, a, z: (a - e) / sd, band: n ? 1.96 * sd / n : 1 };
         }
         const scBrier = (ps, ys) => ps.reduce((s, p, i) => s + (p - ys[i]) ** 2, 0) / (ps.length || 1);
+        // graded.json holds HAWK's RAW chances — engine/grade.mjs grades with learning
+        // switched off on purpose, so the record is of the model itself. The builder
+        // then shifts a market by exactly this much before you ever see a price, so a
+        // gap here is not a gap in what you bet. Same constants as the builder.
+        const SC_LEARN_MIN = 30, SC_LEARN_SHRINK = 60, SC_LEARN_CAP = 0.6;
+        const scLg = (p) => Math.log(p / (1 - p)), scIlg = (x) => 1 / (1 + Math.exp(-x));
+        function scCorrection(n, said, got) {
+            if (!(n >= SC_LEARN_MIN) || !(said > 0 && said < 1)) return null;
+            const g = Math.min(Math.max(got, 0.02), 0.98);
+            const want = (n / (n + SC_LEARN_SHRINK)) * (scLg(g) - scLg(said));
+            const shift = Math.max(-SC_LEARN_CAP, Math.min(SC_LEARN_CAP, want));
+            if (Math.abs(shift) < 0.02) return null;
+            const after = scIlg(scLg(said) + shift);
+            return { shift, after, capped: Math.abs(want) > SC_LEARN_CAP + 1e-9,
+                     fixed: after - said, left: g - after };
+        }
         const scPct = (x, d = 1) => (100 * x).toFixed(d) + '%';
         const scCard = (inner) => `<div class="bg-zinc-900/60 p-5 rounded-2xl border border-zinc-800/80 space-y-3">${inner}</div>`;
         const scH = (icon, text, sub) => `<h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">${icon}</span> ${text}</h3>${
@@ -1070,16 +1086,36 @@
             if (G && G.byMarket) {
                 const mk = Object.entries(G.byMarket).map(([m, b]) => ({ m, n: b.n, said: b.p / b.n, got: b.won / b.n }))
                     .filter(x => x.n >= 500).map(x => ({ ...x, gap: x.got - x.said }));
-                const off = mk.filter(x => Math.abs(x.gap) >= 0.03).sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
-                const ok = mk.filter(x => Math.abs(x.gap) < 0.03).sort((a, b) => b.n - a.n);
+                // Split by what is LEFT after the builder's correction, not by the raw
+                // gap. Player Tackles is 16 points out raw and the builder already
+                // shifts it 15 of those before a price is ever shown — listing it as an
+                // open problem would send you to fix something that is fixed.
+                for (const x of mk) { x.fix = scCorrection(x.n, x.said, x.got); x.left = x.fix ? Math.abs(x.fix.left) : Math.abs(x.gap); }
+                const off = mk.filter(x => x.left >= 0.03).sort((a, b) => b.left - a.left);
+                const fixed = mk.filter(x => x.left < 0.03 && x.fix).sort((a, b) => Math.abs(b.fix.fixed) - Math.abs(a.fix.fixed));
+                const ok = mk.filter(x => x.left < 0.03 && !x.fix).sort((a, b) => b.n - a.n);
+                const fixRow = (x) => `<tr class="border-t border-zinc-800/70">
+                    <td class="py-2 pr-3 text-zinc-300">${escHtml(x.m)}</td>
+                    <td class="py-2 pr-3 text-right text-zinc-500 tabular-nums">${x.n.toLocaleString()}</td>
+                    <td class="py-2 pr-3 text-right text-zinc-500 tabular-nums line-through">${scPct(x.said)}</td>
+                    <td class="py-2 pr-3 text-right text-zinc-200 tabular-nums">${scPct(x.fix.after)}</td>
+                    <td class="py-2 pr-3 text-right text-zinc-400 tabular-nums">${scPct(x.got)}</td>
+                    <td class="py-2 text-right text-[11px] text-emerald-400 tabular-nums">${x.fix.fixed >= 0 ? '+' : ''}${(100 * x.fix.fixed).toFixed(1)}${x.fix.capped ? ' <span class="text-[#fb923c]" title="The correction is capped at 0.6 in log-odds">capped</span>' : ''}</td></tr>`;
                 marketHtml = (off.length
-                        ? `<p class="text-[11px] text-zinc-400">${off.length} market${off.length > 1 ? 's are' : ' is'} more than 3 points away from what HAWK says. With ${off[0].n.toLocaleString()}+ legs behind ${off.length > 1 ? 'the biggest' : 'it'}, that is real and worth knowing before you put a leg like it in a builder.</p>`
+                        ? `<p class="text-[11px] text-zinc-400">${off.length} market${off.length > 1 ? 's are' : ' is'} still more than 3 points out <b class="text-zinc-200">after</b> the builder's correction. These are the ones worth care.</p>`
                             + scTable('Market', off.map(x => scRow(escHtml(x.m), x.n, x.said, x.got, false)).join(''))
-                        : '<p class="text-[11px] text-emerald-400">Every market with 500+ legs is inside 3 points of what HAWK says.</p>')
-                    + (ok.length ? `<details class="pt-1"><summary class="text-[11px] text-[#f5c518] cursor-pointer">The ${ok.length} markets that are in line ▸</summary>${
+                        : '<p class="text-[11px] text-emerald-400">No market with 500+ legs is more than 3 points out once the builder\'s correction is applied.</p>')
+                    + (fixed.length ? `<details class="pt-1" open><summary class="text-[11px] text-[#f5c518] cursor-pointer">${fixed.length} market${fixed.length > 1 ? 's are' : ' is'} corrected before you see a price ▾</summary>
+                        <p class="text-[11px] text-zinc-500 py-1">The model's raw number, what HAWK actually quotes you, and what landed.</p>
+                        <div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-[10px] text-zinc-500 uppercase tracking-wider">
+                          <th class="text-left pb-1">Market</th><th class="text-right pb-1 pr-3">Legs</th><th class="text-right pb-1 pr-3">Raw</th>
+                          <th class="text-right pb-1 pr-3">Quoted</th><th class="text-right pb-1 pr-3">Landed</th><th class="text-right pb-1">Corrected by</th>
+                        </tr></thead><tbody>${fixed.map(fixRow).join('')}</tbody></table></div></details>` : '')
+                    + (ok.length ? `<details class="pt-1"><summary class="text-[11px] text-[#f5c518] cursor-pointer">The ${ok.length} markets that need no correction ▸</summary>${
                         scTable('Market', ok.map(x => scRow(escHtml(x.m), x.n, x.said, x.got, false)).join(''))}</details>` : '');
             }
-            document.getElementById('sc-market').innerHTML = scCard(scH('🔍', 'Where HAWK is off', 'Only markets with 500+ graded legs, because anything smaller swings too much to act on. A gap here is a market to be careful with — the builder also corrects a market\'s chances once it has 30+ legs of its own.') + marketHtml);
+            document.getElementById('sc-market').innerHTML = scCard(scH('🔍', 'Where HAWK is off',
+                'This file grades HAWK\'s <b>raw</b> chances — the grader runs with learning switched off on purpose, so the record is of the model itself. The builder then shifts a market by what its record shows before quoting you, so a raw gap is not a gap in what you actually bet.') + marketHtml);
 
             // ---- 3. against the closing line (your bets only — the only place a closing price is stored) ----
             const paired = legs.filter(x => x.close > 1);

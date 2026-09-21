@@ -44,12 +44,12 @@ html{overflow-x:clip}
 button,input,select{font:inherit;color:inherit}
 img{max-width:100%}
 /* header: row 1 = logo · pages · alerts + Vault, row 2 = leagues */
-:root{--head:66px}
+:root{--head:92px}
 .top{position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line);
   background:linear-gradient(180deg,rgba(18,26,30,.97),rgba(13,17,20,.95));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .topbar{display:flex;align-items:center;gap:18px;padding:10px 22px 8px}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);flex-shrink:0}
-.brand .logo{width:54px;height:54px;filter:drop-shadow(0 0 12px rgba(245,197,24,.35));transition:transform .2s}
+.brand .logo{width:78px;height:78px;filter:drop-shadow(0 0 12px rgba(245,197,24,.35));transition:transform .2s}
 .brand:hover .logo{transform:rotate(-4deg) scale(1.05)}
 .wordmark{display:flex;flex-direction:column;line-height:1}
 .wordmark b{font-size:20px;font-weight:900;letter-spacing:.22em;
@@ -1264,7 +1264,7 @@ a.nav{text-decoration:none}
   .top{position:static}
   .topbar{flex-wrap:wrap;gap:10px;padding:10px 12px 8px}
   .wordmark small{display:none}
-  .brand .logo{width:34px;height:34px}
+  .brand .logo{width:50px;height:50px}
   .topright{margin-left:auto}
   .mainnav{order:3;width:100%;margin:0;overflow-x:auto;scrollbar-width:none}
   .nav{flex:1;justify-content:center;padding:7px 8px}
@@ -1372,8 +1372,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260921j"></script>
-<script src="hawk-settle.js?v=20260921j"></script>
+<script src="engine.js?v=20260921k"></script>
+<script src="hawk-settle.js?v=20260921k"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.

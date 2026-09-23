@@ -39,6 +39,9 @@
   ].map((g) => ({ ...g, leagues: Object.keys(g.ids) }));
   // Competitions between national teams: no club data file will ever match them.
   const INTL = new Set(["World Cup", "Euro", "Nations League", "World Cup Qualifiers", "Copa America", "Internationals"]);
+  // 365Scores writes -1 for a shirt number it doesn't know, and -1 shown on a
+  // player's badge looks like a rating rather than a missing number.
+  const shirt = (n) => (+n > 0 ? +n : null);
   const COMPETITIONS = Object.assign({}, ...LEAGUE_GROUPS.map((g) => g.ids));
   const LEAGUES = Object.keys(COMPETITIONS);
   const S365 = "https://webws.365scores.com/web";
@@ -359,7 +362,7 @@
         const nm = (r.team || {}).displayName || "";
         const side = r.homeAway === "home" || r.homeAway === "away" ? r.homeAway : nameSimilarity(home, nm) >= nameSimilarity(away, nm) ? "home" : "away";
         const players = (r.roster || []).map((p) => { const a = p.athlete || {};
-          return { name: a.displayName || "?", num: +p.jersey || null, pos: espnPos((p.position || {}).abbreviation), starter: !!p.starter,
+          return { name: a.displayName || "?", num: shirt(p.jersey), pos: espnPos((p.position || {}).abbreviation), starter: !!p.starter,
                    photo: (a.headshot && a.headshot.href) || (a.id ? `https://a.espncdn.com/i/headshots/soccer/players/full/${a.id}.png` : null) }; });
         out[side] = { formation: r.formation || null, starters: players.filter((p) => p.starter), subs: players.filter((p) => !p.starter) };
       }
@@ -675,7 +678,7 @@
         // two ways ("Fabrício Garcia" / "Fabrício Andrade" — one man, two
         // surnames), so the shirt number settles it, and a single leftover name
         // on each side with the same first name is the same player too.
-        const xi365 = (lu.members || []).filter((m) => m.statusText === "Starting").map((m) => ({ name: memberName[m.id], num: +memberNum[m.id] || null })).filter((x) => x.name);
+        const xi365 = (lu.members || []).filter((m) => m.statusText === "Starting").map((m) => ({ name: memberName[m.id], num: shirt(memberNum[m.id]) })).filter((x) => x.name);
         const same = (a, b) => samePlayer(a.name, b.name) || (a.num && b.num && a.num === b.num);
         let only365 = xi365.filter((a) => !e.starters.some((b) => same(a, b)));
         let onlyEspn = e.starters.filter((b) => !xi365.some((a) => same(a, b)));
@@ -696,7 +699,12 @@
     const refFactor = refereeFactor(refAvg, refGames, profH && profH.avg_cards_total);
 
     const lamModel = profH && profA ? expectedPair(profH, fdH, profA, fdA, "goals") : null;
-    for (const [team, fdName, p] of [[home, fdH, profH], [away, fdA, profA]]) {
+    // A national side has no league to be rated in, so saying "their league isn't
+    // in HAWK's ratings" reads as a fault when it is simply how internationals
+    // work — and saying it once per team said it twice for the same reason.
+    if (INTL.has(league) && !fdH && !fdA && meta)
+      warnings.push("National teams have no season ratings in HAWK — the result, goals, corner and card chances come from the bookmakers' prices.");
+    else for (const [team, fdName, p] of [[home, fdH, profH], [away, fdA, profA]]) {
       if (!fdName && meta) warnings.push(`${team}: their league isn't in HAWK's team ratings (football-data covers the main European leagues) — their chances come from the bookmakers' prices.`);
       else if (p && ((p.teams[fdName] || {}).games_this_season || 0) < 3)
         warnings.push(`${team}: under 3 league games this season, ratings lean on last season${(p.teams[fdName] || {}).promoted ? " (promoted — starts from a below-average prior)" : ""}.`);
@@ -856,7 +864,7 @@
         // Where he plays on the pitch (for the lineup view): depth 0 = own goal … 100 = attack, side 0 … 100.
         const field = y && y.fieldLine != null ? { depth: y.fieldLine, side: y.fieldSide } : null;
         return [info.name || "?", m.statusText, POSITIONS[(m.position || {}).name], info.athleteId ? athletePhoto(info) : null,
-                field, info.jerseyNumber || null, info.shortName || null];
+                field, shirt(info.jerseyNumber), info.shortName || null];
       });
       // Faces: 365Scores' photo, else ESPN's headshot (a second source for the players 365Scores has none for).
       const espnSide = (an.espn && an.espn[side]) || null, espnAll = espnSide ? [...espnSide.starters, ...espnSide.subs] : [];
@@ -2947,7 +2955,7 @@
     const players = {};
     for (const [side, key] of [["home", "homeCompetitor"], ["away", "awayCompetitor"]])
       players[side] = (((game[key] || {}).lineups || {}).members || []).filter((m) => m.statusText === "Starting" || m.statusText === "Substitute")
-        .map((m) => ({ name: names[m.id] || "", num: nums[m.id] || null, photo: photos[m.id] || null, starter: m.statusText === "Starting", pos: ((m.position || {}).name) || "",
+        .map((m) => ({ name: names[m.id] || "", num: shirt(nums[m.id]), photo: photos[m.id] || null, starter: m.statusText === "Starting", pos: ((m.position || {}).name) || "",
                        stats: (m.stats || []).map((s) => [s.name, String(s.value)]) }));
     return { status: game.statusGroup, statusText: game.statusText, clock: game.gameTimeDisplay, players,
              events: (game.events || []).map((e) => {

@@ -33,8 +33,9 @@ for (const f of ["builder/engine.js", "builder/hawk-settle.js"])
 const { HAWK, HawkSettle } = globalThis;
 HAWK.setLearning({});   // grade HAWK's own chances, not adjusted ones
 
-const newTotals = () => ({ matches: 0, legs: 0, byMarket: {}, byKey: {}, byLeague: {}, recent: [],
-                           bands: BANDS.map(([lo, hi]) => ({ lo, hi, n: 0, p: 0, won: 0 })) });
+const newBands = () => BANDS.map(([lo, hi]) => ({ lo, hi, n: 0, p: 0, won: 0 }));
+const newTotals = () => ({ matches: 0, legs: 0, byMarket: {}, byKey: {}, byLeague: {}, keyBands: {},
+                           recent: [], bands: newBands() });
 // Upset radar record, per level (Low … Very high): how often the favourite
 // really failed to win / the underdog won, against what the radar said.
 const newUpsets = () => ["Low", "Medium", "High", "Very high"].map((label, level) =>
@@ -95,7 +96,16 @@ for (const [id, pr] of Object.entries(state.pending)) {
     n++; said += leg.p; if (w) won++;
     tally(T.byMarket[leg.market] ||= { n: 0, p: 0, won: 0 }, leg.p, w);
     const key = HAWK.learnKey(leg.id, leg.market);
-    if (key) tally(T.byKey[key] ||= { n: 0, p: 0, won: 0 }, leg.p, w);
+    if (key) {
+      tally(T.byKey[key] ||= { n: 0, p: 0, won: 0 }, leg.p, w);
+      // The same split again, but per market: one figure per market says
+      // whether HAWK is out, not how. A mean that is too high misses at every
+      // line in one direction; tails that are too thin (OVERDISP) miss at both
+      // ends and the other way in the middle. Only the curve tells them apart.
+      const kb = (T.keyBands ||= {})[key] ||= newBands();
+      const b = kb.find((x) => leg.p >= x.lo && leg.p < x.hi);
+      if (b) tally(b, leg.p, w);
+    }
     const band = T.bands.find((b) => leg.p >= b.lo && leg.p < b.hi);
     if (band) tally(band, leg.p, w);
     // Per league, so "is HAWK better in Serie A than in La Liga" can be answered
@@ -154,6 +164,7 @@ await writeFile(STATE_FILE, JSON.stringify(state));
 await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   updated: new Date().toISOString(), matches: T.matches, legs: T.legs, waiting: Object.keys(state.pending).length,
   byMarket: T.byMarket, byKey: T.byKey, byLeague: T.byLeague || {}, bands: T.bands,
+  keyBands: T.keyBands || {},
   recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets, weeks: T.weeks || {},
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);

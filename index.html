@@ -186,7 +186,7 @@
     <!-- Icons: new names / ?v= so browsers drop the old cached logo -->
     <link rel="icon" href="hawk-tab.svg" type="image/svg+xml">
     <link rel="icon" href="icon.svg?v=5" sizes="any" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png?v=6">
     <!-- Installable as an app (one app with the builder: manifest + sw.js at the site root) -->
     <link rel="manifest" href="manifest.webmanifest?v=5">
     <meta name="theme-color" content="#0a0a0a">
@@ -238,6 +238,7 @@
                     <button onclick="openSync()" class="vbtn" title="Send your bets to your phone or PC with a link"><span class="icon-gold">📲</span> Sync</button>
                     <button onclick="exportData()" class="vbtn" title="Download a backup of your Vault"><span class="icon-gold">💾</span> Export</button>
                     <label class="vbtn" title="Load a backup (replaces your current data)"><span class="icon-gold">📂</span> Import<input type="file" id="import-file" onchange="importData(event)" class="hidden" accept=".json"></label>
+                    <button onclick="archiveOld()" class="vbtn" title="Back up the Vault, then clear settled tickets older than six months to free up storage"><span class="icon-gold">🗄️</span> Archive</button>
                     <button onclick="resetVault()" class="vbtn vicon" title="Reset the Vault (downloads a backup first)"><span class="icon-gold">⚙️</span></button>
                 </div>
             </div>
@@ -821,8 +822,8 @@
                 if (!storageWarned) {
                     storageWarned = true;
                     alert("This browser's storage is full, so that change was NOT saved.\n\n"
-                        + "Export your data (Vault → Export) before doing anything else, "
-                        + "then clear some old settled bets to make room.");
+                        + "Press Archive at the top of the Vault: it downloads a full backup "
+                        + "and then clears settled tickets older than six months to make room.");
                 }
             }
             rebuildSavedFixtures();
@@ -2490,6 +2491,38 @@
             a.href = URL.createObjectURL(blob);
             a.download = `hawk_backup_${new Date().toISOString().slice(0,10)}.json`;
             a.click();
+        }
+
+        // --- ARCHIVE: clear settled tickets older than six months ---
+        // Bets are the only thing here that grows without a cap, and the browser
+        // gives this site about 5 MB. This is a button rather than something that
+        // happens quietly: they are your records, and the all-time figures change
+        // when they go. The file it downloads first is a FULL backup, so Import
+        // puts everything back exactly as it was.
+        const ARCHIVE_MONTHS = 6;
+        function oldSettled() {
+            const cut = new Date();
+            cut.setMonth(cut.getMonth() - ARCHIVE_MONTHS);
+            return bets.filter(b => b.status !== 'PENDING' && settleTime(b) && settleTime(b) < +cut);
+        }
+        function archiveOld() {
+            const old = oldSettled();
+            if (!old.length) { alert(`Nothing to archive — no settled tickets older than ${ARCHIVE_MONTHS} months.`); return; }
+            const freed = Math.max(1, Math.round(JSON.stringify(old).length / 1024));
+            const days = old.map(settleTime).sort((a, b) => a - b);
+            const span = `${new Date(days[0]).toLocaleDateString()} to ${new Date(days[days.length - 1]).toLocaleDateString()}`;
+            const staked = old.reduce((s, b) => s + b.stake, 0);
+            const pl = old.reduce((s, b) => s + betReturn(b) - b.stake, 0);
+            const cash = (x) => `€${Math.abs(x).toFixed(2)}`;   // plain text: this goes in a confirm(), not the page
+            if (!confirm(`Archive ${old.length} settled ticket${old.length > 1 ? 's' : ''} — ${span}, about ${freed} KB.\n\n`
+                + `Those tickets staked ${cash(staked)} and ${pl >= 0 ? 'made' : 'lost'} ${cash(pl)}.\n\n`
+                + `A full backup of the Vault downloads first, so Import restores everything if you change your mind.\n\n`
+                + `Afterwards your all-time profit, streaks, drawdown and scorecard cover only the tickets that remain.`)) return;
+            exportData();   // the whole Vault as it stands, before anything is removed
+            const drop = new Set(old);   // by identity, so tickets sharing an id can't take each other with them
+            bets = bets.filter(b => !drop.has(b));
+            saveState();
+            alert(`Archived ${old.length} ticket${old.length > 1 ? 's' : ''} — ${bets.length} left in the Vault.\n\nKeep the backup that just downloaded.`);
         }
 
         function importData(event) {

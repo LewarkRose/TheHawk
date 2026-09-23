@@ -803,18 +803,63 @@ _NOT_MENS_FOOTBALL = re.compile(r"h[aå]nd(bold|ball|boll)|basket|volley|hockey|
                                 re.I)
 
 
+def _not_mens(team):
+    """The name alone isn't enough: StatsHub calls Chelsea's women's side
+    "Chelsea FC" and Tottenham's "Tottenham FC", and only the slug
+    ("chelsea-fc-women") says so. Both then tie with the men's team on name
+    and the search gives up, losing that club's player stats entirely."""
+    return bool(_NOT_MENS_FOOTBALL.search(team.get("name") or "")
+                or _NOT_MENS_FOOTBALL.search((team.get("slug") or "").replace("-", " ")))
+
+
+_SEARCH_SKIP = {"real", "club", "sport", "sporting", "athletic", "atletico", "united", "city", "town"}
+
+
+def _search_queries(name):
+    """What to ask StatsHub for `name`. Its search prefix-matches every word
+    you give it against the words in a club's name, so "Bayern Munich" finds
+    nothing at all (no word starts with "munich" — theirs is "München") while
+    "Bayern" finds it at once. So: the whole name, its alias, then its own
+    distinctive words, longest first."""
+    seen = list(dict.fromkeys((name, _norm(name))))
+    words = sorted((w for w in re.split(r"[^0-9A-Za-zÀ-ÿ]+", _norm(name))
+                    if len(w) >= 4 and w.lower() not in _SEARCH_SKIP), key=len, reverse=True)
+    return seen + [w for w in words[:2] if w not in seen]
+
+
+def sh_team_choices(name):
+    """Every men's club StatsHub offers for `name`, closest first, as
+    [(similarity, club name, id)] — with no similarity floor, so a caller
+    that can check a candidate some other way gets to see the near misses.
+    Cached 12 hours."""
+    def load():
+        found = {}
+        for q in _search_queries(name):
+            for t in ((_get_json(f"{SH_BASE}/api/search", {"q": q}) or {}).get("teams") or []):
+                # Keyed by id, never by name: StatsHub lists two clubs called
+                # "Juventus" (2687 and 269824), and keying by name kept only
+                # the second — the wrong one, silently.
+                if t.get("name") and t.get("id") and not _not_mens(t):
+                    found[t["id"]] = t["name"]
+            if any(name_similarity(name, c) >= 0.75 for c in found.values()):
+                break                                  # good enough; don't go fishing with single words
+        # Ties break towards the lower id: where StatsHub holds the same club
+        # name twice, the long-established men's club is the older record.
+        return [(s, c, i) for s, i, c in
+                sorted(((name_similarity(name, c), i, c) for i, c in found.items()),
+                       key=lambda x: (-x[0], x[1]))]
+    return _cached(("sh", "choices2", name), 12 * 3600, load)
+
+
 def sh_search_team(name):
     """StatsHub id for one club from its team search, or None unless one
     result clearly is that club. Cached 12 hours."""
-    def load():
-        for q in dict.fromkeys((name, _norm(name))):   # e.g. "Chivas", then its alias "guadalajara"
-            found = {t["name"]: t["id"] for t in ((_get_json(f"{SH_BASE}/api/search", {"q": q}) or {}).get("teams") or [])
-                     if t.get("name") and t.get("id") and not _NOT_MENS_FOOTBALL.search(t["name"])}
-            hit = best_match(name, found, threshold=0.75) if found else None
-            if hit:
-                return found[hit]
+    choices = [c for c in sh_team_choices(name) if c[0] >= 0.75]
+    if not choices:
         return None
-    return _cached(("sh", "search", name), 12 * 3600, load)
+    if len(choices) > 1 and choices[1][0] == choices[0][0] and choices[1][1] != choices[0][1]:
+        return None                                    # two different names, equally good: neither is safe
+    return choices[0][2]
 
 
 def sh_players(team_id, limit=20):

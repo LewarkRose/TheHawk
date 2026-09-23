@@ -47,6 +47,15 @@ jobs:
           PROPLINE_KEY: ${{ secrets.PROPLINE_KEY }}
         run: python build_data.py ../data
 
+      # National-team squads, built from each player's club record so an
+      # international gets real player props instead of position averages.
+      # Separate from the step above and exits 0 whatever happens: a bad club
+      # name match must not cost HAWK the ratings and player stats it just built.
+      - name: Build national-team squads
+        continue-on-error: true
+        working-directory: engine
+        run: python intl_squads.py ../data
+
       # HAWK grades itself: saves its chances for matches kicking off soon and
       # marks earlier ones right or wrong (engine/grade.mjs). The state it needs
       # between runs is kept in the Actions cache.

@@ -1372,8 +1372,8 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260921k"></script>
-<script src="hawk-settle.js?v=20260921k"></script>
+<script src="engine.js?v=20260923a"></script>
+<script src="hawk-settle.js?v=20260923a"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
 // can hide where it isn't used; on the builder it folds into one bar once a match is open.
@@ -1773,6 +1773,7 @@ function renderMatch() {
       ${how ? `<div class="note" style="margin-top:6px">${esc(how)}</div>` : ""}
     </div>
     ${upsetCard(m)}
+    ${intlNote()}
     ${lineupCard(m)}
     ${teamNews(m)}
     ${mFold("numbers", "📊 Match numbers", `xG ${e.goals[0].toFixed(2)}–${e.goals[1].toFixed(2)} · ${e.sot[0].toFixed(1)}–${e.sot[1].toFixed(1)} on target · ${e.corners.toFixed(1)} corners · ${(e.cards[0] + e.cards[1]).toFixed(1)} cards`,
@@ -1878,6 +1879,15 @@ document.addEventListener("visibilitychange", () => {
 
 // Injured/suspended ("out") and doubtful players, from 365Scores. HAWK leaves
 // the out players out of its predicted lineups and gives doubtful ones no legs.
+// International fixtures: say plainly what HAWK can and cannot do here, rather
+// than leaving you to wonder where the player props went.
+function intlNote() {
+  if (!(HAWK.INTL || []).includes(S.league)) return "";
+  return `<div class="warn" style="margin:10px 0">🌐 <b>${esc(S.league)}</b> — national teams.
+    HAWK's ratings and player records are built per club league, so there are none for these sides.
+    The result, goals, corner and card markets here come from the bookmakers' own prices and are as good as anywhere.
+    <b>Player props are left out</b>: without a player's record they would be a position average wearing his name.</div>`;
+}
 function teamNews(m) {
   const miss = m.missing || {};
   if (!(miss.home || []).length && !(miss.away || []).length) return "";

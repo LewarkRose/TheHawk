@@ -30,7 +30,15 @@
     { key: "cups", name: "Cups", icon: "🏅", ids: { "FA Cup": 8, "EFL Cup": 9, "Copa del Rey": 13, "Coppa Italia": 20, "DFB-Pokal": 28, "Coupe de France": 37 } },
     { key: "world", name: "World", icon: "🌎", ids: { "MLS": 104, "Brasileirão": 113, "Argentina Primera": 72, "Liga MX": 141, "Saudi Pro League": 649,
         "Copa Libertadores": 102 } },
+    // National teams. HAWK has no ratings or player files for them — those are
+    // built per club league — so an international runs on the bookmakers' prices
+    // alone: result and goals markets are sound, but there are no player props
+    // and the corner/card lines fall back to league-average rates. See INTL.
+    { key: "intl", name: "International", icon: "🌐", ids: { "World Cup": 5930, "Euro": 6316, "Nations League": 7016,
+        "World Cup Qualifiers": 5421, "Copa America": 595, "Internationals": 570 } },
   ].map((g) => ({ ...g, leagues: Object.keys(g.ids) }));
+  // Competitions between national teams: no club data file will ever match them.
+  const INTL = new Set(["World Cup", "Euro", "Nations League", "World Cup Qualifiers", "Copa America", "Internationals"]);
   const COMPETITIONS = Object.assign({}, ...LEAGUE_GROUPS.map((g) => g.ids));
   const LEAGUES = Object.keys(COMPETITIONS);
   const S365 = "https://webws.365scores.com/web";
@@ -1299,7 +1307,15 @@
       add(`sot:u${line}`, withCount(`Under ${line} Shots on Target`, "Under", line), "Match Shots on Target", "sot", mask(n, (s) => tsot(s) < line));
     }
 
+    // Player props need the player's own record, and that comes from his LEAGUE's
+    // data file. National teams have no league file, so in an international not one
+    // player is found — Virgil van Dijk included — and every prop would be built
+    // from a position average dressed up as a number about him. Nothing is offered
+    // rather than something that looks precise and is a guess. The result, goals,
+    // corner and card markets are unaffected: those come from the bookmakers.
+    const intlNoPlayers = INTL.has(an.league) && !sim.squads.home.some((p) => p.has_data);
     for (const [key, a] of Object.entries(sim.player)) {
+      if (intlNoPlayers) break;
       const [side, i] = key.split(":"), p = sim.squads[side][+i];
       if (p.start_p < 0.5) continue;
       const pid = `p:${side}:${i}`;
@@ -2953,7 +2969,7 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, refOff, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
+  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, INTL: [...INTL], fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, refOff, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
                   scores, matchReport, ticketLive, gameEvents, halfStats, readLeg, isPlayerText, nameSimilarity, kambiLive, tables,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },

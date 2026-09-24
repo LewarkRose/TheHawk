@@ -244,6 +244,7 @@
             </div>
             <div class="vault-bank" title="Your betting bankroll — HAWK's recommended stakes are worked out from it">
                 <div><span class="lbl">Bankroll</span><span id="bankroll-display" class="amt">€1,000.00</span></div>
+                <button onclick="openReconcileModal()" class="vbtn vicon" title="Check this against your bookmaker's balance"><span class="icon-gold">⚖️</span></button>
                 <button onclick="openEditBankrollModal()" class="vbtn vicon" title="Edit bankroll"><span class="icon-gold">✏️</span></button>
             </div>
         </header>
@@ -555,6 +556,25 @@
                 <button type="button" onclick="closeEditBankrollModal()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs transition">Cancel</button>
             </div>
             <button type="button" onclick="closeEditBankrollModal(); openBankrollLogModal();" class="w-full text-center text-[10px] text-zinc-500 hover:text-[#f5c518] transition">View edit history →</button>
+        </div>
+    </div>
+
+    <!-- Reconcile: HAWK never sees your bookmaker balance, so the two drift whenever
+         a bet is placed, settled or cashed out without being logged here. This finds
+         the gap and records the correction instead of silently overwriting it. -->
+    <div id="reconcile-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+        <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-sm w-full space-y-4">
+            <h3 class="text-white font-bold text-base flex items-center gap-2"><span class="icon-gold">⚖️</span> Check against your bookmaker</h3>
+            <div>
+                <label class="text-[10px] text-zinc-400 block mb-1">What does your bookmaker say you have? (€)</label>
+                <input type="number" id="reconcile-input" step="0.01" inputmode="decimal" oninput="renderReconcile()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f5c518]">
+            </div>
+            <div id="reconcile-out" class="text-xs"></div>
+            <div class="flex gap-2 pt-1">
+                <button type="button" id="reconcile-go" onclick="applyReconcile()" class="flex-1 bg-[#f5c518] hover:bg-[#ffe066] text-black font-bold py-2 rounded-xl text-xs transition">Use their number</button>
+                <button type="button" onclick="closeReconcileModal()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs transition">Cancel</button>
+            </div>
+            <p class="text-[10px] text-zinc-500">Your ticket history isn't touched — only the bankroll, and the change is logged.</p>
         </div>
     </div>
 
@@ -2896,6 +2916,65 @@
             saveState();
             renderUI();
             closeEditBankrollModal();
+        }
+
+        // --- RECONCILE: your bookmaker's balance is the truth, this one is a tally ---
+        // HAWK deducts a stake when you log a ticket and adds a return when it settles,
+        // so anything you bet without logging it leaves the two apart. Kelly sizes every
+        // stake off this number, which is why the gap is worth naming rather than nudging.
+        const RECONCILE_NAG = 0.03;   // 3% out is enough to move a recommended stake
+        function openReconcileModal() {
+            document.getElementById('reconcile-input').value = '';
+            renderReconcile();
+            document.getElementById('reconcile-modal').classList.remove('hidden');
+            document.getElementById('reconcile-input').focus();
+        }
+        function closeReconcileModal() {
+            document.getElementById('reconcile-modal').classList.add('hidden');
+        }
+        function renderReconcile() {
+            const real = parseFloat(document.getElementById('reconcile-input').value);
+            const out = document.getElementById('reconcile-out');
+            const go = document.getElementById('reconcile-go');
+            if (isNaN(real) || real < 0) {
+                out.innerHTML = `<div class="text-zinc-500">HAWK has <b class="text-[#f5c518]">€${bankroll.toFixed(2)}</b>. Type what your bookmaker shows to compare.</div>`;
+                go.disabled = true; go.classList.add('opacity-40');
+                return;
+            }
+            go.disabled = false; go.classList.remove('opacity-40');
+            const gap = real - bankroll, off = bankroll > 0 ? Math.abs(gap) / bankroll : 0;
+            const pending = bets.filter(b => b.status === 'PENDING');
+            const staked = pending.reduce((s, b) => s + (b.stake || 0), 0);
+            const rows = [
+                `<div class="flex justify-between"><span class="text-zinc-400">HAWK</span><b class="text-[#f5c518]">€${bankroll.toFixed(2)}</b></div>`,
+                `<div class="flex justify-between"><span class="text-zinc-400">Your bookmaker</span><b class="text-white">€${real.toFixed(2)}</b></div>`,
+                `<div class="flex justify-between border-t border-zinc-800 pt-1.5 mt-1.5"><span class="text-zinc-400">Difference</span><b class="${gap === 0 ? 'text-zinc-300' : gap > 0 ? 'text-emerald-400' : 'text-red-400'}">${gap > 0 ? '+' : gap < 0 ? '−' : ''}€${Math.abs(gap).toFixed(2)}</b></div>`,
+            ];
+            let say;
+            if (Math.abs(gap) < 0.01) say = `<div class="text-emerald-400">They agree. Nothing to correct.</div>`;
+            else {
+                const why = gap < 0
+                    ? (pending.length
+                        ? `You have <b>${pending.length}</b> ticket${pending.length > 1 ? 's' : ''} still running here, staking <b>€${staked.toFixed(2)}</b> — but HAWK already took those off, so they don't explain it. Most likely a bet placed and settled without being logged, or a win your bookmaker paid less on.`
+                        : `Nothing is pending here, so most likely a bet placed and settled without being logged, a win your bookmaker paid less on, or a withdrawal.`)
+                    : `HAWK is behind. Most likely a winning ticket not settled here yet, or a deposit.`;
+                say = `<div class="text-zinc-300 leading-relaxed">${why}</div>`
+                    + (off >= RECONCILE_NAG
+                        ? `<div class="text-orange-400 mt-2">That's ${(100 * off).toFixed(0)}% out, so HAWK is sizing stakes ${gap < 0 ? 'too big' : 'too small'}. Worth fixing now.</div>`
+                        : `<div class="text-zinc-500 mt-2">Under ${Math.round(100 * RECONCILE_NAG)}% — it barely moves a stake, but it's still worth keeping straight.</div>`);
+            }
+            out.innerHTML = `<div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3 space-y-1.5">${rows.join('')}</div><div class="mt-3">${say}</div>`;
+        }
+        function applyReconcile() {
+            const real = parseFloat(document.getElementById('reconcile-input').value);
+            if (isNaN(real) || real < 0) { alert("Enter the balance your bookmaker shows."); return; }
+            if (Math.abs(real - bankroll) < 0.01) { closeReconcileModal(); return; }
+            const gap = real - bankroll;
+            logBankrollEdit(bankroll, real, `Reconciled to bookmaker balance (${gap > 0 ? '+' : '−'}€${Math.abs(gap).toFixed(2)})`);
+            bankroll = real;
+            saveState();
+            renderUI();
+            closeReconcileModal();
         }
 
         function openBankrollLogModal() {

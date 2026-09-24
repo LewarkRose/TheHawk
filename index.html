@@ -2843,6 +2843,9 @@
             const made = data.at ? new Date(data.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'a backup file';
             if (!add.length && !upd.length && Math.abs((data.bankroll || 0) - bankroll) < 0.005) { alert(`📲 Sync link from ${made}: this device already has everything in it.`); return; }
             if (!confirm(`📲 Sync link from your other device (made ${made}):\n\n• ${add.length} new ticket${add.length === 1 ? '' : 's'} to add\n• ${upd.length} ticket${upd.length === 1 ? '' : 's'} settled or updated there\n\nTickets already here are kept. Add them?`)) return;
+            // What each updated ticket contributed before it's replaced, so the bankroll
+            // can be moved by the difference rather than left behind.
+            const wasBefore = new Map(upd.map(b => [b.id, { ...here.get(b.id) }]));
             add.forEach(b => bets.push(b));
             upd.forEach(b => { const i = bets.findIndex(x => x.id === b.id); if (i >= 0) bets[i] = b; });
             const ms = (b) => { const t = /^bet_(\d{12,})/.exec(b.id || ''); return t ? +t[1] : 0; };
@@ -2856,17 +2859,40 @@
                     localStorage.setItem(k, JSON.stringify([...(mine || []), ...v.filter(x => !have.has(JSON.stringify(x)))]));
                 } catch (e) { /* skip this one */ }
             }
-            if (typeof data.bankroll === 'number' && Math.abs(data.bankroll - bankroll) >= 0.005
-                && confirm(`Bankroll: the other device has €${data.bankroll.toFixed(2)}, this one €${bankroll.toFixed(2)}.\n\nOK = use the other device's (pick this if you bet there last)\nCancel = keep this one's`)) {
-                if (Array.isArray(data.bankrollLog)) bankrollLog = data.bankrollLog;
-                logBankrollEdit(bankroll, data.bankroll, 'Synced from your other device');
-                bankroll = data.bankroll;
+            // The bankroll follows the tickets that just arrived, rather than being a
+            // choice between two whole numbers. Picking a side was only ever right when
+            // one device had done nothing: bet on both and whichever you chose threw the
+            // other one's stakes and returns away. That is how €9.25 went missing.
+            const was = bankroll;
+            for (const b of add) bankroll += -(b.stake || 0) + payoutContribution(b.status, b.potentialReturn, b.cashOutAmount);
+            for (const b of upd) {
+                const old = wasBefore.get(b.id) || {};
+                bankroll += -((b.stake || 0) - (old.stake || 0))
+                    + payoutContribution(b.status, b.potentialReturn, b.cashOutAmount)
+                    - payoutContribution(old.status, old.potentialReturn, old.cashOutAmount);
+            }
+            // Money you moved by hand over there (a top-up, a correction) isn't in any
+            // ticket, so carry across only the log entries this device hasn't seen.
+            const seenEdits = new Set(bankrollLog.map(e => e.timestamp));
+            const newEdits = (Array.isArray(data.bankrollLog) ? data.bankrollLog : []).filter(e => e && !seenEdits.has(e.timestamp));
+            for (const e of newEdits) bankroll += (e.delta || 0);
+            if (newEdits.length) {
+                bankrollLog = [...newEdits, ...bankrollLog].sort((a, b) => Date.parse(b.timestamp || 0) - Date.parse(a.timestamp || 0));
                 localStorage.setItem('hawk_bankroll_log', JSON.stringify(bankrollLog));
             }
+            bankroll = Math.round(bankroll * 100) / 100;
+            if (Math.abs(bankroll - was) >= 0.005) logBankrollEdit(was, bankroll, `Synced from your other device (${add.length} added, ${upd.length} updated)`);
             saveState();
             renderUI();
             if (!document.getElementById('view-history').classList.contains('hidden')) renderHistory();
-            alert(`✅ Synced: ${add.length} added, ${upd.length} updated. You now have ${bets.length} tickets and €${bankroll.toFixed(2)}.`);
+            // If the other device's own total disagrees, say so rather than silently
+            // preferring one — that gap is real and ⚖️ is how you settle it.
+            const theirs = typeof data.bankroll === 'number' ? data.bankroll : null;
+            alert(`✅ Synced: ${add.length} added, ${upd.length} updated. You now have ${bets.length} tickets and €${bankroll.toFixed(2)}.`
+                + (theirs !== null && Math.abs(theirs - bankroll) >= 0.01
+                    ? `\n\n⚠️ The other device's own total was €${theirs.toFixed(2)}, €${Math.abs(theirs - bankroll).toFixed(2)} apart from this.`
+                      + `\nThis number is worked out from the tickets, so it's usually the right one — check it against your bookmaker with ⚖️.`
+                    : ''));
         }
 
         // Downloads a backup, then deletes only the Vault's own data (keys starting

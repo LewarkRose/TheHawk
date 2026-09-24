@@ -711,6 +711,16 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       color:var(--text);font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
     .rchips button:hover{border-color:var(--accent)}
     .rchips button.on{border-color:rgba(245,197,24,.45);background:rgba(245,197,24,.1);color:var(--accent)}
+    /* Max legs: a stepper, not a chip. As a chip it looked like a label and
+       nobody tapped it, so the cap stayed at its default and quietly stopped
+       the bigger prices being reachable at all. */
+    .legstep{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--line);border-radius:999px;
+      background:var(--panel2);overflow:hidden;min-height:36px}
+    .legstep button{border:0;background:transparent;border-radius:0;min-width:34px;padding:7px 0;
+      font-size:17px;font-weight:700;line-height:1;color:var(--accent)}
+    .legstep button:hover:not(:disabled){background:rgba(245,197,24,.12)}
+    .legstep button:disabled{color:var(--muted);cursor:default}
+    .legstep b{font-size:12px;font-weight:700;padding:0 2px;white-space:nowrap;min-width:82px;text-align:center}
     /* Acca: one row per part, the full card behind a tap (see accaRow) */
     .arows{margin-top:12px}
     .arow{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:7px;overflow:hidden}
@@ -1447,6 +1457,7 @@ const oddsToSlider = (o) => 100 * Math.log(o / 1.5) / Math.log(25 / 1.5);
 // in both places. The left end of the travel is "any odds", where HAWK picks the
 // payout itself; past that it snaps to quarters, because 4.25+ and 4.27+ are the
 // same bet and a price you can't read back is no use.
+const LEG_STEPS = [3, 4, 5, 6, 8, 10, 12];   // 12 is the engine's own ceiling
 const MIN_ODDS_CHIPS = [0, 2, 3, 5, 10];
 const MIN_ODDS_ANY = 4;                       // slider positions below this mean "any odds"
 const minOddsToSlider = (o) => (o ? oddsToSlider(o) : 0);
@@ -2722,7 +2733,11 @@ function renderSlip() {
       <button data-cyc="style" title="How likely each leg should be">${STYLES[S.style].label}</button>
       <button data-cyc="focus" title="What the builder is made of">${{ Mix: "Mix of markets", Players: "Player props", Match: "Match stats" }[S.focus]}</button>
       <button data-cyc="picks" title="How HAWK chooses between legs">${S.picks === "value" ? "Best value" : "Most likely"}</button>
-      <button data-cyc="max" title="The most legs HAWK will use">Max ${S.maxLegs} legs</button>
+      <span class="legstep" title="The most legs HAWK will use. More legs reach a bigger price, but the builder lands less often — and a price you've asked for may need more legs than this to be reachable at all.">
+        <button data-legs="-1" aria-label="Fewer legs" ${S.maxLegs <= LEG_STEPS[0] ? "disabled" : ""}>−</button>
+        <b>Max ${S.maxLegs} legs</b>
+        <button data-legs="1" aria-label="More legs" ${S.maxLegs >= LEG_STEPS[LEG_STEPS.length - 1] ? "disabled" : ""}>+</button>
+      </span>
       <button data-cyc="priced" class="${S.priced ? "on" : ""}" title="Only legs Bet365 publishes a price for. Measured on twelve builders: those come in at 0.924 of fair, while a build with a player prop in it comes in at 0.741 — the prop costs about a fifth of the ticket.">${
         S.priced ? "Bet365-priced legs" : "Open market · props on"}</button>
       <button data-cyc="fav" class="${S.favourite ? "on" : ""}" title="Start every builder with the favourite to win (or the double chance)">Favourite first</button>
@@ -2786,13 +2801,23 @@ function renderSlip() {
   wireMinOdds("auto", renderSlip);
   // Every chip cycles through its own options — one tap, no menus.
   $("#rchips").onclick = (e) => {
+    // Max legs steps up and down instead of cycling, so the ends are visible.
+    const step = e.target.closest("[data-legs]");
+    if (step) {
+      // A value saved before these steps existed (7, say) snaps to the nearest one.
+      let at = LEG_STEPS.indexOf(S.maxLegs);
+      if (at < 0) at = LEG_STEPS.reduce((best, v, i) =>
+        Math.abs(v - S.maxLegs) < Math.abs(LEG_STEPS[best] - S.maxLegs) ? i : best, 0);
+      const to = LEG_STEPS[at + (+step.dataset.legs)];
+      if (to) { S.maxLegs = to; savePref("hawk.maxLegs", S.maxLegs); renderSlip(); }
+      return;
+    }
     const b = e.target.closest("[data-cyc]"); if (!b) return;
     const next = (list, cur) => list[(list.indexOf(cur) + 1) % list.length];
     switch (b.dataset.cyc) {
       case "style": S.style = next(Object.keys(STYLES), S.style); savePref("hawk.style", S.style); break;
       case "focus": S.focus = next(["Mix", "Players", "Match", "Stats"], S.focus); savePref("hawk.focus", S.focus); break;
       case "picks": S.picks = S.picks === "value" ? "likely" : "value"; savePref("hawk.picks", S.picks); break;
-      case "max": S.maxLegs = next([3, 4, 5, 6, 8, 10, 12], S.maxLegs); savePref("hawk.maxLegs", S.maxLegs); break;
       case "priced": S.priced = !S.priced; savePref("hawk.priced", S.priced);
         toast(S.priced ? "Only legs Bet365 publishes a price for — builds like these came in at 0.924 of fair"
                        : "Player props are back in. Measured at 0.741 of fair: the prop costs about a fifth of the ticket", 6000); break;

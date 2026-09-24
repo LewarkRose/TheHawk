@@ -1443,6 +1443,41 @@ const capitalise = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const sliderToOdds = (v) => 1.5 * Math.pow(25 / 1.5, v / 100);
 const oddsToSlider = (o) => 100 * Math.log(o / 1.5) / Math.log(25 / 1.5);
 
+// "At least this much" for 🎯 Auto and for the Picks scan — one setting, shown
+// in both places. The left end of the travel is "any odds", where HAWK picks the
+// payout itself; past that it snaps to quarters, because 4.25+ and 4.27+ are the
+// same bet and a price you can't read back is no use.
+const MIN_ODDS_CHIPS = [0, 2, 3, 5, 10];
+const MIN_ODDS_ANY = 4;                       // slider positions below this mean "any odds"
+const minOddsToSlider = (o) => (o ? oddsToSlider(o) : 0);
+const sliderToMinOdds = (v) => (v < MIN_ODDS_ANY ? 0 : Math.max(2, Math.round(sliderToOdds(v) * 4) / 4));
+const minOddsLabel = (o) => (o ? `${o.toFixed(2)}+` : "Any odds");
+function minOddsControl(id) {
+  const o = S.scan.minOdds;
+  return `<div class="target"><div><div class="muted" style="font-size:12px;letter-spacing:.1em" title="HAWK stacks legs until Bet365's likely price for the builder reaches this">AT LEAST · BET365 PAYS</div>
+      <div class="big" id="${id}Val">${minOddsLabel(o)}</div></div>
+      <div class="muted" style="text-align:right;font-size:12px">${o ? `the likeliest build<br><b style="font-size:13px;color:var(--text)">that clears it</b>`
+        : `HAWK picks<br><b style="font-size:13px;color:var(--text)">2 to 4</b>`}</div></div>
+    <input type="range" min="0" max="100" step="0.5" value="${minOddsToSlider(o)}" id="${id}Rng" title="Drag for any price, or tap one below">
+    <div class="rchips" id="${id}Chips">${MIN_ODDS_CHIPS.map((v) =>
+      `<button data-min="${v}" class="${v === o ? "on" : ""}">${minOddsLabel(v)}</button>`).join("")}</div>`;
+}
+function setMinOdds(o, after) {
+  if (o !== S.scan.minOdds) {
+    S.scan.minOdds = o;
+    savePref("hawk.minOdds", o);
+    if (o) S.scan.sort = "lands";   // you set the payout — HAWK sorts by what lands most
+  }
+  if (after) after();
+}
+function wireMinOdds(id, after) {
+  const rng = $(`#${id}Rng`); if (!rng) return;
+  // Dragging only repaints the number; the rebuild waits for you to let go.
+  rng.oninput = () => { $(`#${id}Val`).textContent = minOddsLabel(sliderToMinOdds(+rng.value)); };
+  rng.onchange = () => setMinOdds(sliderToMinOdds(+rng.value), after);
+  $(`#${id}Chips`).onclick = (e) => { const b = e.target.closest("button[data-min]"); if (b) setMinOdds(+b.dataset.min, after); };
+}
+
 // True when the slip sits below the match instead of beside it (phones, small windows).
 const narrow = () => window.matchMedia("(max-width: 1250px)").matches;
 function toast(msg, ms = 2200) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), ms); }
@@ -2675,8 +2710,9 @@ function renderSlip() {
       ? `🔄 BUILD AGAIN — option ${(S.options.at + 1) % S.options.list.length + 1} of ${S.options.list.length}` : "⚡ BUILD MY BET BUILDER"}</button>
     <details class="tune" id="tune" ${S.auto && !S.tuneOpen ? "" : "open"}><summary>${tuneSummary()}</summary>
     <div class="seg" id="autoSeg" title="Auto: HAWK picks the odds and legs for you">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
-    ${S.auto ? `<div class="hint" style="margin-top:0">${S.scan.minOdds
-      ? `You've asked Picks for <b>${S.scan.minOdds.toFixed(2)}+</b>, so HAWK stacks legs (up to your max, below) until Bet365's likely price gets there, likeliest build first. Change it on Picks, or use 🎚 My odds here.`
+    ${S.auto ? `${minOddsControl("auto")}
+    <div class="hint">${S.scan.minOdds
+      ? "HAWK stacks legs (up to your max, below) until Bet365's likely price gets there, likeliest build first. This is the same setting Picks scans with."
       : "HAWK tries odds from about 2 to 4 with up to your max legs (below) and only keeps builders that land at least 1 time in 4 — worth-it ones at Bet365 first."}</div>` : ""}
     <div class="target" ${S.auto ? 'style="display:none"' : ""}><div><div class="muted" style="font-size:12px;letter-spacing:.1em" title="HAWK builds until Bet365's likely price for the builder reaches this">TARGET · BET365 PRICE</div><div class="big" id="tgt">${S.target.toFixed(2)}</div></div>
       <div class="muted" style="text-align:right;font-size:12px">${r && r.p && S.slip.length ? `this one lands<br><b style="font-size:16px;color:var(--text)">${pct(r.p, 1)}</b>` : `HAWK builds to<br><b style="font-size:13px;color:var(--text)">Bet365's price</b>`}</div></div>
@@ -2747,6 +2783,7 @@ function renderSlip() {
   $("#autoSeg").onclick = (e) => { const b = e.target.closest("button"); if (b) { S.auto = b.dataset.auto === "1"; savePref("hawk.auto", S.auto); renderSlip(); } };
   $("#rng").oninput = (e) => { S.target = sliderToOdds(+e.target.value); $("#tgt").textContent = S.target.toFixed(2); };
   $("#rng").onchange = () => renderSlip();
+  wireMinOdds("auto", renderSlip);
   // Every chip cycles through its own options — one tap, no menus.
   $("#rchips").onclick = (e) => {
     const b = e.target.closest("[data-cyc]"); if (!b) return;
@@ -3463,6 +3500,7 @@ function renderScan() {
         ? `Every builder here pays <b style="color:var(--gold)">${sc.minOdds.toFixed(2)}+</b> on Bet365. The big number is <b>how often it lands</b> — likeliest first.`
         : "HAWK's best builder for every match, likeliest first."} Build one on Bet365 and type its price in to check it.</div>
       <div class="seg" id="scanAuto" style="margin:8px 0;max-width:360px">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
+      <div style="max-width:420px">${minOddsControl("pk")}</div>
       <details class="scanset"><summary>🏅 Leagues (${sc.leagues.size} competitions)</summary>
       ${leaguePicker("scanLeagues", sc.leagues)}</details>
       <div class="opts" style="justify-content:flex-start;gap:16px;flex-wrap:wrap">
@@ -3479,9 +3517,6 @@ function renderScan() {
         <label title="How many different builders HAWK offers for each match. It builds several anyway — this keeps the runners-up so you have something to choose between when the top one is a skip.">Options <select id="scanOpts">${
           [[1, "1 per match"], [2, "2 per match"], [3, "3 per match"]].map(([v, t]) =>
           `<option value="${v}" ${v === sc.options ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-        <label title="Only builders that pay at least this — HAWK then picks the likeliest one that does">At least <select id="minOdds">${
-          [[0, "any odds"], [2, "2.00+"], [2.5, "2.50+"], [3, "3.00+"], [5, "5.00+"], [8, "8.00+"], [12, "12.00+"], [20, "20.00+"]].map(([v, t]) =>
-          `<option value="${v}" ${v === sc.minOdds ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label title="Most likely: the legs likeliest to land together. Value first: legs where Bet365's own price beats HAWK's fair odds — the same reason a pick turns up on the green board, built into the builder.">Built from <select id="scanPicks">${
           [["likely", "🎯 Likeliest legs"], ["value", "💰 Legs with value"]].map(([v, t]) =>
           `<option value="${v}" ${v === S.picks ? "selected" : ""}>${t}</option>`).join("")}</select></label>
@@ -3523,10 +3558,8 @@ function renderScan() {
     renderScan(); await rescan(); };
   $("#scanOpts").onchange = async (e) => { sc.options = Math.min(3, Math.max(1, +e.target.value || 1)); savePref("hawk.scanOpts", sc.options);
     renderScan(); await rescan(); };
-  $("#minOdds").onchange = async (e) => { sc.minOdds = +e.target.value; savePref("hawk.minOdds", sc.minOdds);
-    if (sc.minOdds) sc.sort = "lands";   // you set the payout — HAWK sorts by what lands most
-    renderScan();   // the line above the boxes says what HAWK is building: redraw it
-    await rescan(); };
+  // the line above the boxes says what HAWK is building: redraw it, then scan again
+  wireMinOdds("pk", async () => { renderScan(); await rescan(); });
   $("#scanPicks").onchange = async (e) => { S.picks = e.target.value === "value" ? "value" : "likely"; savePref("hawk.picks", S.picks);
     renderScan();
     await rescan(); };

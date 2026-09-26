@@ -249,6 +249,11 @@
             </div>
         </header>
 
+        <!-- Shown only when the browser has NOT agreed to keep this site's storage.
+             Invisible risk otherwise: everything looks fine right up until the day
+             the Vault is empty. -->
+        <div id="storage-warn" class="hidden bg-amber-500/5 border border-amber-500/25 rounded-xl px-3 py-2.5 mb-4 text-[11px] text-orange-300"></div>
+
         <!-- Navigation Tabs -->
         <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-6">
             <div class="flex gap-3">
@@ -845,8 +850,20 @@
         (async () => {
             try {
                 if (!navigator.storage || !navigator.storage.persist) return;
-                if (await navigator.storage.persisted()) return;
-                await navigator.storage.persist();
+                let kept = await navigator.storage.persisted();
+                if (!kept) kept = await navigator.storage.persist();
+                if (kept) return;
+                // Refused. Say so once, quietly, with the one thing that fixes it —
+                // installing the app is what earns the permission in every browser
+                // that grants it at all.
+                const el = document.getElementById('storage-warn');
+                if (!el) return;
+                el.innerHTML = `<b class="text-orange-200">This browser hasn't agreed to keep your Vault.</b>
+                    Your ${bets.length} ticket${bets.length === 1 ? '' : 's'} and bankroll are saved here and survive closing the tab —
+                    but the browser may clear them if it's short of space, or if it's set to forget this site when you close it.
+                    <b class="text-orange-200">Install HAWK</b> (the button above) and it usually stops being a question.
+                    Either way, <b class="text-orange-200">Export</b> now and then — that file is the only copy the browser can't touch.`;
+                el.classList.remove('hidden');
             } catch (e) { /* not supported here */ }
         })();
 

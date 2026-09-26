@@ -847,24 +847,45 @@
         // haven't installed loses its storage after 7 days of not being opened.
         // Granted quietly where the site is installed or used often; a refusal
         // changes nothing, so there's nothing to handle.
+        const installedApp = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+        // Every browser on iPhone is Safari underneath — Apple requires it — so this
+        // catches Brave and Chrome there too.
+        const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
+            || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         (async () => {
             try {
-                if (!navigator.storage || !navigator.storage.persist) return;
-                let kept = await navigator.storage.persisted();
-                if (!kept) kept = await navigator.storage.persist();
-                if (kept) return;
-                // Refused. Say so once, quietly, with the one thing that fixes it —
-                // installing the app is what earns the permission in every browser
-                // that grants it at all.
+                let kept = false;
+                // The API is missing on iOS Safari, which is precisely where storage is
+                // cleared. Treating "missing" as "fine" hid the warning on the one
+                // device that needed it, so a missing API counts as not kept.
+                if (navigator.storage && navigator.storage.persist) {
+                    kept = await navigator.storage.persisted();
+                    if (!kept) kept = await navigator.storage.persist();
+                }
+                if (kept || installedApp()) return;
                 const el = document.getElementById('storage-warn');
                 if (!el) return;
-                el.innerHTML = `<b class="text-orange-200">This browser hasn't agreed to keep your Vault.</b>
-                    Your ${bets.length} ticket${bets.length === 1 ? '' : 's'} and bankroll are saved here and survive closing the tab —
-                    but the browser may clear them if it's short of space, or if it's set to forget this site when you close it.
-                    <b class="text-orange-200">Install HAWK</b> (the button above) and it usually stops being a question.
-                    Either way, <b class="text-orange-200">Export</b> now and then — that file is the only copy the browser can't touch.`;
+                const n = `${bets.length} ticket${bets.length === 1 ? '' : 's'}`;
+                el.innerHTML = isIOS
+                    ? `<b class="text-orange-200">On iPhone this Vault will be cleared.</b>
+                       Apple wipes a website's saved data after <b class="text-orange-200">7 days</b> without opening it — every browser on iPhone,
+                       Brave included, because they all run Safari underneath. Your ${n} would go with it.
+                       <br><b class="text-orange-200">Fix it now:</b> tap <b class="text-orange-200">Share ⬆️</b> then <b class="text-orange-200">Add to Home Screen</b>,
+                       and open HAWK from that icon from now on — an installed app is exempt. Then <b class="text-orange-200">📲 Sync</b> from your PC to bring your bets back.`
+                    : /android/i.test(navigator.userAgent)
+                    ? `<b class="text-orange-200">This browser hasn't agreed to keep your Vault</b>, so your ${n} can be cleared —
+                       which is what happens when it "disappears after a while". Three things cause it on Android, in order:
+                       <br>1. <b class="text-orange-200">Not installed.</b> Brave menu → <b class="text-orange-200">Add to Home screen</b>, then always open HAWK from that icon. An installed app gets kept storage.
+                       <br>2. <b class="text-orange-200">Brave clearing on exit.</b> Check Brave Settings → Brave Shields &amp; privacy → <b class="text-orange-200">Clear data on exit</b>, and that this site isn't set to "forget me when I close it".
+                       <br>3. <b class="text-orange-200">Samsung Device Care</b> clearing storage when the phone runs low.
+                       <br>Meanwhile <b class="text-orange-200">📲 Sync</b> from your PC to bring the bets back, and <b class="text-orange-200">Export</b> for a copy the browser can't touch.`
+                    : `<b class="text-orange-200">This browser hasn't agreed to keep your Vault.</b>
+                       Your ${n} and bankroll survive closing the tab, but the browser may clear them if it's short of space,
+                       or if it's set to forget this site when you close it.
+                       <b class="text-orange-200">Install HAWK</b> and it usually stops being a question.
+                       Either way, <b class="text-orange-200">Export</b> now and then — that file is the only copy the browser can't touch.`;
                 el.classList.remove('hidden');
-            } catch (e) { /* not supported here */ }
+            } catch (e) { /* nothing we can do about it here */ }
         })();
 
         let storageWarned = false;

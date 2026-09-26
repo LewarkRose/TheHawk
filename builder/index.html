@@ -893,9 +893,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     /* Today and Picks are full-width pages: the league list and the builder
        column are for the builder, so they step aside and the content gets the room. */
     @media (min-width:821px){
-      body[data-view="today"] main.grid, body[data-view="scan"] main.grid{grid-template-columns:minmax(0,1fr)}
-      body[data-view="today"] #fxPanel, body[data-view="scan"] #fxPanel,
-      body[data-view="today"] .slipcol, body[data-view="scan"] .slipcol{display:none}
+      body[data-view="today"] main.grid, body[data-view="scan"] main.grid, body[data-view="board"] main.grid{grid-template-columns:minmax(0,1fr)}
+      body[data-view="today"] #fxPanel, body[data-view="scan"] #fxPanel, body[data-view="board"] #fxPanel,
+      body[data-view="today"] .slipcol, body[data-view="scan"] .slipcol, body[data-view="board"] .slipcol{display:none}
       /* The acca keeps the league list — that's how you go and add another
          match — but the builder column only works on an open fixture, so on
          the acca it sat there saying "pick a fixture" and took 400px for it. */
@@ -931,6 +931,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     }
     @media (min-width:1900px){
       body[data-view="scan"] main.grid, body[data-view="today"] main.grid,
+      body[data-view="board"] main.grid,
       body[data-view="scores"] main.grid{max-width:1860px;margin:0 auto}
     }
     /* paper mode: following a pick with no money on it */
@@ -1204,7 +1205,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* Only the builder pages keep the league column when the slip is away. Today,
    Picks and Live are full-width pages: leaving 290px reserved there squeezed
    the whole day into a strip with two thirds of the screen empty. */
-@media (min-width:1251px){body.slip-away:not([data-view="match"]):not([data-view="today"]):not([data-view="scan"]):not([data-view="scores"]) main.grid{grid-template-columns:290px minmax(0,1fr)}}
+@media (min-width:1251px){body.slip-away:not([data-view="match"]):not([data-view="today"]):not([data-view="scan"]):not([data-view="scores"]):not([data-view="board"]) main.grid{grid-template-columns:290px minmax(0,1fr)}}
 /* 🎟 My bets drawer (wide screens): swings in from the right and stays open beside the builder */
 .bdrawer{display:none}
 body.drawer-open .bdrawer{display:block;position:fixed;right:0;bottom:0;width:390px;z-index:20;overflow:auto;padding:16px 16px 22px;
@@ -1356,6 +1357,7 @@ a.nav{text-decoration:none}
     <div class="moremenu" id="moreMenu" hidden>
       <button class="mm" id="navBuilder" data-nav="builder">⚡ <span>Builder</span><small>build a bet on one match</small></button>
       <button class="mm" id="accaBtn" data-nav="acca">🧩 <span>Acca</span><small>several matches on one ticket</small></button>
+      <button class="mm" id="boardBtn" data-nav="board">📋 <span>Board</span><small>how HAWK itself is doing</small></button>
       <a class="mm vaultnav" href="../">🏦 <span>Vault</span><small>bankroll, all bets, track record</small></a>
     </div>
     <div class="topright">
@@ -1552,6 +1554,7 @@ async function init() {
   setTimeout(trackPrices, 5000);
   $("#ltree").onclick = onTreeClick;
   $("#navBuilder").onclick = showBuilder;
+  $("#boardBtn").onclick = showBoard;
   // The folding league bar (phones).
   $("#fxToggle").onclick = () => { const p = $("#fxPanel"); foldFixtures(!p.classList.contains("folded")); if (!p.classList.contains("folded")) p.scrollIntoView({ behavior: "smooth", block: "start" }); };
   watchView();
@@ -4497,8 +4500,8 @@ function monsterClick(e) {
 /* ---------- page navigation ---------- */
 // The page buttons in the header light up for the page on screen. S.view is
 // set all over the place, so it's watched rather than every caller updating it.
-const NAV_OF = { match: "builder", inplay: "live", scores: "live", scan: "scan", acca: "acca", today: "today" };
-const UNDER_MORE = new Set(["builder", "acca"]);
+const NAV_OF = { match: "builder", inplay: "live", scores: "live", scan: "scan", acca: "acca", today: "today", board: "board" };
+const UNDER_MORE = new Set(["builder", "acca", "board"]);
 function watchView() {
   let view = S.view;
   const paint = () => {
@@ -5116,6 +5119,103 @@ function paperCard() {
   void mine;
   return auto.length ? paperBlock(auto, "HAWK'S OWN BOARD, GRADED",
     "Taken from every scan whether you back them or not, at the price HAWK expects Bet365 to show. Volume is the point — your own bets will never reach a number that proves anything.", "") : "";
+}
+// --- 📋 BOARD: how HAWK itself is doing ---
+// Three records, because three different questions get muddled otherwise. The
+// one you could see until now was the smallest — a bad week on 26 picks looked
+// like HAWK being wrong, when the 128,000-leg record next to it said otherwise.
+function boardStat(n, p, won) {
+  if (!n) return null;
+  const said = p / n, hit = won / n, sd = Math.sqrt(n * said * (1 - said));
+  return { n, said, hit, gap: hit - said, z: sd ? (won - p) / sd : 0 };
+}
+function boardRow(label, s, note) {
+  if (!s) return "";
+  const tone = s.z > 1.96 ? "var(--accent)" : s.z < -1.96 ? "var(--red)" : "var(--text)";
+  return `<div class="prow"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(label)}</span>
+    <span class="muted" style="flex:none;width:58px;text-align:right">${(100 * s.said).toFixed(1)}%</span>
+    <span style="flex:none;width:58px;text-align:right;color:${tone};font-weight:700">${(100 * s.hit).toFixed(1)}%</span>
+    <span class="muted" style="flex:none;width:52px;text-align:right;font-size:11px">${note || s.n.toLocaleString()}</span></div>`;
+}
+function boardTable(title, rows, hint) {
+  if (!rows) return "";
+  return `<div style="margin-top:14px"><div class="muted" style="font-size:10px;letter-spacing:.13em">${esc(title)}</div>
+    ${hint ? `<div class="muted" style="font-size:11px;margin:3px 0 2px">${hint}</div>` : ""}
+    <div class="prow" style="border-top:0;padding-bottom:2px"><span style="flex:1"></span>
+      <span class="muted" style="flex:none;width:58px;text-align:right;font-size:10px">SAID</span>
+      <span class="muted" style="flex:none;width:58px;text-align:right;font-size:10px">LANDED</span>
+      <span class="muted" style="flex:none;width:52px;text-align:right;font-size:10px">LEGS</span></div>
+    ${rows}</div>`;
+}
+function renderBoard() {
+  S.view = "board";
+  const g = S.graded, L = S.learn || {};
+  const auto = paperList().filter((x) => x.auto), done = auto.filter((x) => x.result);
+  const won = done.filter((x) => x.result === "won");
+  const keep = done.length ? won.reduce((a, x) => a + (+x.price || 0), 0) / done.length : null;
+  const bets = vaultBets(), settled = bets.filter((b) => b.status && b.status !== "PENDING");
+  const ret = (b) => b.status === "WON" ? (+b.potentialReturn || 0) : b.status === "CASHED_OUT" ? (+b.cashOutAmount || 0) : 0;
+  const pl = settled.reduce((a, b) => a + ret(b) - (+b.stake || 0), 0);
+  const overall = g && g.bands ? boardStat(g.bands.reduce((a, b) => a + b.n, 0), g.bands.reduce((a, b) => a + b.p, 0),
+                                           g.bands.reduce((a, b) => a + b.won, 0)) : null;
+  const tile = (key, big, sub, ask, tone) => `<div class="btile" style="text-align:left">
+    <div class="k" style="margin-bottom:4px">${key}</div>
+    <div class="n" style="color:${tone || "var(--accent)"}">${big}</div>
+    <div class="muted" style="font-size:11.5px;margin-top:3px">${sub}</div>
+    <div class="muted" style="font-size:10.5px;margin-top:6px;line-height:1.45">${ask}</div></div>`;
+
+  const byRows = (obj, min) => Object.entries(obj || {})
+    .map(([k, v]) => [k, boardStat(v.n, v.p, v.won), v])
+    .filter(([, s]) => s && s.n >= min)
+    .sort((a, b) => b[1].n - a[1].n)
+    .map(([k, s, v]) => boardRow(k, s, v.matches ? `${v.matches} m` : null)).join("");
+
+  $("#match").innerHTML = `
+    <div class="section" style="border-top:0">
+      <h3>📋 HAWK's board</h3>
+      <div class="note" style="margin-top:0">Three records, and they answer different questions. Only the first has the volume to prove anything.</div>
+      <div class="btiles" style="grid-template-columns:repeat(auto-fit,minmax(178px,1fr))">
+        ${tile("HAWK ON EVERY MATCH", overall ? `${(100 * overall.hit).toFixed(1)}%` : "—",
+          overall ? `said ${(100 * overall.said).toFixed(1)}% · ${overall.n.toLocaleString()} legs` : "not built yet",
+          "Are its percentages honest? Graded on every match in HAWK's leagues, whether you bet or not.")}
+        ${tile("PICKS FROM YOUR SCANS", done.length ? `€${keep.toFixed(2)}` : `${auto.length || 0}`,
+          done.length ? `per €1 · ${won.length} of ${done.length} landed` : "none settled yet",
+          "Would following it have paid, at the price HAWK expects Bet365 to show?", keep >= 1 ? "var(--accent)" : "var(--gold)")}
+        ${tile("YOUR BETS", `${bets.length}`,
+          settled.length ? `${settled.length} settled · ${pl >= 0 ? "+" : "−"}€${Math.abs(pl).toFixed(2)}` : "nothing settled yet",
+          "Did you make money? The smallest sample here — read it last.", pl >= 0 ? "var(--accent)" : "var(--red)")}
+      </div>
+      ${g ? `<div class="muted" style="font-size:11px;margin-top:10px">${g.matches.toLocaleString()} matches graded · ${
+        g.waiting || 0} waiting on results · built ${esc(String(g.updated || "").slice(0, 16).replace("T", " "))}</div>` : ""}
+    </div>
+    ${g ? `<div class="section">
+      <h3>Is it calibrated?</h3>
+      <div class="note" style="margin-top:0">Of the legs HAWK called 60%, did 60% land? A market can be well calibrated and still not be worth backing — that depends on the price.</div>
+      ${boardTable("BY HOW LIKELY HAWK SAID IT WAS", (g.bands || []).map((b) =>
+        boardRow(`${Math.round(100 * b.lo)}–${Math.round(100 * Math.min(1, b.hi))}%`, boardStat(b.n, b.p, b.won))).join(""))}
+      ${boardTable("BY MARKET", byRows(g.byKey, 200), "Green or red means the gap is past chance for that many legs.")}
+      ${boardTable("BY LEAGUE", byRows(g.byLeague, 200), "Matches, not legs, decide whether a league's number means anything.")}
+    </div>` : `<div class="section"><div class="note">HAWK's graded board hasn't loaded. It's built by the site every few hours.</div></div>`}
+    ${(L.changes || []).length ? `<div class="section">
+      <h3>Corrections in force</h3>
+      <div class="note" style="margin-top:0">Where the board says HAWK runs high or low, its chances are shifted before you ever see them — so a gap above doesn't mean money is leaking.</div>
+      <div class="bchips" style="margin-top:8px">${(L.changes || []).map((c) =>
+        `<span class="bchip ${c.pts >= 0 ? "up" : "dn"}">${esc(c.market)} <b>${c.pts >= 0 ? "+" : ""}${c.pts.toFixed(1)}</b></span>`).join("")}</div>
+    </div>` : ""}
+    ${g && (g.recent || []).length ? `<div class="section">
+      <h3>Recently graded</h3>
+      <div class="prows">${g.recent.slice(0, 20).map((r) => {
+        const hit = r.got, said = r.said;
+        return `<div class="prow"><span class="tick ${hit >= said ? "won" : "lost"}">${hit >= said ? "✓" : "✕"}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.home)} ${esc(r.score || "")} ${esc(r.away)}
+            <span class="muted">· ${esc(r.league || "")}</span></span>
+          <span class="muted" style="flex:none;font-size:11px">said ${Math.round(100 * said)}% · landed ${Math.round(100 * hit)}% · ${r.n} legs</span></div>`;
+      }).join("")}</div>
+    </div>` : ""}`;
+}
+function showBoard() {
+  document.querySelectorAll(".fx").forEach((f) => f.classList.remove("on"));
+  renderBoard();
 }
 function showToday() {
   S.view = "today";

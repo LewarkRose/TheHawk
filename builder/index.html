@@ -1608,7 +1608,7 @@ async function openFromUrl() {
   // the builder and everything else are a tap away when you want them.
   if (!id && !view) return showToday();
   // App shortcuts (long-press the HAWK icon): builder/?view=scores | acca | scan
-  const views = { scores: showScores, acca: showAcca, scan: showScan, today: showToday };
+  const views = { scores: showScores, acca: showAcca, scan: showScan, today: showToday, board: showBoard };
   if (view && views[view]) { history.replaceState(null, "", location.pathname); return views[view](); }
   // From a goal notification: builder/?view=live&id=GAME&league=L
   if (view === "live" && q.get("id")) { history.replaceState(null, "", location.pathname); return goToLive(q.get("league"), q.get("id")); }

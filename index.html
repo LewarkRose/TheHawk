@@ -524,6 +524,11 @@
 
         <!-- VIEW 3: HOW GOOD IS HAWK -->
         <div id="view-scorecard" class="hidden">
+            <a href="builder/?view=board" class="block bg-zinc-950 border border-zinc-800 hover:border-[#f5c518] rounded-xl px-3 py-2.5 mb-4 transition">
+                <span class="text-xs text-zinc-300">This page blends <b class="text-white">your own bet legs</b> in with HAWK's graded ones.
+                For HAWK's record on its own — every market and league, with a plain verdict on each —</span>
+                <b class="text-[#f5c518] text-xs whitespace-nowrap">open 📋 Board →</b>
+            </a>
             <div id="sc-headline"></div>
             <div class="vband"><span>HAWK on every match</span><i></i></div>
             <div class="space-y-4">
@@ -664,7 +669,8 @@
             localStorage.setItem('hawk_code_version', CURRENT_VERSION);
         }
 
-        let bankroll = parseFloat(localStorage.getItem('hawk_bankroll')) || 1000.00;
+        const round2 = (v) => Math.round((+v || 0) * 100) / 100;
+        let bankroll = round2(parseFloat(localStorage.getItem('hawk_bankroll')) || 1000.00);
         let bankrollLog = JSON.parse(localStorage.getItem('hawk_bankroll_log')) || [];
 
         function logBankrollEdit(oldValue, newValue, note) {
@@ -832,6 +838,12 @@
         // written if they fail, so the two can't drift apart.
         let storageWarned = false;
         function saveState() {
+            // Money is kept to the cent. A return is stake x odds, so €2.57 at 11.4
+            // is €29.298, and adding those across a hundred tickets leaves a balance
+            // like 103.42509999999999 — which is where the +€0.01 and +€0.02 "manual
+            // edits" in the log came from. Rounding here catches every path, because
+            // nothing changes the bankroll without saving straight after.
+            bankroll = round2(bankroll);
             try {
                 localStorage.setItem('hawk_bets', JSON.stringify(bets));
                 localStorage.setItem('hawk_bankroll', bankroll.toFixed(2));
@@ -1985,7 +1997,18 @@
         }
 
         function deleteBet(id) {
-            if(!confirm("Delete this ticket?")) return;
+            const bet = bets.find(b => b.id === id);
+            // A settled ticket's money is already in the bankroll and really is yours,
+            // so deleting it must NOT reverse the balance. What it does lose is the
+            // record explaining that money — after this, the bankroll no longer adds
+            // up from the tickets, and ⚖️ will show the gap with nothing to blame.
+            const settled = bet && bet.status && bet.status !== 'PENDING';
+            const pay = settled ? payoutContribution(bet.status, bet.potentialReturn, bet.cashOutAmount) - (bet.stake || 0) : 0;
+            const ask = settled
+                ? `Delete this settled ticket?\n\nIt ${pay >= 0 ? 'made' : 'lost'} €${Math.abs(pay).toFixed(2)}, and that stays in your bankroll — the money is real. `
+                  + `What goes is the record of where it came from, so your tickets will no longer add up to your balance.\n\nDelete it anyway?`
+                : "Delete this ticket? The stake goes back on your bankroll.";
+            if(!confirm(ask)) return;
             const index = bets.findIndex(b => b.id === id);
             if(index !== -1) {
                 if(bets[index].status === 'PENDING') bankroll += bets[index].stake;
@@ -2911,7 +2934,7 @@
         // straight away instead of overwriting them with this tab's older copy.
         function reloadFromStorage() {
             try {
-                bankroll = parseFloat(localStorage.getItem('hawk_bankroll')) || 1000.00;
+                bankroll = round2(parseFloat(localStorage.getItem('hawk_bankroll')) || 1000.00);
                 bets = JSON.parse(localStorage.getItem('hawk_bets')) || [];
             } catch (e) { /* keep what's in memory */ }
         }
@@ -2949,6 +2972,27 @@
         // so anything you bet without logging it leaves the two apart. Kelly sizes every
         // stake off this number, which is why the gap is worth naming rather than nudging.
         const RECONCILE_NAG = 0.03;   // 3% out is enough to move a recommended stake
+        // What the tickets themselves add up to, independent of the stored number.
+        // The newest manual edit is an absolute value, so everything before it is
+        // already accounted for: start there and apply only what happened since.
+        // Two numbers can't tell you whose fault a gap is; three can.
+        const placedAt = (b) => { const m = /bet_(\d{12,})/.exec(b.id || ''); return m ? +m[1] : 0; };
+        const settledAtMs = (b) => Date.parse(b.settledAt || '') || 0;
+        function ledgerTotal() {
+            const anchor = bankrollLog[0];
+            if (!anchor || typeof anchor.newValue !== 'number') return null;   // nothing absolute to start from
+            const at = Date.parse(anchor.timestamp || '') || 0;
+            if (!at) return null;
+            let total = anchor.newValue, staked = 0, paid = 0, counted = 0;
+            for (const b of bets) {
+                if (placedAt(b) > at) { total -= (b.stake || 0); staked += (b.stake || 0); counted++; }
+                const pay = payoutContribution(b.status, b.potentialReturn, b.cashOutAmount);
+                // A ticket settled but never stamped can't be placed in time, so it is
+                // left out rather than guessed at — better a gap you can see.
+                if (pay && settledAtMs(b) > at) { total += pay; paid += pay; }
+            }
+            return { total: round2(total), from: anchor, staked: round2(staked), paid: round2(paid), counted };
+        }
         function openReconcileModal() {
             document.getElementById('reconcile-input').value = '';
             renderReconcile();
@@ -2971,19 +3015,35 @@
             const gap = real - bankroll, off = bankroll > 0 ? Math.abs(gap) / bankroll : 0;
             const pending = bets.filter(b => b.status === 'PENDING');
             const staked = pending.reduce((s, b) => s + (b.stake || 0), 0);
+            const led = ledgerTotal();
+            const ledGap = led ? round2(bankroll - led.total) : null;
             const rows = [
-                `<div class="flex justify-between"><span class="text-zinc-400">HAWK</span><b class="text-[#f5c518]">€${bankroll.toFixed(2)}</b></div>`,
+                `<div class="flex justify-between"><span class="text-zinc-400">HAWK's total</span><b class="text-[#f5c518]">€${bankroll.toFixed(2)}</b></div>`,
+                led ? `<div class="flex justify-between" title="Worked out from your tickets since the edit on ${escHtml(led.from.displayDate || '')}: ${led.counted} placed (−€${led.staked.toFixed(2)}), €${led.paid.toFixed(2)} paid back"><span class="text-zinc-400">Your tickets say</span><b class="${Math.abs(ledGap) < 0.01 ? 'text-zinc-300' : 'text-orange-400'}">€${led.total.toFixed(2)}</b></div>` : '',
                 `<div class="flex justify-between"><span class="text-zinc-400">Your bookmaker</span><b class="text-white">€${real.toFixed(2)}</b></div>`,
                 `<div class="flex justify-between border-t border-zinc-800 pt-1.5 mt-1.5"><span class="text-zinc-400">Difference</span><b class="${gap === 0 ? 'text-zinc-300' : gap > 0 ? 'text-emerald-400' : 'text-red-400'}">${gap > 0 ? '+' : gap < 0 ? '−' : ''}€${Math.abs(gap).toFixed(2)}</b></div>`,
-            ];
+            ].filter(Boolean);
             let say;
             if (Math.abs(gap) < 0.01) say = `<div class="text-emerald-400">They agree. Nothing to correct.</div>`;
             else {
-                const why = gap < 0
-                    ? (pending.length
-                        ? `You have <b>${pending.length}</b> ticket${pending.length > 1 ? 's' : ''} still running here, staking <b>€${staked.toFixed(2)}</b> — but HAWK already took those off, so they don't explain it. Most likely a bet placed and settled without being logged, or a win your bookmaker paid less on.`
-                        : `Nothing is pending here, so most likely a bet placed and settled without being logged, a win your bookmaker paid less on, or a withdrawal.`)
-                    : `HAWK is behind. Most likely a winning ticket not settled here yet, or a deposit.`;
+                // Three numbers split the blame. If HAWK's total has left its own
+                // tickets behind, that's HAWK's fault. If the tickets match the
+                // bookmaker, the total is simply stale.
+                // A few cents across a hundred-odd tickets is rounding in old data,
+                // not a missing bet — calling that "never got logged" sends you
+                // hunting for something that was never there.
+                const CLOSE = 0.10;
+                const drift = led && Math.abs(ledGap) >= CLOSE;
+                const ledMatchesBook = led && Math.abs(led.total - real) < CLOSE;
+                const why = ledMatchesBook
+                    ? `Your tickets and your bookmaker agree at <b>€${led.total.toFixed(2)}</b> — it's HAWK's running total that has drifted, by <b>€${Math.abs(ledGap).toFixed(2)}</b>. Nothing is missing from your history.`
+                    : drift
+                        ? `HAWK's total is <b>€${Math.abs(ledGap).toFixed(2)}</b> away from what its own tickets add up to, and the tickets are <b>€${Math.abs(led.total - real).toFixed(2)}</b> from your bookmaker — so there's both a drift here and something that never got logged.`
+                        : gap < 0
+                            ? (pending.length
+                                ? `Your tickets match HAWK's total, so nothing has drifted. You have <b>${pending.length}</b> still running, staking <b>€${staked.toFixed(2)}</b> — but those came off at lock-in, so they don't explain it. Most likely a bet placed and settled without being logged.`
+                                : `Your tickets match HAWK's total, so nothing has drifted here — the money left your bookmaker without a ticket to show for it. A bet placed and settled without being logged, a win paid less than expected, or a withdrawal.`)
+                            : `HAWK is behind your bookmaker. Most likely a winning ticket not settled here yet, or a deposit.`;
                 say = `<div class="text-zinc-300 leading-relaxed">${why}</div>`
                     + (off >= RECONCILE_NAG
                         ? `<div class="text-orange-400 mt-2">That's ${(100 * off).toFixed(0)}% out, so HAWK is sizing stakes ${gap < 0 ? 'too big' : 'too small'}. Worth fixing now.</div>`

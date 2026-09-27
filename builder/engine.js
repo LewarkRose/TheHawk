@@ -260,16 +260,34 @@
   // competition (groups too), where each place leads (Champions League,
   // relegation…), and each club's next match — so a game being played right now
   // can be added to the table as it stands.
-  async function tables(league) {
-    const d = await s365("standings", { competitions: COMPETITIONS[league] }, 60 * 1000);
+  // where = "all" | "home" | "away". A side's home and away records are two
+  // different teams as far as a bet is concerned — Brighton are 2nd at home and
+  // 9th away on the same points — and the split adds back to the full table
+  // exactly, so nothing is being estimated here.
+  const TABLE_TYPE = { all: 1, home: 2, away: 3 };
+  async function tables(league, where = "all") {
+    const d = await s365("standings", { competitions: COMPETITIONS[league], type: TABLE_TYPE[where] || 1 }, 60 * 1000);
     if (!d) throw new Error("365Scores didn't return the table — try again in a moment");
+    // recentForm is oldest-first: 1 won, 2 drew, 0 lost. Checked against six
+    // teams' own W/D/L records. It saves a request per team — form used to mean
+    // one call each, twenty of them for a league table.
+    const FORM = { 1: "W", 2: "D", 0: "L" };
     return (d.standings || []).filter((t) => (t.rows || []).length).map((t) => ({
       name: t.displayName || null,
+      // "League A - Group 1" and the rest. A competition without them (a normal
+      // league) has none, and the whole table is one group.
+      groups: Object.fromEntries((t.groups || []).map((g) => [g.num, g.name])),
+      // How ties are broken here — head to head, goal difference, away goals.
+      // 365Scores only states them where they aren't the obvious ones.
+      rules: t.competitionRules && t.competitionRules.title
+        ? { title: t.competitionRules.title, points: t.competitionRules.descriptions || [] } : null,
       dest: Object.fromEntries((t.destinations || []).map((x) => [x.num, { name: x.name, color: x.color }])),
       rows: t.rows.filter((r) => r.competitor).map((r) => ({
         id: String(r.competitor.id), name: r.competitor.name, crest: crest(r.competitor), pos: r.position,
+        group: r.groupNum || null,
         p: r.gamePlayed || 0, w: r.gamesWon || 0, d: r.gamesEven || 0, l: r.gamesLost || 0, gf: r.for || 0, ga: r.against || 0,
-        pts: Math.round(r.points || 0), dest: r.destinationNum || null, next: r.nextMatch ? String(r.nextMatch.id) : null })) }));
+        pts: Math.round(r.points || 0), dest: r.destinationNum || null, next: r.nextMatch ? String(r.nextMatch.id) : null,
+        form: (r.recentForm || []).map((c) => FORM[c] || "").join("") || null })) }));
   }
   async function form(competitorId, games = 6) {
     const d = await s365("games/results", { competitors: competitorId }, 30 * 60 * 1000);

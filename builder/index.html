@@ -277,23 +277,30 @@ img{max-width:100%}
 .ltable .tl{font-style:normal;font-size:11.5px;font-weight:800;padding:1px 6px;border-radius:6px;white-space:nowrap;background:var(--panel2)}
 .ltable .tl.w{color:var(--accent)}.ltable .tl.l{color:#ff8a9a}.ltable .tl.d{color:var(--gold)}.ltable .tl small{font-weight:600;color:var(--muted)}
 .ltable .tleg{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 4px;font-size:11.5px;color:var(--muted)}
-/* Goals per game: the column that decides an over/under leg, which is what a
-   table is actually for here. Gold when a side's games are going over 3.5. */
-.ltable td.tgm{font-variant-numeric:tabular-nums;color:var(--muted)}
-.ltable td.tgm.hot{color:var(--accent);font-weight:800}
-.ltable th.sortable{cursor:pointer;user-select:none}
-.ltable th.sortable:hover{color:var(--accent)}
-.ltable th.sortable.on{color:var(--accent)}
-.ltable .tform{white-space:nowrap;text-align:right}
-.ltable .tform i{display:inline-block;width:15px;height:15px;border-radius:4px;margin-left:2px;font-style:normal;
+/* One row per team, and nothing on it you have to decode: where they are, how
+   they've been going, how many points. Everything else is a tap away, because a
+   table you have to read across eight columns of is a table you skim instead. */
+.lrow{display:flex;align-items:center;gap:10px;padding:9px 6px;border-top:1px solid var(--line);
+  cursor:pointer;transition:.12s;list-style:none}
+.lrow::-webkit-details-marker{display:none}
+.lrow:hover{background:var(--panel2)}
+.lrow .lp{width:30px;flex:none;text-align:right;color:var(--muted);font-size:12.5px;font-weight:700;white-space:nowrap}
+.lrow .lc{width:20px;height:20px;flex:none}
+.lrow .ln{flex:1;min-width:0;color:var(--text);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lrow .lpts{width:28px;flex:none;text-align:right;color:var(--text);font-weight:900;font-size:14px}
+.lteam[open] > .lrow{background:var(--panel2)}
+.lopen{padding:2px 8px 12px 46px;font-size:12.5px;color:var(--muted);line-height:1.75;background:var(--panel)}
+.lopen b{color:var(--text)}
+.lopen .hot{color:var(--accent)}
+.lform{white-space:nowrap;flex:none}
+.lform i{display:inline-block;width:15px;height:15px;border-radius:4px;margin-left:2px;font-style:normal;
   font-size:9px;line-height:15px;text-align:center;font-weight:800}
-.ltable .tform .fw{background:rgba(245,197,24,.9);color:#1a1400}
-.ltable .tform .fd{background:var(--panel2);color:var(--muted)}
-.ltable .tform .fl{background:rgba(220,60,60,.7);color:#fff}
-.ltable .tform .fq{opacity:.35}
-@media (max-width:560px){.ltable .tw{display:none}.ltable table{font-size:12.5px}.ltable .tl small{display:none}
-  .ltable .tform i{width:12px;height:12px;line-height:12px;font-size:8px}}
-@media (max-width:420px){.ltable .tgf{display:none}}
+.lform .fw{background:rgba(245,197,24,.9);color:#1a1400}
+.lform .fd{background:var(--panel2);color:var(--muted)}
+.lform .fl{background:rgba(220,60,60,.7);color:#fff}
+.lform .fq{opacity:.3}
+@media (max-width:560px){.lform i{width:12px;height:12px;line-height:12px;font-size:8px}
+  .lrow .ln{font-size:12.5px}.lopen{padding-left:40px}}
 .tie{margin:8px auto 2px;max-width:440px;padding:8px 12px;border-radius:12px;border:1px solid rgba(251,146,60,.35);background:rgba(251,146,60,.07);font-size:12.5px;line-height:1.45}
 .tie b{color:var(--gold)}.tie small{display:block;margin-top:3px;font-size:12px;color:var(--text)}.tie small.muted{color:var(--muted)}
 .ip-agg{margin-top:4px;font-size:13px;color:var(--gold)}.ip-agg b{font-weight:900}
@@ -1532,7 +1539,7 @@ async function api(path, body) {
     case "/api/monster/stop": return HAWK.stopMonster();
     case "/api/build": return HAWK.build(body);
     case "/api/options": return HAWK.buildOptions(body);
-    case "/api/tables": return HAWK.tables(q.league);
+    case "/api/tables": return HAWK.tables(q.league, q.where);
     case "/api/evaluate": return HAWK.evaluate(body);
     case "/api/scan": return body ? HAWK.startScan(body) : HAWK.scanStatus();
     case "/api/scan/stop": return HAWK.stopScan();
@@ -2290,44 +2297,51 @@ document.addEventListener("click", (e) => {
   openTable(b.dataset.table, hl);
 }, true);
 async function openTable(league, highlight = []) {
+  S.tableWhere = "all";   // always opens on the full table
   modal(`<div class="mhead" style="justify-content:space-between"><h2 style="margin:0">📊 ${esc(league)}</h2><button class="ghost" data-close style="width:auto;padding:6px 12px">\u2715</button></div>
     <div id="tblBody" style="margin-top:12px"><div class="note">Loading the table\u2026</div></div>`);
   const paint = async () => {
     const box = $("#tblBody");
     if (!box) return;
+    const where = S.tableWhere || "all";
     let tabs, games = [];
-    try { [tabs, games] = await Promise.all([api(`/api/tables?league=${encodeURIComponent(league)}`), HAWK.scores(localDay(new Date())).catch(() => [])]); }
+    try { [tabs, games] = await Promise.all([api(`/api/tables?league=${encodeURIComponent(league)}&where=${where}`), HAWK.scores(localDay(new Date())).catch(() => [])]); }
     catch (err) { box.innerHTML = `<div class="note">${esc(err.message)}</div>`; return; }
-    const live = games.filter(g => g.league === league && (g.status === 3 || g.status === 4));
+    // A live game only belongs in the full table: it hasn't finished, so it isn't
+    // yet a home result or an away one to anybody.
+    const live = where === "all" ? games.filter(g => g.league === league && (g.status === 3 || g.status === 4)) : [];
     if (!$("#tblBody")) return;
-    box.innerHTML = tabs.length ? tabs.map(t => tableHTML(t, live, highlight, tabs.length > 1)).join("")
-      : `<div class="note">This competition has no table \u2014 it's knockout games only.</div>`;
-    // Sorting is a repaint of what's already here, so it costs nothing.
-    box.querySelectorAll("[data-tsort]").forEach((el) => {
-      el.onclick = () => { S.tableSort = S.tableSort === el.dataset.tsort ? "pos" : el.dataset.tsort; paint(); };
+    // The Nations League came back as one list of 54 nations ranked 1 to 54 \u2014
+    // Leagues A to D and every group in them, flattened. 365Scores does say which
+    // group each row belongs to; HAWK was dropping it. Same for World Cup
+    // qualifying. A competition with no groups is simply one table, as before.
+    const split = tabs.flatMap((t) => {
+      const nums = [...new Set(t.rows.map((r) => r.group).filter((g) => g != null))];
+      if (nums.length < 2) return [t];
+      return nums.map((g) => ({ ...t, name: t.groups[g] || `Group ${g}`,
+        rows: t.rows.filter((r) => r.group === g) }));
     });
-    loadTableForm(tabs, paint);
+    const seg = `<div class="seg" id="tblWhere" style="max-width:320px;margin:0 0 10px">${
+      [["all", "All"], ["home", "\ud83c\udfe0 Home"], ["away", "\u2708\ufe0f Away"]].map(([k, lab]) =>
+        `<button class="${where === k ? "on" : ""}" data-where="${k}">${lab}</button>`).join("")}</div>`;
+    box.innerHTML = split.length ? seg + split.map(t => tableHTML(t, live, highlight, split.length > 1)).join("")
+        + rulesHTML(tabs[0])
+      : `<div class="note">This competition has no table \u2014 it's knockout games only.</div>`;
+    const sw = $("#tblWhere");
+    if (sw) sw.onclick = (e) => { const b = e.target.closest("[data-where]");
+      if (b && b.dataset.where !== S.tableWhere) { S.tableWhere = b.dataset.where; paint(); } };
   };
   await paint();
   const timer = setInterval(() => { if (!$("#tblBody")) return clearInterval(timer); paint(); }, 30000);
 }
-// Last-five form, one request per team and cached 30 minutes by the engine. The
-// table is already on screen before this starts \u2014 it fills in a moment later
-// rather than holding twenty teams' worth of requests in front of the standings.
-async function loadTableForm(tabs, paint) {
-  S.form ||= {};
-  const ids = [...new Set(tabs.flatMap((t) => t.rows.map((r) => r.id)))].filter((id) => !(id in S.form));
-  if (!ids.length) return;
-  let i = 0, got = 0;
-  const worker = async () => {
-    while (i < ids.length) {
-      const id = ids[i++];
-      try { S.form[id] = (await HAWK.form(id, 5)) || null; } catch { S.form[id] = null; }
-      got++;
-    }
-  };
-  await Promise.all([worker(), worker(), worker()]);
-  if (got && $("#tblBody")) paint();
+// How this competition breaks a tie. Worth saying in the Nations League, where
+// two nations level on points are separated by head to head and then away goals
+// rather than by goal difference \u2014 it decides who goes up and who goes down.
+function rulesHTML(t) {
+  const r = t && t.rules;
+  if (!r || !r.points.length) return "";
+  return `<div class="note" style="margin-top:12px"><b>${esc(r.title)}</b>
+    <ol style="margin:5px 0 0;padding-left:20px">${r.points.map((p) => `<li>${esc(p)}</li>`).join("")}</ol></div>`;
 }
 function tableHTML(t, games, highlight, showName) {
   const rows = t.rows.map(r => ({ ...r }));
@@ -2350,44 +2364,40 @@ function tableHTML(t, games, highlight, showName) {
     moving = true;
   }
   if (moving) rows.sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
-  // League position is one question; "do this team's games go over?" is the one a
-  // bet builder is actually holding. Goals per game answers it straight from the
-  // table's own numbers, so it costs nothing to show and can be sorted on.
   const gpg = (r) => (r.p ? (r.gf + r.ga) / r.p : 0);
-  const SORTS = { pos: null, gm: (a, b) => gpg(b) - gpg(a), sc: (a, b) => b.gf / (b.p || 1) - a.gf / (a.p || 1),
-                  cn: (a, b) => a.ga / (a.p || 1) - b.ga / (b.p || 1) };
-  const key = S.tableSort && SORTS[S.tableSort] ? S.tableSort : "pos";
-  const order = key === "pos" ? rows : rows.slice().sort(SORTS[key]);
   const hl = (name) => highlight.some(h => h === name);
-  const body = order.map((r) => {
-    const pos = rows.indexOf(r) + 1, move = moving ? r.pos - pos : 0, dest = r.dest && t.dest[r.dest];
-    const g = gpg(r);
-    return `<tr class="${hl(r.name) ? "hl" : ""}">
-      <td class="tp">${dest ? `<i class="tdst" style="background:${esc(dest.color)}" title="${esc(dest.name)}"></i>` : ""}${pos}${move > 0 ? '<b class="up">\u25b2</b>' : move < 0 ? '<b class="dn">\u25bc</b>' : ""}</td>
-      <td class="tn"><div class="tnw"><img src="${esc(r.crest)}" alt="" onerror="this.style.visibility='hidden'"><span>${esc(r.name)}</span>${r.live ? `<em class="tl ${r.live.res}">${r.live.clock === "FT" ? "" : "\u25cf "}${esc(r.live.text)} <small>${esc(r.live.clock)}</small></em>` : ""}</div></td>
-      <td>${r.p}</td><td class="tw">${r.w}</td><td class="tw">${r.d}</td><td class="tw">${r.l}</td>
-      <td class="tgf">${r.gf}:${r.ga}</td><td>${r.gf - r.ga > 0 ? "+" : ""}${r.gf - r.ga}</td>
-      <td class="tgm ${g >= 3.5 ? "hot" : ""}" title="${esc(r.name)}'s games have averaged ${g.toFixed(2)} goals \u2014 ${r.gf} scored, ${r.ga} conceded in ${r.p}">${g ? g.toFixed(1) : "\u2013"}</td>
-      <td class="tpts">${r.pts}</td>
-      <td class="tform" data-form="${esc(r.id)}">${formHTML(S.form && S.form[r.id])}</td></tr>`;
+  const body = rows.map((r, i) => {
+    const pos = i + 1, move = moving ? r.pos - pos : 0, dest = r.dest && t.dest[r.dest];
+    const g = gpg(r), gd = r.gf - r.ga;
+    return `<details class="lteam" ${hl(r.name) ? "open" : ""}>
+      <summary class="lrow">
+        <span class="lp">${dest ? `<i class="tdst" style="background:${esc(dest.color)}" title="${esc(dest.name)}"></i>` : ""}${pos}${
+          move > 0 ? '<b class="up">\u25b2</b>' : move < 0 ? '<b class="dn">\u25bc</b>' : ""}</span>
+        <img class="lc" src="${esc(r.crest)}" alt="" onerror="this.style.visibility='hidden'">
+        <span class="ln" style="${hl(r.name) ? "color:var(--gold);font-weight:800" : ""}">${esc(r.name)}</span>
+        ${r.live ? `<em class="tl ${r.live.res}">${r.live.clock === "FT" ? "" : "\u25cf "}${esc(r.live.text)} <small>${esc(r.live.clock)}</small></em>` : ""}
+        <span class="lform">${formHTML(r.form)}</span>
+        <span class="lpts">${r.pts}</span>
+      </summary>
+      <div class="lopen">
+        Played <b>${r.p}</b> \u00b7 won <b>${r.w}</b>, drew <b>${r.d}</b>, lost <b>${r.l}</b><br>
+        Scored <b>${r.gf}</b>, conceded <b>${r.ga}</b> \u2014 goal difference <b>${gd > 0 ? "+" : ""}${gd}</b><br>
+        <span class="${g >= 3.5 ? "hot" : ""}">Their games average <b${g >= 3.5 ? ' class="hot"' : ""}>${g.toFixed(1)} goals</b></span>${
+          g >= 3.5 ? " \u2014 one to look at for an over" : g && g <= 2.2 ? " \u2014 tight games" : ""}
+      </div>
+    </details>`;
   }).join("");
   const legend = Object.values(t.dest || {}).map(d => `<span><i class="tdst" style="background:${esc(d.color)}"></i>${esc(d.name)}</span>`).join("");
-  const th = (k, label, title) => `<th class="sortable ${key === k ? "on" : ""}" data-tsort="${k}" title="${esc(title)}">${label}</th>`;
   return `<div class="ltable">${showName && t.name ? `<h3 class="mb-h">${esc(t.name)}</h3>` : ""}
     ${moving ? `<div class="note" style="margin:0 0 8px">\u25cf Live \u2014 today's games are in the table as they stand; it updates every 30 seconds.</div>` : ""}
-    <div style="overflow-x:auto"><table><thead><tr>
-      ${th("pos", "#", "Back to league order")}<th style="text-align:left">Team</th><th>P</th>
-      <th class="tw">W</th><th class="tw">D</th><th class="tw">L</th>
-      ${th("sc", "F:A", "Scored and conceded \u2014 tap to sort by goals scored")}<th>GD</th>
-      ${th("gm", "G/GM", "Goals per game in this team's matches \u2014 tap to sort")}
-      <th>Pts</th><th style="text-align:right">Last 5</th></tr></thead><tbody>${body}</tbody></table></div>
-    ${legend ? `<div class="tleg">${legend}</div>` : ""}
-    ${key !== "pos" ? `<div class="note" style="margin:6px 0 0">Sorted by ${key === "gm" ? "goals per game" : key === "sc" ? "goals scored" : "goals conceded"} \u2014 tap <b>#</b> for league order.</div>` : ""}</div>`;
+    <div class="note" style="margin:0 0 4px">Tap a team for its goals and how its games have gone.</div>
+    ${body}
+    ${legend ? `<div class="tleg">${legend}</div>` : ""}</div>`;
 }
-// Last five, oldest to newest, dimmed where HAWK hasn't fetched that team yet.
+// Last five, oldest on the left \u2014 the order the standings give them in.
 function formHTML(s) {
-  if (!s) return `<i class="fq fd">\u00b7</i><i class="fq fd">\u00b7</i><i class="fq fd">\u00b7</i><i class="fq fd">\u00b7</i><i class="fq fd">\u00b7</i>`;
-  return s.split("").slice(0, 5).reverse()
+  if (!s) return "";
+  return s.split("").slice(-5)
     .map((c) => `<i class="${c === "W" ? "fw" : c === "D" ? "fd" : "fl"}">${c}</i>`).join("");
 }
 function pct100(ps) {

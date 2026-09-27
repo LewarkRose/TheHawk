@@ -239,9 +239,6 @@ img{max-width:100%}
 .sc-league:first-child{margin-top:0}
 .sc-hawk{font-size:10.5px;font-weight:600;color:var(--muted);letter-spacing:0;white-space:nowrap;margin-top:1px}
 .sc-hawk b{color:var(--accent);font-weight:900}
-/* A second outcome within a few points of the top: shown bold but dimmer, so a
-   44·33·23 still reads as one call and a 25·37·38 reads as the coin flip it is. */
-.sc-hawk b.alt{color:var(--gold);font-weight:700;opacity:.85}
 .sc-hawk .ok{color:var(--accent)}.sc-hawk .bad{color:var(--red)}
 .sc-row{display:grid;grid-template-columns:58px 1fr 92px 1fr 64px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;
   border:1px solid transparent;transition:.12s}
@@ -4681,7 +4678,12 @@ async function loadPredictions() {
 function predLine(g) {
   const p = S.preds && S.preds.m[String(g.id)];
   if (!p || !p.probs) return "";
-  const v = pct100([p.probs.home, p.probs.draw, p.probs.away]), best = Math.max(...v), top = v.indexOf(best);
+  const raw = [p.probs.home, p.probs.draw, p.probs.away];
+  const v = pct100(raw), best = Math.max(...v);
+  // Pick from the real numbers, not the rounded ones on screen. 35·30·35 is two
+  // different chances that both round to 35, and choosing by the printed value
+  // handed it to whichever came first in the array.
+  const top = raw.indexOf(Math.max(...raw));
   // A three-way market where the draw peaks near 30% means the draw is almost
   // never the single highest — so marking HAWK wrong whenever the match finishes
   // level failed it on roughly a third of games for a call it had not really got
@@ -4696,10 +4698,12 @@ function predLine(g) {
       : ` <span class="bad">✗</span>`;
   }
   const names = [g.home, "Draw", g.away];
-  const near = v.map((x) => best - x <= CLOSE);   // everything that was in the argument
+  // One outcome highlighted, because that is what a prediction is. How close the
+  // call was is already in the three numbers, and in the tooltip when it was tight.
+  const tight = best - Math.max(...v.filter((_, i) => i !== top)) <= CLOSE;   // the RUNNER-UP, not the outsider
   return `<div class="sc-hawk" title="HAWK before kick-off: ${esc(names.map((n, i) => `${n} ${v[i]}%`).join(" · "))}${
-    near.filter(Boolean).length > 1 ? " — too close to call between them" : ""}${p.level >= 2 ? " — ⚡ High upset risk" : ""}">🦅 ${
-    v.map((x, i) => near[i] ? `<b${i === top ? "" : ' class="alt"'}>${x}</b>` : x).join("·")}${p.level >= 2 ? " ⚡" : ""}${mark}</div>`;
+    tight ? " — close between the top two" : ""}${p.level >= 2 ? " — ⚡ High upset risk" : ""}">🦅 ${
+    v.map((x, i) => i === top ? `<b>${x}</b>` : x).join("·")}${p.level >= 2 ? " ⚡" : ""}${mark}</div>`;
 }
 async function openScore(id) {
   const g = (S.scores.data || []).find(x => x.id === String(id));

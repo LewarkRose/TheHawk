@@ -21,6 +21,8 @@
 :root{
   --bg:#0a0a0a; --panel:#141414; --panel2:#1c1c1c; --line:#2a2a2a; --text:#ededed; --muted:#8a8a8a;
   --accent:#f5c518; --accent-d:#c99700; --gold:#fb923c; --red:#ff5d73; --blue:#e2e8f0; --shadow:0 10px 30px rgba(0,0,0,.35);
+  /* Results read as results, not as HAWK's gold: won, drew, lost. */
+  --green:#3ec46d;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -293,12 +295,12 @@ img{max-width:100%}
 .lopen b{color:var(--text)}
 .lopen .hot{color:var(--accent)}
 .lform{white-space:nowrap;flex:none}
-.lform i{display:inline-block;width:15px;height:15px;border-radius:4px;margin-left:2px;font-style:normal;
+.fmr{white-space:nowrap}
+.fmr i{display:inline-block;width:15px;height:15px;border-radius:4px;margin-left:2px;font-style:normal;
   font-size:9px;line-height:15px;text-align:center;font-weight:800}
-.lform .fw{background:rgba(245,197,24,.9);color:#1a1400}
-.lform .fd{background:var(--panel2);color:var(--muted)}
-.lform .fl{background:rgba(220,60,60,.7);color:#fff}
-.lform .fq{opacity:.3}
+.fmr .fw{background:var(--green);color:#06210f}
+.fmr .fd{background:#3a3a3a;color:#cfcfcf}
+.fmr .fl{background:var(--red);color:#2b0008}
 /* Cup rounds — a bracket's information without a bracket's fiction: the draw is
    made round by round, so the later pairings genuinely do not exist yet. */
 .rnd{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:8px;overflow:hidden}
@@ -1846,7 +1848,7 @@ function renderMatch() {
     <div class="hero">
       <div class="vs">
         <div class="side"><img src="${esc(m.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(m.home)}</div>
-          <div class="muted">${esc(tbl("home"))}${m.form.home ? " · " + esc(m.form.home) : ""}</div>${chip("home")}</div>
+          <div class="muted">${esc(tbl("home"))}${m.form.home ? " · " + formHTML(m.form.home, true) : ""}</div>${chip("home")}</div>
         <div class="mid"><div class="x">VS</div><div class="ko">${esc(fmtKick(m.kickoff))}</div><div class="kick-cd" id="kickCountdown"></div>${tieBanner(m)}
           ${m.started ? '<div class="chips"><span class="badge live">STARTED — pre-match model</span></div>' : ""}
           ${m.referee && m.referee.name ? `<div class="ko" style="margin-top:6px">Ref: ${esc(m.referee.name)}${m.referee.avg ? ` · ${m.referee.avg.toFixed(2)} cards/g` : ""}</div>` : ""}
@@ -1857,7 +1859,7 @@ function renderMatch() {
             `<br><button class="ghost" style="width:auto;padding:5px 10px;margin-top:6px;${isWatched(m.id) ? "color:var(--gold);border-color:var(--gold)" : ""}"
               onclick="toggleWatch()">${isWatched(m.id) ? "🔕 Stop lineup alert" : "🔔 Alert me when lineups are confirmed"}</button>` : ""}</div>
         <div class="side"><img src="${esc(m.awayCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(m.away)}</div>
-          <div class="muted">${esc(tbl("away"))}${m.form.away ? " · " + esc(m.form.away) : ""}</div>${chip("away")}</div>
+          <div class="muted">${esc(tbl("away"))}${m.form.away ? " · " + formHTML(m.form.away, true) : ""}</div>${chip("away")}</div>
       </div>
     </div>
     <div class="section">
@@ -2466,11 +2468,14 @@ function tableHTML(t, games, highlight, showName) {
     ${body}
     ${legend ? `<div class="tleg">${legend}</div>` : ""}</div>`;
 }
-// Last five, oldest on the left \u2014 the order the standings give them in.
-function formHTML(s) {
+// Last five as won/drew/lost blocks, oldest on the left. The two sources disagree
+// on order: the standings list oldest first, HAWK's own form() builds newest
+// first, so a caller using that one says so rather than showing it backwards.
+function formHTML(s, newestFirst = false) {
   if (!s) return "";
-  return s.split("").slice(-5)
-    .map((c) => `<i class="${c === "W" ? "fw" : c === "D" ? "fd" : "fl"}">${c}</i>`).join("");
+  const five = newestFirst ? s.split("").slice(0, 5).reverse() : s.split("").slice(-5);
+  return `<span class="fmr">${five
+    .map((c) => `<i class="${c === "W" ? "fw" : c === "D" ? "fd" : "fl"}">${c}</i>`).join("")}</span>`;
 }
 function pct100(ps) {
   const total = ps.reduce((s, p) => s + p, 0) || 1, raw = ps.map(p => (100 * p) / total), out = raw.map(Math.floor);

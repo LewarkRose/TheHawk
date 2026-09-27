@@ -101,6 +101,26 @@
   // Legs the auto-builder leaves out unless asked: counted per player with no
   // link to the opponent or the referee, so they're the least certain.
   const EXTRA_MARKETS = new Set(["Player Fouls Committed", "Player Fouls Won", "Player Tackles", "Player Offsides"]);
+  // A player's tackle count comes from StatsHub, which counts tackles WON. The
+  // lines are settled on challenges made, won or lost — the settle code already
+  // says so, about the team tackles 365Scores doesn't name anybody for. The
+  // graded board put the gap at 44.5% claimed against 61.2% landed over 9,800
+  // legs, wrong by the same ~20 points at every rung of the ladder, which is a
+  // rate that is too low rather than a shape that is wrong. Fitting a Poisson to
+  // the 1+/2+/3+ lines: HAWK's average rate 1.40, reality's 2.10.
+  // 1.5 was the arithmetic; measured on a real squad it put the average leg at
+  // 64.0% against the 61.2% that lands, so the Poisson fit was a shade generous.
+  const TACKLE_SCALE = 1.4;
+  // What the graded board has learned about a market is only true of the model
+  // that produced it. Change how a market is worked out and the correction sitting
+  // on it is measuring something that no longer exists — it would be applied on
+  // top of the fix and overshoot, and since the board only ever adds, it would
+  // take as many fresh legs again to wash out. Bumping the number here tells
+  // grade.mjs to start that market's tally over.
+  //
+  //   2 — Player Tackles, 2026-09-27. StatsHub counts tackles won; the lines are
+  //       settled on challenges made, so HAWK's rate ran about a third low.
+  const MODEL_VERSION = { "Player Tackles": 2 };
   // Simulated matches kept in memory: each holds ~12 MB of legs, so a phone keeps
   // fewer — eight of them was enough to crash the tab on a phone browser.
   const MATCHES_KEPT = typeof matchMedia === "function" && matchMedia("(max-width:820px)").matches ? 3 : 6;
@@ -1207,7 +1227,8 @@
       const counted = {};
       for (const key of ["fouls", "fouled", "tackles", "offsides"]) {
         const arr = new Int16Array(n * k);
-        for (let s = 0; s < n; s++) for (let i = 0; i < k; i++) { const f = frac[s * k + i]; if (f) arr[s * k + i] = poisson(rng, f * xr(squad[i], key)); }
+        const scale = key === "tackles" ? TACKLE_SCALE : 1;
+        for (let s = 0; s < n; s++) for (let i = 0; i < k; i++) { const f = frac[s * k + i]; if (f) arr[s * k + i] = poisson(rng, f * xr(squad[i], key) * scale); }
         counted[key] = arr;
       }
       const wCards = weighted((p) => p.c90);
@@ -3060,7 +3081,7 @@
     return jobStatus(valueJob);
   }
 
-  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, INTL: [...INTL], fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, refOff, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
+  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, INTL: [...INTL], MODEL_VERSION, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, refOff, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
                   scores, matchReport, ticketLive, gameEvents, halfStats, readLeg, isPlayerText, nameSimilarity, kambiLive, tables,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },

@@ -97,7 +97,22 @@ for (const [id, pr] of Object.entries(state.pending)) {
     tally(T.byMarket[leg.market] ||= { n: 0, p: 0, won: 0 }, leg.p, w);
     const key = HAWK.learnKey(leg.id, leg.market);
     if (key) {
-      tally(T.byKey[key] ||= { n: 0, p: 0, won: 0 }, leg.p, w);
+      // A market whose model has been changed starts again: what was measured
+      // was measured about a different model, and the board never forgets on its
+      // own — it only adds, so a stale correction would outlive the bug it was
+      // covering for by as many legs again.
+      const ver = (HAWK.MODEL_VERSION || {})[key] || 1;
+      const had = T.byKey[key];
+      // Everything already on the board predates this and carries no version:
+      // that IS version 1, not a mismatch, or the first run after this shipped
+      // would throw away every market's record.
+      if (!had) T.byKey[key] = { n: 0, p: 0, won: 0, ver };
+      else if ((had.ver || 1) !== ver) {
+        console.log(`[grade] ${key}: model v${ver} — starting its record over (was ${had.n} legs)`);
+        T.byKey[key] = { n: 0, p: 0, won: 0, ver };
+        if (T.keyBands) delete T.keyBands[key];
+      }
+      tally(T.byKey[key], leg.p, w);
       // The same split again, but per market: one figure per market says
       // whether HAWK is out, not how. A mean that is too high misses at every
       // line in one direction; tails that are too thin (OVERDISP) miss at both

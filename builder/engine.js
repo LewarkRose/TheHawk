@@ -289,6 +289,45 @@
         pts: Math.round(r.points || 0), dest: r.destinationNum || null, next: r.nextMatch ? String(r.nextMatch.id) : null,
         form: (r.recentForm || []).map((c) => FORM[c] || "").join("") || null })) }));
   }
+  // A cup has no table to show, so it showed nothing at all. What it has is
+  // rounds: every tie played and still to play, which is the same information a
+  // bracket carries. The draw is made round by round, so the later rounds have no
+  // pairings yet — a tree drawn in advance would be invented.
+  async function cupRounds(league) {
+    const id = COMPETITIONS[league];
+    if (!id) return [];
+    const [fx, rs] = await Promise.all([
+      s365("games/fixtures", { competitions: id }, 5 * 60 * 1000).catch(() => null),
+      s365("games/results", { competitions: id }, 5 * 60 * 1000).catch(() => null),
+    ]);
+    const all = [...((fx || {}).games || []), ...((rs || {}).games || [])];
+    const seen = new Set(), rounds = new Map();
+    for (const g of all) {
+      if (!g || seen.has(g.id) || !g.homeCompetitor || !g.awayCompetitor) continue;
+      seen.add(g.id);
+      // Stage only. In a knockout, groupNum is the slot in the bracket — the
+      // 4th Round's eight ties carry eight different ones — so keying on it
+      // split a single round into eight rounds of one tie each.
+      const key = String(g.stageNum);
+      if (!rounds.has(key)) rounds.set(key, { name: g.stageName || `Round ${g.stageNum}`, games: [] });
+      const hs = g.homeCompetitor.score, as = g.awayCompetitor.score;
+      const done = g.statusGroup === 4;
+      rounds.get(key).games.push({
+        id: String(g.id), kickoff: g.startTime || null,
+        home: g.homeCompetitor.name, away: g.awayCompetitor.name,
+        homeCrest: crest(g.homeCompetitor), awayCrest: crest(g.awayCompetitor),
+        score: done && hs >= 0 && as >= 0 ? [Math.trunc(hs), Math.trunc(as)] : null,
+        live: g.statusGroup === 3, status: g.statusText || "", clock: g.gameTimeDisplay || null,
+        agg: g.aggregateText || null,
+        // Who went through, where 365Scores says so.
+        won: g.homeCompetitor.isQualified ? "home" : g.awayCompetitor.isQualified ? "away" : null,
+      });
+    }
+    const first = (r) => r.games.map((g) => g.kickoff || "").sort()[0] || "";
+    const out = [...rounds.values()];
+    for (const r of out) r.games.sort((a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""));
+    return out.sort((a, b) => first(a).localeCompare(first(b)));
+  }
   async function form(competitorId, games = 6) {
     const d = await s365("games/results", { competitors: competitorId }, 30 * 60 * 1000);
     if (!d) return null;
@@ -3027,7 +3066,7 @@
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },
                   meta: () => data("meta.json"),
-                  form,
+                  form, cupRounds,
                   _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas, espnLineups, matchPlayer, playerRows,
                                 selectionModel, priceRows, entry: (id) => matches.get(String(id)), liveState, finalMatrix,
                                 fitTotalLambda, scoreMatrix, nameSimilarity, bestMatch } };

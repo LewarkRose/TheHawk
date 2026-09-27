@@ -893,9 +893,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     /* Today and Picks are full-width pages: the league list and the builder
        column are for the builder, so they step aside and the content gets the room. */
     @media (min-width:821px){
-      body[data-view="today"] main.grid, body[data-view="scan"] main.grid, body[data-view="board"] main.grid{grid-template-columns:minmax(0,1fr)}
-      body[data-view="today"] #fxPanel, body[data-view="scan"] #fxPanel, body[data-view="board"] #fxPanel,
-      body[data-view="today"] .slipcol, body[data-view="scan"] .slipcol, body[data-view="board"] .slipcol{display:none}
+      body[data-view="today"] main.grid, body[data-view="scan"] main.grid, body[data-view="board"] main.grid, body[data-view="value"] main.grid{grid-template-columns:minmax(0,1fr)}
+      body[data-view="today"] #fxPanel, body[data-view="scan"] #fxPanel, body[data-view="board"] #fxPanel, body[data-view="value"] #fxPanel,
+      body[data-view="today"] .slipcol, body[data-view="scan"] .slipcol, body[data-view="board"] .slipcol, body[data-view="value"] .slipcol{display:none}
       /* The acca keeps the league list — that's how you go and add another
          match — but the builder column only works on an open fixture, so on
          the acca it sat there saying "pick a fixture" and took 400px for it. */
@@ -1358,6 +1358,7 @@ a.nav{text-decoration:none}
       <button class="mm" id="navBuilder" data-nav="builder">⚡ <span>Builder</span><small>build a bet on one match</small></button>
       <button class="mm" id="accaBtn" data-nav="acca">🧩 <span>Acca</span><small>several matches on one ticket</small></button>
       <button class="mm" id="boardBtn" data-nav="board">📋 <span>Board</span><small>how HAWK itself is doing</small></button>
+      <button class="mm" id="valueBtn" data-nav="value">💰 <span>Value</span><small>where the price looks wrong</small></button>
       <a class="mm vaultnav" href="../">🏦 <span>Vault</span><small>bankroll, all bets, track record</small></a>
     </div>
     <div class="topright">
@@ -1519,6 +1520,8 @@ async function api(path, body) {
     case "/api/evaluate": return HAWK.evaluate(body);
     case "/api/scan": return body ? HAWK.startScan(body) : HAWK.scanStatus();
     case "/api/scan/stop": return HAWK.stopScan();
+    case "/api/value": return body ? HAWK.startValue(body) : HAWK.valueStatus();
+    case "/api/value/stop": return HAWK.stopValue();
   }
   throw new Error("unknown request " + p);
 }
@@ -1555,6 +1558,7 @@ async function init() {
   $("#ltree").onclick = onTreeClick;
   $("#navBuilder").onclick = showBuilder;
   $("#boardBtn").onclick = showBoard;
+  $("#valueBtn").onclick = showValue;
   // The folding league bar (phones).
   $("#fxToggle").onclick = () => { const p = $("#fxPanel"); foldFixtures(!p.classList.contains("folded")); if (!p.classList.contains("folded")) p.scrollIntoView({ behavior: "smooth", block: "start" }); };
   watchView();
@@ -4500,8 +4504,8 @@ function monsterClick(e) {
 /* ---------- page navigation ---------- */
 // The page buttons in the header light up for the page on screen. S.view is
 // set all over the place, so it's watched rather than every caller updating it.
-const NAV_OF = { match: "builder", inplay: "live", scores: "live", scan: "scan", acca: "acca", today: "today", board: "board" };
-const UNDER_MORE = new Set(["builder", "acca", "board"]);
+const NAV_OF = { match: "builder", inplay: "live", scores: "live", scan: "scan", acca: "acca", today: "today", board: "board", value: "value" };
+const UNDER_MORE = new Set(["builder", "acca", "board", "value"]);
 function watchView() {
   let view = S.view;
   const paint = () => {
@@ -5240,6 +5244,76 @@ function renderBoard() {
 function showBoard() {
   document.querySelectorAll(".fx").forEach((f) => f.classList.remove("on"));
   renderBoard();
+}
+
+// --- 💰 VALUE: every quoted line where the book pays more than HAWK's number ---
+// The builder can only offer legs inside the style band, which is right for a
+// ticket but means whole markets are never mentioned — the draw is the obvious
+// one, a result that happens a quarter of the time and that HAWK prices slightly
+// above the bookmakers. This asks a different question: forget how likely it is,
+// where is the price wrong? The engine could already answer it; nothing called it.
+const VALUE_MIN_EDGE = 0.02;
+function valueRows() {
+  const v = S.value || {};
+  let rows = (v.data && v.data.results) || [];
+  if (v.market && v.market !== "All") rows = rows.filter((r) => (r.market || "") === v.market);
+  return rows.filter((r) => r.edge >= VALUE_MIN_EDGE).sort((a, b) => b.edge - a.edge);
+}
+function renderValue() {
+  S.view = "value";
+  const v = (S.value ||= { market: "All", hours: 24, data: null });
+  const all = (v.data && v.data.results) || [];
+  const markets = [...new Set(all.map((r) => r.market).filter(Boolean))].sort();
+  const rows = valueRows(), running = v.data && v.data.running;
+  const chip = (m) => `<button data-vm="${esc(m)}" class="${v.market === m ? "on" : ""}">${esc(m)}${
+    m === "All" ? "" : ` <b>${all.filter((r) => r.market === m && r.edge >= VALUE_MIN_EDGE).length}</b>`}</button>`;
+  $("#match").innerHTML = `
+    <div class="section" style="border-top:0">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h3 style="margin:0">💰 Where the price is wrong</h3><span style="flex:1"></span>
+        <label class="muted" style="font-size:12px">Kick-off
+          <select id="vHours">${KICKOFF_WINDOWS.filter(([h]) => h !== 72).map(([h, t]) =>
+            `<option value="${h}" ${h === v.hours ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+        <button class="build" id="vGo" style="width:auto;margin:0;padding:11px 18px">${running ? "⏹ Stop" : "💰 Find value"}</button>
+      </div>
+      <div class="note" style="margin-top:8px">Every line the bookmakers quote, against HAWK's own chance — whatever the odds, however unlikely.
+        This is the one place a <b>draw</b> can turn up: the builder skips it because a draw lands under a third of the time, not because HAWK doubts it.
+        An edge is what you'd expect to make per €1 <i>if HAWK's number is right</i>, which is the part to keep a hand on.</div>
+      ${v.data ? `<div class="muted" style="font-size:11.5px;margin-top:8px">${v.data.done} of ${v.data.total} matches${
+        running ? " — still looking…" : ""} · ${rows.length} price${rows.length === 1 ? "" : "s"} worth a look</div>` : ""}
+      ${markets.length ? `<div class="rchips" id="vChips">${["All", ...markets].map(chip).join("")}</div>` : ""}
+    </div>
+    ${rows.length ? `<div class="section"><div class="prows">${rows.slice(0, 60).map((r) => `
+      <div class="prow" style="gap:8px">
+        <span style="flex:none;width:52px;text-align:right;font-weight:700;color:var(--accent)">+${(100 * r.edge).toFixed(1)}%</span>
+        <span style="flex:1;min-width:0">
+          <b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.label || "")}</b>
+          <span class="muted" style="font-size:11px">${esc(r.home || "")} v ${esc(r.away || "")} · ${esc(fmtKick(r.kickoff) || "")}</span></span>
+        <span class="muted" style="flex:none;text-align:right;font-size:11px">
+          ${esc(r.book || "")} <b style="color:var(--text)">${(+r.price).toFixed(2)}</b><br>HAWK ${(+r.fair).toFixed(2)}</span>
+      </div>`).join("")}</div>
+      ${rows.length > 60 ? `<div class="muted" style="font-size:11px;margin-top:8px">Showing the 60 biggest of ${rows.length}.</div>` : ""}
+      <div class="muted" style="font-size:11px;margin-top:10px">A price beating HAWK's fair odds is not the same as a bet that wins — it is a bet HAWK thinks is priced too generously. Small edges are mostly noise.</div>
+    </div>` : v.data && !running ? `<div class="section"><div class="note">No price beat HAWK's number by ${Math.round(100 * VALUE_MIN_EDGE)}% or more in that window.</div></div>` : ""}`;
+
+  $("#vHours").onchange = (e) => { v.hours = +e.target.value; savePref("hawk.valueHours", v.hours); };
+  $("#vGo").onclick = async () => {
+    if (running) { await api("/api/value/stop"); return pollValue(); }
+    v.data = await api("/api/value", { leagues: [...S.scan.leagues], hours: hoursFor(v.hours) });
+    renderValue(); pollValue();
+  };
+  if ($("#vChips")) $("#vChips").onclick = (e) => { const b = e.target.closest("[data-vm]"); if (b) { v.market = b.dataset.vm; renderValue(); } };
+}
+async function pollValue() {
+  const v = S.value;
+  v.data = await api("/api/value");
+  if (S.view === "value") renderValue();
+  if (v.data && v.data.running) setTimeout(pollValue, 900);
+}
+function showValue() {
+  document.querySelectorAll(".fx").forEach((f) => f.classList.remove("on"));
+  S.value ||= { market: "All", hours: loadPref("hawk.valueHours", 24), data: null };
+  renderValue();
 }
 function showToday() {
   S.view = "today";

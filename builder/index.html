@@ -1826,7 +1826,7 @@ function renderMatch() {
       ${how ? `<div class="note" style="margin-top:6px">${esc(how)}</div>` : ""}
     </div>
     ${upsetCard(m)}
-    ${intlNote()}
+    ${intlNote(m)}
     ${lineupCard(m)}
     ${teamNews(m)}
     ${mFold("numbers", "📊 Match numbers", `xG ${e.goals[0].toFixed(2)}–${e.goals[1].toFixed(2)} · ${e.sot[0].toFixed(1)}–${e.sot[1].toFixed(1)} on target · ${e.corners.toFixed(1)} corners · ${(e.cards[0] + e.cards[1]).toFixed(1)} cards`,
@@ -1934,12 +1934,19 @@ document.addEventListener("visibilitychange", () => {
 // the out players out of its predicted lineups and gives doubtful ones no legs.
 // International fixtures: say plainly what HAWK can and cannot do here, rather
 // than leaving you to wonder where the player props went.
-function intlNote() {
+function intlNote(m) {
   if (!(HAWK.INTL || []).includes(S.league)) return "";
-  return `<div class="warn" style="margin:10px 0">🌐 <b>${esc(S.league)}</b> — national teams.
-    HAWK's ratings and player records are built per club league, so there are none for these sides.
-    The result, goals, corner and card markets here come from the bookmakers' own prices and are as good as anywhere.
-    <b>Player props are left out</b>: without a player's record they would be a position average wearing his name.</div>`;
+  // Since the national-squad build, a player's record can be there after all —
+  // it comes from his CLUB, joined up by engine/intl_squads.py. This used to say
+  // props were left out whatever had actually been found, which stopped being
+  // true the day that shipped.
+  const squads = [...(((m || {}).players || {}).home || []), ...(((m || {}).players || {}).away || [])];
+  const known = squads.filter((p) => p.has_data).length;
+  const ratings = `HAWK rates clubs, not countries, so the result, goals, corner and card markets here come from the bookmakers' own prices — as good as anywhere.`;
+  return `<div class="warn" style="margin:10px 0">🌐 <b>${esc(S.league)}</b> — national teams. ${ratings}
+    ${known ? `<b>Player legs are on</b>: ${known} of these ${squads.length} players are matched to their club record, so their shots, fouls and cards are their own.
+        Anyone HAWK couldn't place gets no legs rather than a guess.`
+      : `<b>Player props are left out</b>: none of this squad could be matched to a club record, and without one a leg would be a position average wearing his name.`}</div>`;
 }
 function teamNews(m) {
   const miss = m.missing || {};

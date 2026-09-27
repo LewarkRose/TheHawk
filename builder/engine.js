@@ -3009,6 +3009,7 @@
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },
                   meta: () => data("meta.json"),
+                  form,
                   _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas, espnLineups, matchPlayer, playerRows,
                                 selectionModel, priceRows, entry: (id) => matches.get(String(id)), liveState, finalMatrix,
                                 fitTotalLambda, scoreMatrix, nameSimilarity, bestMatch } };

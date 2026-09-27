@@ -183,9 +183,13 @@
         .tr-fold[open] .tr-hide { display: inline; }
         .vsec { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #71717a; margin: 10px 2px 2px; }
     </style>
-    <!-- Icons: new names / ?v= so browsers drop the old cached logo -->
-    <link rel="icon" href="hawk-tab.svg" type="image/svg+xml">
-    <link rel="icon" href="icon.svg?v=5" sizes="any" type="image/svg+xml">
+    <!-- Icons: new names / ?v= so browsers drop the old cached logo.
+         ONE rel=icon. icon.svg used to be declared here too, with sizes="any",
+         and Chrome preferred it — so the tab showed the app icon: a black plate
+         with the crest shrunk to 78% inside it, which is why the mark looked
+         tiny. icon.svg is still the app icon, through the manifest, where the
+         plate is wanted. -->
+    <link rel="icon" href="hawk-tab.svg?v=7" type="image/svg+xml">
     <link rel="apple-touch-icon" href="apple-touch-icon.png?v=6">
     <!-- Installable as an app (one app with the builder: manifest + sw.js at the site root) -->
     <link rel="manifest" href="manifest.webmanifest?v=5">

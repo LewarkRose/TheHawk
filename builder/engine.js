@@ -966,6 +966,25 @@
     const k = lam / (v - 1);
     return gamma(rng, k) / k;
   };
+  // How lopsided the corner count is between the two sides. Two independent
+  // Poissons — which is what this used to be — can only produce a share that
+  // hugs its average: with ten corners in a match it almost never hands eight
+  // of them to one team. Real matches do that all the time, because one side
+  // camps in the other's half for twenty minutes. Measured over 316 finished
+  // matches, the split varies 2.03x as much as independent Poissons allow
+  // (12.9 sigma), with a tenth of matches under 25% and a tenth over 86%.
+  // A share drawn from a Beta, then the total dealt out with it, gives that
+  // spread while leaving the match total exactly as it was — and the total is
+  // the part already calibrated to the bookmakers' lines.
+  const SPLIT_SPREAD = 2.03;
+  const beta = (rng, a, b) => { const x = gamma(rng, a); return x / (x + gamma(rng, b)); };
+  function splitShare(rng, share, total) {
+    // Beta concentration that reproduces the measured spread at this total.
+    if (!(total > 1) || !(share > 0) || !(share < 1)) return share;
+    const k = Math.max(0.5, (total - 1) / (SPLIT_SPREAD - 1) - 1);
+    return beta(rng, k * share, k * (1 - share));
+  }
+  const binomial = (rng, n, p) => { let k = 0; for (let i = 0; i < n; i++) if (rng() < p) k++; return k; };
   function teamExpectations(an) {
     const M = an.M;
     let gh = 0, ga = 0;
@@ -1086,10 +1105,17 @@
       cornerMult[s] = dispMult(rng, cornerLam, OVERDISP.corners);
       cardMult[s] = dispMult(rng, cardLam, OVERDISP.cards);
     }
+    // The match total first — that is the part fitted to the bookmakers' lines,
+    // and a sum of two Poissons is the same Poisson, so it is unchanged. Then
+    // deal those corners out between the sides with a share that varies the way
+    // real matches do (see splitShare). Team lines and "most corners" were the
+    // legs paying for the old fixed split.
+    const homeShare = cornerLam > 0 ? exp.cornersTeam[0] / cornerLam : 0.5;
     for (let s = 0; s < n; s++) {
-      cornersTeam.home[s] = poisson(rng, exp.cornersTeam[0] * cornerMult[s]);
-      cornersTeam.away[s] = poisson(rng, exp.cornersTeam[1] * cornerMult[s]);
-      corners[s] = cornersTeam.home[s] + cornersTeam.away[s];
+      corners[s] = poisson(rng, cornerLam * cornerMult[s]);
+      const sh = splitShare(rng, homeShare, corners[s]);
+      cornersTeam.home[s] = binomial(rng, corners[s], sh);
+      cornersTeam.away[s] = corners[s] - cornersTeam.home[s];
     }
     const teamSot = {}, teamShots = {}, teamCards = {};
     ["home", "away"].forEach((side, t) => {

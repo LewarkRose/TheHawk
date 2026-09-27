@@ -3305,8 +3305,14 @@ function buildBody() {
            known: knownLegIds(),
            learnt: propPrices().length };   // (a new Bet365 prop price → fresh options)
 }
-const sameOptions = () => S.options && S.match && S.options.sig === JSON.stringify(buildBody())
-  && S.slip.join("|") === S.options.list[S.options.at].legs.map(l => l.id).join("|");
+// A build that finds nothing leaves an empty list, and reaching into it threw
+// from inside renderSlip — outside build()'s own try — so the slip never
+// redrew and the button sat on "SIMULATING…" for good.
+const sameOptions = () => {
+  const o = S.options, cur = o && o.list && o.list[o.at];
+  return !!(cur && S.match && o.sig === JSON.stringify(buildBody())
+    && S.slip.join("|") === cur.legs.map((l) => l.id).join("|"));
+};
 function showOption(i) {
   const o = S.options; o.at = (i + o.list.length) % o.list.length;
   S.result = o.list[o.at]; S.slip = S.result.legs.map(l => l.id);
@@ -3323,15 +3329,24 @@ async function build() {
   try {
     const body = buildBody(), { options } = await api("/api/options", body);
     S.options = { sig: JSON.stringify(body), list: options, at: 0 };
-    S.result = options[0];
-    S.slip = S.result.legs.map(l => l.id);
+    S.result = options[0] || null;
+    S.slip = S.result ? S.result.legs.map(l => l.id) : [];
     // Keep the build's settings signature valid: the new slip's locks are the same ones.
-    if (!S.slip.length) toast("No legs fit this style — try another style or target.");
+    if (!S.result) toast(`Nothing here fits ${S.focus === "Players" ? "player legs only" : "those settings"}${
+      S.priced ? " with Bet365-priced legs only" : ""}${S.scan.minOdds ? ` at ${S.scan.minOdds.toFixed(2)}+` : ""} — loosen one of them and build again.`, 6000);
+    else if (!S.slip.length) toast("No legs fit this style — try another style or target.");
     else if (S.result.worth >= 1.02) { const n = options.filter(o => o.worth >= 1.02).length; toast(`✅ ${n} worth-it builder${n > 1 ? "s" : ""} found${options.length > 1 ? " — press Build again for the next" : ""}`, 4000); }
     else if (S.result.worth >= 0.95) toast("🤏 Best here is a fair price (Bet365's cut is small) — ⚡ Best builders shows the best across all matches.", 5000);
     else toast("Bet365 underpays every builder in this match — ⚡ Best builders shows the best across all matches.", 6000);
   } catch (err) { toast(err.message); }
-  renderSlip(); refreshTab();
+  finally {
+    // Put the button back before anything else runs. renderSlip redraws it
+    // normally, but if that throws for any reason this is the only way off the
+    // "SIMULATING…" screen short of reloading the page.
+    const b = $("#go");
+    if (b && /SIMULATING/.test(b.textContent)) { b.disabled = false; b.textContent = "⚡ BUILD MY BET BUILDER"; }
+  }
+  try { renderSlip(); refreshTab(); } catch (e) { console.error("[slip] render failed", e); }
   if (narrow() && S.slip.length) $("#slip").scrollIntoView({ behavior: "smooth" });
 }
 

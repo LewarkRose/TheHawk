@@ -1742,9 +1742,27 @@
     const n = all[0].arr.length;
     const noResult = NO_RESULT.has(focus);
     let chosen = locked.filter((i) => legs[i]);
+    // The result leg the builder opens with. It used to take the side HAWK rates
+    // higher to WIN and consider nothing else, so in a match the upset radar had
+    // at High or Very high it still started from the favourite every time.
+    // Graded over 411 matches, when the radar says "Very high" the favourite fails
+    // to win 57.9% of the time — but the underdog only wins 23.7%. Almost all of
+    // that gap is the draw, so the live leg in those matches is the underdog's
+    // DOUBLE CHANCE, and it was never a candidate at all.
+    // The favourite's legs stay first choice. The underdog's double chance takes
+    // their place only when it's more likely than not on its own AND Bet365 pays
+    // enough more for it to beat the favourite's leg on value — by a wide enough
+    // margin that a penny of price movement can't flip the pick. Both sides need a
+    // real Bet365 price: an estimated one isn't comparable to a quoted one.
+    const DOG_DC_P = 0.5, DOG_DC_EDGE = 0.04;
     if (favourite && !noResult && !chosen.some((i) => legs[i].group === "result")) {
-      const side = ["home", "away"].sort((a, b) => ((legs[`res:${b}`] || {}).p || 0) - ((legs[`res:${a}`] || {}).p || 0))[0];
-      for (const [id, floor] of [[`res:${side}`, 0.5], [`dc:${side}`, 0.6]]) if (legs[id] && !banned.has(id) && legs[id].p >= floor) { chosen.unshift(id); break; }
+      const [fav, dog] = ["home", "away"].sort((a, b) => ((legs[`res:${b}`] || {}).p || 0) - ((legs[`res:${a}`] || {}).p || 0));
+      const pick = (id, floor) => (legs[id] && !banned.has(id) && legs[id].p >= floor ? id : null);
+      let seed = pick(`res:${fav}`, 0.5) || pick(`dc:${fav}`, 0.6);
+      const alt = pick(`dc:${dog}`, DOG_DC_P);
+      if (seed && alt && legs[alt].bookPrice > 1 && legs[seed].bookPrice > 1
+          && valueScore(legs[alt]) >= valueScore(legs[seed]) + DOG_DC_EDGE) seed = alt;
+      if (seed) chosen.unshift(seed);
     }
     const keep = new Set(chosen);
     let m = maskOf(legs, chosen, n);

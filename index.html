@@ -1985,7 +1985,10 @@
                     const row = document.createElement('details');
                     row.className = 'vbet';
                     const icon = bet.status === 'WON' ? '✅' : bet.status === 'CASHED_OUT' ? '💰' : '❌';
-                    row.innerHTML = `<summary><span>${icon}</span><span class="fx">${escHtml(bet.legs.map(l => l.fixture).join(' · '))}</span>
+                    // Each match once. A bet builder is several legs on ONE game,
+                    // so joining every leg's fixture printed the same tie three
+                    // or four times across the row.
+                    row.innerHTML = `<summary><span>${icon}</span><span class="fx">${escHtml([...new Set(bet.legs.map(l => l.fixture).filter(Boolean))].join(' · '))}</span>
                         <span class="text-zinc-500">@ ${bet.odds.toFixed(2)}</span>${money(betProfit(bet))}</summary>`;
                     row.appendChild(card);
                     body.appendChild(row);

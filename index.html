@@ -686,9 +686,11 @@
             bankrollLog.unshift({
                 timestamp: new Date().toISOString(),
                 displayDate: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                oldValue,
-                newValue,
-                delta: newValue - oldValue,
+                oldValue: round2(oldValue),
+                newValue: round2(newValue),
+                // Rounded, not just formatted on the way out: ledgerTotal adds
+                // these up, and a stored -6.340000000000003 compounds.
+                delta: round2(newValue - oldValue),
                 note: note || 'Manual bankroll edit'
             });
             localStorage.setItem('hawk_bankroll_log', JSON.stringify(bankrollLog));

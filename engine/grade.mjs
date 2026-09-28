@@ -40,6 +40,19 @@ const newTotals = () => ({ matches: 0, legs: 0, byMarket: {}, byKey: {}, byLeagu
 // really failed to win / the underdog won, against what the radar said.
 const newUpsets = () => ["Low", "Medium", "High", "Very high"].map((label, level) =>
   ({ level, label, n: 0, saidFail: 0, failed: 0, saidDog: 0, dogWon: 0 }));
+// The same record, but split by the WEIGHT OF THE SIGNALS rather than the level.
+// The level can't answer the question that matters, because it's built partly out
+// of HAWK's own probability — `score = net + (probs[dog] - 0.2) * 5` — so a level
+// bucket agreeing with the result mostly says the probabilities are calibrated,
+// which we already know. The open question is whether the signals the model never
+// sees (rotation, missing regulars, money moving, Polymarket, rest) carry anything
+// BEYOND the probability. That shows up as a residual: inside a band, compare what
+// HAWK said to what happened. If strong upset signals mean the favourite fails more
+// often than HAWK's own number said, the signals are worth feeding into the model.
+// If every band sits on zero, the radar really is only a display and this can rest.
+const NET_BANDS = [[-99, -0.5, "Points to the favourite"], [-0.5, 0.5, "Nothing either way"],
+                   [0.5, 1.5, "Some upset signals"], [1.5, 99, "Strong upset signals"]];
+const newUpsetNet = () => NET_BANDS.map(([lo, hi, label]) => ({ lo, hi, label, n: 0, saidFail: 0, failed: 0 }));
 const tally = (b, p, won) => { b.n++; b.p = +(b.p + p).toFixed(4); if (won) b.won++; };
 
 // Last run's state: kept by the Action's cache; if that's missing, the copy on
@@ -62,6 +75,7 @@ const mondayKey = (iso) => {
 const state = await loadState();
 const T = state.totals;
 T.upsets ||= newUpsets();
+T.upsetNet ||= newUpsetNet();
 const now = Date.now();
 let graded = 0, predicted = 0;
 
@@ -86,6 +100,14 @@ for (const [id, pr] of Object.entries(state.pending)) {
       b.n++; b.saidFail = +(b.saidFail + upset.favFail).toFixed(4); b.saidDog = +(b.saidDog + upset.dogWin).toFixed(4);
       if (upset.failed) b.failed++;
       if (upset.dogWon) b.dogWon++;
+    }
+    // Predictions saved before the signal weight was recorded have no `net`. They
+    // are left out rather than counted as "nothing either way", which would put
+    // matches that had loud signals into the quiet band and flatten the very
+    // residual this is here to measure.
+    if (typeof pr.upset.net === "number") {
+      const nb = T.upsetNet.find((x) => pr.upset.net >= x.lo && pr.upset.net < x.hi);
+      if (nb) { nb.n++; nb.saidFail = +(nb.saidFail + upset.favFail).toFixed(4); if (upset.failed) nb.failed++; }
     }
   }
   let n = 0, won = 0, said = 0;
@@ -156,7 +178,8 @@ for (const league of HAWK.LEAGUES) {
         league, home: f.home, away: f.away, kickoff: f.kickoff, at: new Date().toISOString(),
         legs: m.legs.filter((l) => !l.low_data).map((l) => ({ id: l.id, market: l.market, p: +(l.pRaw ?? l.p).toFixed(4),
                                                              ...(l.player ? { player: l.player } : {}) })),
-        upset: m.upset ? { level: m.upset.level, fav: m.upset.fav, favFail: +m.upset.favFail.toFixed(3), dogWin: +m.upset.dogWin.toFixed(3) } : null,
+        upset: m.upset ? { level: m.upset.level, fav: m.upset.fav, favFail: +m.upset.favFail.toFixed(3),
+                           dogWin: +m.upset.dogWin.toFixed(3), net: +(m.upset.net || 0).toFixed(2) } : null,
         probs: { home: +m.probs.home.toFixed(3), draw: +m.probs.draw.toFixed(3), away: +m.probs.away.toFixed(3) },
       };
       predicted++;
@@ -180,7 +203,7 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   updated: new Date().toISOString(), matches: T.matches, legs: T.legs, waiting: Object.keys(state.pending).length,
   byMarket: T.byMarket, byKey: T.byKey, byLeague: T.byLeague || {}, bands: T.bands,
   keyBands: T.keyBands || {},
-  recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets, weeks: T.weeks || {},
+  recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets, upsetNet: T.upsetNet || [], weeks: T.weeks || {},
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
 process.exit(0);   // the engine's timers shouldn't keep the job alive

@@ -53,6 +53,38 @@ const newUpsets = () => ["Low", "Medium", "High", "Very high"].map((label, level
 const NET_BANDS = [[-99, -0.5, "Points to the favourite"], [-0.5, 0.5, "Nothing either way"],
                    [0.5, 1.5, "Some upset signals"], [1.5, 99, "Strong upset signals"]];
 const newUpsetNet = () => NET_BANDS.map(([lo, hi, label]) => ({ lo, hi, label, n: 0, saidFail: 0, failed: 0 }));
+// How many corners / cards / shots on target / tackles HAWK EXPECTED against how many
+// there were. The leg board can only ever say a market is off by so many points of
+// probability, which is a symptom: it cannot tell a wrong average from a wrong spread,
+// and it cannot be turned back into "expect 4% fewer corners". Worse, the inputs behind
+// an expectation do not survive the match — the bookmakers' corner lines, which the
+// total is 70% built from, are deleted at full time, and a finished fixture drops out
+// of fixtures.json, so no amount of digging afterwards can reconstruct what HAWK said.
+// Recording the expectation up front is the only way these become measurable, and it
+// is kept per league because a constant tuned on one competition has twice now failed
+// to hold in another.
+// Tackles are the reason this exists. StatsHub's `totalTackle` is challenges MADE —
+// the same thing the lines settle on, confirmed against 365Scores over 405
+// player-matches — yet TACKLE_SCALE multiplies it by 1.4 on the stated grounds that it
+// counts tackles won. Three attempts to measure the right figure gave 1.0, 1.22 and
+// 1.56 depending on the sample, so the constant stays where it is until the record
+// here says what it should be, measured on the legs actually being graded. Rates are
+// applied to the minutes each player REALLY played, so this tests the rate alone and
+// never HAWK's guess at who would start.
+const newStat = () => ({ n: 0, exp: 0, act: 0 });
+const fitStat = (league, stat, exp, act) => {
+  if (!(exp > 0) || !(act >= 0)) return;
+  for (const key of [league, "ALL"]) {
+    const b = ((T.statFit ||= {})[key] ||= {});
+    const s = (b[stat] ||= newStat());
+    s.n++; s.exp = +(s.exp + exp).toFixed(3); s.act = +(s.act + act).toFixed(3);
+  }
+};
+// 365Scores writes a tackle count as "2/3 (66.7%)": won out of made. The lines settle
+// on made, so that is the denominator — the same reading hawk-settle.js uses.
+const tacklesMade = (v) => { const m = /^(\d+)\s*\/\s*(\d+)/.exec(String(v ?? "")); return m ? +m[2] : null; };
+const pairSum = (p) => (Array.isArray(p) && p[0] != null && p[1] != null ? p[0] + p[1] : null);
+const r3 = (v) => (typeof v === "number" && Number.isFinite(v) ? +v.toFixed(3) : null);
 const tally = (b, p, won) => { b.n++; b.p = +(b.p + p).toFixed(4); if (won) b.won++; };
 
 // Last run's state: kept by the Action's cache; if that's missing, the copy on
@@ -109,6 +141,26 @@ for (const [id, pr] of Object.entries(state.pending)) {
       const nb = T.upsetNet.find((x) => pr.upset.net >= x.lo && pr.upset.net < x.hi);
       if (nb) { nb.n++; nb.saidFail = +(nb.saidFail + upset.favFail).toFixed(4); if (upset.failed) nb.failed++; }
     }
+  }
+  // Expectation against outcome, for the match totals and for tackles.
+  if (pr.expected) {
+    fitStat(pr.league, "corners", pr.expected.corners, pairSum(f.corners));
+    fitStat(pr.league, "cards", pr.expected.cards, pairSum(f.cards));
+    fitStat(pr.league, "sot", pr.expected.sot, pairSum(f.sot));
+  }
+  for (const side of ["home", "away"]) {
+    const rates = (pr.tackleRates || {})[side] || [];
+    if (!rates.length) continue;
+    const byName = new Map(rates.map((r) => [r.name, r.rate]));
+    let exp = 0, act = 0;
+    for (const p of (f.players || {})[side] || []) {
+      const made = tacklesMade(p.stats && p.stats["Tackles Won"]);
+      const rate = byName.get(p.name);
+      // A player with no minutes tells us nothing, and a missing stat is not a zero.
+      if (made == null || rate == null || !(p.minutes > 0)) continue;
+      exp += rate * (p.minutes / 90); act += made;
+    }
+    if (exp > 0) fitStat(pr.league, "tackles", exp, act);
   }
   let n = 0, won = 0, said = 0;
   for (const leg of pr.legs) {
@@ -180,6 +232,15 @@ for (const league of HAWK.LEAGUES) {
                                                              ...(l.player ? { player: l.player } : {}) })),
         upset: m.upset ? { level: m.upset.level, fav: m.upset.fav, favFail: +m.upset.favFail.toFixed(3),
                            dogWin: +m.upset.dogWin.toFixed(3), net: +(m.upset.net || 0).toFixed(2) } : null,
+        // What HAWK expected, for the expectation-against-outcome record. The totals
+        // are one number each; tackles are per player, as an unscaled per-90 rate
+        // (TACKLE_SCALE is deliberately left off so the record measures the rate
+        // itself and the scale can be read straight off the result).
+        expected: m.expected ? { corners: r3(m.expected.corners), cards: r3(pairSum(m.expected.cards)),
+                                 sot: r3(pairSum(m.expected.sot)) } : null,
+        tackleRates: Object.fromEntries(["home", "away"].map((side) => [side,
+          ((m.players || {})[side] || []).filter((p) => p.name && p.has_data && p.x && p.x.tackles > 0)
+            .map((p) => ({ name: p.name, rate: +p.x.tackles.toFixed(3) }))])),
         probs: { home: +m.probs.home.toFixed(3), draw: +m.probs.draw.toFixed(3), away: +m.probs.away.toFixed(3) },
       };
       predicted++;
@@ -203,7 +264,8 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   updated: new Date().toISOString(), matches: T.matches, legs: T.legs, waiting: Object.keys(state.pending).length,
   byMarket: T.byMarket, byKey: T.byKey, byLeague: T.byLeague || {}, bands: T.bands,
   keyBands: T.keyBands || {},
-  recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets, upsetNet: T.upsetNet || [], weeks: T.weeks || {},
+  recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets, upsetNet: T.upsetNet || [],
+  statFit: T.statFit || {}, weeks: T.weeks || {},
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
 process.exit(0);   // the engine's timers shouldn't keep the job alive

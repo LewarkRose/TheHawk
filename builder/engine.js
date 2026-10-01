@@ -2387,17 +2387,28 @@
         // handicap leg at Bet365's own price that's worth the most (even when
         // that's still under fair — the card says so).
         pick: (() => {
-          const rows = json.legs.filter((l) => l.bookPrice > 1.01 && l.p >= 0.3 && /Full Time Result|Double Chance|Handicap|Draw No Bet/.test(l.market))
+          const rows = json.legs.filter((l) => l.bookPrice > 1.01 && l.p >= pickFloor(l) && /Full Time Result|Double Chance|Handicap|Draw No Bet/.test(l.market))
             .map((l) => ({ id: l.id, label: l.label, market: l.market, price: l.bookPrice, p: l.p, edge: l.bookPrice * l.p - 1 }))
             .sort((a, b) => b.edge - a.edge);
           return rows[0] || null;
         })(),
-        singles: json.legs.filter((l) => l.bookPrice > 1.01 && l.p >= 0.25 && l.bookPrice * l.p >= 1.02)
+        singles: json.legs.filter((l) => l.bookPrice > 1.01 && l.p >= Math.min(0.25, pickFloor(l)) && l.bookPrice * l.p >= 1.02)
           .map((l) => ({ id: l.id, label: l.label, market: l.market, price: l.bookPrice, p: l.p, edge: l.bookPrice * l.p - 1 }))
           .sort((a, b) => b.edge - a.edge).slice(0, 6) });
     });
     return jobStatus(scan);
   }
+  // The draw never appeared on a pick card, and not because it was weighed and
+  // beaten: a draw is 22-30% and every floor sat above it. The acca floors are
+  // right to — STYLES bottoms out at 0.35 in Punchy, and a 25% leg really does
+  // wreck a builder's chance — but a single bet at Bet365's own price is a
+  // different question, and the draw is the one result market where HAWK's number
+  // sits ABOVE the bookmakers' (23.27% against 22.82% over the graded record,
+  // t = 5.75). Dropping the floor for everything would mostly let in other long
+  // shots, whose edge is the noisiest figure on the page, so the draw alone gets
+  // the lower bar — the market the evidence is actually about.
+  const DRAW_PICK_P = 0.18;
+  const pickFloor = (l) => (l.id === "res:draw" ? DRAW_PICK_P : 0.3);
   // What an acca needs to remember about one leg once the match isn't loaded.
   function legSummary(e, json, id) {
     const l = e.legs[id], j = json.legs.find((x) => x.id === id) || {};

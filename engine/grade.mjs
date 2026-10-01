@@ -85,6 +85,19 @@ const fitStat = (league, stat, exp, act) => {
 const tacklesMade = (v) => { const m = /^(\d+)\s*\/\s*(\d+)/.exec(String(v ?? "")); return m ? +m[2] : null; };
 const pairSum = (p) => (Array.isArray(p) && p[0] != null && p[1] != null ? p[0] + p[1] : null);
 const r3 = (v) => (typeof v === "number" && Number.isFinite(v) ? +v.toFixed(3) : null);
+// Every league-and-market cell is kept in state.json so it keeps accumulating, but a
+// cell with four legs in it is noise that would treble the size of the file the
+// builder downloads on every visit. Only cells with enough legs to be worth reading
+// are published; the rest carry on filling up out of sight.
+const PUBLISH_LEAGUE_KEY_MIN = 10;
+const publishedLeagueKeys = () => {
+  const out = {};
+  for (const [league, keys] of Object.entries(T.byLeagueKey || {})) {
+    const kept = Object.fromEntries(Object.entries(keys).filter(([, v]) => v.n >= PUBLISH_LEAGUE_KEY_MIN));
+    if (Object.keys(kept).length) out[league] = kept;
+  }
+  return out;
+};
 const tally = (b, p, won) => { b.n++; b.p = +(b.p + p).toFixed(4); if (won) b.won++; };
 
 // Last run's state: kept by the Action's cache; if that's missing, the copy on
@@ -200,6 +213,21 @@ for (const [id, pr] of Object.entries(state.pending)) {
     // Per league, so "is HAWK better in Serie A than in La Liga" can be answered
     // from every match rather than from the handful you happened to bet on.
     if (pr.league) tally((T.byLeague ||= {})[pr.league] ||= { n: 0, p: 0, won: 0, matches: 0 }, leg.p, w);
+    // Per league AND market. The corrections the builder applies are keyed on the
+    // market alone, which assumes a market behaves the same everywhere — and it
+    // demonstrably doesn't: the tackle rate that fits Brazil is 1.22 and the one
+    // that fits Spain is 1.56, so a single number fitted across both is wrong in
+    // both. Friendlies have been over-confident for weeks (39.6% said, 37.4%
+    // landed) and cannot correct themselves for exactly this reason.
+    // Recording it is cheap. APPLYING it is not yet possible and must not be
+    // switched on because this exists: a league-and-market cell needs its own
+    // LEARN_MIN before it means anything, and most cells will sit near zero for
+    // months (Serie A has one graded match today). This is here to accumulate so
+    // the question can be settled later with numbers instead of a third guess.
+    if (pr.league && key) {
+      const lk = ((T.byLeagueKey ||= {})[pr.league] ||= {});
+      tally(lk[key] ||= { n: 0, p: 0, won: 0 }, leg.p, w);
+    }
   }
   if (!n) continue;
   // Matches as well as legs: one match brings hundreds of legs and they share a
@@ -265,7 +293,7 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   byMarket: T.byMarket, byKey: T.byKey, byLeague: T.byLeague || {}, bands: T.bands,
   keyBands: T.keyBands || {},
   recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets, upsetNet: T.upsetNet || [],
-  statFit: T.statFit || {}, weeks: T.weeks || {},
+  statFit: T.statFit || {}, byLeagueKey: publishedLeagueKeys(), weeks: T.weeks || {},
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
 process.exit(0);   // the engine's timers shouldn't keep the job alive

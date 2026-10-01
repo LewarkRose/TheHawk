@@ -48,7 +48,16 @@
   // Your device's time zone (e.g. Europe/Malta), so a "day" of scores runs midnight to midnight for you.
   const LOCAL_TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/London"; } catch { return "Europe/London"; } })();
   const S365_PARAMS = { appTypeId: 5, langId: 1, timezoneName: LOCAL_TZ, userCountryId: -1 };
-  const ODDS_COUNTRIES = [21, 31, 37]; // each exposes a different bookmaker set
+  // Each id exposes a different bookmaker set, and 365Scores reshuffles them: 21, 31
+  // and 37 served Bet365, BWIN and STS when this was written, and by 2026-10-01 they
+  // served 365Scores, BWIN and STS — no Bet365 at all. PRICE_BOOK is Bet365, so every
+  // leg's bookPrice silently went null, and with it the pick card, the value rows, the
+  // singles, the builder's preference for priced legs and the underdog double-chance
+  // swap (which needs a real price on both sides). Nothing errored; the pages just
+  // quietly had nothing in them. Bet365 is still served at 1, 8, 9, 10, 13, 28 and 39,
+  // all with identical coverage, so 1 goes back in front. priceBookMissing below is
+  // the guard: if this happens again it says so instead of emptying the pages.
+  const ODDS_COUNTRIES = [1, 21, 31, 37];
   const PM_BASE = "https://gamma-api.polymarket.com";
   const DATA_URL = new URL("../data/", document.baseURI).href;
   const PRICE_BOOK = "Bet365";
@@ -266,6 +275,10 @@
     }
     return dedupeQuotes(quotes);
   }
+  // The feed answering fine while carrying no Bet365 at all is the failure that hid
+  // for days: every price-led feature empties out and nothing anywhere says why.
+  const priceBookMissing = (quotes) =>
+    quotes.some((q) => q.source === "365Scores") && !quotes.some((q) => q.book === PRICE_BOOK);
   function dedupeQuotes(quotes) {
     const seen = new Set();
     return quotes.filter((q) => { const k = `${q.book}|${q.type}|${q.value}`; if (seen.has(k)) return false; seen.add(k); return true; });
@@ -738,6 +751,8 @@
                           prices: { 1: 1 / pm.home, X: 1 / pm.draw, 2: 1 / pm.away } });
     const cons = consensus(quotes);
     if (!quotes.length) warnings.push("No odds found for this game on any source yet.");
+    else if (priceBookMissing(quotes))
+      warnings.push(`${PRICE_BOOK} isn't in the odds feed for this game — other bookmakers are, so the chances are fine, but anything that needs ${PRICE_BOOK}'s own price (the value rows, the pick, single bets) will be empty.`);
 
     const lineups = {}, lineupCheck = {};
     const memberName = Object.fromEntries((detail.members || []).map((m) => [m.id, m.name]));

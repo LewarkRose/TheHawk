@@ -2799,6 +2799,8 @@ const propKeyLabel = (k) => { const m = /^([a-z]+?)(\d*)$/.exec(k) || []; return
 function propPrices() { return loadPref("hawk.propPrices", PROP_SEED); }
 function applyPropBook() {
   const lg = (p) => { p = Math.min(Math.max(p, 1e-4), 1 - 1e-4); return Math.log(p / (1 - p)); };
+  // Slip labels are matched to leg labels by text, so collapse whitespace and case.
+  const norm = (s) => String(s == null ? "" : s).replace(/\s+/g, " ").trim().toLowerCase();
   const book = {};
   for (const x of propPrices()) {
     if (!(x.price > 1 && x.p > 0 && x.p < 1)) continue;
@@ -2811,6 +2813,34 @@ function applyPropBook() {
     const f = propShiftFromBuilder(x);
     if (f && f.props) for (const d of f.props) (book[d.k] ||= []).push({ x: lg(d.p), d: f.s, w: 1 / f.props.length });
     // (Bet365 ÷ Unibet isn't learnt from builder prices any more: the gap there is Bet365's builder cut, which applyAim learns per leg.)
+  }
+  // …and, free and with no typing at all, from the tickets already in your Vault.
+  // A logged builder keeps Bet365's own price for each leg in subSelections, beside
+  // the hawk block naming those legs. On a player prop HAWK had no Bet365 price of
+  // its own — measured across 318 logged legs, props were priced 0% of the time, so
+  // every prop chance leant on Unibet plus a flat +1.2% guess. The slip has the real
+  // number. Same shape as a typed price, so it feeds the same book; and where the leg
+  // also kept its Unibet price, the pair finally makes refRatio measurable.
+  // These are SINGLE-leg prices as Bet365 shows them inside the slip, not the
+  // builder's total, so they carry no builder cut — which is why the total was
+  // unusable for this and these are not.
+  for (const b of vaultBets()) {
+    for (const row of b.legs || []) {
+      const h = row.hawk;
+      if (!h || !Array.isArray(h.legs)) continue;
+      const slip = {};
+      for (const s of row.subSelections || []) if (s && s.odds > 1) slip[norm(s.label)] = s.odds;
+      if (!Object.keys(slip).length) continue;
+      for (const l of h.legs) {
+        const key = HAWK.propKey(l);            // null for anything that isn't a player prop
+        const price = slip[norm(l.label)];
+        if (!key || !(price > 1) || !(l.p > 0 && l.p < 1)) continue;
+        if (l.bookPrice > 1) continue;          // HAWK already knew this one
+        const d = lg(Math.min(0.995, 1 / price)) - lg(l.p);
+        if (Math.abs(d) <= 4) (book[key] ||= []).push({ x: lg(l.p), d });
+        if (l.refPrice > 1) (ratios[key] ||= []).push(Math.log(price / l.refPrice));
+      }
+    }
   }
   // Bet365 ÷ Unibet per kind of leg: your builders' average, pulled towards the measured 1.2% until there are a few.
   const refRatio = Object.fromEntries(Object.entries(ratios).map(([k, rs]) => [k, (rs.reduce((a, r) => a + r, 0) + HAWK.REF_TO_B365 * 2) / (rs.length + 2)]));
@@ -3275,7 +3305,13 @@ function hawkPart(info, legs, p) {
   return { game: String(info.id), league: info.league, home: info.home, away: info.away, kickoff: info.kickoff, p,
            legs: legs.map(l => ({ id: l.id, label: l.label, market: l.market, p: l.p, pRaw: l.pRaw != null ? l.pRaw : l.p,
                                   player: l.player || null, side: l.side || null,
-                                  bookPrice: l.bookPrice || null })) };   // Bet365's single price when you bet (closing price check)
+                                  bookPrice: l.bookPrice || null,   // Bet365's single price when you bet (closing price check)
+                                  // The reference (Unibet) price beside it. Without this the two halves of the
+                                  // pair were never stored together, so refRatio — Bet365 ÷ Unibet per kind of
+                                  // leg — could never be measured and b365FromRef was stuck on the global
+                                  // +1.2% for every player prop, which is the whole market HAWK cannot price.
+                                  // Checked across 318 logged legs: not one carried a refPrice.
+                                  refPrice: l.refPrice || null, refBooks: l.refBooks || null })) };
 }
 // Adds a PENDING bet to the Vault and takes the stake off its bankroll.
 function saveToVault(legs, stake, price, extra = {}) {

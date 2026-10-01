@@ -789,6 +789,15 @@
             ['🥈 Second tier', { 'Championship': 1, 'League One': 2, '2. Bundesliga': 26, 'Serie B': 18, 'LaLiga 2': 12, 'Ligue 2': 36 }],
             ['🏅 Cups', { 'FA Cup': 8, 'EFL Cup': 9, 'Copa del Rey': 13, 'Coppa Italia': 20, 'DFB-Pokal': 28, 'Coupe de France': 37 }],
             ['🌎 World', { 'MLS': 104, 'Brasileirão': 113, 'Argentina Primera': 72, 'Liga MX': 141, 'Saudi Pro League': 649, 'Copa Libertadores': 102 }],
+            // National teams. The builder has had these all along (engine.js, the "intl"
+            // group) but the Vault never did, so an international had no entry in the
+            // league selector, no live fixture feed and no home in the per-league figures
+            // — during a break, when they are the only football on, the Vault looked empty
+            // and a ticket had to be filed under "Other competition" by hand.
+            // Same 365Scores ids as the builder, so a ticket sent over already carries a
+            // league name that matches one of these.
+            ['🌐 International', { 'World Cup': 5930, 'Euro': 6316, 'Nations League': 7016,
+                                   'World Cup Qualifiers': 5421, 'Copa America': 595, 'Internationals': 570 }],
         ];
         const FEED_LEAGUES = [...LEAGUE_GROUPS.flatMap(([, ids]) => Object.keys(ids)), "Other Matches"];
         document.getElementById('league-selector').insertAdjacentHTML('beforeend',

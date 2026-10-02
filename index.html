@@ -118,6 +118,14 @@
             box-shadow: 0 10px 24px -10px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06); }
         .vault-bank .lbl { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: #8a8f93; }
         .vault-bank .amt { display: block; font-size: 22px; font-weight: 900; color: #ecc98a; line-height: 1.1; }
+        /* Shown only when the last export is old enough to matter, so it stays a notice
+           rather than furniture: amber, not red — nothing is wrong yet. */
+        .bkwarn { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 0;
+            padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.45; color: #f0d9a0;
+            background: rgba(245,197,24,.09); border: 1px solid rgba(245,197,24,.32); }
+        .bkwarn button { margin-left: auto; padding: 6px 12px; border-radius: 9px; cursor: pointer;
+            font: inherit; font-weight: 700; color: #16202a; background: #ecc98a; border: 0; }
+        .bkwarn button:hover { background: #f5d9a4; }
         .vault-bank .vicon { background: rgba(255,255,255,.05); }
         @media (max-width: 767px) {
             .vault-brand { margin-right: 0; flex: 1; }
@@ -246,6 +254,7 @@
                     <button onclick="resetVault()" class="vbtn vicon" title="Reset the Vault (downloads a backup first)"><span class="icon-gold">⚙️</span></button>
                 </div>
             </div>
+            <div id="backup-warning"></div>
             <div class="vault-bank" title="Your betting bankroll — HAWK's recommended stakes are worked out from it">
                 <div><span class="lbl">Bankroll</span><span id="bankroll-display" class="amt">€1,000.00</span></div>
                 <button onclick="openReconcileModal()" class="vbtn vicon" title="Check this against your bookmaker's balance"><span class="icon-gold">⚖️</span></button>
@@ -2604,6 +2613,35 @@
             a.href = URL.createObjectURL(blob);
             a.download = `hawk_backup_${new Date().toISOString().slice(0,10)}.json`;
             a.click();
+            // The code is on GitHub; your tickets are not. They live in this browser's
+            // storage, which Brave can clear on its own, so the only copy that survives
+            // that is the last file you exported. Nothing used to record when that was,
+            // so there was no way to tell a backup from yesterday from one from a month
+            // ago. Remembered here, and read by backupWarning() below.
+            try { localStorage.setItem('hawk_last_export', String(Date.now())); } catch { /* private window */ }
+            renderBackupWarning();
+        }
+        // How long a gap is worth mentioning. Long enough not to nag, short enough that
+        // a clear would cost you days rather than months.
+        const BACKUP_STALE_DAYS = 7;
+        function backupWarning() {
+            let at = 0;
+            try { at = +localStorage.getItem('hawk_last_export') || 0; } catch { return null; }
+            const settled = bets.filter(b => b.status && b.status !== 'PENDING').length;
+            if (!settled) return null;                       // nothing to lose yet
+            const days = at ? (Date.now() - at) / 86400e3 : null;
+            if (days != null && days < BACKUP_STALE_DAYS) return null;
+            return days == null
+                ? `No backup yet — your ${settled} ticket${settled === 1 ? '' : 's'} exist only in this browser.`
+                : `Last backup was ${Math.floor(days)} days ago — anything since then exists only in this browser.`;
+        }
+        function renderBackupWarning() {
+            const el = document.getElementById('backup-warning');
+            if (!el) return;
+            const msg = backupWarning();
+            el.innerHTML = msg
+                ? `<div class="bkwarn">💾 ${escHtml(msg)} <button onclick="exportData()">Export now</button></div>`
+                : '';
         }
 
         // --- ARCHIVE: clear settled tickets older than six months ---
@@ -3331,6 +3369,7 @@
         function renderUI() {
             document.getElementById('bankroll-display').textContent = `€${bankroll.toFixed(2)}`;
             updateDateLabel();
+            renderBackupWarning();
         }
 
         renderUI();

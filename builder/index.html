@@ -3640,6 +3640,11 @@ function addLeg(id) {
   if (clash) { S.slip = S.slip.map(x => x === clash ? id : x); S.locked.delete(clash); toast(`Swapped for: ${leg.label}`); }
   else S.slip.push(id);
   S.locked.add(id); S.banned.delete(id);
+  // HAWK won't build with these, but you can still put one in by hand, and the slip
+  // would price a ticket Bet365 refuses to make. Better said here than found out at
+  // the till. One leg on its own is fine — it's a single, and singles are allowed.
+  if (S.slip.length > 1 && S.slip.some(x => AH_LEG.test(x)))
+    toast("⚠️ Bet365 won't put an Asian Handicap in a Bet Builder — it'll stay a separate bet.");
   evaluateSlip();
 }
 function removeLeg(id) { S.slip = S.slip.filter(x => x !== id); S.locked.delete(id); S.banned.add(id); evaluateSlip(); }
@@ -3667,9 +3672,21 @@ function markOnBet365() {
 // Legs you've given Bet365's own price for (price check / ✎), for this match.
 const typedLegIds = () => propPrices().filter(x => x.match === String(S.match && S.match.id) && x.price > 1).map(x => x.leg);
 const knownLegIds = () => { const on = onBet365(); return S.match && on.size ? Object.values(S.legs).filter(l => on.has(no365Key(l))).map(l => l.id) : []; };
+// Asian handicap can't go in a Bet Builder. Bet365 keeps it out whatever else is on
+// the slip: add one and the two legs stay separate bets with their own stake boxes,
+// and the builder price never appears. engine.js reasoned that a half line is
+// builder-safe because it can't push and the stake can't come back — true about
+// pushes, and beside the point. It's the market that's barred, not the line.
+// So HAWK stops combining them. They stay on the leg list and keep their place on
+// the pick card, which is a single bet and can take them perfectly well — this only
+// keeps them out of tickets that would be impossible to place.
+const AH_LEG = /^ah:/;
 function unofferedLegIds() {
   const set = notOn365();
-  return S.match && set.size ? Object.values(S.legs).filter(l => set.has(no365Key(l))).map(l => l.id) : [];
+  const ids = Object.values(S.legs)
+    .filter(l => AH_LEG.test(l.id) || (set.size && set.has(no365Key(l))))
+    .map(l => l.id);
+  return S.match ? ids : [];
 }
 async function notOnBet365(id) {
   const l = S.legs[id];

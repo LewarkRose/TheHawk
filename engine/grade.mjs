@@ -21,7 +21,17 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOCAL = process.env.HAWK_LOCAL || "http://127.0.0.1:8000";
 const LIVE = process.env.HAWK_LIVE || "https://lewarkrose.github.io/TheHawk";
-const PREDICT_AHEAD_H = 6, GRADE_AFTER_H = 2.5, GIVE_UP_AFTER_D = 4, KEEP_RECENT = 40;
+// How far ahead a prediction is saved. This has to be longer than the longest gap
+// between runs, because a match that kicks off inside a gap is never predicted at
+// all: no HAWK probability on the Scores page, and nothing to grade afterwards —
+// the record simply skips it, which is worse, because it is invisible.
+// 6 hours assumed the 3-hourly cron actually ran 3-hourly. It did for two days and
+// then GitHub started dropping scheduled runs: measured gaps of 5.6, 4.4, 7.3 and
+// 7.1 hours on 3-4 Oct 2026. 14 covers those with room, and costs nothing in
+// accuracy — every run overwrites the pending prediction, so the numbers that get
+// graded are still the ones from the last run before kick-off. It only means more
+// matches analysed per run.
+const PREDICT_AHEAD_H = 14, GRADE_AFTER_H = 2.5, GIVE_UP_AFTER_D = 4, KEEP_RECENT = 40;
 const BANDS = [[0, 0.2], [0.2, 0.35], [0.35, 0.5], [0.5, 0.65], [0.65, 0.8], [0.8, 0.9], [0.9, 1.01]];
 const STATE_FILE = path.join(ROOT, "data", "grading", "state.json");
 

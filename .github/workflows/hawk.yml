@@ -1,7 +1,17 @@
 # Builds HAWK's data files and publishes the whole site to GitHub Pages.
 #
-# Runs every 3 hours, whenever you upload/commit to main, and on demand
+# Runs roughly every 2 hours, whenever you upload/commit to main, and on demand
 # (Actions tab -> "HAWK data + site" -> Run workflow).
+#
+# Why every 2 and not every 3: GitHub treats scheduled runs as best effort and
+# drops them under load. Measured 1-4 Oct 2026, the every-3-hours cron held to
+# 2.9-3.1 hours for two days and then started slipping — 5.6, 4.4, 7.3, and a
+# 7.1-hour gap on 4 Oct. A match that kicks off inside a gap longer than
+# PREDICT_AHEAD_H never has a prediction saved, so the Scores page shows no
+# HAWK probability for it and it is never graded either; the record just skips it.
+# More frequent attempts mean a dropped run costs less, and the minutes are free
+# on a public repo. The odd minute avoids the top of the hour, which is when
+# GitHub sheds the most scheduled work.
 #
 # One-time setup: Settings -> Pages -> Build and deployment -> Source:
 # "GitHub Actions".
@@ -9,7 +19,7 @@ name: HAWK data + site
 
 on:
   schedule:
-    - cron: "17 */3 * * *"
+    - cron: "9 */2 * * *"
   push:
     branches: [main]
   workflow_dispatch:

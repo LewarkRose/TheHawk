@@ -236,6 +236,19 @@
   const rawFixtures = new Map(); // game id -> {league, game}
   const CUPS = new Set(LEAGUE_GROUPS.find((g) => g.key === "cups").leagues);
   const DATA_DAYS = 8;   // build_data.py's DAYS_AHEAD
+  // "Spain U21", "Brazil U20", "U.A.E. U19" — an age-group side.
+  // These are dropped everywhere: the fixture list, the Scores page and the graded
+  // board all come through here. HAWK has no ratings and no player files for them,
+  // no book prices their corners or cards, so every stat falls back to a senior
+  // average that doesn't carry. Measured over 26 such matches: HAWK expected 9.28
+  // corners and 4.20 cards against 6.92 and 3.27 that happened — about 25% high on
+  // every stat at once. They were 18% of recently graded matches, so they were also
+  // dragging the corrections for every market towards a kind of football that is not
+  // the kind being bet. Senior internationals are unaffected: Nations League grades
+  // at 1.015 on corners because the lines actually exist there.
+  const YOUTH_TEAM = /\bU-?\d{2}\b/i;
+  const youthGame = (g) => YOUTH_TEAM.test((g.homeCompetitor || {}).name || "") ||
+                           YOUTH_TEAM.test((g.awayCompetitor || {}).name || "");
   async function fixtures(league) {
     const d = await s365("games/fixtures", { competitions: COMPETITIONS[league] }, 5 * 60 * 1000);
     if (!d) throw new Error("365Scores didn't return fixtures — try again in a moment");
@@ -245,7 +258,7 @@
     // bet builders), plus ties too far ahead to be in the files yet.
     const kept = CUPS.has(league) ? ((await data("fixtures.json")) || {}).fixtures : null;
     const keep = (g) => !kept || kept[String(g.id)] || !g.startTime || Date.parse(g.startTime) - now > DATA_DAYS * 86400e3;
-    return (d.games || []).filter((g) => g.statusGroup !== 4 && keep(g))
+    return (d.games || []).filter((g) => g.statusGroup !== 4 && keep(g) && !youthGame(g))
       .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""))
       .map((g) => {
         rawFixtures.set(String(g.id), { league, game: g });

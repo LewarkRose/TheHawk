@@ -44,7 +44,15 @@ INTL_COMPS = {"World Cup": 5930, "Euro": 6316, "Nations League": 7016,
               "World Cup Qualifiers": 5421, "Copa America": 595, "Internationals": 570}
 INTL_LEAGUES = set(INTL_COMPS)
 DAYS_AHEAD = 8          # the horizon build_data.py uses for club fixtures
-SQUAD_MIN = 11          # below this the join has clearly failed; write nothing
+# Below this the join has clearly failed and the file is not worth writing. It was
+# 11, which quietly threw away good work: when 365Scores lists only the starting XI
+# and no bench, 10 of 11 matched is a 91% join and it was rejected for being one
+# short. Colombia and Mexico both lost their squads that way on 6 Oct. Nine is most
+# of an XI, and a partial file still helps — the players it does carry get their real
+# rates while the rest fall back to position priors, which is what happens today for
+# every one of them. Genuine failures are nowhere near it: Belarus matched 5 of 23,
+# San Marino 2 of 23.
+SQUAD_MIN = 9
 MATCH_LIMIT = 20        # matches per player, as for clubs
 HOURS_AHEAD = 96        # only fixtures close enough for the squad to be named
 CANDIDATE_CAP = 3       # StatsHub clubs to test per name before giving up
@@ -216,8 +224,8 @@ def main(out_dir):
         for key in ("homeCompetitor", "awayCompetitor"):
             comp = (game.get(key) or {}).get("id")
             if not comp:
-                pair = []
-                break
+                pair.append(None)
+                continue
             key_id = f"intl_{comp}"
             if key_id not in built:
                 try:
@@ -232,11 +240,14 @@ def main(out_dir):
                     print(f"[intl] {(game.get(key) or {}).get('name')}: {len(squad)} players")
                 else:
                     built[key_id] = 0
-            if not built[key_id]:
-                pair = []
-                break
-            pair.append(key_id)
-        if len(pair) == 2:
+            pair.append(key_id if built[key_id] else None)
+        # One side is enough. This used to demand both and drop the fixture entirely
+        # otherwise, so a side that resolved cleanly was thrown away because its
+        # opponent could not be: on 6 Oct that cost Albania (19 players matched, lost
+        # to San Marino's 2) and Argentina (11, lost to Benin's 7). Half a match with
+        # real player props beats none, and the engine already copes — the side with
+        # no file falls back to position priors, exactly as both sides do today.
+        if any(pair):
             f["sh"] = pair
             changed = True
 

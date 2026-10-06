@@ -757,7 +757,12 @@
       odds365(id), s365("game", { gameId: id }), standings(league), form(hc.id), form(ac.id),
       meta && meta.pm_slug ? polymarket(meta.pm_slug, home, away) : null,
       fd.home ? data(`profiles/${fd.home[0]}.json`) : null, fd.away ? data(`profiles/${fd.away[0]}.json`) : null,
-      meta && meta.sh ? data(`players/${meta.sh[0]}.json`) : null, meta && meta.sh ? data(`players/${meta.sh[1]}.json`) : null,
+      // Either side may be null on its own: a national squad is built from its
+      // players' club records and one side can resolve while the other doesn't, so
+      // a fixture can carry ["intl_5029", null]. Asking for players/null.json would
+      // just 404, but the guard says what is going on.
+      meta && meta.sh && meta.sh[0] ? data(`players/${meta.sh[0]}.json`) : null,
+      meta && meta.sh && meta.sh[1] ? data(`players/${meta.sh[1]}.json`) : null,
       recentForm(hc.id), recentForm(ac.id),
       // ESPN's lineups only matter close to kick-off (they're published about an hour before).
       kickoff && kickoff.getTime() - Date.now() < 4 * 3600e3 ? espnLineups(league, home, away, kickoff).catch(() => null) : null,
@@ -2892,7 +2897,7 @@
       });
     }
     const meta = ((await data("fixtures.json")) || { fixtures: {} }).fixtures[id];
-    const files = meta && meta.sh ? await Promise.all(meta.sh.map((t) => data(`players/${t}.json`))) : [null, null];
+    const files = meta && meta.sh ? await Promise.all(meta.sh.map((t) => (t ? data(`players/${t}.json`) : null))) : [null, null];
     const history = { home: playerRows(files[0]), away: playerRows(files[1]) };
     const usual = (side, name, pos) => {
       const rows = history[side] || [], hit = rows.length ? bestMatch(name, rows.map((p) => p.name), 0.6) : null;

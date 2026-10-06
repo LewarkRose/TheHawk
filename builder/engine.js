@@ -110,16 +110,24 @@
   // Legs the auto-builder leaves out unless asked: counted per player with no
   // link to the opponent or the referee, so they're the least certain.
   const EXTRA_MARKETS = new Set(["Player Fouls Committed", "Player Fouls Won", "Player Tackles", "Player Offsides"]);
-  // A player's tackle count comes from StatsHub, which counts tackles WON. The
-  // lines are settled on challenges made, won or lost — the settle code already
-  // says so, about the team tackles 365Scores doesn't name anybody for. The
-  // graded board put the gap at 44.5% claimed against 61.2% landed over 9,800
-  // legs, wrong by the same ~20 points at every rung of the ladder, which is a
-  // rate that is too low rather than a shape that is wrong. Fitting a Poisson to
-  // the 1+/2+/3+ lines: HAWK's average rate 1.40, reality's 2.10.
-  // 1.5 was the arithmetic; measured on a real squad it put the average leg at
-  // 64.0% against the 61.2% that lands, so the Poisson fit was a shade generous.
-  const TACKLE_SCALE = 1.4;
+  // How much higher a player's real tackle count runs than the rate built from his
+  // StatsHub history. The reason first given here — that StatsHub counts tackles WON
+  // while the lines settle on challenges MADE — is wrong: sources.py reads
+  // `totalTackle`, which IS challenges made, and joining the published logs against
+  // 365Scores over 405 player-matches gave 562 against 564. The units were never the
+  // problem. What is low is the RATE: `rates()` shrinks every per-90 towards a
+  // position prior with PRIOR_MINUTES of 450, five full matches of it, and those
+  // priors (1.8 a defender, 1.6 a midfielder) sit below what players actually do.
+  // So the correction is real but it is compensating for shrinkage, not for a
+  // mismatch in what is being counted.
+  // The size of it is now measured rather than reasoned. statFit records the unscaled
+  // rate against what settled, on the very legs being graded, and over 102 matches
+  // wants 1.586. Two other routes agree: projecting each player's rate from his prior
+  // matches in LaLiga 2 gave 1.562, and totalTackle + challengeLost over a full squad
+  // gave 1.561 — a number dismissed as coincidence at the time, wrongly. 1.57 is the
+  // middle of the three. Earlier attempts at this constant (1.5, then 1.4) were fitted
+  // to samples that were never the graded legs, which is why they never reconciled.
+  const TACKLE_SCALE = 1.57;
   // What the graded board has learned about a market is only true of the model
   // that produced it. Change how a market is worked out and the correction sitting
   // on it is measuring something that no longer exists — it would be applied on
@@ -129,7 +137,13 @@
   //
   //   2 — Player Tackles, 2026-09-27. StatsHub counts tackles won; the lines are
   //       settled on challenges made, so HAWK's rate ran about a third low.
-  const MODEL_VERSION = { "Player Tackles": 2 };
+  //       (That reason turned out to be wrong — see TACKLE_SCALE — but the
+  //       direction was right and the reset was still the correct call.)
+  //   3 — Player Tackles, 2026-10-06. TACKLE_SCALE 1.4 -> 1.57, this time measured
+  //       by statFit on the graded legs themselves rather than reasoned from a
+  //       sample. The v2 record (1,842 legs saying +5.8 points at z=+5.1) was
+  //       measuring the 1.4 model and would overshoot if left on top of 1.57.
+  const MODEL_VERSION = { "Player Tackles": 3 };
   // Simulated matches kept in memory: each holds ~12 MB of legs, so a phone keeps
   // fewer — eight of them was enough to crash the tab on a phone browser.
   const MATCHES_KEPT = typeof matchMedia === "function" && matchMedia("(max-width:820px)").matches ? 3 : 6;
@@ -3044,7 +3058,10 @@
     if (!res) throw new Error("365Scores didn't return scores — try again in a moment");
     const score = (c, g) => (g.statusGroup === 2 || !(c.score >= 0) ? null : Math.trunc(c.score));
     const qualifier = (g) => CUPS.has(LEAGUE_OF[g.competitionId]) && /qualif|prelim/i.test(g.stageName || "");
-    return (res.games || []).filter((g) => !qualifier(g)).map((g) => ({
+    // Scores asks 365Scores directly rather than going through fixtures(), so it needs
+    // the youth filter of its own — otherwise they vanish from the builder and the
+    // graded board but still fill the Scores page, which is where they are most visible.
+    return (res.games || []).filter((g) => !qualifier(g) && !youthGame(g)).map((g) => ({
       id: String(g.id), league: LEAGUE_OF[g.competitionId] || g.competitionDisplayName || "", home: g.homeCompetitor.name, away: g.awayCompetitor.name,
       homeCrest: crest(g.homeCompetitor), awayCrest: crest(g.awayCompetitor), kickoff: g.startTime, status: g.statusGroup,
       statusText: g.shortStatusText || g.statusText || "", clock: g.gameTimeDisplay || "", score: [score(g.homeCompetitor, g), score(g.awayCompetitor, g)],

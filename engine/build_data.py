@@ -45,10 +45,29 @@ LIVE_DATA = os.environ.get("HAWK_LIVE", "https://lewarkrose.github.io/TheHawk") 
 MAX_AGE = {"profiles": dt.timedelta(days=10), "players": dt.timedelta(days=4), "results365": dt.timedelta(days=60),
            "props": dt.timedelta(hours=12)}
 # Player-prop prices (PropLine, free key in PROPLINE_KEY): only matches kicking
-# off inside this window, and never more than this many requests in one run —
-# the free key allows 1,000 a day and the Action runs every 3 hours.
+# off inside this window, and never more than this many requests in one run.
+#
+# This number is the daily cap divided by the number of runs, so it has to move
+# whenever the cron does. It was 90, sized for the every-3-hours schedule: 8 runs
+# x 90 = 720 against a free key's 1,000 a day. The workflow went to every 2 hours
+# on 4 Oct 2026 and nobody changed this, so the spend became 12 x 90 = 1,080 plus
+# one event lookup per league per run — and PropLine mailed on the 8th to say the
+# cap had been hit. Nothing broke, because a match whose props fail to fetch keeps
+# the file from an earlier run, but the newest matches stop getting fresh prices.
+#
+#   1,000 a day  /  12 runs  =  83 per run, including the event lookups
+#   less ~8 leagues of those =  75, and 55 leaves real headroom
+#
+# Smaller batches cost nothing here: `soon` is sorted by kick-off so the nearest
+# matches are always served first, and with a 60-hour window and 12 runs a day
+# every match gets dozens of chances before it starts.
 PROPS_HOURS = 60
-PROPS_PER_RUN = 90
+PROPS_PER_RUN = 55
+# Kept beside it so the sum above can be checked rather than remembered. If the
+# cron in .github/workflows/hawk.yml changes, change RUNS_PER_DAY to match and the
+# run will say whether the budget still works.
+PL_DAILY_LIMIT = 1000
+RUNS_PER_DAY = 12          # cron: "9 */2 * * *"
 # 365Scores backup ratings: how far back to keep matches, how many match-stat
 # requests one run may make (one per match; the history fills in over several
 # runs), and how old football-data's last ratings may be before 365Scores' win.
@@ -242,13 +261,16 @@ def main(out_dir):
         by_league = {}
         for f, fid in soon:
             by_league.setdefault(f["league"], []).append((f, fid))
+        calls = 0
         for league, games in by_league.items():
             events = sources.pl_events(league, pl_key)
+            calls += 1
             for f, fid in games:
                 ev = next((e for e in events
                            if sources.name_similarity(f["home"], e.get("home_team", "")) > 0.7
                            and sources.name_similarity(f["away"], e.get("away_team", "")) > 0.7), None)
                 rows = sources.pl_props(league, ev["id"], pl_key) if ev else []
+                calls += 1 if ev else 0
                 if rows:
                     write(out_dir / "props" / f"{fid}.json", {"built": stamp, "books": list(sources.PL_BOOKS), "rows": rows})
                     props["fresh"] += 1
@@ -259,6 +281,9 @@ def main(out_dir):
                 else:
                     props["missing"] += 1
         print(f"player prices: {props['fresh']} matches ({props['legs']} legs), {props['reused']} kept, {props['missing']} without")
+        projected = calls * RUNS_PER_DAY
+        note = "OVER THE CAP — lower PROPS_PER_RUN or slow the cron" if projected > PL_DAILY_LIMIT else "within the free key"
+        print(f"player prices: {calls} PropLine requests this run -> ~{projected}/day at {RUNS_PER_DAY} runs ({note}, limit {PL_DAILY_LIMIT})")
     else:
         print("player prices: no PROPLINE_KEY — skipping (HAWK falls back to Unibet's prices)")
 

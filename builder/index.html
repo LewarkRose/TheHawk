@@ -424,7 +424,33 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   box-shadow:0 8px 24px rgba(188, 200, 255,.3)}
 .build:disabled{opacity:.5;cursor:default}
 @keyframes shine{to{background-position:-200% 0}}
-.ticket{margin-top:14px;border-radius:14px;border:1px solid var(--accent);background:linear-gradient(180deg,#1a2a2c,#172024);overflow:hidden}
+/* The ticket is a physical object: a printed stub with a perforation across it,
+   not a panel. Corners are nearly square because tickets are cut, not rounded;
+   the lift comes from a real shadow rather than a border; and the faint diagonal
+   tooth is paper grain. Nothing here tilts — every figure on it has to be read. */
+.ticket{position:relative;margin-top:14px;border-radius:5px;border:0;overflow:hidden;isolation:isolate;
+  background:
+    repeating-linear-gradient(135deg,rgba(255,255,255,.012) 0 2px,transparent 2px 5px),
+    linear-gradient(180deg,#272533 0%,#211f2b 46%,#1d1b26 100%);
+  box-shadow:0 22px 38px -20px rgba(0,0,0,.95),0 3px 10px -4px rgba(0,0,0,.6),
+             inset 0 1px 0 rgba(255,255,255,.065),inset 0 0 0 1px rgba(188,200,255,.10)}
+/* the printed header rule, the way a ticket carries its issuer along the top */
+.ticket::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;z-index:2;
+  background:linear-gradient(90deg,var(--accent-d),var(--accent) 45%,var(--accent-d))}
+/* THE PERFORATION. Two holes punched through the edges and a dashed score between
+   them, with the fold line labelled. Everything under it is the stub you keep. */
+.ticket .tear{position:relative;height:0;margin:12px 0 0;
+  border-top:2px dashed rgba(188,200,255,.26)}
+.ticket .tear::before,.ticket .tear::after{content:"";position:absolute;top:-10px;
+  width:20px;height:20px;border-radius:50%;background:var(--bg);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.8)}
+.ticket .tear::before{left:-10px}
+.ticket .tear::after{right:-10px}
+.ticket .tear span{position:absolute;left:50%;top:-7px;transform:translateX(-50%);
+  padding:0 10px;background:#211f2b;white-space:nowrap;
+  font:700 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.24em;
+  color:var(--muted);text-transform:uppercase}
+@media (max-width:420px){.ticket .tear span{letter-spacing:.14em;font-size:8.5px}}
 .ticket .th{display:flex;justify-content:space-between;align-items:center;padding:12px 14px}
     /* the header: how often this builder lands, and where the price's break-even sits */
     .ticket .thb{display:flex;align-items:center;gap:14px;padding:12px 14px 13px}
@@ -561,7 +587,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .leg .acts button.on{color:var(--gold);border-color:var(--gold)}
 .leg .pb{margin-top:6px}
 @keyframes in{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
-.sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 14px;border-top:1px solid #272d51;background:rgba(188, 200, 255,.05)}
+/* The stub: what you keep below the tear. Sunk slightly, so it reads as the
+   other half of the same piece of card rather than a second panel. The border
+   is gone because the perforation above is now the divider. */
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px 14px 13px;border-top:0;
+  background:linear-gradient(180deg,rgba(0,0,0,.22),rgba(0,0,0,.10))}
 .sum .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 .guess{padding:8px 14px 11px;font-size:12.5px;background:rgba(188, 200, 255,.05)}.guess b{color:var(--text)}
 .sum .v{font-size:20px;font-weight:900}
@@ -2981,6 +3011,7 @@ function renderSlip() {
       <div class="legkey"><span><i style="background:var(--accent)"></i>Bet365's price</span>
         <span><i style="background:var(--blue)"></i>close books' price</span>
         <span><i style="background:#4a4a4a"></i>HAWK's estimate</span></div>
+      <div class="tear"><span>HAWK &middot; 12,000 sims</span></div>
       <div class="sum"><div><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${r && r.fair ? odds(r.fair) : "–"}</div></div>
         <div><div class="k">Worth it from</div><div class="v" style="color:var(--gold)">${worthFrom(r) ? odds(worthFrom(r)) : "–"}</div></div></div>
       ${guessLine(r)}

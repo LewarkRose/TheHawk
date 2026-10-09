@@ -696,8 +696,31 @@
         const round2 = (v) => Math.round((+v || 0) * 100) / 100;
         let bankroll = round2(parseFloat(localStorage.getItem('hawk_bankroll')) || 1000.00);
         let bankrollLog = JSON.parse(localStorage.getItem('hawk_bankroll_log')) || [];
+        // Tickets removed on purpose, so a sync from the other device doesn't bring them
+        // back. Sync treats "not here" as "new over there" and re-adds it, applying its
+        // stake and payout to the bankroll a second time — the money for a settled
+        // ticket is already in the balance and deleting it deliberately leaves it there.
+        // Ids only, capped, and never cleared on import: a restored backup is supposed
+        // to bring its tickets back, and an id that is in `bets` is simply not consulted.
+        const REMOVED_KEEP = 2000;
+        let removedBets = (() => {
+            try { return new Set(JSON.parse(localStorage.getItem('hawk_removed')) || []); } catch { return new Set(); }
+        })();
+        function rememberRemoved(ids) {
+            const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
+            if (!list.length) return;
+            list.forEach(id => removedBets.add(id));
+            // Oldest out first: these are bet_<ms> ids, so plain sort is chronological.
+            if (removedBets.size > REMOVED_KEEP) removedBets = new Set([...removedBets].sort().slice(-REMOVED_KEEP));
+            try { localStorage.setItem('hawk_removed', JSON.stringify([...removedBets])); } catch { /* private window */ }
+        }
 
-        function logBankrollEdit(oldValue, newValue, note) {
+        // derived: this entry only RECORDS a move the tickets already explain, rather
+        // than being money moved by hand. A sync writes one so the log reads honestly,
+        // but the other device must never re-apply it: it will arrive at the same
+        // figure itself by replaying the tickets, and adding the delta on top counts it
+        // twice. That is what took €6.34 off this Vault twice on 28 September.
+        function logBankrollEdit(oldValue, newValue, note, derived = false) {
             bankrollLog.unshift({
                 timestamp: new Date().toISOString(),
                 displayDate: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
@@ -706,6 +729,7 @@
                 // Rounded, not just formatted on the way out: ledgerTotal adds
                 // these up, and a stored -6.340000000000003 compounds.
                 delta: round2(newValue - oldValue),
+                ...(derived ? { derived: true } : {}),
                 note: note || 'Manual bankroll edit'
             });
             localStorage.setItem('hawk_bankroll_log', JSON.stringify(bankrollLog));
@@ -2098,6 +2122,7 @@
             const index = bets.findIndex(b => b.id === id);
             if(index !== -1) {
                 if(bets[index].status === 'PENDING') bankroll += bets[index].stake;
+                rememberRemoved(bets[index].id);
                 bets.splice(index, 1);
                 saveState();
                 renderUI();
@@ -2142,7 +2167,7 @@
                 if (!groups[league]) groups[league] = { count: 0, wins: 0, losses: 0, staked: 0, returned: 0 };
                 const g = groups[league];
                 g.count++;
-                g.staked += bet.stake;
+                g.staked += (bet.stake || 0);
                 if (bet.status === 'WON') { g.wins++; g.returned += bet.potentialReturn; }
                 else if (bet.status === 'CASHED_OUT') { g.returned += (bet.cashOutAmount || 0); }
                 else { g.losses++; }
@@ -2172,7 +2197,12 @@
             let totalStaked = 0, totalReturned = 0, wins = 0, losses = 0, cashedOut = 0;
             bets.forEach(b => {
                 if(b.status !== 'PENDING') {
-                    totalStaked += b.stake;
+                    // Guarded like the ledger paths. One ticket with no stake used to
+                    // turn every tile on this row into NaN — profit, ROI, drawdown —
+                    // with nothing on screen to say which ticket did it, while the
+                    // bankroll figures beside them stayed correct because those always
+                    // guarded. A missing stake should cost one ticket, not the page.
+                    totalStaked += (b.stake || 0);
                     if(b.status === 'WON') { wins++; totalReturned += b.potentialReturn; }
                     else if(b.status === 'CASHED_OUT') { cashedOut++; totalReturned += (b.cashOutAmount || 0); }
                     else losses++;
@@ -2259,8 +2289,8 @@
             if (!el) return;
             const settled = bets.filter(b => b.status && b.status !== 'PENDING');
             const side = (rows) => {
-                const staked = rows.reduce((s, b) => s + b.stake, 0);
-                const net = rows.reduce((s, b) => s + betReturn(b) - b.stake, 0);
+                const staked = rows.reduce((s, b) => s + (b.stake || 0), 0);
+                const net = rows.reduce((s, b) => s + betReturn(b) - (b.stake || 0), 0);
                 const won = rows.filter(b => b.status === 'WON').length;
                 return { n: rows.length, staked, net, won, roi: staked > 0 ? (100 * net) / staked : null };
             };
@@ -2337,7 +2367,12 @@
             const placed = bets.filter(b => inWeek(+((/bet_(\d+)/.exec(b.id || '') || [])[1] || 0)));
             const pending = placed.filter(b => b.status === 'PENDING').length;
             const staked = settled.reduce((s, b) => s + b.stake, 0), back = settled.reduce((s, b) => s + betReturn(b), 0), pl = back - staked;
+            // Cashed out is counted, not inferred. It used to be "whatever is left over
+            // after won and lost", which labels any other status — a void, a typo, a
+            // status added later — as a cash-out, while the stat tiles above count the
+            // same ticket as a loss. Same data, two different stories.
             const won = settled.filter(b => b.status === 'WON').length, lost = settled.filter(b => b.status === 'LOST').length;
+            const cashed = settled.filter(b => b.status === 'CASHED_OUT').length;
             const byPl = settled.map(b => ({ b, pl: betReturn(b) - b.stake })).sort((x, y) => y.pl - x.pl);
             const name = (b) => escHtml((b.legs || []).map(l => l.fixture).filter(Boolean).slice(0, 2).join(' + ') || 'a ticket');
             // Legs from those bets: closing prices, and how each market did against HAWK's chance.
@@ -2376,7 +2411,7 @@
                 <div class="text-[11px] text-zinc-500">${weekTab === 'last' ? `Monday ${fmt(d1)} – Sunday ${fmt(d2)}` : `Since Monday ${fmt(d1)}`}${pending ? ` · ${pending} still pending` : ''}</div>
                 <div class="text-sm text-zinc-200 leading-relaxed bg-zinc-950 border border-[#f5c518]/25 rounded-xl px-3 py-2">💬 ${say.join(' ')}</div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    ${tile('Profit / loss', settled.length ? money(pl) : '—', settled.length ? `${won} won · ${lost} lost${settled.length - won - lost ? ` · ${settled.length - won - lost} cashed out` : ''}` : 'nothing settled', pl > 0 ? 'text-emerald-400' : pl < 0 ? 'text-red-400' : 'text-zinc-200')}
+                    ${tile('Profit / loss', settled.length ? money(pl) : '—', settled.length ? `${won} won · ${lost} lost${cashed ? ` · ${cashed} cashed out` : ''}${settled.length - won - lost - cashed ? ` · ${settled.length - won - lost - cashed} other` : ''}` : 'nothing settled', pl > 0 ? 'text-emerald-400' : pl < 0 ? 'text-red-400' : 'text-zinc-200')}
                     ${tile('ROI', staked ? `${pl >= 0 ? '+' : ''}${(100 * pl / staked).toFixed(1)}%` : '—', staked ? `€${staked.toFixed(2)} staked` : '', pl > 0 ? 'text-emerald-400' : pl < 0 ? 'text-red-400' : 'text-zinc-200')}
                     ${tile('vs closing price', clv != null ? `${clv >= 0 ? '+' : ''}${(100 * clv).toFixed(1)}%` : '—', clvLegs.length ? `beat it on ${clvLegs.filter(h => h.bookPrice > h.close).length} of ${clvLegs.length} legs` : 'no priced legs settled', clv > 0.005 ? 'text-emerald-400' : clv < -0.005 ? 'text-red-400' : 'text-zinc-200')}
                     ${tile('HAWK on every match', hawkSaid != null ? `${pc(hawkSaid)} → ${pc(hawkGot)}` : '—', rec.length ? `said → landed · ${rec.length} matches${bigCalls.length ? ` · ⚡ ${bigRight}/${bigCalls.length} upset calls right` : ''}` : 'no graded matches', 'text-[#f5c518]')}
@@ -2767,6 +2802,7 @@
                 + `Afterwards your all-time profit, streaks, drawdown and scorecard cover only the tickets that remain.`)) return;
             exportData();   // the whole Vault as it stands, before anything is removed
             const drop = new Set(old);   // by identity, so tickets sharing an id can't take each other with them
+            rememberRemoved(old.map(b => b.id));
             bets = bets.filter(b => !drop.has(b));
             saveState();
             alert(`Archived ${old.length} ticket${old.length > 1 ? 's' : ''} — ${bets.length} left in the Vault.\n\nKeep the backup that just downloaded.`);
@@ -3065,11 +3101,19 @@
         async function applySyncData(data) {
             if (!data || !Array.isArray(data.bets)) return;
             const here = new Map(bets.map(b => [b.id, b]));
-            const add = data.bets.filter(b => b && b.id && !here.has(b.id));
+            // A ticket you deleted or archived here is not a ticket the other device
+            // has that this one is missing, and re-adding it would apply its stake and
+            // payout to the bankroll again — the money for a settled ticket is already
+            // in the balance. Counted so the summary can say so rather than skip in
+            // silence, which would look like the sync had simply failed to arrive.
+            const incoming = data.bets.filter(b => b && b.id && !here.has(b.id));
+            const add = incoming.filter(b => !removedBets.has(b.id));
+            const blocked = incoming.length - add.length;
             const upd = data.bets.filter(b => b && here.has(b.id) && newer(b, here.get(b.id)));
             const made = data.at ? new Date(data.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'a backup file';
-            if (!add.length && !upd.length && Math.abs((data.bankroll || 0) - bankroll) < 0.005) { alert(`📲 Sync link from ${made}: this device already has everything in it.`); return; }
-            if (!confirm(`📲 Sync link from your other device (made ${made}):\n\n• ${add.length} new ticket${add.length === 1 ? '' : 's'} to add\n• ${upd.length} ticket${upd.length === 1 ? '' : 's'} settled or updated there\n\nTickets already here are kept. Add them?`)) return;
+            const blockedNote = blocked ? `\n• ${blocked} ticket${blocked === 1 ? '' : 's'} you removed here — left out` : '';
+            if (!add.length && !upd.length && Math.abs((data.bankroll || 0) - bankroll) < 0.005) { alert(`📲 Sync link from ${made}: this device already has everything in it.${blockedNote}`); return; }
+            if (!confirm(`📲 Sync link from your other device (made ${made}):\n\n• ${add.length} new ticket${add.length === 1 ? '' : 's'} to add\n• ${upd.length} ticket${upd.length === 1 ? '' : 's'} settled or updated there${blockedNote}\n\nTickets already here are kept. Add them?`)) return;
             // What each updated ticket contributed before it's replaced, so the bankroll
             // can be moved by the difference rather than left behind.
             const wasBefore = new Map(upd.map(b => [b.id, { ...here.get(b.id) }]));
@@ -3110,13 +3154,17 @@
             // ticket, so carry across only the log entries this device hasn't seen.
             const seenEdits = new Set(bankrollLog.map(e => e.timestamp));
             const newEdits = (Array.isArray(data.bankrollLog) ? data.bankrollLog : []).filter(e => e && !seenEdits.has(e.timestamp));
-            if (!fresh) for (const e of newEdits) bankroll += (e.delta || 0);
+            // Only entries that moved money by hand. A `derived` entry is the other
+            // device's own record of a sync, and the tickets behind it have just been
+            // replayed above — adding its delta as well charges for the same tickets
+            // twice. Kept in the log either way, so the history still reads straight.
+            if (!fresh) for (const e of newEdits) if (!e.derived) bankroll += (e.delta || 0);
             if (newEdits.length) {
                 bankrollLog = [...newEdits, ...bankrollLog].sort((a, b) => Date.parse(b.timestamp || 0) - Date.parse(a.timestamp || 0));
                 localStorage.setItem('hawk_bankroll_log', JSON.stringify(bankrollLog));
             }
             bankroll = Math.round(bankroll * 100) / 100;
-            if (Math.abs(bankroll - was) >= 0.005) logBankrollEdit(was, bankroll, `Synced from your other device (${add.length} added, ${upd.length} updated)`);
+            if (Math.abs(bankroll - was) >= 0.005) logBankrollEdit(was, bankroll, `Synced from your other device (${add.length} added, ${upd.length} updated)`, true);
             saveState();
             renderUI();
             if (!document.getElementById('view-history').classList.contains('hidden')) renderHistory();

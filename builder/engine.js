@@ -143,7 +143,12 @@
   //       by statFit on the graded legs themselves rather than reasoned from a
   //       sample. The v2 record (1,842 legs saying +5.8 points at z=+5.1) was
   //       measuring the 1.4 model and would overshoot if left on top of 1.57.
-  const MODEL_VERSION = { "Player Tackles": 3 };
+  //   2 — Player Offsides, 2026-10-09. The extras prior is now keyed on the position
+  //       a player's record was built in rather than the one he is listed at today.
+  //       The old record (5,447 legs at -1.8, z=-3.6) was measuring a model that gave
+  //       a forward's offside prior to midfielders; roughly 14% of those legs were
+  //       repriced, so the correction standing on them no longer describes anything.
+  const MODEL_VERSION = { "Player Tackles": 3, "Player Offsides": 2 };
   // Simulated matches kept in memory: each holds ~12 MB of legs, so a phone keeps
   // fewer — eight of them was enough to crash the tab on a phone browser.
   const MATCHES_KEPT = typeof matchMedia === "function" && matchMedia("(max-width:820px)").matches ? 3 : 6;
@@ -1024,8 +1029,20 @@
         // Minutes in the team's last 5 games: 0 for a starter = new signing, back
         // from a long injury — or a lineup mistake (the lineup view flags it).
         const teamMins = lastGames.size ? minutesIn(matches, lastGames) : null;
+        // Two positions, and they are not interchangeable. `pos` is where 365Scores or
+        // ESPN list him for THIS match; StatsHub's is the one his record was built in.
+        // extraPriors pools on StatsHub's, so keying the extras prior on today's listing
+        // lays a forward's prior over a midfielder's counts — and PRIOR_MINUTES is 450,
+        // five whole matches of it, 36-42% of the answer at typical history. It matters
+        // most for offsides, where the priors run F 0.55 against M 0.15: measured over
+        // 201 matches, 8.5% of starters are listed as a forward while StatsHub has them
+        // as a midfielder, and for those the rate came out 60% high. On the graded board
+        // that group's legs said 19.6% and landed 13.7%, against 15.1%/16.5% where the
+        // two sources agree. Minutes, display and the shots priors keep today's position,
+        // which is right for them; only the extras prior follows the record.
         pos = pos || (match && byName[match].position) || "M";
-        const r = rates(matches, priors[pos] || DEFAULT_RATES.M, pos, teamHasExtras ? xpriors[pos] || EXTRA_DEFAULTS.M : null);
+        const xpos = (match && byName[match].position) || pos;
+        const r = rates(matches, priors[pos] || DEFAULT_RATES.M, pos, teamHasExtras ? xpriors[xpos] || EXTRA_DEFAULTS.M : null);
         // A doubtful player in a predicted lineup may well not start (and gets no legs).
         const doubt = !confirmed && listed(name, "Doubtful") ? DOUBTFUL_START : 1;
         const alt = espnPhoto(name), photo2 = alt && alt !== photo ? alt : null;
@@ -1642,7 +1659,15 @@
   function b365Raw(legs, ids, joint) {
     if (!ids.length || !(joint > 0)) return null;
     let prod = 1, pp = 1;
-    for (const id of ids) { const l = legs[id]; prod *= legB365(l); pp *= l.p * (l.adj || 1); }
+    // pp is the independence product, divided by `joint` below to recover how much the
+    // legs move together. Both have to be on the same scale and they are: catalogue
+    // overwrites leg.p with the adjusted chance and keeps leg.adj only as a record of
+    // the factor it used (`leg.adj = p / leg.p; leg.p = p`), and evaluate() builds
+    // `joint` from those same adjusted values. Multiplying by l.adj here applied every
+    // learning and prop-book correction a second time, so the ratio came out high by
+    // the product of all of them and the Bet365 estimate with it — HAWK thought the
+    // book paid more than it does, which flatters every value check built on it.
+    for (const id of ids) { const l = legs[id]; prod *= legB365(l); pp *= l.p; }
     return prod * Math.min(1.5, Math.max(0.3, pp / joint)) * squeeze(legs, ids);
   }
   const b365Of = (legs, ids, joint) => { const r = b365Raw(legs, ids, joint); return r && r * aimOf(ids.length, guessedCount(legs, ids)); };

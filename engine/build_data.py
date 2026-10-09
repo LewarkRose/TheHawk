@@ -147,13 +147,28 @@ def write(path, obj):
     path.write_text(json.dumps(obj, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
 
 
-def previous(name):
-    """The last published copy of a data file (the live site), or None."""
+# Returned instead of None when the published file could not be READ — a timeout, a
+# connection error, unparseable JSON. "Not there" and "could not look" are different
+# answers and the callers that accumulate history have to tell them apart.
+UNREADABLE = object()
+
+
+def previous(name, strict=False):
+    """The last published copy of a data file (the live site), or None.
+
+    With strict=True a read failure returns UNREADABLE rather than None, so a caller
+    that would otherwise treat the absence as "start from scratch" can instead leave
+    the published file alone for this run.
+    """
     try:
         r = requests.get(LIVE_DATA + name, params={"t": int(time.time())}, timeout=20)
-        return r.json() if r.status_code == 200 else None
+        if r.status_code == 404:
+            return None
+        if r.status_code != 200:
+            return UNREADABLE if strict else None
+        return r.json()
     except (requests.RequestException, ValueError):
-        return None
+        return UNREADABLE if strict else None
 
 
 def parse_time(s):
@@ -294,7 +309,18 @@ def main(out_dir):
     results365, cursors, budget = {}, {}, S365_STATS_PER_RUN
     step_end = time.time() + S365_SECONDS
     def listing(code):
-        prev = previous(f"results365/{code}.json") or {}
+        # results365/<code>.json is 400 days of match stats accumulated a few hundred
+        # at a time over many runs, and this is the only copy. previous() used to
+        # answer None for a timeout exactly as it does for a file that isn't there, so
+        # one flaky GET turned `prev` into {} and the run rewrote the file with just
+        # this run's fresh rows — the history gone, silently, for that league. Asking
+        # strictly lets a read failure skip the league instead, leaving what is
+        # published untouched until the next run can read it.
+        prev = previous(f"results365/{code}.json", strict=True)
+        if prev is UNREADABLE:
+            print(f"results365 {code}: could not read the published history — skipped this run, file left as is")
+            return code, None, None, None
+        prev = prev or {}
         rows = {r["id"]: r for r in results_rows(prev) if r["date"] >= since.isoformat()}
         got = sources.s365_results(sources.FD_TO_S365[code], since, set(rows), prev.get("cursor"), deadline=step_end - 120)
         if got is None:
@@ -305,7 +331,7 @@ def main(out_dir):
         return code, rows, cursor, done
     with ThreadPoolExecutor(4) as ex:
         for code, rows, cursor, done in ex.map(listing, sorted(c for c in codes_needed if c in sources.FD_TO_S365)):
-            if rows:
+            if rows:   # None = the published history could not be read; leave it alone
                 results365[code], cursors[code] = rows, (cursor, done)
     pending = sorted(((r["date"], code, r) for code, rows in results365.items() for r in rows.values() if not r.get("got")),
                      key=lambda x: x[0], reverse=True)

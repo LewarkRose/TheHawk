@@ -99,6 +99,44 @@ const r3 = (v) => (typeof v === "number" && Number.isFinite(v) ? +v.toFixed(3) :
 // cell with four legs in it is noise that would treble the size of the file the
 // builder downloads on every visit. Only cells with enough legs to be worth reading
 // are published; the rest carry on filling up out of sight.
+// HAWK's own headline call — home, draw or away — graded as three separate things.
+//
+// It looks like this is already covered, because byMarket has a "Full Time Result"
+// line reading 33.6% said against 33.6% landed over 1,707 legs. That number is
+// arithmetic, not calibration: every match contributes three legs that sum to 100%
+// and exactly one of them wins, so "landed" is pinned at a third no matter what the
+// model does. A draw bias of any size is invisible there, cancelled exactly by the
+// opposite error on home and away. byKey has no result entry at all. So HAWK grades
+// 183,000 legs and has never once checked the prediction on the front of the page.
+//
+// Worth checking because there is a hint of something. Over a rolling window of 101
+// finished matches, draws landed 32.7% against 24.4% claimed, and split by how high
+// HAWK rated the draw the gap only appears at the top:
+//   under 25% rated — calibrated.  25-28% — +14.0.  28-32% — +13.2.  32%+ — +16.8.
+// Three bands in a row, same direction, growing. But the 40-match slice of that
+// window on its own says +3.2 at z=+0.47, so one sample is doing all the work.
+// Hence: record it, per outcome and banded, and decide when there is enough.
+const newResult = () => ({ home: { n: 0, p: 0, hit: 0 }, draw: { n: 0, p: 0, hit: 0 }, away: { n: 0, p: 0, hit: 0 } });
+const DRAW_BANDS = [[0, 0.20], [0.20, 0.25], [0.25, 0.28], [0.28, 0.32], [0.32, 1.01]];
+const newDrawBands = () => DRAW_BANDS.map(([lo, hi]) => ({ lo, hi, n: 0, p: 0, drew: 0 }));
+const tallyResult = (probs, ft) => {
+  if (!probs || !Array.isArray(ft) || ft[0] == null || ft[1] == null) return;
+  const actual = ft[0] > ft[1] ? "home" : ft[0] === ft[1] ? "draw" : "away";
+  // All three checked before any of them is counted. Validating inside the loop
+  // banked home and draw and then bailed on a missing away, leaving the three
+  // totals on different denominators — which is exactly the kind of quiet skew
+  // this tally exists to detect.
+  const sides = ["home", "draw", "away"];
+  if (!sides.every((k) => probs[k] >= 0 && probs[k] <= 1)) return;
+  const R = (T.result ||= newResult());
+  for (const k of sides) {
+    R[k].n++; R[k].p = +(R[k].p + probs[k]).toFixed(4); if (actual === k) R[k].hit++;
+  }
+  // Banded on the draw's own chance: the pattern above is a slope, not a shift, so
+  // one overall figure would average it away.
+  const b = (T.drawBands ||= newDrawBands()).find((x) => probs.draw >= x.lo && probs.draw < x.hi);
+  if (b) { b.n++; b.p = +(b.p + probs.draw).toFixed(4); if (actual === "draw") b.drew++; }
+};
 const PUBLISH_LEAGUE_KEY_MIN = 10;
 const publishedLeagueKeys = () => {
   const out = {};
@@ -131,6 +169,17 @@ const state = await loadState();
 const T = state.totals;
 T.upsets ||= newUpsets();
 T.upsetNet ||= newUpsetNet();
+// A one-off head start. state.done keeps the last four days of {probs, ft} for the
+// Scores page, which is the same pairing this tally wants, so the first run seeds
+// itself from matches already graded instead of starting empty. Guarded by a flag
+// because running it twice would count them twice, and the whole point of the
+// exercise is a number that can be trusted.
+if (!state.resultSeeded) {
+  let seeded = 0;
+  for (const d of Object.values(state.done || {})) { tallyResult(d.probs, d.ft); seeded++; }
+  state.resultSeeded = true;
+  console.log(`[grade] result tally seeded from ${seeded} already-graded match(es)`);
+}
 const now = Date.now();
 let graded = 0, predicted = 0;
 
@@ -145,6 +194,7 @@ for (const [id, pr] of Object.entries(state.pending)) {
   if (f.off) continue;   // postponed / abandoned
   // Kept a few days for the Scores page: HAWK's prediction next to the result.
   if (pr.probs && f.ft) (state.done ||= {})[id] = { probs: pr.probs, level: pr.upset ? pr.upset.level : null, kickoff: pr.kickoff, ft: f.ft };
+  tallyResult(pr.probs, f.ft);
   // The upset radar's call against the result.
   let upset = null;
   if (pr.upset && f.ft) {
@@ -303,7 +353,8 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   byMarket: T.byMarket, byKey: T.byKey, byLeague: T.byLeague || {}, bands: T.bands,
   keyBands: T.keyBands || {},
   recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets, upsetNet: T.upsetNet || [],
-  statFit: T.statFit || {}, byLeagueKey: publishedLeagueKeys(), weeks: T.weeks || {},
+  statFit: T.statFit || {}, byLeagueKey: publishedLeagueKeys(),
+  result: T.result || newResult(), drawBands: T.drawBands || newDrawBands(), weeks: T.weeks || {},
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
 process.exit(0);   // the engine's timers shouldn't keep the job alive

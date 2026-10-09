@@ -137,6 +137,11 @@ const tallyResult = (probs, ft) => {
   const b = (T.drawBands ||= newDrawBands()).find((x) => probs.draw >= x.lo && probs.draw < x.hi);
   if (b) { b.n++; b.p = +(b.p + probs.draw).toFixed(4); if (actual === "draw") b.drew++; }
 };
+// A line needs enough legs to be read against its neighbours — the whole point is the
+// shape across six of them, and one noisy rung makes a flat curve look alternating.
+const PUBLISH_LINE_MIN = 40;
+const publishedLines = () =>
+  Object.fromEntries(Object.entries(T.byLine || {}).filter(([, v]) => v.n >= PUBLISH_LINE_MIN));
 const PUBLISH_LEAGUE_KEY_MIN = 10;
 const publishedLeagueKeys = () => {
   const out = {};
@@ -270,6 +275,29 @@ for (const [id, pr] of Object.entries(state.pending)) {
     }
     const band = T.bands.find((b) => leg.p >= b.lo && leg.p < b.hi);
     if (band) tally(band, leg.p, w);
+    // By the LINE itself, which is the one cut that can say WHY a totals market is
+    // off. The chance-band ladder cannot: a leg at 45% might be Over 2.5 for a weak
+    // side or Over 6.5 for a strong one, and those two fail in opposite directions
+    // when the variance is wrong. Against the line they separate cleanly.
+    //
+    //   mean too high      — every line misses the same way, a flat -2 or -3 across
+    //                        2.5, 3.5, 4.5, 5.5, 6.5, 7.5
+    //   variance too wide  — the miss ALTERNATES: low lines land more than said,
+    //                        high lines fewer, crossing over around the middle
+    //
+    // Team Corners is -2.5 points over 6,452 legs with the match total calibrated at
+    // 0.983, which says the split between the two sides is at fault, but not which
+    // way. A 2,000,000-draw simulation of the engine's own corner path put the two
+    // signatures at flat -2.1/-3.0 against an alternating +5.9/+3.2/0/-2.9/-4.0/-3.9
+    // — nothing alike, and the aggregate throws away exactly the difference.
+    // Match totals only. No player prop ends `:o<n>` or `:u<n>` today — they end in
+    // the stat and its count, `:tackles1`, `:offsides2` — but one named `:u21` would
+    // slip straight into a corner line's bucket, and a prop always carries `player`.
+    const lineAt = leg.player ? null : /:([ou])(\d+(?:\.\d+)?)$/.exec(leg.id || "");
+    if (lineAt) {
+      const lk = `${leg.market} · ${lineAt[1] === "o" ? "Over" : "Under"} ${lineAt[2]}`;
+      tally((T.byLine ||= {})[lk] ||= { n: 0, p: 0, won: 0 }, leg.p, w);
+    }
     // Per league, so "is HAWK better in Serie A than in La Liga" can be answered
     // from every match rather than from the handful you happened to bet on.
     if (pr.league) tally((T.byLeague ||= {})[pr.league] ||= { n: 0, p: 0, won: 0, matches: 0 }, leg.p, w);
@@ -354,7 +382,8 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   keyBands: T.keyBands || {},
   recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets, upsetNet: T.upsetNet || [],
   statFit: T.statFit || {}, byLeagueKey: publishedLeagueKeys(),
-  result: T.result || newResult(), drawBands: T.drawBands || newDrawBands(), weeks: T.weeks || {},
+  result: T.result || newResult(), drawBands: T.drawBands || newDrawBands(),
+  byLine: publishedLines(), weeks: T.weeks || {},
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
 process.exit(0);   // the engine's timers shouldn't keep the job alive

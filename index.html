@@ -485,6 +485,12 @@
             </div>
 
             <div class="space-y-4 mt-4">
+                <!-- The two buckets side by side. Deliberately here with the other
+                     analytics rather than in the header: the header is sticky on every
+                     tab, and this is a thing to look at now and then, not a thing to
+                     carry around. -->
+                <div id="hawk-split"></div>
+
                 <div id="auto-settle-status" class="hidden bg-zinc-900/60 px-4 py-2.5 rounded-2xl border border-zinc-800/80 text-xs text-zinc-400"></div>
 
                 <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
@@ -1934,7 +1940,8 @@
                 card.innerHTML = `
                     <div class="flex justify-between items-center pb-2 border-b border-zinc-900 text-xs">
                         <div class="flex items-center gap-2 flex-wrap"><span class="text-zinc-400">${bet.date}</span><span class="text-[#f5c518] font-bold">Odds: ${bet.odds.toFixed(2)}</span>${typeBadge}${
-                            isHawkBet(bet) ? '<span class="bg-zinc-800 text-[#f5c518] px-2 py-0.5 rounded text-[10px] font-bold" title="Built with HAWK">🦅 HAWK</span>' : ''}${
+                            isHawkBuilt(bet) ? '<span class="bg-zinc-800 text-[#f5c518] px-2 py-0.5 rounded text-[10px] font-bold" title="Built with HAWK">🦅 HAWK</span>'
+                            : isHawkBet(bet) ? '<span class="bg-zinc-800/60 text-zinc-400 px-2 py-0.5 rounded text-[10px]" title="You built this one — HAWK knows the match, so it can settle it and check the closing prices">🔗 linked</span>' : ''}${
                             bet.settledBy === 'HAWK' ? '<span class="bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded text-[10px]" title="Settled automatically from the final result — ✏️ Edit to change it">🤖 auto-settled</span>' : ''}</div>
                         <div class="flex items-center gap-2">
                             ${badge}
@@ -2231,6 +2238,71 @@
             renderBeatBet365();
             renderTrackRecord();
             renderWeekly();
+            renderHawkSplit();
+        }
+
+        // --- HAWK-BUILT vs YOUR OWN ---------------------------------------------
+        // The largest number in the Vault and the only one it never showed you.
+        //
+        // Everything here follows updateAnalytics exactly on purpose, because the two
+        // must add up: PENDING filtered out first (betReturn returns 0 for a running
+        // ticket, so leaving them in books every one as a total loss), betReturn rather
+        // than payoutContribution (which omits the stake by design, since the stake came
+        // off the bankroll at lock-in), stake read unguarded as the stat tiles read it,
+        // and ROI as profit over that bucket's own staked total.
+        //
+        // The two P/L figures therefore sum to the Total Profit / Loss tile. The two
+        // ROIs do NOT average to the ROI tile — each is over its own stake — and that
+        // is worth knowing before it looks like a bug.
+        function renderHawkSplit() {
+            const el = document.getElementById('hawk-split');
+            if (!el) return;
+            const settled = bets.filter(b => b.status && b.status !== 'PENDING');
+            const side = (rows) => {
+                const staked = rows.reduce((s, b) => s + b.stake, 0);
+                const net = rows.reduce((s, b) => s + betReturn(b) - b.stake, 0);
+                const won = rows.filter(b => b.status === 'WON').length;
+                return { n: rows.length, staked, net, won, roi: staked > 0 ? (100 * net) / staked : null };
+            };
+            const hawk = side(settled.filter(isHawkBuilt)), mine = side(settled.filter(b => !isHawkBuilt(b)));
+            // Nothing useful to say until both sides have something in them, and a
+            // handful of tickets either way is noise dressed as a verdict.
+            if (hawk.n < 5 || mine.n < 5) { el.innerHTML = ''; return; }
+
+            const MINUS = '−';
+            const money = (v) => `${v < 0 ? MINUS : v > 0 ? '+' : ''}€${Math.abs(v).toFixed(2)}`;
+            const tone = (v) => v > 0.005 ? 'text-emerald-400' : v < -0.005 ? 'text-red-400' : 'text-zinc-300';
+            const pct = (v) => v == null ? '—' : `${v < 0 ? MINUS : v > 0 ? '+' : ''}${Math.abs(v).toFixed(2)}%`;
+            const row = (icon, label, s, hint) => `
+                <div class="bg-zinc-950/60 p-3 rounded-xl border border-zinc-800/80">
+                    <div class="flex items-baseline justify-between gap-2">
+                        <span class="text-[11px] text-zinc-400 flex items-center gap-1.5"><span class="icon-gold">${icon}</span>${escHtml(label)}</span>
+                        <span class="text-[10px] text-zinc-500">${s.n} tickets · ${s.won} won · €${s.staked.toFixed(2)} staked</span>
+                    </div>
+                    <div class="flex items-baseline gap-3 mt-1">
+                        <span class="text-lg font-bold ${tone(s.net)}">${money(s.net)}</span>
+                        <span class="text-sm font-bold ${tone(s.roi == null ? 0 : s.roi)}">${pct(s.roi)} ROI</span>
+                    </div>
+                    <div class="text-[10px] text-zinc-500 mt-0.5">${escHtml(hint)}</div>
+                </div>`;
+            const gap = (hawk.roi ?? 0) - (mine.roi ?? 0);
+            el.innerHTML = `
+                <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-3">
+                    <div class="flex flex-wrap justify-between items-baseline gap-2">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">⚖️</span> Did following HAWK pay?</h3>
+                        <span class="text-[10px] text-zinc-500">settled tickets only</span>
+                    </div>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        ${row('🦅', 'HAWK built it', hawk, 'Legs HAWK picked, sent over from the builder.')}
+                        ${row('✍️', 'You built it', mine, 'Your own tickets, including any reused from history.')}
+                    </div>
+                    <div class="text-[11px] text-zinc-400 leading-relaxed">
+                        ${Math.abs(gap) < 0.01
+                            ? 'The two are running level.'
+                            : `HAWK's tickets are running <b class="${tone(gap)}">${pct(Math.abs(gap)).replace(MINUS, '')}</b> ${gap > 0 ? 'better' : 'worse'} than your own, by return on stake.`}
+                        The two profits add up to Total Profit / Loss; the two ROIs don't average to the ROI tile, since each is measured against its own stake.
+                    </div>
+                </div>`;
         }
 
         // --- WEEKLY HAWK REPORT: last week (Monday to Sunday) or this week so far ---
@@ -2321,7 +2393,25 @@
             + `&legs=${encodeURIComponent((l.hawk.legs || []).map(h => h.id).join(','))}`;
         const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         const betReturn = (b) => b.status === 'WON' ? b.potentialReturn : b.status === 'CASHED_OUT' ? (b.cashOutAmount || 0) : 0;
+        // Two different questions, and they were being answered by one function.
+        //
+        // isHawkBet asks "does HAWK know this match?" — true as soon as any leg carries
+        // a hawk block. But linkVaultBets in the builder deliberately grafts that block
+        // onto tickets you typed in yourself, so it can be about your own work. On the
+        // current export it calls 16 of 211 tickets HAWK's that HAWK never built: angles
+        // like 'Live' or blank, entered by hand. It is the right test for things that
+        // need HAWK's view of the match — auto-settling, closing prices, the leg
+        // calibration — which is what every existing caller uses it for.
+        //
+        // isHawkBuilt asks "did HAWK pick these legs?" — which is the only fair question
+        // to put to a performance comparison, because the other bucket is the answer.
+        // Both builder write paths are covered: saveToVault sets source:'hawk', and check
+        // mode's "I placed it" goes through logBetToVault, which sets hawkChance and no
+        // source at all. Neither is set by anything in the Vault, and reuseEntireBet
+        // strips both, so a re-placed HAWK ticket counts as your own — which is right,
+        // you chose to place it again.
         const isHawkBet = (b) => b.source === 'hawk' || (b.legs || []).some(l => l.hawk || /^HAWK/.test(l.angle || ''));
+        const isHawkBuilt = (b) => b.source === 'hawk' || b.hawkChance != null;
         // When a ticket was settled (or, for older tickets, placed — the id holds that time).
         const settleTime = (b) => (b.settledAt ? Date.parse(b.settledAt) : 0) || +((/bet_(\d+)/.exec(b.id || '') || [])[1] || 0);
 
@@ -2374,7 +2464,13 @@
             if (!el) return;
             const legs = bets.flatMap(b => (b.legs || []).flatMap(l => (l.hawk && l.hawk.legs) || []))
                 .filter(h => (h.result === 'won' || h.result === 'lost') && h.p > 0);
-            const tickets = bets.filter(b => b.hawkP > 0 && (b.status === 'WON' || b.status === 'LOST'));
+            // The two builder paths name this field differently — saveToVault writes
+            // hawkP, check mode's "I placed it" writes hawkChance — and only hawkP was
+            // read here, so every check-mode ticket was missing from this record without
+            // saying so. No such tickets exist in the current Vault, which is why it has
+            // never shown: a silent hole waiting for the first one.
+            const ticketP = (b) => b.hawkP ?? b.hawkChance;
+            const tickets = bets.filter(b => ticketP(b) > 0 && (b.status === 'WON' || b.status === 'LOST'));
             const row = (label, list) => calRow(label, list.length, list.reduce((s, h) => s + h.p, 0) / list.length,
                                                 list.filter(h => h.result === 'won').length / list.length);
             const bands = [[0, 0.5, 'Under 50%'], [0.5, 0.65, '50–65%'], [0.65, 0.8, '65–80%'], [0.8, 0.9, '80–90%'], [0.9, 1.01, '90%+']];
@@ -2382,7 +2478,7 @@
             const byMarket = {};
             legs.forEach(h => (byMarket[h.market || 'Other'] ||= []).push(h));
             const markets = Object.entries(byMarket).sort((a, b) => b[1].length - a[1].length).slice(0, 6);
-            const expWins = tickets.reduce((s, b) => s + b.hawkP, 0), wins = tickets.filter(b => b.status === 'WON').length;
+            const expWins = tickets.reduce((s, b) => s + ticketP(b), 0), wins = tickets.filter(b => b.status === 'WON').length;
             const yours = !legs.length
                 ? `<div class="text-zinc-500 text-xs py-2">Nothing yet. Send bets from the HAWK builder with 🦅 Send to Vault — they settle themselves after the match and show up here.</div>`
                 : `${legs.length < 50 ? `<div class="text-[10px] text-orange-400/80">${legs.length} settled legs so far — these numbers swing a lot until there are 50+.</div>` : ''}

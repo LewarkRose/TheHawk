@@ -21,10 +21,10 @@
            glow, tilt) in the Vault's gold. Layered over the Tailwind classes, so
            the page's markup is unchanged. "html body" outranks Tailwind's own
            rules, which it injects after this. ---- */
-        :root { --v-bg:#0a0a0a; --v-line:#2a2a2a; --v-gold:#f5c518; --accent:#f5c518; --v-shadow:0 18px 40px -14px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.35); }
+        :root { --v-bg:#0a0a0a; --v-line:#2a2a2a; --v-gold:#bcc8ff; --accent:#bcc8ff; --v-shadow:0 18px 40px -14px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.35); }
         html body {
-            background: radial-gradient(1100px 520px at 12% -12%, rgba(245,197,24,.12), transparent 60%),
-                        radial-gradient(900px 480px at 100% -5%, rgba(245,197,24,.06), transparent 60%), var(--v-bg) !important;
+            background: radial-gradient(1100px 520px at 12% -12%, rgba(188, 200, 255,.12), transparent 60%),
+                        radial-gradient(900px 480px at 100% -5%, rgba(188, 200, 255,.06), transparent 60%), var(--v-bg) !important;
             background-attachment: fixed !important;
             font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
         }
@@ -33,10 +33,10 @@
            reason, behind numbers that mean money. Stripes, markings, edge fade. */
         .bgfx { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
         .bg-mow { position: absolute; inset: 0;
-            background: repeating-linear-gradient(90deg, rgba(245,197,24,.038) 0 5%, transparent 5% 10%); }
+            background: repeating-linear-gradient(90deg, rgba(188, 200, 255,.038) 0 5%, transparent 5% 10%); }
         .bg-pitch { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: .20; }
-        .bg-pitch svg { width: 112%; max-width: none; fill: none; stroke: #f5c518; stroke-width: .30; }
-        .bg-pitch .spot { fill: #f5c518; stroke: none; }
+        .bg-pitch svg { width: 112%; max-width: none; fill: none; stroke: #bcc8ff; stroke-width: .30; }
+        .bg-pitch .spot { fill: #bcc8ff; stroke: none; }
         .bg-vig { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 22%, rgba(11,15,18,.88) 78%); }
         @media (max-width: 700px) { .bg-pitch svg { width: 200%; } .bg-mow { background-size: 200% 100%; } }
         html body > .max-w-6xl { position: relative; z-index: 1; }
@@ -52,12 +52,12 @@
             border-color: #222d35 !important;
             box-shadow: inset 0 2px 6px rgba(0,0,0,.5), inset 0 -1px 0 rgba(255,255,255,.02) !important;
         }
-        html body input:focus, html body select:focus { border-color: var(--v-gold) !important; box-shadow: inset 0 2px 6px rgba(0,0,0,.5), 0 0 0 3px rgba(245,197,24,.15) !important; }
+        html body input:focus, html body select:focus { border-color: var(--v-gold) !important; box-shadow: inset 0 2px 6px rgba(0,0,0,.5), 0 0 0 3px rgba(188, 200, 255,.15) !important; }
         /* gold buttons: lit from above, press in when clicked */
-        html body .bg-\[\#f5c518\] {
-            background: linear-gradient(180deg, #ffeaa0 0%, #f5c518 55%, #a37c00 100%) !important;
-            color: #120e00 !important;
-            box-shadow: 0 10px 22px -8px rgba(245,197,24,.6), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(0,0,0,.2) !important;
+        html body .bg-\[\#bcc8ff\] {
+            background: linear-gradient(180deg, #e4e9ff 0%, #bcc8ff 55%, #6d7bcc 100%) !important;
+            color: #0a0d1d !important;
+            box-shadow: 0 10px 22px -8px rgba(188, 200, 255,.6), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(0,0,0,.2) !important;
         }
         /* dark buttons */
         html body button.bg-zinc-900, html body label.bg-zinc-900, html body button.bg-zinc-800, html body .bg-zinc-800.rounded-lg {
@@ -65,9 +65,9 @@
             border-color: var(--v-line) !important;
             box-shadow: 0 6px 14px -6px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06) !important;
         }
-        html body button, html body a.bg-\[\#f5c518\], html body label.bg-zinc-900 { transition: transform .12s ease, box-shadow .12s ease, filter .12s ease !important; }
-        html body button:hover, html body a.bg-\[\#f5c518\]:hover, html body label.bg-zinc-900:hover { transform: translateY(-1px); filter: brightness(1.08); }
-        html body button:active, html body a.bg-\[\#f5c518\]:active, html body label.bg-zinc-900:active { transform: translateY(1px); filter: brightness(.96); }
+        html body button, html body a.bg-\[\#bcc8ff\], html body label.bg-zinc-900 { transition: transform .12s ease, box-shadow .12s ease, filter .12s ease !important; }
+        html body button:hover, html body a.bg-\[\#bcc8ff\]:hover, html body label.bg-zinc-900:hover { transform: translateY(-1px); filter: brightness(1.08); }
+        html body button:active, html body a.bg-\[\#bcc8ff\]:active, html body label.bg-zinc-900:active { transform: translateY(1px); filter: brightness(.96); }
         /* header: frosted, sticky, glowing mark and gold title */
         /* sticky on wide screens only: on a phone the header wraps to several rows */
         @media (min-width: 768px) {
@@ -80,11 +80,11 @@
         /* header: brand · actions · bankroll, one height and one style */
         .vault-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
         .vault-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-        html body header .vault-logo { width: 88px; height: 88px; flex-shrink: 0; filter: drop-shadow(0 0 14px rgba(245,197,24,.45)); transition: transform .2s; }
+        html body header .vault-logo { width: 88px; height: 88px; flex-shrink: 0; filter: drop-shadow(0 0 14px rgba(188, 200, 255,.45)); transition: transform .2s; }
         .vault-brand:hover .vault-logo { transform: rotate(-4deg) scale(1.05); }
         .vault-wordmark { display: flex; flex-direction: column; line-height: 1; }
         .vault-wordmark b { font-size: 26px; font-weight: 900; letter-spacing: .2em;
-            background: linear-gradient(180deg, #fff4cc, #f5c518 60%, #8a6800); -webkit-background-clip: text; background-clip: text; color: transparent; }
+            background: linear-gradient(180deg, #f0f3ff, #bcc8ff 60%, #5c67ad); -webkit-background-clip: text; background-clip: text; color: transparent; }
         .vault-wordmark small { font-size: 10px; font-weight: 700; letter-spacing: .3em; color: #8a8f93; margin-top: 6px; text-transform: uppercase; }
         .vault-actions { display: flex; align-items: center; gap: 8px; }
         /* site menu: the builder's pages + the Vault (gold here, lit on Vault) */
@@ -95,8 +95,8 @@
         html body .snav { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px; color: #a1a1aa; font-weight: 700;
             font-size: 12.5px; text-decoration: none; white-space: nowrap; transition: .15s; }
         html body .snav:hover { color: #fff; background: rgba(255,255,255,.06); }
-        html body .snav.on { color: #120e00; background: linear-gradient(180deg, #ffeaa0 0%, #f5c518 55%, #a37c00 100%);
-            box-shadow: 0 6px 16px -6px rgba(245,197,24,.6), inset 0 1px 0 rgba(255,255,255,.5); }
+        html body .snav.on { color: #0a0d1d; background: linear-gradient(180deg, #e4e9ff 0%, #bcc8ff 55%, #6d7bcc 100%);
+            box-shadow: 0 6px 16px -6px rgba(188, 200, 255,.6), inset 0 1px 0 rgba(255,255,255,.5); }
         .snav .ns { display: none; }
         /* narrower screens: the menu gets its own row; phones: icon over a short label */
         @media (max-width: 640px) {
@@ -108,24 +108,24 @@
         html body .vbtn { height: 38px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px; border-radius: 10px; font-size: 12.5px; font-weight: 700;
             color: #d4d4d8; background: transparent; border: 0; cursor: pointer; text-decoration: none; white-space: nowrap; }
         html body .vgroup .vbtn:hover { background: rgba(255,255,255,.06); color: #fff; }
-        html body .vbtn-gold { height: 44px; padding: 0 18px; border-radius: 12px; color: #120e00;
-            background: linear-gradient(180deg, #ffeaa0 0%, #f5c518 55%, #a37c00 100%);
-            box-shadow: 0 10px 22px -8px rgba(245,197,24,.6), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(0,0,0,.2); }
+        html body .vbtn-gold { height: 44px; padding: 0 18px; border-radius: 12px; color: #0a0d1d;
+            background: linear-gradient(180deg, #e4e9ff 0%, #bcc8ff 55%, #6d7bcc 100%);
+            box-shadow: 0 10px 22px -8px rgba(188, 200, 255,.6), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(0,0,0,.2); }
         .vbtn-gold img { width: 18px; height: 18px; filter: brightness(.25) saturate(0); }
         html body .vicon { width: 38px; padding: 0; justify-content: center; }
         .vault-bank { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 8px 0 16px; border-radius: 14px;
-            background: linear-gradient(180deg, #1e282e, #151c20); border: 1px solid rgba(245,197,24,.35);
+            background: linear-gradient(180deg, #1e282e, #151c20); border: 1px solid rgba(188, 200, 255,.35);
             box-shadow: 0 10px 24px -10px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06); }
         .vault-bank .lbl { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: #8a8f93; }
-        .vault-bank .amt { display: block; font-size: 22px; font-weight: 900; color: #ecc98a; line-height: 1.1; }
+        .vault-bank .amt { display: block; font-size: 22px; font-weight: 900; color: #c0cbff; line-height: 1.1; }
         /* Shown only when the last export is old enough to matter, so it stays a notice
            rather than furniture: amber, not red — nothing is wrong yet. */
         .bkwarn { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 0;
-            padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.45; color: #f0d9a0;
-            background: rgba(245,197,24,.09); border: 1px solid rgba(245,197,24,.32); }
+            padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.45; color: #d0d9ff;
+            background: rgba(188, 200, 255,.09); border: 1px solid rgba(188, 200, 255,.32); }
         .bkwarn button { margin-left: auto; padding: 6px 12px; border-radius: 9px; cursor: pointer;
-            font: inherit; font-weight: 700; color: #16202a; background: #ecc98a; border: 0; }
-        .bkwarn button:hover { background: #f5d9a4; }
+            font: inherit; font-weight: 700; color: #16202a; background: #c0cbff; border: 0; }
+        .bkwarn button:hover { background: #d2dbff; }
         .vault-bank .vicon { background: rgba(255,255,255,.05); }
         @media (max-width: 767px) {
             .vault-brand { margin-right: 0; flex: 1; }
@@ -134,11 +134,11 @@
             .vault-wordmark b { font-size: 22px; }
         }
         html body header h1 {
-            background: linear-gradient(180deg, #fff4cc, #f5c518 60%, #8a6800);
+            background: linear-gradient(180deg, #f0f3ff, #bcc8ff 60%, #5c67ad);
             -webkit-background-clip: text; background-clip: text; color: transparent !important;
-            filter: drop-shadow(0 2px 10px rgba(245,197,24,.25));
+            filter: drop-shadow(0 2px 10px rgba(188, 200, 255,.25));
         }
-        html body #bankroll-display { text-shadow: 0 0 18px rgba(245,197,24,.35); }
+        html body #bankroll-display { text-shadow: 0 0 18px rgba(188, 200, 255,.35); }
         /* big numbers feel embossed */
         html body #view-history .text-lg.font-bold { text-shadow: 0 2px 10px rgba(0,0,0,.6); }
         /* modals: glass over a blurred page */
@@ -156,15 +156,15 @@
         .vband:first-child { margin-top: 4px; }
         .vband span { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent);
             font-weight: 700; white-space: nowrap; }
-        .vband i { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(245,197,24,.42), transparent); }
+        .vband i { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(188, 200, 255,.42), transparent); }
         /* tilt: cards lean towards the mouse, with a light that follows it */
         .tilt { transform-style: preserve-3d; transition: transform .18s ease, box-shadow .18s ease; will-change: transform; position: relative; }
         .tilt::after {
             content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .2s;
-            background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(255,236,190,.09), transparent 45%);
+            background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(232, 237, 255,.09), transparent 45%);
         }
         .tilt.tilting::after { opacity: 1; }
-        .tilt.tilting { box-shadow: 0 28px 50px -18px rgba(0,0,0,.85), 0 0 0 1px rgba(245,197,24,.18) !important; }
+        .tilt.tilting { box-shadow: 0 28px 50px -18px rgba(0,0,0,.85), 0 0 0 1px rgba(188, 200, 255,.18) !important; }
         /* cards rise into place */
         @keyframes vaultRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
         html body #bets-container > div, html body #view-history > div, html body #view-builder > div { animation: vaultRise .35s ease both; }
@@ -177,13 +177,13 @@
         .vday > summary, .vbet > summary { list-style: none; cursor: pointer; }
         .vday > summary::-webkit-details-marker, .vbet > summary::-webkit-details-marker { display: none; }
         .vday > summary { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; font-size: 13px; }
-        .vday > summary::before, .vbet > summary::before { content: "▸"; color: #f5c518; transition: transform .15s; display: inline-block; }
+        .vday > summary::before, .vbet > summary::before { content: "▸"; color: #bcc8ff; transition: transform .15s; display: inline-block; }
         .vday[open] > summary::before, .vbet[open] > summary::before { transform: rotate(90deg); }
         .vday-body { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 6px; }
         .vbet > summary { display: grid; grid-template-columns: 12px 22px minmax(0,1fr) auto auto; gap: 8px; align-items: center;
             padding: 9px 10px; border-radius: 10px; background: rgba(24,24,27,.6); border: 1px solid #1f1f23; font-size: 12px; }
         .vbet > summary .fx { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #e4e4e7; }
-        .vbet[open] > summary { border-color: rgba(201,160,92,.35); }
+        .vbet[open] > summary { border-color: rgba(149, 163, 230,.35); }
         .vbet > div { margin-top: 6px; }
         .tr-fold > summary { list-style: none; cursor: pointer; }
         .tr-fold > summary::-webkit-details-marker { display: none; }
@@ -270,7 +270,7 @@
         <!-- Navigation Tabs -->
         <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-6">
             <div class="flex gap-3">
-                <button onclick="switchView('builder')" id="nav-builder" class="bg-[#f5c518] text-black font-bold px-5 py-2.5 rounded-xl text-xs transition shadow-lg shadow-[#1f1800]/20 flex items-center gap-2">
+                <button onclick="switchView('builder')" id="nav-builder" class="bg-[#bcc8ff] text-black font-bold px-5 py-2.5 rounded-xl text-xs transition shadow-lg shadow-[#13172c]/20 flex items-center gap-2">
                     <span class="icon-gold">📝</span> Log a bet
                 </button>
                 <button onclick="switchView('history')" id="nav-history" class="bg-zinc-900 text-zinc-400 hover:text-white font-semibold px-5 py-2.5 rounded-xl text-xs border border-zinc-800 transition flex items-center gap-2">
@@ -288,7 +288,7 @@
                 <!-- Interactive Quick Chip Presets Bar -->
                 <div id="quick-chips-panel" class="bg-zinc-900/60 p-5 rounded-2xl border border-zinc-800/80">
                     <div class="flex justify-between items-center mb-3">
-                        <h2 id="chips-title" class="font-bold text-sm text-[#f5c518] uppercase tracking-wider flex items-center gap-2">
+                        <h2 id="chips-title" class="font-bold text-sm text-[#bcc8ff] uppercase tracking-wider flex items-center gap-2">
                             <span class="icon-gold">⚡</span> Quick Chips: Double Chance / Result
                         </h2>
                         <span class="text-[10px] text-zinc-500">Click chips to combine into one leg, then type your bookmaker's price</span>
@@ -299,7 +299,7 @@
 
                 <!-- Ticket Mode Toggle -->
                 <div class="bg-zinc-900/60 p-2 rounded-2xl border border-zinc-800/80 grid grid-cols-2 gap-2">
-                    <button type="button" id="mode-btn-builder" onclick="setBuilderMode('builder')" class="py-2.5 rounded-xl text-xs font-bold transition bg-[#f5c518] text-black">
+                    <button type="button" id="mode-btn-builder" onclick="setBuilderMode('builder')" class="py-2.5 rounded-xl text-xs font-bold transition bg-[#bcc8ff] text-black">
                         <span class="icon-gold">🎯</span> Bet Builder <span class="block text-[9px] font-normal opacity-80">Same match, multiple markets</span>
                     </button>
                     <button type="button" id="mode-btn-acca" onclick="setBuilderMode('acca')" class="py-2.5 rounded-xl text-xs font-bold transition bg-zinc-950 text-zinc-400 border border-zinc-800">
@@ -318,22 +318,22 @@
                     
                     <div class="bg-zinc-950 p-3 rounded-xl border border-zinc-800 space-y-2 overflow-visible">
                         <div class="flex justify-between items-center">
-                            <label class="text-[10px] text-[#f5c518] block font-bold uppercase tracking-wider">⚡ Match Feed (live fixtures)</label>
+                            <label class="text-[10px] text-[#bcc8ff] block font-bold uppercase tracking-wider">⚡ Match Feed (live fixtures)</label>
                             <span id="feed-status" class="text-[10px] text-zinc-500 italic flex items-center gap-2">
                                 Select a league to load fixtures
-                                <button type="button" onclick="refreshLiveFeed()" title="Refresh live fixtures" class="text-zinc-400 hover:text-[#f5c518] transition">🔄</button>
+                                <button type="button" onclick="refreshLiveFeed()" title="Refresh live fixtures" class="text-zinc-400 hover:text-[#bcc8ff] transition">🔄</button>
                             </span>
                         </div>
                         <label class="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
-                            <input type="checkbox" id="today-only-filter" onchange="populateMatchDropdownOnly(document.getElementById('league-selector').value)" class="accent-[#f5c518]">
+                            <input type="checkbox" id="today-only-filter" onchange="populateMatchDropdownOnly(document.getElementById('league-selector').value)" class="accent-[#bcc8ff]">
                             Today only
                         </label>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-visible">
-                            <select id="league-selector" onchange="onLeagueChange()" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#f5c518]">
+                            <select id="league-selector" onchange="onLeagueChange()" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#bcc8ff]">
                                 <option value="">-- Select League / Category --</option>
                                 <!-- filled from LEAGUE_GROUPS -->
                             </select>
-                            <select id="league-match-dropdown" onchange="onLeagueMatchSelect()" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#f5c518]" disabled>
+                            <select id="league-match-dropdown" onchange="onLeagueMatchSelect()" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#bcc8ff]" disabled>
                                 <option value="">-- Choose Match --</option>
                             </select>
                         </div>
@@ -356,7 +356,7 @@
 
                     <div>
                         <label class="text-[10px] text-zinc-400 block mb-1">Market Category</label>
-                        <select id="builder-category" onchange="onCategoryChange()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#f5c518]">
+                        <select id="builder-category" onchange="onCategoryChange()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#bcc8ff]">
                             <option value="Double Chance / Result">Double Chance / Result</option>
                             <option value="Goals Market">Goals Market</option>
                             <option value="Player Props">Player Props</option>
@@ -370,28 +370,28 @@
                     </div>
                     <div id="builder-category-wrap" class="relative">
                         <label class="text-[10px] text-zinc-400 block mb-1">Fixture / Match Description</label>
-                        <input type="text" id="builder-fixture" placeholder="Type or pick from match feed..." oninput="filterFixtures()" onfocus="showFixtureDropdown()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#f5c518]" autocomplete="off">
+                        <input type="text" id="builder-fixture" placeholder="Type or pick from match feed..." oninput="filterFixtures()" onfocus="showFixtureDropdown()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#bcc8ff]" autocomplete="off">
                         <div id="fixture-dropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-zinc-950 border border-zinc-800 rounded-xl max-h-48 overflow-y-auto z-20 shadow-xl"></div>
                     </div>
                     <div id="acca-fixture-only-wrap" class="hidden relative">
                         <label class="text-[10px] text-zinc-400 block mb-1">Fixture / Match Description</label>
-                        <input type="text" id="builder-fixture-acca" placeholder="Type or pick from match feed..." oninput="filterFixtures()" onfocus="showFixtureDropdown()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#f5c518]" autocomplete="off">
+                        <input type="text" id="builder-fixture-acca" placeholder="Type or pick from match feed..." oninput="filterFixtures()" onfocus="showFixtureDropdown()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#bcc8ff]" autocomplete="off">
                     </div>
                     <div>
                         <label class="text-[10px] text-zinc-400 block mb-1">Selection / Market</label>
-                        <input type="text" id="builder-selection" placeholder="e.g. Real Madrid Win & Over 1.5 Goals" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#f5c518]">
+                        <input type="text" id="builder-selection" placeholder="e.g. Real Madrid Win & Over 1.5 Goals" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#bcc8ff]">
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div class="md:col-span-2">
                             <label class="text-[10px] text-zinc-400 block mb-1">Tactical Angle / Reason</label>
-                            <input type="text" id="builder-angle" placeholder="e.g. Strong home form & table position" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#f5c518]">
+                            <input type="text" id="builder-angle" placeholder="e.g. Strong home form & table position" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#bcc8ff]">
                         </div>
                         <div>
                             <label class="text-[10px] text-zinc-400 block mb-1">Decimal Odds</label>
-                            <input type="number" id="builder-odds" step="0.01" placeholder="Enter current price" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#f5c518]">
+                            <input type="number" id="builder-odds" step="0.01" placeholder="Enter current price" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#bcc8ff]">
                         </div>
                     </div>
-                    <button type="button" onclick="addLegToTicket()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-[#f5c518] font-bold py-2.5 rounded-xl border border-zinc-700 transition text-xs">
+                    <button type="button" onclick="addLegToTicket()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-[#bcc8ff] font-bold py-2.5 rounded-xl border border-zinc-700 transition text-xs">
                         + Add Leg to Ticket
                     </button>
                 </div>
@@ -415,11 +415,11 @@
                         <div class="grid grid-cols-2 gap-2">
                             <div>
                                 <label class="text-[10px] text-zinc-400 block mb-1">Stake Amount (€)</label>
-                                <input type="number" id="ticket-stake" step="0.01" value="5.00" oninput="calculateTicketReturn()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#f5c518]">
+                                <input type="number" id="ticket-stake" step="0.01" value="5.00" oninput="calculateTicketReturn()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#bcc8ff]">
                             </div>
                             <div>
                                 <label class="text-[10px] text-zinc-400 block mb-1">Total Odds</label>
-                                <input type="number" id="ticket-total-odds" step="0.01" value="0.00" readonly class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-[#f5c518] font-bold focus:outline-none">
+                                <input type="number" id="ticket-total-odds" step="0.01" value="0.00" readonly class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-[#bcc8ff] font-bold focus:outline-none">
                             </div>
                         </div>
 
@@ -434,9 +434,9 @@
                 <div class="mt-6 pt-3 border-t border-zinc-800">
                     <div class="flex justify-between text-xs mb-3">
                         <span class="text-zinc-400">Potential Return:</span>
-                        <span id="ticket-potential-return" class="text-[#f5c518] font-bold text-sm">€0.00</span>
+                        <span id="ticket-potential-return" class="text-[#bcc8ff] font-bold text-sm">€0.00</span>
                     </div>
-                    <button type="button" onclick="lockInTicket()" class="w-full bg-[#f5c518] hover:bg-[#ffe066] text-black font-extrabold py-3 rounded-xl transition shadow-lg shadow-[#1f1800]/20 text-xs">
+                    <button type="button" onclick="lockInTicket()" class="w-full bg-[#bcc8ff] hover:bg-[#d8e0ff] text-black font-extrabold py-3 rounded-xl transition shadow-lg shadow-[#13172c]/20 text-xs">
                         Lock In Bet
                     </button>
                 </div>
@@ -446,9 +446,9 @@
         <!-- VIEW 2: BANKROLL & HISTORY -->
         <div id="view-history" class="hidden">
             <div class="vband"><span>This week</span><i></i></div>
-            <div class="bg-zinc-900/60 p-4 rounded-2xl border border-[#f5c518]/40 space-y-3" id="weekly-card">
+            <div class="bg-zinc-900/60 p-4 rounded-2xl border border-[#bcc8ff]/40 space-y-3" id="weekly-card">
                 <div class="flex flex-wrap justify-between items-center gap-2">
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🗓️</span> Weekly HAWK report <span id="weekly-new" class="hidden text-[10px] font-bold bg-[#f5c518] text-black px-2 py-0.5 rounded-full">NEW</span></h3>
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🗓️</span> Weekly HAWK report <span id="weekly-new" class="hidden text-[10px] font-bold bg-[#bcc8ff] text-black px-2 py-0.5 rounded-full">NEW</span></h3>
                     <div class="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs gap-1">
                         <button type="button" data-week="last" class="week-tab px-3 py-1 rounded-lg">Last week</button>
                         <button type="button" data-week="this" class="week-tab px-3 py-1 rounded-lg">This week so far</button>
@@ -515,7 +515,7 @@
                         <span class="icon-gold">📋</span> Ticket History & Settlement Log
                     </h2>
                     <div class="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs gap-1">
-                        <button onclick="setFilter('ALL')" id="filter-ALL" class="px-3 py-1.5 rounded-lg bg-[#f5c518] text-black font-bold transition">All</button>
+                        <button onclick="setFilter('ALL')" id="filter-ALL" class="px-3 py-1.5 rounded-lg bg-[#bcc8ff] text-black font-bold transition">All</button>
                         <button onclick="setFilter('PENDING')" id="filter-PENDING" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white transition">Pending</button>
                         <button onclick="setFilter('WON')" id="filter-WON" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white transition">Won</button>
                         <button onclick="setFilter('LOST')" id="filter-LOST" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white transition">Lost</button>
@@ -536,11 +536,11 @@
                  "how is my money doing", so they moved to their own tab; this is the
                  one line left behind, with the headline number and a way across. -->
             <div class="vband"><span>How good is HAWK</span><i></i></div>
-            <a href="#" onclick="event.preventDefault();switchView('scorecard')" class="block bg-zinc-900/60 p-4 rounded-2xl border border-[#f5c518]/30 hover:border-[#f5c518]/70 transition">
+            <a href="#" onclick="event.preventDefault();switchView('scorecard')" class="block bg-zinc-900/60 p-4 rounded-2xl border border-[#bcc8ff]/30 hover:border-[#bcc8ff]/70 transition">
                 <div class="flex items-center gap-2">
                     <span class="icon-gold">🎯</span>
                     <span id="track-record-line" class="text-sm font-bold text-white min-w-0">HAWK Track Record</span>
-                    <span class="text-[11px] text-[#f5c518] font-semibold ml-auto shrink-0">open ▸</span>
+                    <span class="text-[11px] text-[#bcc8ff] font-semibold ml-auto shrink-0">open ▸</span>
                 </div>
                 <p class="text-[10px] text-zinc-500 mt-1">Whether HAWK's chances come true, how it scores against Bet365's closing prices, and which markets it is off on — all in <b class="text-zinc-400">How good is HAWK</b>.</p>
             </a>
@@ -548,10 +548,10 @@
 
         <!-- VIEW 3: HOW GOOD IS HAWK -->
         <div id="view-scorecard" class="hidden">
-            <a href="builder/?view=board" class="block bg-zinc-950 border border-zinc-800 hover:border-[#f5c518] rounded-xl px-3 py-2.5 mb-4 transition">
+            <a href="builder/?view=board" class="block bg-zinc-950 border border-zinc-800 hover:border-[#bcc8ff] rounded-xl px-3 py-2.5 mb-4 transition">
                 <span class="text-xs text-zinc-300">This page blends <b class="text-white">your own bet legs</b> in with HAWK's graded ones.
                 For HAWK's record on its own — every market and league, with a plain verdict on each —</span>
-                <b class="text-[#f5c518] text-xs whitespace-nowrap">open 📋 Board →</b>
+                <b class="text-[#bcc8ff] text-xs whitespace-nowrap">open 📋 Board →</b>
             </a>
             <div id="sc-headline"></div>
             <div class="vband"><span>HAWK on every match</span><i></i></div>
@@ -573,18 +573,18 @@
             <h3 class="text-white font-bold text-base flex items-center gap-2"><span class="icon-gold">✏️</span> Edit Active Bankroll</h3>
             <div>
                 <label class="text-[10px] text-zinc-400 block mb-1">New Bankroll Amount (€)</label>
-                <input type="number" id="edit-bankroll-input" step="0.01" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f5c518]">
+                <input type="number" id="edit-bankroll-input" step="0.01" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#bcc8ff]">
             </div>
             <div>
                 <label class="text-[10px] text-zinc-400 block mb-1">Reason <span class="text-zinc-600">(optional, but future-you will thank you)</span></label>
-                <input type="text" id="edit-bankroll-reason" placeholder="e.g. topped up €50 cash, corrected a typo..." class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f5c518]">
+                <input type="text" id="edit-bankroll-reason" placeholder="e.g. topped up €50 cash, corrected a typo..." class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#bcc8ff]">
                 <p class="text-[10px] text-zinc-500 mt-2">This directly overwrites your current balance — use it to correct a mistake or top up manually. It won't touch your ticket history, and it's logged so you can trace it later.</p>
             </div>
             <div class="flex gap-2 pt-2">
-                <button type="button" onclick="saveBankrollEdit()" class="flex-1 bg-[#f5c518] hover:bg-[#ffe066] text-black font-bold py-2 rounded-xl text-xs transition">Save</button>
+                <button type="button" onclick="saveBankrollEdit()" class="flex-1 bg-[#bcc8ff] hover:bg-[#d8e0ff] text-black font-bold py-2 rounded-xl text-xs transition">Save</button>
                 <button type="button" onclick="closeEditBankrollModal()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs transition">Cancel</button>
             </div>
-            <button type="button" onclick="closeEditBankrollModal(); openBankrollLogModal();" class="w-full text-center text-[10px] text-zinc-500 hover:text-[#f5c518] transition">View edit history →</button>
+            <button type="button" onclick="closeEditBankrollModal(); openBankrollLogModal();" class="w-full text-center text-[10px] text-zinc-500 hover:text-[#bcc8ff] transition">View edit history →</button>
         </div>
     </div>
 
@@ -596,11 +596,11 @@
             <h3 class="text-white font-bold text-base flex items-center gap-2"><span class="icon-gold">⚖️</span> Check against your bookmaker</h3>
             <div>
                 <label class="text-[10px] text-zinc-400 block mb-1">What does your bookmaker say you have? (€)</label>
-                <input type="number" id="reconcile-input" step="0.01" inputmode="decimal" oninput="renderReconcile()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f5c518]">
+                <input type="number" id="reconcile-input" step="0.01" inputmode="decimal" oninput="renderReconcile()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#bcc8ff]">
             </div>
             <div id="reconcile-out" class="text-xs"></div>
             <div class="flex gap-2 pt-1">
-                <button type="button" id="reconcile-go" onclick="applyReconcile()" class="flex-1 bg-[#f5c518] hover:bg-[#ffe066] text-black font-bold py-2 rounded-xl text-xs transition">Use their number</button>
+                <button type="button" id="reconcile-go" onclick="applyReconcile()" class="flex-1 bg-[#bcc8ff] hover:bg-[#d8e0ff] text-black font-bold py-2 rounded-xl text-xs transition">Use their number</button>
                 <button type="button" onclick="closeReconcileModal()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs transition">Cancel</button>
             </div>
             <p class="text-[10px] text-zinc-500">Your ticket history isn't touched — only the bankroll, and the change is logged.</p>
@@ -621,11 +621,11 @@
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="text-[10px] text-zinc-400 block mb-1">Stake (€)</label>
-                    <input type="number" id="edit-ticket-stake" step="0.01" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f5c518]">
+                    <input type="number" id="edit-ticket-stake" step="0.01" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#bcc8ff]">
                 </div>
                 <div>
                     <label class="text-[10px] text-zinc-400 block mb-1">Status</label>
-                    <select id="edit-ticket-status" onchange="onEditStatusChange()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f5c518]">
+                    <select id="edit-ticket-status" onchange="onEditStatusChange()" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#bcc8ff]">
                         <option value="PENDING">Pending</option>
                         <option value="WON">Won</option>
                         <option value="LOST">Lost</option>
@@ -636,19 +636,19 @@
             <div id="edit-ticket-legs" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
             <div>
                 <label class="text-[10px] text-zinc-400 block mb-1">League</label>
-                <select id="edit-ticket-league" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f5c518]"></select>
+                <select id="edit-ticket-league" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#bcc8ff]"></select>
             </div>
             <div>
                 <label class="text-[10px] text-zinc-400 block mb-1">Combined Odds <span class="text-zinc-600">(auto-fills from legs above — overwrite if your book's actual same-game-parlay price was different)</span></label>
-                <input type="number" id="edit-ticket-combined-odds" step="0.01" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-[#f5c518] font-bold focus:outline-none focus:border-[#f5c518]">
+                <input type="number" id="edit-ticket-combined-odds" step="0.01" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-[#bcc8ff] font-bold focus:outline-none focus:border-[#bcc8ff]">
             </div>
             <div id="edit-cashout-wrap" class="hidden">
                 <label class="text-[10px] text-zinc-400 block mb-1">Cash Out Amount (€) <span class="text-zinc-600">— what you actually received</span></label>
-                <input type="number" id="edit-ticket-cashout" step="0.01" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f5c518]">
+                <input type="number" id="edit-ticket-cashout" step="0.01" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#bcc8ff]">
             </div>
             <p class="text-[10px] text-zinc-500">Your bankroll is automatically corrected for whatever changes here — stake, status, or a cash-out amount — including reversing any payout that was already credited.</p>
             <div class="flex gap-2 pt-2">
-                <button type="button" onclick="saveEditedTicket()" class="flex-1 bg-[#f5c518] hover:bg-[#ffe066] text-black font-bold py-2 rounded-xl text-xs transition">Save Changes</button>
+                <button type="button" onclick="saveEditedTicket()" class="flex-1 bg-[#bcc8ff] hover:bg-[#d8e0ff] text-black font-bold py-2 rounded-xl text-xs transition">Save Changes</button>
                 <button type="button" onclick="closeEditTicketModal()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs transition">Cancel</button>
             </div>
         </div>
@@ -659,11 +659,11 @@
             <h3 class="text-white font-bold text-base flex items-center gap-2"><span class="icon-gold">💰</span> Cash Out Ticket</h3>
             <div>
                 <label class="text-[10px] text-zinc-400 block mb-1">Cash Out Amount (€)</label>
-                <input type="number" id="quick-cashout-amount" step="0.01" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f5c518]">
+                <input type="number" id="quick-cashout-amount" step="0.01" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#bcc8ff]">
                 <p class="text-[10px] text-zinc-500 mt-2">This settles the ticket immediately at whatever amount your book actually offered — separate from a full Win or Loss.</p>
             </div>
             <div class="flex gap-2 pt-2">
-                <button type="button" onclick="confirmQuickCashOut()" class="flex-1 bg-[#f5c518] hover:bg-[#ffe066] text-black font-bold py-2 rounded-xl text-xs transition">Confirm Cash Out</button>
+                <button type="button" onclick="confirmQuickCashOut()" class="flex-1 bg-[#bcc8ff] hover:bg-[#d8e0ff] text-black font-bold py-2 rounded-xl text-xs transition">Confirm Cash Out</button>
                 <button type="button" onclick="closeQuickCashOutModal()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs transition">Cancel</button>
             </div>
         </div>
@@ -675,7 +675,7 @@
             <p class="text-[10px] text-zinc-500">Untick anything you don't want to bring across — the combined odds recalculate from only what's checked.</p>
             <div id="reuse-picker-legs" class="space-y-2 max-h-96 overflow-y-auto pr-1"></div>
             <div class="flex gap-2 pt-2">
-                <button type="button" onclick="confirmReusePicker()" class="flex-1 bg-[#f5c518] hover:bg-[#ffe066] text-black font-bold py-2 rounded-xl text-xs transition">Add to Bet Slip</button>
+                <button type="button" onclick="confirmReusePicker()" class="flex-1 bg-[#bcc8ff] hover:bg-[#d8e0ff] text-black font-bold py-2 rounded-xl text-xs transition">Add to Bet Slip</button>
                 <button type="button" onclick="closeReusePicker()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded-xl text-xs transition">Cancel</button>
             </div>
         </div>
@@ -1011,7 +1011,7 @@
             const el = document.getElementById('feed-status');
             if (!el) return;
             const color = tone === 'live' ? 'text-emerald-400' : tone === 'fallback' ? 'text-orange-400' : 'text-zinc-500';
-            el.innerHTML = `<span class="${color}">${text}</span> <button type="button" onclick="refreshLiveFeed()" title="Refresh live fixtures" class="text-zinc-400 hover:text-[#f5c518] transition">🔄</button>`;
+            el.innerHTML = `<span class="${color}">${text}</span> <button type="button" onclick="refreshLiveFeed()" title="Refresh live fixtures" class="text-zinc-400 hover:text-[#bcc8ff] transition">🔄</button>`;
         }
 
         function refreshLiveFeed() {
@@ -1089,7 +1089,7 @@
             });
 
             document.getElementById(`view-${view}`).classList.remove('hidden');
-            document.getElementById(`nav-${view}`).className = "bg-[#f5c518] text-black font-bold px-5 py-2.5 rounded-xl text-xs transition shadow-lg shadow-[#1f1800]/20 flex items-center gap-2";
+            document.getElementById(`nav-${view}`).className = "bg-[#bcc8ff] text-black font-bold px-5 py-2.5 rounded-xl text-xs transition shadow-lg shadow-[#13172c]/20 flex items-center gap-2";
 
             if(view === 'history') renderHistory();
             if(view === 'scorecard') renderScorecard();
@@ -1174,7 +1174,7 @@
                 <td class="py-2 pr-3 text-right text-[11px] ${tone} tabular-nums">${gap >= 0 ? '+' : ''}${gap.toFixed(1)}</td>
                 <td class="py-2 w-1/4 min-w-[90px]">
                     <div class="relative h-2.5 rounded-full bg-zinc-950 overflow-hidden">
-                        <div class="absolute inset-y-0 left-0 rounded-full ${thin ? 'bg-zinc-700' : 'bg-[#f5c518]'}" style="width:${Math.min(100, 100 * got).toFixed(1)}%"></div>
+                        <div class="absolute inset-y-0 left-0 rounded-full ${thin ? 'bg-zinc-700' : 'bg-[#bcc8ff]'}" style="width:${Math.min(100, 100 * got).toFixed(1)}%"></div>
                         <div class="absolute inset-y-0 w-0.5 bg-white/70" style="left:${Math.min(100, 100 * said).toFixed(1)}%"></div>
                     </div>${thin ? '<span class="text-[9px] text-zinc-600">too few to read</span>' : ''}</td></tr>`;
         }
@@ -1197,14 +1197,14 @@
                 verdict = worst <= 0.03
                     ? { t: 'HAWK\'s chances come true', c: 'text-emerald-400',
                         d: `Across <b class="text-zinc-200">${G.legs.toLocaleString()}</b> graded legs from ${G.matches} matches, no chance band is more than <b class="text-zinc-200">${pts}</b> points away from what actually landed. At this many legs that is not luck — the percentages mean what they say.` }
-                    : { t: `Off by up to ${pts} points`, c: 'text-[#f5c518]',
+                    : { t: `Off by up to ${pts} points`, c: 'text-[#bcc8ff]',
                         d: `Across <b class="text-zinc-200">${G.legs.toLocaleString()}</b> graded legs from ${G.matches} matches, one band is ${pts} points out. See which below — the builder corrects a market once it has 30+ graded legs.` };
             } else {
                 verdict = { t: 'Waiting for the graded file', c: 'text-zinc-300',
                     d: 'HAWK grades its chances on every match, not just the ones you bet. That file has not loaded — the numbers below are from your own bets only, which is a far smaller sample.' };
             }
             document.getElementById('sc-headline').innerHTML = `
-                <div class="bg-zinc-900/60 p-5 rounded-2xl border border-[#f5c518]/40 space-y-2">
+                <div class="bg-zinc-900/60 p-5 rounded-2xl border border-[#bcc8ff]/40 space-y-2">
                     <div class="flex flex-wrap items-baseline justify-between gap-2">
                         <h2 class="text-lg font-bold ${verdict.c}">${verdict.t}</h2>
                         <span class="text-[10px] text-zinc-500 uppercase tracking-wider">${G ? `${G.legs.toLocaleString()} legs on every match` : 'every-match file not loaded'} · ${all.n} from your own bets${G && G.waiting ? ` · ${G.waiting} waiting` : ''}</span>
@@ -1239,18 +1239,18 @@
                     <td class="py-2 pr-3 text-right text-zinc-500 tabular-nums line-through">${scPct(x.said)}</td>
                     <td class="py-2 pr-3 text-right text-zinc-200 tabular-nums">${scPct(x.fix.after)}</td>
                     <td class="py-2 pr-3 text-right text-zinc-400 tabular-nums">${scPct(x.got)}</td>
-                    <td class="py-2 text-right text-[11px] text-emerald-400 tabular-nums">${x.fix.fixed >= 0 ? '+' : ''}${(100 * x.fix.fixed).toFixed(1)}${x.fix.capped ? ' <span class="text-[#fb923c]" title="The correction is capped at 0.6 in log-odds">capped</span>' : ''}</td></tr>`;
+                    <td class="py-2 text-right text-[11px] text-emerald-400 tabular-nums">${x.fix.fixed >= 0 ? '+' : ''}${(100 * x.fix.fixed).toFixed(1)}${x.fix.capped ? ' <span class="text-[#99a9ff]" title="The correction is capped at 0.6 in log-odds">capped</span>' : ''}</td></tr>`;
                 marketHtml = (off.length
                         ? `<p class="text-[11px] text-zinc-400">${off.length} market${off.length > 1 ? 's are' : ' is'} still more than 3 points out <b class="text-zinc-200">after</b> the builder's correction. These are the ones worth care.</p>`
                             + scTable('Market', off.map(x => scRow(escHtml(x.m), x.n, x.said, x.got, false)).join(''))
                         : '<p class="text-[11px] text-emerald-400">No market with 500+ legs is more than 3 points out once the builder\'s correction is applied.</p>')
-                    + (fixed.length ? `<details class="pt-1" open><summary class="text-[11px] text-[#f5c518] cursor-pointer">${fixed.length} market${fixed.length > 1 ? 's are' : ' is'} corrected before you see a price ▾</summary>
+                    + (fixed.length ? `<details class="pt-1" open><summary class="text-[11px] text-[#bcc8ff] cursor-pointer">${fixed.length} market${fixed.length > 1 ? 's are' : ' is'} corrected before you see a price ▾</summary>
                         <p class="text-[11px] text-zinc-500 py-1">The model's raw number, what HAWK actually quotes you, and what landed.</p>
                         <div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-[10px] text-zinc-500 uppercase tracking-wider">
                           <th class="text-left pb-1">Market</th><th class="text-right pb-1 pr-3">Legs</th><th class="text-right pb-1 pr-3">Raw</th>
                           <th class="text-right pb-1 pr-3">Quoted</th><th class="text-right pb-1 pr-3">Landed</th><th class="text-right pb-1">Corrected by</th>
                         </tr></thead><tbody>${fixed.map(fixRow).join('')}</tbody></table></div></details>` : '')
-                    + (ok.length ? `<details class="pt-1"><summary class="text-[11px] text-[#f5c518] cursor-pointer">The ${ok.length} markets that need no correction ▸</summary>${
+                    + (ok.length ? `<details class="pt-1"><summary class="text-[11px] text-[#bcc8ff] cursor-pointer">The ${ok.length} markets that need no correction ▸</summary>${
                         scTable('Market', ok.map(x => scRow(escHtml(x.m), x.n, x.said, x.got, false)).join(''))}</details>` : '');
             }
             document.getElementById('sc-market').innerHTML = scCard(scH('🔍', 'Where HAWK is off',
@@ -1269,7 +1269,7 @@
                 const bookB = scBrier(paired.map(x => Math.min(0.999, (1 / x.close) / 1.045)), ys);
                 const diff = bookB - hawkB;
                 const call = Math.abs(diff) < 0.004
-                    ? ['Level with the closing line', 'text-[#f5c518]', 'Matching the market is a real result — the closing price is the hardest forecast in betting to beat. It also means no edge over it, which is why the price you get still decides whether a bet is worth placing.']
+                    ? ['Level with the closing line', 'text-[#bcc8ff]', 'Matching the market is a real result — the closing price is the hardest forecast in betting to beat. It also means no edge over it, which is why the price you get still decides whether a bet is worth placing.']
                     : diff > 0
                     ? ['Ahead of the closing line', 'text-emerald-400', 'HAWK scored better than Bet365\'s own closing price on these legs. Worth trusting only once the sample is a few hundred.']
                     : ['Behind the closing line', 'text-zinc-300', 'Bet365\'s closing price scored better. Normal — it is the sharpest number in the market.'];
@@ -1400,8 +1400,8 @@
             builderMode = mode;
             const isAcca = mode === 'acca';
 
-            document.getElementById('mode-btn-builder').className = 'py-2.5 rounded-xl text-xs font-bold transition ' + (isAcca ? 'bg-zinc-950 text-zinc-400 border border-zinc-800' : 'bg-[#f5c518] text-black');
-            document.getElementById('mode-btn-acca').className = 'py-2.5 rounded-xl text-xs font-bold transition ' + (isAcca ? 'bg-[#f5c518] text-black' : 'bg-zinc-950 text-zinc-400 border border-zinc-800');
+            document.getElementById('mode-btn-builder').className = 'py-2.5 rounded-xl text-xs font-bold transition ' + (isAcca ? 'bg-zinc-950 text-zinc-400 border border-zinc-800' : 'bg-[#bcc8ff] text-black');
+            document.getElementById('mode-btn-acca').className = 'py-2.5 rounded-xl text-xs font-bold transition ' + (isAcca ? 'bg-[#bcc8ff] text-black' : 'bg-zinc-950 text-zinc-400 border border-zinc-800');
 
             document.getElementById('builder-category-wrap').classList.toggle('hidden', isAcca);
             document.getElementById('acca-fixture-only-wrap').classList.toggle('hidden', !isAcca);
@@ -1582,9 +1582,9 @@
                 <div class="text-[10px] text-zinc-500 mb-1.5">Building this leg from ${selectedChips.length} chip${selectedChips.length !== 1 ? 's' : ''}:</div>
                 <div class="flex flex-wrap gap-1.5">
                     ${selectedChips.map(c => `
-                        <span class="inline-flex items-center gap-1.5 bg-[#c99700]/10 border border-[#f5c518]/40 text-[#f5c518] text-[11px] font-medium px-2.5 py-1 rounded-lg">
+                        <span class="inline-flex items-center gap-1.5 bg-[#8697f9]/10 border border-[#bcc8ff]/40 text-[#bcc8ff] text-[11px] font-medium px-2.5 py-1 rounded-lg">
                             ${c.label}
-                            <button type="button" onclick="removeSelectedChip(${c._uid})" class="text-[#f5c518] hover:text-red-400 ml-0.5">✕</button>
+                            <button type="button" onclick="removeSelectedChip(${c._uid})" class="text-[#bcc8ff] hover:text-red-400 ml-0.5">✕</button>
                         </span>
                     `).join('')}
                 </div>
@@ -1602,9 +1602,9 @@
                 const btn = document.createElement('button');
                 btn.type = "button";
                 btn.className = selected
-                    ? "bg-[#c99700]/15 hover:bg-[#c99700]/20 border border-[#f5c518] p-2.5 rounded-xl text-left transition flex justify-between items-center gap-2 group"
-                    : "bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-[#f5c518]/50 p-2.5 rounded-xl text-left transition flex justify-between items-center gap-2 group";
-                btn.innerHTML = `<span class="flex items-center gap-2 text-xs ${selected ? 'text-[#f5c518]' : 'text-zinc-300 group-hover:text-[#f5c518]'} font-medium">${selected ? '<span class="icon-gold">✓</span>' : ''}<span class="opacity-70">${item.icon || '⚡'}</span>${item.label}</span>`;
+                    ? "bg-[#8697f9]/15 hover:bg-[#8697f9]/20 border border-[#bcc8ff] p-2.5 rounded-xl text-left transition flex justify-between items-center gap-2 group"
+                    : "bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-[#bcc8ff]/50 p-2.5 rounded-xl text-left transition flex justify-between items-center gap-2 group";
+                btn.innerHTML = `<span class="flex items-center gap-2 text-xs ${selected ? 'text-[#bcc8ff]' : 'text-zinc-300 group-hover:text-[#bcc8ff]'} font-medium">${selected ? '<span class="icon-gold">✓</span>' : ''}<span class="opacity-70">${item.icon || '⚡'}</span>${item.label}</span>`;
                 btn.onclick = () => toggleChip(item);
                 container.appendChild(btn);
             });
@@ -1652,7 +1652,7 @@
             list.forEach(f => {
                 const item = document.createElement('div');
                 item.className = "p-2.5 text-xs text-zinc-300 hover:bg-zinc-900 cursor-pointer border-b border-zinc-900 flex justify-between items-center";
-                item.innerHTML = `<span>${f.name}</span> <span class="text-[10px] text-[#f5c518] font-semibold">${f.time || ''}</span>`;
+                item.innerHTML = `<span>${f.name}</span> <span class="text-[10px] text-[#bcc8ff] font-semibold">${f.time || ''}</span>`;
                 item.onmousedown = () => {
                     document.getElementById(activeFixtureFieldId()).value = f.name;
                     dropdown.classList.add('hidden');
@@ -1737,7 +1737,7 @@
 
             typeBadge.classList.remove('hidden');
             typeBadge.textContent = 'ACTIVE SLIP';
-            typeBadge.className = 'text-[10px] font-bold px-2 py-1 rounded-lg bg-[#c99700]/15 text-[#f5c518]';
+            typeBadge.className = 'text-[10px] font-bold px-2 py-1 rounded-lg bg-[#8697f9]/15 text-[#bcc8ff]';
 
             container.innerHTML = "";
             let totalOdds = 1.0;
@@ -1746,19 +1746,19 @@
                 totalOdds *= leg.odds;
                 const parts = leg.selection.split(' & ').map(p => p.trim()).filter(Boolean);
                 const selectionHtml = parts.length > 1
-                    ? `<ul class="text-xs font-semibold text-white space-y-0.5">${parts.map(p => `<li class="flex items-start gap-1.5"><span class="text-[#f5c518] shrink-0">·</span>${p}</li>`).join('')}</ul>`
+                    ? `<ul class="text-xs font-semibold text-white space-y-0.5">${parts.map(p => `<li class="flex items-start gap-1.5"><span class="text-[#bcc8ff] shrink-0">·</span>${p}</li>`).join('')}</ul>`
                     : `<div class="text-xs font-semibold text-white">${leg.selection}</div>`;
                 const card = document.createElement('div');
                 card.className = "bg-zinc-950 p-3 rounded-xl border border-zinc-800/80 relative group";
                 card.innerHTML = `
                     <div class="flex justify-between items-start mb-1">
-                        <span class="text-[10px] text-[#f5c518] font-bold">${leg.fixture}</span>
+                        <span class="text-[10px] text-[#bcc8ff] font-bold">${leg.fixture}</span>
                         <button onclick="removeTicketLeg(${index})" class="text-zinc-500 hover:text-red-400 text-xs">✕</button>
                     </div>
                     ${selectionHtml}
                     <div class="mt-2 flex justify-between items-center text-[10px] text-zinc-400">
                         <span>${leg.type.toUpperCase()}</span>
-                        <span class="text-[#f5c518] font-bold">@ ${leg.odds.toFixed(2)}</span>
+                        <span class="text-[#bcc8ff] font-bold">@ ${leg.odds.toFixed(2)}</span>
                     </div>
                 `;
                 container.appendChild(card);
@@ -1833,11 +1833,11 @@
             const container = document.getElementById('reuse-picker-legs');
             container.innerHTML = reusePickerLegs.map((leg, li) => `
                 <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3">
-                    <div class="text-[11px] text-[#f5c518] font-bold mb-1.5">${leg.fixture}</div>
+                    <div class="text-[11px] text-[#bcc8ff] font-bold mb-1.5">${leg.fixture}</div>
                     <div class="space-y-1">
                         ${leg.subSelections.map((s, si) => `
                             <label class="flex items-center gap-2 text-xs text-zinc-200 cursor-pointer py-0.5">
-                                <input type="checkbox" ${s.checked ? 'checked' : ''} onchange="toggleReusePickerItem(${li}, ${si})" class="accent-[#f5c518]">
+                                <input type="checkbox" ${s.checked ? 'checked' : ''} onchange="toggleReusePickerItem(${li}, ${si})" class="accent-[#bcc8ff]">
                                 <span class="flex-1">${s.label}</span>
                                 ${s.odds ? `<span class="text-zinc-500">@${s.odds.toFixed(2)}</span>` : ''}
                             </label>
@@ -1902,7 +1902,7 @@
         function setFilter(filter) {
             currentFilter = filter;
             ['ALL', 'PENDING', 'WON', 'LOST', 'ACCA', 'CASHED_OUT'].forEach(f => {
-                document.getElementById(`filter-${f}`).className = f === filter ? "px-3 py-1.5 rounded-lg bg-[#f5c518] text-black font-bold transition" : "px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white transition";
+                document.getElementById(`filter-${f}`).className = f === filter ? "px-3 py-1.5 rounded-lg bg-[#bcc8ff] text-black font-bold transition" : "px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white transition";
             });
             renderHistory();
         }
@@ -1949,7 +1949,7 @@
             filtered.forEach(bet => {
                 let badge = bet.status === 'PENDING' ? '<span class="bg-sky-500/10 text-sky-400 border border-sky-500/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">PENDING</span>' :
                             bet.status === 'WON' ? '<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">WON</span>' :
-                            bet.status === 'CASHED_OUT' ? '<span class="bg-[#c99700]/10 text-[#f5c518] border border-[#c99700]/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">CASHED OUT</span>' :
+                            bet.status === 'CASHED_OUT' ? '<span class="bg-[#8697f9]/10 text-[#bcc8ff] border border-[#8697f9]/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">CASHED OUT</span>' :
                             '<span class="bg-red-500/10 text-red-400 border border-red-500/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">LOST</span>';
 
                 const kind = ticketType(bet);
@@ -1957,20 +1957,20 @@
                     ? '<span class="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded text-[10px] font-bold">MIXED</span>'
                     : kind === 'Acca'
                         ? '<span class="bg-blue-500/15 text-blue-300 px-2 py-0.5 rounded text-[10px] font-bold">Acca</span>'
-                        : '<span class="bg-[#c99700]/15 text-[#f5c518] px-2 py-0.5 rounded text-[10px] font-bold">Bet Builder</span>';
+                        : '<span class="bg-[#8697f9]/15 text-[#bcc8ff] px-2 py-0.5 rounded text-[10px] font-bold">Bet Builder</span>';
 
                 const card = document.createElement('div');
                 card.className = "bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-3 tilt";
                 card.innerHTML = `
                     <div class="flex justify-between items-center pb-2 border-b border-zinc-900 text-xs">
-                        <div class="flex items-center gap-2 flex-wrap"><span class="text-zinc-400">${bet.date}</span><span class="text-[#f5c518] font-bold">Odds: ${bet.odds.toFixed(2)}</span>${typeBadge}${
-                            isHawkBuilt(bet) ? '<span class="bg-zinc-800 text-[#f5c518] px-2 py-0.5 rounded text-[10px] font-bold" title="Built with HAWK">🦅 HAWK</span>'
+                        <div class="flex items-center gap-2 flex-wrap"><span class="text-zinc-400">${bet.date}</span><span class="text-[#bcc8ff] font-bold">Odds: ${bet.odds.toFixed(2)}</span>${typeBadge}${
+                            isHawkBuilt(bet) ? '<span class="bg-zinc-800 text-[#bcc8ff] px-2 py-0.5 rounded text-[10px] font-bold" title="Built with HAWK">🦅 HAWK</span>'
                             : isHawkBet(bet) ? '<span class="bg-zinc-800/60 text-zinc-400 px-2 py-0.5 rounded text-[10px]" title="You built this one — HAWK knows the match, so it can settle it and check the closing prices">🔗 linked</span>' : ''}${
                             bet.settledBy === 'HAWK' ? '<span class="bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded text-[10px]" title="Settled automatically from the final result — ✏️ Edit to change it">🤖 auto-settled</span>' : ''}</div>
                         <div class="flex items-center gap-2">
                             ${badge}
                             <button onclick="reuseEntireBet('${bet.id}')" class="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 px-2.5 py-1 rounded-lg text-[10px] border border-zinc-800 flex items-center gap-1 transition" title="Reuse entire ticket selections">🔄 Reuse Acca</button>
-                            <button onclick="openEditTicketModal('${bet.id}')" class="bg-zinc-900 p-1.5 rounded-lg text-zinc-300 hover:text-[#f5c518]" title="Edit ticket"><span class="icon-gold">✏️</span></button>
+                            <button onclick="openEditTicketModal('${bet.id}')" class="bg-zinc-900 p-1.5 rounded-lg text-zinc-300 hover:text-[#bcc8ff]" title="Edit ticket"><span class="icon-gold">✏️</span></button>
                             <button onclick="deleteBet('${bet.id}')" class="bg-zinc-900 p-1.5 rounded-lg text-red-400" title="Delete">🗑️</button>
                         </div>
                     </div>
@@ -1987,19 +1987,19 @@
                             const mark = (r) => r === 'won' ? '<span class="text-emerald-400 shrink-0">✓</span>'
                                 : r === 'lost' ? '<span class="text-red-400 shrink-0">✗</span>'
                                 : r === 'void' ? '<span class="text-orange-400 shrink-0" title="Didn\'t play — void">⊘</span>'
-                                : '<span class="text-[#f5c518] shrink-0">·</span>';
+                                : '<span class="text-[#bcc8ff] shrink-0">·</span>';
                             const selHtml = parts.length > 1 || hawkLegs
                                 ? `<ul class="text-white font-medium space-y-0.5">${parts.map(p => `<li class="flex items-start gap-1.5">${mark(p.res)}${p.text}</li>`).join('')}</ul>`
                                 : `<span class="text-white font-medium">${l.selection}</span>`;
                             return `
                             <div class="text-xs flex justify-between items-center bg-zinc-900/40 p-2 rounded-lg border border-zinc-900">
                                 <div>
-                                    <span class="text-[10px] text-[#f5c518] font-semibold block">${l.fixture}${l.hawk && l.hawk.score ? ` <span class="text-zinc-400 font-normal">· FT ${l.hawk.score}</span>` : ''}</span>
+                                    <span class="text-[10px] text-[#bcc8ff] font-semibold block">${l.fixture}${l.hawk && l.hawk.score ? ` <span class="text-zinc-400 font-normal">· FT ${l.hawk.score}</span>` : ''}</span>
                                     ${selHtml}
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <span class="text-xs text-zinc-400 font-bold">@ ${l.odds.toFixed(2)}</span>
-                                    ${hawkLegs && l.hawk.game ? `<a href="${hawkLink(l)}" class="bg-[#c99700]/15 hover:bg-[#c99700]/25 text-[#f5c518] px-2 py-1 rounded text-[10px] font-bold transition whitespace-nowrap" title="Open this match in the HAWK builder (live view or match report if it has started)">${
+                                    ${hawkLegs && l.hawk.game ? `<a href="${hawkLink(l)}" class="bg-[#8697f9]/15 hover:bg-[#8697f9]/25 text-[#bcc8ff] px-2 py-1 rounded text-[10px] font-bold transition whitespace-nowrap" title="Open this match in the HAWK builder (live view or match report if it has started)">${
                                         bet.status === 'PENDING' && Date.parse(l.hawk.kickoff || 0) < Date.now() && !l.hawk.score ? '🔴 Live · cash out?' : 'Open in HAWK'}</a>` : ''}
                                     <button onclick="reuseLeg('${bet.id}', ${li})" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded text-[10px] transition" title="Reuse this selection">Reuse</button>
                                 </div>
@@ -2009,8 +2009,8 @@
                     ${bet.lostEarly ? `<div class="text-[11px] text-red-300 bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2">❌ Settled during the match: ${escHtml(bet.lostEarly)} was lost, so the bet couldn't land.</div>` : ''}
                     ${bet.status === 'PENDING' && bet.needsCheck ? `<div class="text-[11px] text-orange-400 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2">⚠️ HAWK couldn't settle this one: ${escHtml(bet.needsCheck)}. Settle it yourself with what Bet365 paid (✏️ Edit lets you set the exact return).</div>` : ''}
                     <div class="flex justify-between items-center pt-2 border-t border-zinc-900 text-xs">
-                        <div><span class="text-zinc-400">Stake:</span> <span class="text-white font-bold">€${bet.stake.toFixed(2)}</span><span class="text-zinc-400 ml-3">${bet.status === 'CASHED_OUT' ? 'Cashed Out:' : 'Return:'}</span> <span class="text-[#f5c518] font-bold">€${(bet.status === 'CASHED_OUT' ? (bet.cashOutAmount || 0) : bet.potentialReturn).toFixed(2)}</span></div>
-                        ${bet.status === 'PENDING' ? `<div class="flex gap-1"><button onclick="settleBet('${bet.id}', 'WON')" class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg font-bold text-[10px]">Won ✓</button><button onclick="settleBet('${bet.id}', 'LOST')" class="bg-red-500/20 text-red-400 px-3 py-1 rounded-lg font-bold text-[10px]">Lost ✗</button><button onclick="openQuickCashOutModal('${bet.id}')" class="bg-[#c99700]/20 text-[#f5c518] px-3 py-1 rounded-lg font-bold text-[10px]">Cash Out 💰</button></div>` : ''}
+                        <div><span class="text-zinc-400">Stake:</span> <span class="text-white font-bold">€${bet.stake.toFixed(2)}</span><span class="text-zinc-400 ml-3">${bet.status === 'CASHED_OUT' ? 'Cashed Out:' : 'Return:'}</span> <span class="text-[#bcc8ff] font-bold">€${(bet.status === 'CASHED_OUT' ? (bet.cashOutAmount || 0) : bet.potentialReturn).toFixed(2)}</span></div>
+                        ${bet.status === 'PENDING' ? `<div class="flex gap-1"><button onclick="settleBet('${bet.id}', 'WON')" class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg font-bold text-[10px]">Won ✓</button><button onclick="settleBet('${bet.id}', 'LOST')" class="bg-red-500/20 text-red-400 px-3 py-1 rounded-lg font-bold text-[10px]">Lost ✗</button><button onclick="openQuickCashOutModal('${bet.id}')" class="bg-[#8697f9]/20 text-[#bcc8ff] px-3 py-1 rounded-lg font-bold text-[10px]">Cash Out 💰</button></div>` : ''}
                     </div>
                 `;
                 if (bet.status === 'PENDING') { container.appendChild(card); return; }
@@ -2027,7 +2027,7 @@
                 day.className = 'vday';
                 if (g.today) day.open = true;
                 day.innerHTML = `<summary><b class="text-white">${g.label}</b><span class="text-zinc-500">${g.list.length} ticket${g.list.length === 1 ? '' : 's'}</span>
-                    <span class="text-zinc-400">${won ? `<span class="text-emerald-400">✓ ${won}</span> ` : ''}${lost ? `<span class="text-red-400">✗ ${lost}</span> ` : ''}${co ? `<span class="text-[#f5c518]">💰 ${co}</span>` : ''}</span>
+                    <span class="text-zinc-400">${won ? `<span class="text-emerald-400">✓ ${won}</span> ` : ''}${lost ? `<span class="text-red-400">✗ ${lost}</span> ` : ''}${co ? `<span class="text-[#bcc8ff]">💰 ${co}</span>` : ''}</span>
                     <span style="margin-left:auto">${money(pl)}</span></summary><div class="vday-body"></div>`;
                 const body = day.querySelector('.vday-body');
                 g.list.forEach(({ bet, card }) => {
@@ -2353,7 +2353,7 @@
             if (!el) return;
             const [from, to, d1, d2] = weekRange(weekTab), fmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
             document.querySelectorAll('.week-tab').forEach(b => {
-                b.className = `week-tab px-3 py-1 rounded-lg ${b.dataset.week === weekTab ? 'bg-[#f5c518] text-black font-bold' : 'text-zinc-400 hover:text-white'}`;
+                b.className = `week-tab px-3 py-1 rounded-lg ${b.dataset.week === weekTab ? 'bg-[#bcc8ff] text-black font-bold' : 'text-zinc-400 hover:text-white'}`;
                 b.onclick = () => { weekTab = b.dataset.week; renderWeekly(); };
             });
             // "NEW" once a week, until you've looked at last week's report.
@@ -2409,12 +2409,12 @@
 
             el.innerHTML = `
                 <div class="text-[11px] text-zinc-500">${weekTab === 'last' ? `Monday ${fmt(d1)} – Sunday ${fmt(d2)}` : `Since Monday ${fmt(d1)}`}${pending ? ` · ${pending} still pending` : ''}</div>
-                <div class="text-sm text-zinc-200 leading-relaxed bg-zinc-950 border border-[#f5c518]/25 rounded-xl px-3 py-2">💬 ${say.join(' ')}</div>
+                <div class="text-sm text-zinc-200 leading-relaxed bg-zinc-950 border border-[#bcc8ff]/25 rounded-xl px-3 py-2">💬 ${say.join(' ')}</div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
                     ${tile('Profit / loss', settled.length ? money(pl) : '—', settled.length ? `${won} won · ${lost} lost${cashed ? ` · ${cashed} cashed out` : ''}${settled.length - won - lost - cashed ? ` · ${settled.length - won - lost - cashed} other` : ''}` : 'nothing settled', pl > 0 ? 'text-emerald-400' : pl < 0 ? 'text-red-400' : 'text-zinc-200')}
                     ${tile('ROI', staked ? `${pl >= 0 ? '+' : ''}${(100 * pl / staked).toFixed(1)}%` : '—', staked ? `€${staked.toFixed(2)} staked` : '', pl > 0 ? 'text-emerald-400' : pl < 0 ? 'text-red-400' : 'text-zinc-200')}
                     ${tile('vs closing price', clv != null ? `${clv >= 0 ? '+' : ''}${(100 * clv).toFixed(1)}%` : '—', clvLegs.length ? `beat it on ${clvLegs.filter(h => h.bookPrice > h.close).length} of ${clvLegs.length} legs` : 'no priced legs settled', clv > 0.005 ? 'text-emerald-400' : clv < -0.005 ? 'text-red-400' : 'text-zinc-200')}
-                    ${tile('HAWK on every match', hawkSaid != null ? `${pc(hawkSaid)} → ${pc(hawkGot)}` : '—', rec.length ? `said → landed · ${rec.length} matches${bigCalls.length ? ` · ⚡ ${bigRight}/${bigCalls.length} upset calls right` : ''}` : 'no graded matches', 'text-[#f5c518]')}
+                    ${tile('HAWK on every match', hawkSaid != null ? `${pc(hawkSaid)} → ${pc(hawkGot)}` : '—', rec.length ? `said → landed · ${rec.length} matches${bigCalls.length ? ` · ⚡ ${bigRight}/${bigCalls.length} upset calls right` : ''}` : 'no graded matches', 'text-[#bcc8ff]')}
                 </div>
                 ${byPl.length ? `<div class="grid md:grid-cols-2 gap-2 text-xs">
                     <div class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2"><span class="text-zinc-500">Best:</span> <b class="text-emerald-400">${money(byPl[0].pl)}</b> <span class="text-zinc-300">${name(byPl[0].b)}</span></div>
@@ -2541,7 +2541,7 @@
             return `<div class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs">
                 <div class="flex justify-between gap-2"><span class="text-white font-semibold">${label} <span class="text-zinc-500 font-normal">(${n.toLocaleString()})</span></span>
                     <span>HAWK said <b class="text-zinc-200">${Math.round(100 * said)}%</b> · landed <b class="${tone}">${Math.round(100 * got)}%</b></span></div>
-                <div class="relative h-1.5 bg-zinc-800 rounded mt-1.5"><div class="absolute inset-y-0 left-0 bg-[#f5c518]/70 rounded" style="width:${(100 * got).toFixed(1)}%"></div>
+                <div class="relative h-1.5 bg-zinc-800 rounded mt-1.5"><div class="absolute inset-y-0 left-0 bg-[#bcc8ff]/70 rounded" style="width:${(100 * got).toFixed(1)}%"></div>
                     <div class="absolute -top-0.5 h-2.5 w-0.5 bg-white" style="left:${(100 * said).toFixed(1)}%" title="What HAWK said"></div></div></div>`;
         }
         // HAWK's predictions on EVERY match, graded on GitHub (engine/grade.mjs): not
@@ -3011,8 +3011,8 @@
                 <p class="text-sm text-zinc-300">Open this link on your phone (or PC) and your <b class="text-white">${bets.length} tickets</b>, your <b class="text-white">€${bankroll.toFixed(2)}</b> bankroll and HAWK's Bet365 price learning copy across.</p>
                 <p class="text-xs text-zinc-400">🔒 Everything is inside the link — nothing goes to any server. Keep it to yourself.</p>
                 <div class="grid grid-cols-2 gap-2">
-                    <button data-qr-full class="bg-[#c99700] hover:bg-[#f5c518] text-black font-bold rounded-xl py-2.5 text-sm">📷 Show QR — everything</button>
-                    <button data-qr-diff class="bg-zinc-900 border border-[#f5c518]/50 text-[#f5c518] font-bold rounded-xl py-2.5 text-sm" ${syncNewCount() ? '' : 'disabled style="opacity:.45"'}>📷 QR — ${syncNewCount()} new</button>
+                    <button data-qr-full class="bg-[#8697f9] hover:bg-[#bcc8ff] text-black font-bold rounded-xl py-2.5 text-sm">📷 Show QR — everything</button>
+                    <button data-qr-diff class="bg-zinc-900 border border-[#bcc8ff]/50 text-[#bcc8ff] font-bold rounded-xl py-2.5 text-sm" ${syncNewCount() ? '' : 'disabled style="opacity:.45"'}>📷 QR — ${syncNewCount()} new</button>
                 </div>
                 <div class="flex gap-2">${navigator.share ? '<button data-share class="flex-1 bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm">Share…</button>' : ''}
                     <button data-copy class="flex-1 bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm">Copy link</button></div>
@@ -3020,7 +3020,7 @@
                 <p class="text-[11px] text-zinc-500">Send it to yourself (WhatsApp “Message yourself”, email or notes). The link is a snapshot: after new bets, make a new one.
                     ${link.length > 4000 ? `<b class="text-amber-300">This link is long (${link.length.toLocaleString()} characters) — some apps cut long links short. If it doesn't work, use “Send as a file”.</b>` : ''}</p>
                 <div class="border-t border-zinc-800 pt-3 space-y-2">
-                    <button data-scan class="w-full bg-[#c99700] hover:bg-[#f5c518] text-black font-bold rounded-xl py-2.5 text-sm">📷 Scan the other device's QR</button>
+                    <button data-scan class="w-full bg-[#8697f9] hover:bg-[#bcc8ff] text-black font-bold rounded-xl py-2.5 text-sm">📷 Scan the other device's QR</button>
                     <div class="text-white text-sm font-bold">📥 Or got a link from your other device?</div>
                     <p class="text-[11px] text-zinc-400">If tapping it opened the wrong browser (not the one you use HAWK in): long-press the link → <b class="text-zinc-200">Copy</b>, then paste it here.</p>
                     <textarea data-in rows="2" placeholder="Paste the sync link here" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white" style="font-size:16px"></textarea>
@@ -3267,7 +3267,7 @@
             const out = document.getElementById('reconcile-out');
             const go = document.getElementById('reconcile-go');
             if (isNaN(real) || real < 0) {
-                out.innerHTML = `<div class="text-zinc-500">HAWK has <b class="text-[#f5c518]">€${bankroll.toFixed(2)}</b>. Type what your bookmaker shows to compare.</div>`;
+                out.innerHTML = `<div class="text-zinc-500">HAWK has <b class="text-[#bcc8ff]">€${bankroll.toFixed(2)}</b>. Type what your bookmaker shows to compare.</div>`;
                 go.disabled = true; go.classList.add('opacity-40');
                 return;
             }
@@ -3278,7 +3278,7 @@
             const led = ledgerTotal();
             const ledGap = led ? round2(bankroll - led.total) : null;
             const rows = [
-                `<div class="flex justify-between"><span class="text-zinc-400">HAWK's total</span><b class="text-[#f5c518]">€${bankroll.toFixed(2)}</b></div>`,
+                `<div class="flex justify-between"><span class="text-zinc-400">HAWK's total</span><b class="text-[#bcc8ff]">€${bankroll.toFixed(2)}</b></div>`,
                 led ? `<div class="flex justify-between" title="Worked out from your tickets since the edit on ${escHtml(led.from.displayDate || '')}: ${led.counted} placed (−€${led.staked.toFixed(2)}), €${led.paid.toFixed(2)} paid back"><span class="text-zinc-400">Your tickets say</span><b class="${Math.abs(ledGap) < 0.01 ? 'text-zinc-300' : 'text-orange-400'}">€${led.total.toFixed(2)}</b></div>` : '',
                 `<div class="flex justify-between"><span class="text-zinc-400">Your bookmaker</span><b class="text-white">€${real.toFixed(2)}</b></div>`,
                 `<div class="flex justify-between border-t border-zinc-800 pt-1.5 mt-1.5"><span class="text-zinc-400">Difference</span><b class="${gap === 0 ? 'text-zinc-300' : gap > 0 ? 'text-emerald-400' : 'text-red-400'}">${gap > 0 ? '+' : gap < 0 ? '−' : ''}€${Math.abs(gap).toFixed(2)}</b></div>`,
@@ -3393,11 +3393,11 @@
                 const row = document.createElement('div');
                 row.className = 'bg-zinc-950 border border-zinc-800 rounded-xl p-3 space-y-2';
                 row.innerHTML = `
-                    <input type="text" data-field="fixture" data-i="${i}" value="${leg.fixture.replace(/"/g, '&quot;')}" placeholder="Fixture" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-[#f5c518] font-semibold focus:outline-none focus:border-[#f5c518]">
-                    <input type="text" data-field="selection" data-i="${i}" value="${leg.selection.replace(/"/g, '&quot;')}" placeholder="Selection" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#f5c518]">
+                    <input type="text" data-field="fixture" data-i="${i}" value="${leg.fixture.replace(/"/g, '&quot;')}" placeholder="Fixture" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-[#bcc8ff] font-semibold focus:outline-none focus:border-[#bcc8ff]">
+                    <input type="text" data-field="selection" data-i="${i}" value="${leg.selection.replace(/"/g, '&quot;')}" placeholder="Selection" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#bcc8ff]">
                     <div class="flex items-center gap-2">
                         <label class="text-[10px] text-zinc-400 shrink-0">Odds</label>
-                        <input type="number" step="0.01" data-field="odds" data-i="${i}" value="${leg.odds.toFixed(2)}" oninput="recalcEditTicketOdds()" class="w-20 bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-[#f5c518] font-bold focus:outline-none focus:border-[#f5c518]">
+                        <input type="number" step="0.01" data-field="odds" data-i="${i}" value="${leg.odds.toFixed(2)}" oninput="recalcEditTicketOdds()" class="w-20 bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-[#bcc8ff] font-bold focus:outline-none focus:border-[#bcc8ff]">
                     </div>
                 `;
                 legsContainer.appendChild(row);

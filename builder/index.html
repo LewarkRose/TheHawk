@@ -1471,7 +1471,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             // the card, not to take the legs away. Tick the box for a clean
             // match-market build.
             priced: loadPref("hawk.priced", false), favourite: true, result: null, tab: "players", q: "",
-            chk: { price: "", boost: "", stake: "5" }, moreOpen: false, tuneOpen: loadPref("hawk.tuneOpen", false), radarOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: false, cat: "All", legsMore: false, ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
+            chk: { price: "", boost: "", stake: "5" }, moreOpen: false, tuneOpen: loadPref("hawk.tuneOpen", false), radarOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: loadPref("hawk.extras", false), cat: "All", legsMore: false, ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaOpen: new Set(), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
@@ -3034,7 +3034,10 @@ function renderSlip() {
   // Remember whether you like the dials open — closed by default, so Build is the first thing you see.
   const tune = $("#tune"); if (tune) tune.ontoggle = () => { S.tuneOpen = tune.open; savePref("hawk.tuneOpen", tune.open); };
   const upDet = $("#upDet"); if (upDet) upDet.ontoggle = () => { S.radarOpen = upDet.open; };
-  $("#xtra").onchange = (e) => { S.extras = e.target.checked; };
+  // Remembered, like every other switch on this panel. It was the only one that
+  // reset on every page load, so a build made after a refresh quietly went back to
+  // leaving tackles, fouls and offsides out with nothing on screen to say so.
+  $("#xtra").onchange = (e) => { S.extras = e.target.checked; savePref("hawk.extras", S.extras); };
   $("#slip").querySelectorAll("[data-bsw]").forEach((b) => b.onclick = () => {
     if (b.dataset.bsw === "ep") {
       S.ep = !S.ep; savePref("hawk.ep", S.ep); HAWK.setEarlyPayout(S.ep);

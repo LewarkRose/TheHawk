@@ -3448,8 +3448,10 @@ function renderSlip() {
         <b>Max ${S.maxLegs} legs</b>
         <button data-legs="1" aria-label="More legs" ${S.maxLegs >= LEG_STEPS[LEG_STEPS.length - 1] ? "disabled" : ""}>+</button>
       </span>
-      <button data-cyc="priced" class="${S.priced ? "on" : ""}" title="Only legs Bet365 publishes a price for. Measured on twelve builders: those come in at 0.924 of fair, while a build with a player prop in it comes in at 0.741 — the prop costs about a fifth of the ticket.">${
-        S.priced ? "Bet365-priced legs" : "Open market · props on"}</button>
+      <button data-cyc="priced" class="${S.priced ? "on" : ""}" title="${S.priced
+        ? "On: only legs Bet365 publishes a price for. Bet365 never publishes player-prop prices in any feed HAWK can reach, so this removes EVERY player prop — that is what it is for. Measured on twelve builders: priced-only builds come in at 0.924 of fair, while one carrying a prop comes in at 0.741, so the prop costs about a fifth of the ticket. Click for props."
+        : "Off: HAWK still prefers legs Bet365 prices and allows at most one it has to estimate, so you get player props with the price risk kept to one leg. Click to drop props entirely."}">${
+        S.priced ? "Bet365-priced · no props" : "Open market · props on"}</button>
       <button data-cyc="fav" class="${S.favourite ? "on" : ""}" title="Start every builder with the favourite to win (or the double chance)">Favourite first</button>
     </div>
     <details class="rmore" ${S.moreOpen ? "open" : ""} id="rmore"><summary>More — ${[S.extras].filter(Boolean).length} on</summary>
@@ -4026,8 +4028,11 @@ function tuneSummary() {
   const aim = !S.auto ? `${S.target.toFixed(2)}` : S.scan.exactLegs ? `${S.scan.exactLegs} legs exactly`
     : S.scan.minOdds ? `${S.scan.minOdds.toFixed(2)}+` : "2–4";
   const of = { Mix: "mix", Players: "player props", Match: "match stats" }[S.focus] || "mix";
+  // "Bet365-priced only" was the mechanism, not the consequence. The consequence is
+  // that every player prop is gone, because Bet365 publishes no prop price HAWK can
+  // read — and this line is the only place a builder that quietly dropped them says so.
   return `⚙️ ${aim} · max ${S.maxLegs} legs · ${of} · ${S.picks === "value" ? "best value" : "likeliest"}${
-    S.priced ? " · Bet365-priced only" : ""}<span>change</span>`;
+    S.priced ? ` · <b style="color:var(--gold)">no player props</b>` : ""}<span>change</span>`;
 }
 // What HAWK is about to build, as one line. The chips under it change a word each.
 const STYLE_RANGE = { Banker: "72% and 95%", Balanced: "55% and 90%", Punchy: "35% and 78%" };

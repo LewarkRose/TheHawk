@@ -302,6 +302,51 @@
         .tr-fold .tr-hide, .tr-fold[open] .tr-show { display: none; }
         .tr-fold[open] .tr-hide { display: inline; }
         .vsec { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #71717a; margin: 10px 2px 2px; }
+
+        /* ---------- THE LEDGER ----------
+           The same four ruled columns the builder's 📋 Board prints, carried over so a
+           row means the same thing in both places: what HAWK said, what landed, the gap
+           as a bar against a centre rule, and how many legs are behind it. Declared in
+           BOTH files — the Vault is Tailwind and the builder is hand-written CSS, with
+           no stylesheet between them — so a change here needs the same change to .bd-*
+           in builder/index.html, and the other way round.
+
+           The bar takes a colour only where the gap is at least a point AND past what
+           chance explains for that many legs. Grey is "real but small, or too little to
+           tell", which is most of your own bets and is the honest thing for them to look
+           like: 25 legs cannot tell a bias from an afternoon however long its bar. */
+        .sc-head, .sc-row { display: grid; grid-template-columns: minmax(0,1fr) 54px 56px 112px 62px; align-items: center; }
+        .sc-head span:not(:first-child), .sc-row span:not(:first-child) { text-align: right; }
+        .sc-head { padding: 8px 2px; font: 700 8.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+            letter-spacing: .15em; color: var(--muted); text-transform: uppercase;
+            border-bottom: 1px solid rgba(188, 200, 255,.16); }
+        .sc-row { padding: 7px 2px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,.045); }
+        .sc-row:hover { background: rgba(188, 200, 255,.035); }
+        .sc-row .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+        .sc-row .lbl i { font-style: normal; color: var(--faint); font-size: 10.5px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+        .sc-row .v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px;
+            font-variant-numeric: tabular-nums; color: var(--muted); }
+        .sc-row .v.hit { color: var(--text); }
+        .sc-row .nn { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: var(--muted); }
+        .sc-bar { position: relative; height: 13px; }
+        .sc-bar::before { content: ""; position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px;
+            background: rgba(188, 200, 255,.3); }
+        .sc-bar i { position: absolute; top: 3px; height: 7px; border-radius: 1px; background: #4e4e58; }
+        .sc-bar i.p { left: 50%; }
+        .sc-bar i.m { right: 50%; }
+        .sc-bar i.p.sig { background: var(--accent); }
+        .sc-bar i.m.sig { background: var(--down); }
+        /* raw → quoted → landed → shifted: five figures, no bar, so its own track sizes */
+        .sc-head.sc-fix, .sc-row.sc-fix { grid-template-columns: minmax(0,1fr) 52px 56px 56px 68px; }
+        .sc-row .v.raw { text-decoration: line-through; }
+        .sc-row .v.by { color: var(--up); font-weight: 700; }
+        .sc-row .v.by i { font-style: normal; color: var(--accent); font-weight: 400; }
+        @media (max-width: 620px) {
+            .sc-head, .sc-row { grid-template-columns: minmax(0,1fr) 44px 46px 70px 52px; }
+            .sc-head.sc-fix, .sc-row.sc-fix { grid-template-columns: minmax(0,1fr) 42px 44px 44px 56px; }
+            .sc-row { font-size: 12.5px; }
+        }
     </style>
     <!-- Icons: new names / ?v= so browsers drop the old cached logo.
          ONE rel=icon. icon.svg used to be declared here too, with sizes="any",
@@ -351,9 +396,9 @@
             <nav class="sitenav" aria-label="HAWK">
                 <a class="snav" href="builder/" title="Build a bet on a match">⚡ <span>Builder</span></a>
                 <a class="snav" href="builder/?view=scores" title="Live scores and results">⚽ <span>Scores</span></a>
-                <a class="snav" href="builder/?view=radar" title="Upset radar: the favourites most at risk">📡 <span>Radar</span></a>
+                <a class="snav" href="builder/?view=today" title="The day's card: what HAWK found, what's running, what settled">📅 <span>Today</span></a>
                 <a class="snav" href="builder/?view=scan" title="HAWK's builder for every fixture">🏆 <span class="nl">Best builders</span><span class="ns">Best</span></a>
-                <a class="snav" href="builder/?view=value" title="Every bookmaker price that beats HAWK's fair odds">💰 <span>Value</span></a>
+                <a class="snav" href="builder/?view=board" title="HAWK's own record: every market and league, graded on every match">📋 <span>Board</span></a>
                 <a class="snav" href="builder/?view=acca" title="Several matches on one ticket, and the Monster Acca">🧩 <span>Acca</span></a>
                 <a class="snav on" href="./" aria-current="page" title="Your bets, bankroll and track record">🏦 <span>Vault</span></a>
             </nav>
@@ -1270,30 +1315,41 @@
         const scCard = (inner) => `<div class="bg-zinc-900/60 p-5 rounded-2xl border border-zinc-800/80 space-y-3">${inner}</div>`;
         const scH = (icon, text, sub) => `<h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">${icon}</span> ${text}</h3>${
             sub ? `<p class="text-[11px] text-zinc-500 leading-relaxed">${sub}</p>` : ''}`;
-        const scTone = (z) => Math.abs(z) < 1.5 ? 'text-zinc-200' : Math.abs(z) < 2.5 ? 'text-orange-400' : 'text-red-400';
 
-        // One calibration row, shared by the big graded set and your own bets.
+        // One ledger row, shared by the big graded set, the markets, the leagues and
+        // your own bets — so converting this converts every table on the page.
+        //
+        // It used to draw a filled bar of what landed with a white tick at what HAWK
+        // said, and colour the landed figure amber or red by the size of the gap alone.
+        // On 73,691 legs that painted a one-point rounding error the same as a real
+        // miss on 300, and the gap you were meant to read was the distance between two
+        // marks on a bar scaled 0–100 — invisible at the point or two these gaps live
+        // at. The bar now draws the gap itself against a centre rule, full width at 2.5
+        // points, which is where the differences actually are.
+        const SC_BAR_FULL = 2.5;
         function scRow(label, n, said, got, thin) {
-            const gap = 100 * (got - said);
-            // Mint is the brand colour, so it can't double as "careful here" — amber does
-            // that, and red is the real miss. In line = plain, which is the point.
-            const tone = thin ? 'text-zinc-500' : Math.abs(gap) < 2 ? 'text-zinc-200' : Math.abs(gap) < 5 ? 'text-orange-400' : 'text-red-400';
-            return `<tr class="border-t border-zinc-800/70">
-                <td class="py-2 pr-3 text-zinc-300">${label}</td>
-                <td class="py-2 pr-3 text-right text-zinc-500 tabular-nums">${n.toLocaleString()}</td>
-                <td class="py-2 pr-3 text-right text-zinc-400 tabular-nums">${scPct(said)}</td>
-                <td class="py-2 pr-3 text-right font-bold ${tone} tabular-nums">${scPct(got)}</td>
-                <td class="py-2 pr-3 text-right text-[11px] ${tone} tabular-nums">${gap >= 0 ? '+' : ''}${gap.toFixed(1)}</td>
-                <td class="py-2 w-1/4 min-w-[90px]">
-                    <div class="relative h-2.5 rounded-full bg-zinc-950 overflow-hidden">
-                        <div class="absolute inset-y-0 left-0 rounded-full ${thin ? 'bg-zinc-700' : 'bg-[#bcc8ff]'}" style="width:${Math.min(100, 100 * got).toFixed(1)}%"></div>
-                        <div class="absolute inset-y-0 w-0.5 bg-white/70" style="left:${Math.min(100, 100 * said).toFixed(1)}%"></div>
-                    </div>${thin ? '<span class="text-[9px] text-zinc-600">too few to read</span>' : ''}</td></tr>`;
+            const pts = 100 * (got - said);
+            const w = Math.min(50, Math.abs(pts) * (50 / SC_BAR_FULL));
+            // Same test the Board uses: a point or more, and past chance for this many
+            // legs. `thin` already means the caller judged the sample too small to read,
+            // so it never colours whatever the arithmetic says.
+            const sd = Math.sqrt(n * said * (1 - said)) || 1e-9;
+            const z = (got * n - said * n) / sd;
+            const sig = !thin && Math.abs(z) >= 1.96 && Math.abs(pts) >= 1;
+            const bar = Math.abs(pts) < 0.05 ? ''
+                : `<i class="${pts > 0 ? 'p' : 'm'}${sig ? ' sig' : ''}" style="width:${w.toFixed(1)}%"></i>`;
+            return `<div class="sc-row" title="HAWK said ${scPct(said)}, it landed ${scPct(got)} over ${n.toLocaleString()} legs — ${
+                pts >= 0 ? '+' : ''}${pts.toFixed(1)} points${
+                thin ? ', over too few legs to read as more than noise'
+                     : sig ? ', past what chance explains at this many legs'
+                           : ', within what chance explains at this many legs'}">
+                <span class="lbl">${label}</span>
+                <span class="v">${(100 * said).toFixed(1)}</span>
+                <span class="v hit">${(100 * got).toFixed(1)}</span>
+                <span class="sc-bar">${bar}</span>
+                <span class="nn">${n.toLocaleString()}</span></div>`;
         }
-        const scTable = (head, rows) => `<div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-[10px] text-zinc-500 uppercase tracking-wider">
-                <th class="text-left pb-1">${head}</th><th class="text-right pb-1 pr-3">Legs</th><th class="text-right pb-1 pr-3">Said</th>
-                <th class="text-right pb-1 pr-3">Landed</th><th class="text-right pb-1 pr-3">Gap</th><th class="pb-1"></th>
-            </tr></thead><tbody>${rows}</tbody></table></div>`;
+        const scTable = (head, rows) => `<div class="sc-head"><span>${head}</span><span>Said</span><span>Landed</span><span>Gap</span><span>Legs</span></div>${rows}`;
 
         function renderScorecard() {
             const legs = scLegs();
@@ -1329,7 +1385,7 @@
             const bigRows = G ? G.bands.filter(b => b.n).map(b => scRow(label(b), b.n, b.p / b.n, b.won / b.n, b.n < 500)).join('') : '';
             document.getElementById('sc-calibration').innerHTML = scCard(
                 scH('📏', 'Does 60% mean 60%?',
-                    'HAWK saves its chances for every match before kick-off and marks them afterwards — so this fills up whether you bet or not. The bar is what happened; the white line is what HAWK said. They should sit on top of each other.') +
+                    'HAWK saves its chances for every match before kick-off and marks them afterwards — so this fills up whether you bet or not. The bar is the gap between the two, drawn either side of a centre rule: nothing on the rule is a band that told the truth.') +
                 (bigRows ? scTable('HAWK says', bigRows) : '<p class="text-xs text-zinc-500">No graded matches yet — the first appear within a day of kick-off.</p>'));
 
             // ---- 2. where it is off: markets with a real gap ----
@@ -1345,23 +1401,24 @@
                 const off = mk.filter(x => x.left >= 0.03).sort((a, b) => b.left - a.left);
                 const fixed = mk.filter(x => x.left < 0.03 && x.fix).sort((a, b) => Math.abs(b.fix.fixed) - Math.abs(a.fix.fixed));
                 const ok = mk.filter(x => x.left < 0.03 && !x.fix).sort((a, b) => b.n - a.n);
-                const fixRow = (x) => `<tr class="border-t border-zinc-800/70">
-                    <td class="py-2 pr-3 text-zinc-300">${escHtml(x.m)}</td>
-                    <td class="py-2 pr-3 text-right text-zinc-500 tabular-nums">${x.n.toLocaleString()}</td>
-                    <td class="py-2 pr-3 text-right text-zinc-500 tabular-nums line-through">${scPct(x.said)}</td>
-                    <td class="py-2 pr-3 text-right text-zinc-200 tabular-nums">${scPct(x.fix.after)}</td>
-                    <td class="py-2 pr-3 text-right text-zinc-400 tabular-nums">${scPct(x.got)}</td>
-                    <td class="py-2 text-right text-[11px] text-emerald-400 tabular-nums">${x.fix.fixed >= 0 ? '+' : ''}${(100 * x.fix.fixed).toFixed(1)}${x.fix.capped ? ' <span class="text-[#99a9ff]" title="The correction is capped at 0.6 in log-odds">capped</span>' : ''}</td></tr>`;
+                // Five ruled columns instead of the ledger's four: this table is not a
+                // gap, it is a before and after, and the shift is the figure to read.
+                const fixRow = (x) => `<div class="sc-row sc-fix" title="HAWK's model said ${scPct(x.said)}; the builder quotes ${
+                    scPct(x.fix.after)} after its own record is applied; ${scPct(x.got)} landed, over ${x.n.toLocaleString()} legs">
+                    <span class="lbl">${escHtml(x.m)} <i>${x.n.toLocaleString()}</i></span>
+                    <span class="v raw">${(100 * x.said).toFixed(1)}</span>
+                    <span class="v hit">${(100 * x.fix.after).toFixed(1)}</span>
+                    <span class="v">${(100 * x.got).toFixed(1)}</span>
+                    <span class="v by">${x.fix.fixed >= 0 ? '+' : ''}${(100 * x.fix.fixed).toFixed(1)}${
+                      x.fix.capped ? '<i title="The correction is capped at 0.6 in log-odds"> capped</i>' : ''}</span></div>`;
                 marketHtml = (off.length
                         ? `<p class="text-[11px] text-zinc-400">${off.length} market${off.length > 1 ? 's are' : ' is'} still more than 3 points out <b class="text-zinc-200">after</b> the builder's correction. These are the ones worth care.</p>`
                             + scTable('Market', off.map(x => scRow(escHtml(x.m), x.n, x.said, x.got, false)).join(''))
                         : '<p class="text-[11px] text-emerald-400">No market with 500+ legs is more than 3 points out once the builder\'s correction is applied.</p>')
                     + (fixed.length ? `<details class="pt-1" open><summary class="text-[11px] text-[#bcc8ff] cursor-pointer">${fixed.length} market${fixed.length > 1 ? 's are' : ' is'} corrected before you see a price ▾</summary>
                         <p class="text-[11px] text-zinc-500 py-1">The model's raw number, what HAWK actually quotes you, and what landed.</p>
-                        <div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-[10px] text-zinc-500 uppercase tracking-wider">
-                          <th class="text-left pb-1">Market</th><th class="text-right pb-1 pr-3">Legs</th><th class="text-right pb-1 pr-3">Raw</th>
-                          <th class="text-right pb-1 pr-3">Quoted</th><th class="text-right pb-1 pr-3">Landed</th><th class="text-right pb-1">Corrected by</th>
-                        </tr></thead><tbody>${fixed.map(fixRow).join('')}</tbody></table></div></details>` : '')
+                        <div class="sc-head sc-fix"><span>Market</span><span>Raw</span><span>Quoted</span><span>Landed</span><span>Shifted</span></div>
+                        ${fixed.map(fixRow).join('')}</details>` : '')
                     + (ok.length ? `<details class="pt-1"><summary class="text-[11px] text-[#bcc8ff] cursor-pointer">The ${ok.length} markets that need no correction ▸</summary>${
                         scTable('Market', ok.map(x => scRow(escHtml(x.m), x.n, x.said, x.got, false)).join(''))}</details>` : '');
             }
@@ -1427,33 +1484,6 @@
                     + (mineRows ? scTable('HAWK says', mineRows) : '<p class="text-xs text-zinc-500">Nothing settled yet.</p>')
                     + `<p class="text-[11px] text-zinc-500">Across all ${all.n}: HAWK said <b class="text-zinc-300">${all.e.toFixed(1)}</b> would land and <b class="text-zinc-300">${all.a}</b> did. Could still be hiding a bias of up to <b class="text-zinc-300">${scPct(all.band)}</b> per leg.</p>`)}`;
 
-            // ---- 5. splits, gated ----
-            const split = (title, sub, keyOf) => {
-                const by = {};
-                for (const x of legs) (by[keyOf(x)] ||= []).push(x);
-                const ready = [], waiting = [];
-                for (const [k, g] of Object.entries(by)) {
-                    const s = scStat(g);
-                    (s.n >= SC_MIN ? ready : waiting).push([k, s]);
-                }
-                ready.sort((a, b) => b[1].n - a[1].n);
-                waiting.sort((a, b) => b[1].n - a[1].n);
-                const readyRows = ready.map(([k, s]) => `<tr class="border-t border-zinc-800/70">
-                        <td class="py-2 pr-3 text-zinc-300">${k}</td>
-                        <td class="py-2 pr-3 text-right text-zinc-500">${s.n}</td>
-                        <td class="py-2 pr-3 text-right text-zinc-400">${s.e.toFixed(1)}</td>
-                        <td class="py-2 pr-3 text-right text-zinc-300">${s.a}</td>
-                        <td class="py-2 text-right font-bold ${scTone(s.z)}">${s.z >= 0 ? '+' : ''}${s.z.toFixed(2)} SD</td></tr>`).join('');
-                const waitRows = waiting.slice(0, 12).map(([k, s]) => `<div class="flex items-center gap-2">
-                        <span class="text-[11px] text-zinc-400 w-32 truncate">${k}</span>
-                        <div class="flex-1 h-1.5 rounded-full bg-zinc-950 overflow-hidden"><div class="h-full bg-zinc-700 rounded-full" style="width:${(100 * s.n / SC_MIN).toFixed(0)}%"></div></div>
-                        <span class="text-[10px] text-zinc-600 tabular-nums">${s.n}/${SC_MIN}</span></div>`).join('');
-                return scCard(scH('🗂️', title, sub) +
-                    (readyRows ? `<div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-[10px] text-zinc-500 uppercase tracking-wider">
-                            <th class="text-left pb-1"></th><th class="text-right pb-1 pr-3">Legs</th><th class="text-right pb-1 pr-3">Said</th>
-                            <th class="text-right pb-1 pr-3">Landed</th><th class="text-right pb-1">Gap</th></tr></thead><tbody>${readyRows}</tbody></table></div>` : '')
-                    + (waitRows ? `<div class="space-y-1.5 pt-1">${readyRows ? '<p class="text-[10px] text-zinc-600 uppercase tracking-wider">Still collecting</p>' : ''}${waitRows}</div>` : ''));
-            };
             // By league, from every match — no betting needed. Gated on MATCHES, not
             // legs: one match brings hundreds of legs but they all share a referee,
             // two teams and one afternoon, so legs alone would wave a league through

@@ -1389,23 +1389,44 @@
                 (bigRows ? scTable('HAWK says', bigRows) : '<p class="text-xs text-zinc-500">No graded matches yet — the first appear within a day of kick-off.</p>'));
 
             // ---- 2. where it is off: markets with a real gap ----
+            //
+            // Read from byKey, NOT byMarket. They are not the same record and the
+            // difference is the whole point of this table:
+            //
+            //   byMarket  every leg ever graded under that market name, across every
+            //             version of the model that priced it. It never resets.
+            //   byKey     the same legs grouped by HAWK.learnKey — which is what the
+            //             builder actually corrects on — and grade.mjs starts a group's
+            //             record over whenever MODEL_VERSION[key] changes, so it only
+            //             ever describes the model that is live now.
+            //
+            // On byMarket, Player Tackles is 13.3 points out over 13,091 legs and this
+            // table reported a +13.3 correction. That number belongs to a model replaced
+            // two versions ago; the engine deliberately forgets it. The live model's own
+            // record is 1,332 legs at −2.2. Quoting the old one here told you the builder
+            // was making a huge correction it no longer makes.
+            //
+            // The floor drops 500 → 200 to match the builder's Board, because a byKey
+            // group holds a fraction of its market's all-time legs once it has restarted.
             let marketHtml = '<p class="text-xs text-zinc-500">Needs the every-match file.</p>';
-            if (G && G.byMarket) {
-                const mk = Object.entries(G.byMarket).map(([m, b]) => ({ m, n: b.n, said: b.p / b.n, got: b.won / b.n }))
-                    .filter(x => x.n >= 500).map(x => ({ ...x, gap: x.got - x.said }));
+            if (G && G.byKey) {
+                const mk = Object.entries(G.byKey).map(([m, b]) => ({ m, n: b.n, said: b.p / b.n, got: b.won / b.n, ver: b.ver || 1 }))
+                    .filter(x => x.n >= 200).map(x => ({ ...x, gap: x.got - x.said }));
                 // Split by what is LEFT after the builder's correction, not by the raw
-                // gap. Player Tackles is 16 points out raw and the builder already
-                // shifts it 15 of those before a price is ever shown — listing it as an
-                // open problem would send you to fix something that is fixed.
+                // gap: a market the builder already fixes is not an open problem, and
+                // listing it as one sends you to fix something that is fixed.
                 for (const x of mk) { x.fix = scCorrection(x.n, x.said, x.got); x.left = x.fix ? Math.abs(x.fix.left) : Math.abs(x.gap); }
                 const off = mk.filter(x => x.left >= 0.03).sort((a, b) => b.left - a.left);
                 const fixed = mk.filter(x => x.left < 0.03 && x.fix).sort((a, b) => Math.abs(b.fix.fixed) - Math.abs(a.fix.fixed));
                 const ok = mk.filter(x => x.left < 0.03 && !x.fix).sort((a, b) => b.n - a.n);
                 // Five ruled columns instead of the ledger's four: this table is not a
                 // gap, it is a before and after, and the shift is the figure to read.
+                // A group that has restarted says so: "v3" is why a market with tens of
+                // thousands of all-time legs shows only a thousand here.
+                const ver = (x) => x.ver > 1 ? ` <i title="This market's model has been rebuilt ${x.ver - 1} time${x.ver > 2 ? 's' : ''}; its record started over each time, so these are the legs priced by the model you have now">v${x.ver}</i>` : '';
                 const fixRow = (x) => `<div class="sc-row sc-fix" title="HAWK's model said ${scPct(x.said)}; the builder quotes ${
                     scPct(x.fix.after)} after its own record is applied; ${scPct(x.got)} landed, over ${x.n.toLocaleString()} legs">
-                    <span class="lbl">${escHtml(x.m)} <i>${x.n.toLocaleString()}</i></span>
+                    <span class="lbl">${escHtml(x.m)} <i>${x.n.toLocaleString()}</i>${ver(x)}</span>
                     <span class="v raw">${(100 * x.said).toFixed(1)}</span>
                     <span class="v hit">${(100 * x.fix.after).toFixed(1)}</span>
                     <span class="v">${(100 * x.got).toFixed(1)}</span>
@@ -1413,17 +1434,18 @@
                       x.fix.capped ? '<i title="The correction is capped at 0.6 in log-odds"> capped</i>' : ''}</span></div>`;
                 marketHtml = (off.length
                         ? `<p class="text-[11px] text-zinc-400">${off.length} market${off.length > 1 ? 's are' : ' is'} still more than 3 points out <b class="text-zinc-200">after</b> the builder's correction. These are the ones worth care.</p>`
-                            + scTable('Market', off.map(x => scRow(escHtml(x.m), x.n, x.said, x.got, false)).join(''))
-                        : '<p class="text-[11px] text-emerald-400">No market with 500+ legs is more than 3 points out once the builder\'s correction is applied.</p>')
+                            + scTable('Market', off.map(x => scRow(escHtml(x.m) + ver(x), x.n, x.said, x.got, false)).join(''))
+                        : '<p class="text-[11px] text-emerald-400">No market with 200+ legs is more than 3 points out once the builder\'s correction is applied.</p>')
                     + (fixed.length ? `<details class="pt-1" open><summary class="text-[11px] text-[#bcc8ff] cursor-pointer">${fixed.length} market${fixed.length > 1 ? 's are' : ' is'} corrected before you see a price ▾</summary>
                         <p class="text-[11px] text-zinc-500 py-1">The model's raw number, what HAWK actually quotes you, and what landed.</p>
                         <div class="sc-head sc-fix"><span>Market</span><span>Raw</span><span>Quoted</span><span>Landed</span><span>Shifted</span></div>
                         ${fixed.map(fixRow).join('')}</details>` : '')
                     + (ok.length ? `<details class="pt-1"><summary class="text-[11px] text-[#bcc8ff] cursor-pointer">The ${ok.length} markets that need no correction ▸</summary>${
-                        scTable('Market', ok.map(x => scRow(escHtml(x.m), x.n, x.said, x.got, false)).join(''))}</details>` : '');
+                        scTable('Market', ok.map(x => scRow(escHtml(x.m) + ver(x), x.n, x.said, x.got, false)).join(''))}</details>` : '');
             }
             document.getElementById('sc-market').innerHTML = scCard(scH('🔍', 'Where HAWK is off',
-                'This file grades HAWK\'s <b>raw</b> chances — the grader runs with learning switched off on purpose, so the record is of the model itself. The builder then shifts a market by what its record shows before quoting you, so a raw gap is not a gap in what you actually bet.') + marketHtml);
+                'This file grades HAWK\'s <b>raw</b> chances — the grader runs with learning switched off on purpose, so the record is of the model itself. The builder then shifts a market by what its record shows before quoting you, so a raw gap is not a gap in what you actually bet. '
+                + 'A market is counted from the model you have now: when one is rebuilt its record starts over, marked <b class="text-zinc-300">v2</b>, <b class="text-zinc-300">v3</b> and so on, so an error that has already been fixed cannot keep being reported as live.') + marketHtml);
 
             // ---- 3. against the closing line (your bets only — the only place a closing price is stored) ----
             const paired = legs.filter(x => x.close > 1);

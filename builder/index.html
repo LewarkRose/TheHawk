@@ -3307,8 +3307,10 @@ function b365Guess(fair, legs) {
 function easyCall(r) {
   if (!r || !(r.fair > 1) || !r.p) return "";
   const { price, boost, eff } = checkerInputs();
-  // The price it's really worth: HAWK's fair, raised where HAWK rates a leg well above the bookies' price.
-  const fair = r.fair / (r.check || 1), need = fair * 1.02, needQuoted = 1 + (need - 1) / (1 + boost / 100);   // the Bet365 price that makes it worth it
+  // The price it's really worth: HAWK's fair, raised where HAWK rates a leg well above
+  // the bookies' price. Taken from worthFrom so the call and the price box cannot
+  // disagree — they used to compute the same thing separately.
+  const fair = r.fair / (r.check || 1), need = worthFrom(r), needQuoted = 1 + (need - 1) / (1 + boost / 100);   // the Bet365 price that makes it worth it
   // How risky, in plain words: how often it lands.
   const in10 = Math.round(r.p * 10), risk = `<small class="risk">${r.p >= 0.6 ? `🙂 Likely — lands about ${in10} in 10`
     : r.p >= 0.4 ? `🪙 Coin flip — lands about ${in10} in 10` : r.p >= 0.2 ? `🎲 Risky — lands about ${Math.max(2, in10)} in 10, loses the rest`
@@ -3337,8 +3339,20 @@ function easyCall(r) {
 }
 // The price a builder is worth it from: HAWK's fair odds, raised where HAWK rates a
 // leg well above what its bookmaker price implies (the same number the call and the
-// price box use, so they can't disagree).
-const worthFrom = (r) => r && r.fair ? (r.fair / (r.check || 1)) * 1.02 : null;
+// price box use, so they can't disagree) — then divided by what builds like this one
+// have actually come back at.
+//
+// REALISATION. Measured on this app's own settled record: a builder made only of legs
+// Bet365 publishes came in at 0.924 of its fair price, while one carrying a player
+// prop came in at 0.741 — the prop costs about a fifth of the ticket. Until now that
+// finding sat in a tooltip and changed nothing, and the threshold was a flat 2%
+// margin. Applying it raises the bar from fair x 1.02 to fair x 1.082, and to
+// fair x 1.349 once a prop is in, so HAWK refuses builds it used to wave through.
+// Set both to 1 to go back to the old behaviour.
+const REALISATION = { priced: 0.924, prop: 0.741 };
+const hasPropLeg = (r) => !!(r && r.legs || []).some((x) => ((S.legs || {})[x.id] || {}).kind === "player");
+const realisation = (r) => (hasPropLeg(r) ? REALISATION.prop : REALISATION.priced);
+const worthFrom = (r) => r && r.fair ? (r.fair / (r.check || 1)) / realisation(r) : null;
 // How close HAWK's expected Bet365 price has been to the prices you typed, and
 // how much of its cut it has learnt from you. Typing one number after each check
 // is what closes the gap — this shows it happening.

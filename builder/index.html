@@ -251,6 +251,56 @@ img{max-width:100%}
   border:1px solid #242938;border-radius:999px;padding:3px 10px}
 .aged b{color:var(--text)}
 
+/* ═══ THE CONTACT SHEET ════════════════════════════════════════════════════
+   Every build the scan printed, as a miniature of the ticket it would make.
+   What HAWK backs is bright with a solid issuer rule; the rest are faint with
+   a dashed one. Nothing is hidden — the faint ones are still readable — but
+   the opinion is obvious at arm's length. Opening one spans the full row. */
+/* #scanRes is itself a grid, so the sheet has to claim the whole row before it
+   can lay its own columns out — otherwise it becomes one cell and prints a
+   single narrow column however wide the screen is. */
+.sheet-grid{grid-column:1/-1;display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(286px,1fr));gap:14px;align-items:start}
+.srow.mini{border:0;background:none;padding:0;margin:0}
+.srow.mini > summary{position:relative;list-style:none;cursor:pointer;border-radius:5px;padding:13px;
+  display:block;transition:box-shadow .15s,opacity .15s;
+  background:repeating-linear-gradient(135deg,rgba(255,255,255,.012) 0 2px,transparent 2px 5px),
+             linear-gradient(180deg,#272533 0%,#211f2b 46%,#1d1b26 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 0 0 1px rgba(188,200,255,.11),
+             0 2px 0 #141219,0 3px 0 #100e14,0 8px 12px -6px rgba(0,0,0,.8)}
+.srow.mini > summary::-webkit-details-marker{display:none}
+.srow.mini > summary::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;
+  border-radius:5px 5px 0 0;background:linear-gradient(90deg,var(--accent-d),var(--accent) 45%,var(--accent-d))}
+.srow.mini > summary:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.09),inset 0 0 0 1px rgba(188,200,255,.2),
+  0 2px 0 #141219,0 3px 0 #100e14,0 14px 22px -8px rgba(0,0,0,.85)}
+/* a build HAWK will not back: faint, and its rule is dashed rather than printed */
+.srow.mini.no > summary{opacity:.62}
+.srow.mini.no > summary::before{background:repeating-linear-gradient(90deg,#3a3846 0 6px,transparent 6px 12px)}
+.srow.mini.no > summary:hover{opacity:1}
+/* an opened build takes the whole row and shows the real card beneath */
+.srow.mini[open]{grid-column:1/-1}
+.srow.mini[open] > summary{border-radius:5px 5px 0 0;opacity:1}
+.mstamp{position:absolute;right:11px;top:34px;font:900 10px system-ui;letter-spacing:.14em;
+  padding:3px 8px;border-radius:4px;transform:rotate(-6deg);white-space:nowrap}
+.mstamp.y{color:var(--green);border:2px solid rgba(62,196,109,.55);background:rgba(62,196,109,.08)}
+.mstamp.n{color:var(--muted);border:2px dashed #3a3846;background:rgba(255,255,255,.02)}
+.mfx{font-weight:900;font-size:14px;margin-top:5px;padding-right:86px}
+.mko{font-size:11px;color:var(--muted);margin-top:2px}
+.mlegs{display:flex;gap:4px;flex-wrap:wrap;margin-top:9px}
+.mlegs span{font-size:10.5px;padding:2px 7px;border-radius:6px;background:var(--sunk);color:var(--text-2);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.5);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mlegs span.more{color:var(--muted)}
+.mperf{position:relative;display:flex;align-items:center;gap:8px;margin:10px 0 9px}
+.mperf i{flex:1;height:0;border-top:2px dashed rgba(188,200,255,.24)}
+.mperf::before,.mperf::after{content:"";position:absolute;top:50%;margin-top:-8px;width:16px;height:16px;
+  border-radius:50%;background:var(--bg);box-shadow:inset 0 1px 2px rgba(0,0,0,.8)}
+.mperf::before{left:-21px} .mperf::after{right:-21px}
+.mperf span{flex:none;font:700 8px var(--mono,ui-monospace);letter-spacing:.2em;color:var(--faint);text-transform:uppercase}
+.mfoot{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.mk{font:800 9px system-ui;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.mv{font-family:var(--mono,ui-monospace);font-variant-numeric:tabular-nums;font-weight:800;font-size:14px;margin-top:1px}
+@media (max-width:700px){.sheet-grid{grid-template-columns:1fr}}
+
 /* A restored scan says its own age. Deliberately not styled as a warning — it is
    not an error, it is a fact about the numbers you are looking at. */
 .scanold{margin:8px 0 0;padding:8px 11px;border-radius:9px;font-size:12px;line-height:1.5;
@@ -4271,7 +4321,7 @@ function updateScan() {
         ? "HAWK can't see Bet365's builder prices — it can only say what each one has to beat. That's a target, not a verdict."
         : "Every leg here has Bet365's own price behind it, so the estimate is those prices multiplied rather than a guess — but it's still out by about 10% either way, which is the difference between a fair price and a good one."}
       Build the top one on Bet365, type the real price in its box, and the card answers for real.</small></div>` : "")
-    + res.map(r => scanRow(r, d.params)).join("") : `<div class="note">${d.running
+    + `<div class="sheet-grid">${res.map(r => scanRow(r, d.params)).join("")}</div>` : `<div class="note">${d.running
     ? "Results appear here as each match is analysed…"
     : d.total === 0 && d.params ? "No fixtures kick off in that window — try a longer one."
     : betOn.size && !open.length ? "Nothing new — you've already bet on every match scanned."
@@ -4578,14 +4628,37 @@ function scanRow(r, params) {
   const lands = (r.p || 0) * (r.check || 1), needs = price > 1 ? 1 / price : 0;
   const pts = Math.round(100 * (lands - needs));
   const tone = pts >= 2 ? "ok" : pts >= -2 ? "mid" : "no";
-  return `<details class="srow" data-rowkey="${esc(key)}" ${open ? "open" : ""}>
+  // A price you could actually be offered: one you typed, or one Bet365 published.
+  // `price` above falls back to HAWK's own fair odds when neither exists, which
+  // makes `pts` a comparison of HAWK's chance against HAWK's own price — circular,
+  // and it always lands near zero or positive. That was survivable when it was
+  // small grey type; printed as a stamp it would claim a fixture with no price at
+  // all is "+2 clear". So the verdict is only given where there is one to give.
+  const real = x || (r.b365 > 1 ? r.b365 : 0);
+  // THE CONTACT SHEET. Every build the scan printed, as a miniature of the
+  // ticket it would make. The one HAWK backs is bright with a solid rule; the
+  // rest are faint with a dashed one and say how far short they are — so the
+  // whole scan reads at arm's length without hiding anything. Opening one
+  // spans the full width and shows the real card underneath.
+  const backed = !!real && pts >= 2;
+  return `<details class="srow mini${backed ? "" : " no"}" data-rowkey="${esc(key)}" ${open ? "open" : ""}>
     <summary>
-      <div class="m"><b>${esc(r.home)} v ${esc(r.away)}</b>
-        <span>${r.legs.length} legs · ${esc(fmtKick(r.kickoff))} · ${r.confirmed ? "XI confirmed" : "XI predicted"}${
-          x ? ` · your price ${odds(x)}` : ""}</span></div>
-      <div class="n"><b>${Math.round(100 * lands)}%</b><span>lands</span></div>
-      <div class="n"><b class="muted">${Math.round(100 * needs)}%</b><span>needed</span></div>
-      <div class="sgap ${tone}">${pts > 0 ? `+${pts} clear` : pts === 0 ? "level" : `${-pts} short`}</div>
+      <div class="mstamp ${backed ? "y" : "n"}">${
+        !real ? "NO PRICE" : pts > 0 ? `+${pts} CLEAR` : pts === 0 ? "LEVEL" : `${-pts} SHORT`}</div>
+      <div class="mfx">${esc(r.home)} v ${esc(r.away)}</div>
+      <div class="mko">${esc(r.league)} · ${esc(fmtKick(r.kickoff))} · ${
+        r.confirmed ? "XI confirmed" : "XI predicted"}</div>
+      <div class="mlegs">${r.legs.slice(0, 4).map(l => `<span>${esc(l.label)}</span>`).join("")}${
+        r.legs.length > 4 ? `<span class="more">+${r.legs.length - 4}</span>` : ""}</div>
+      <div class="mperf"><i></i><span>${(HAWK.SCAN_SIMS || 4000).toLocaleString()} runs</span><i></i></div>
+      <div class="mfoot">
+        <div><div class="mk">Lands</div><div class="mv">${Math.round(100 * lands)}%</div></div>
+        <div><div class="mk">Needs</div><div class="mv">${real ? Math.round(100 * needs) + "%" : "—"}</div></div>
+        <div style="text-align:right"><div class="mk">${real ? "Bet365" : "HAWK's fair"}</div>
+          <div class="mv">${real
+            ? `<span class="q">${odds(real)}</span>`
+            : `<span class="e">${odds(r.fair)}</span>`}</div></div>
+      </div>
     </summary>
     ${open ? scanCard(r, params) : ""}
   </details>`;

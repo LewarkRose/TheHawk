@@ -25,6 +25,28 @@
   --accent:#bcc8ff; --accent-d:#8697f9; --gold:#99a9ff; --red:#ff5d73; --blue:#e2e8f0; --shadow:0 10px 30px rgba(0,0,0,.35);
   /* Results read as results, not as HAWK's gold: won, drew, lost. */
   --green:#3ec46d;
+
+  /* ════ PRESS · the shared vocabulary ════════════════════════════════════
+     The same names the Vault declares, so both halves of HAWK speak one
+     language. Most are aliases of what is already above — the palette and
+     this system agree, which is what makes the bridge possible at all. The
+     genuinely new ones are the stocks and rules the old palette never named.
+     Nothing here changes a layout; it only gives things names to be styled by. */
+  --ink-0:var(--bg);          /* the desk */
+  --stock-1:var(--panel);     /* ordinary card */
+  --stock-2:var(--panel2);    /* raised */
+  --stock-3:#262626;          /* raised further: chips, pressed states */
+  --sunk:#0f0f0f;             /* cut into the card: inputs, bar tracks */
+  --rule:var(--line);         /* a hairline. carries no meaning */
+  --rule-strong:#3d3b48;      /* a boundary that means something */
+  --text-2:#c6c6c6;           /* reading text, below headings */
+  --faint:#6a6a6a;
+  --up:var(--green);
+  --down:var(--red);
+  --on-fill:#101430;          /* the one ink that sits on any bright fill */
+  /* the ticket's own stock: the only warm surface in the app, and the only
+     one with a tooth. it is the thing you take away with you. */
+  --ticket-stock:#232130;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}

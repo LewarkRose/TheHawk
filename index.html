@@ -22,6 +22,62 @@
            the page's markup is unchanged. "html body" outranks Tailwind's own
            rules, which it injects after this. ---- */
         :root { --v-bg:#0a0a0a; --v-line:#2a2a2a; --v-gold:#bcc8ff; --accent:#bcc8ff; --v-shadow:0 18px 40px -14px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.35); }
+
+        /* ════ PRESS · the shared vocabulary ════════════════════════════════
+           The same tokens the builder declares, so both halves of HAWK speak
+           one language. Nothing here changes a layout; it only names things. */
+        :root {
+            --ink-0:#0a0a0a;        /* the desk */
+            --stock-1:#141414;      /* ordinary card */
+            --stock-2:#1c1c1c;      /* raised */
+            --stock-3:#262626;      /* raised further: chips, pressed states */
+            --sunk:#0f0f0f;         /* cut into the card: inputs, tracks */
+            --rule:#2a2a2a;         /* a hairline. carries no meaning */
+            --rule-strong:#3d3b48;  /* a boundary that means something */
+            --text:#ededed;
+            --text-2:#c6c6c6;
+            --muted:#8a8a8a;
+            --faint:#6a6a6a;
+            --accent-d:#8697f9;
+            --up:#3ec46d;
+            --down:#ff5d73;
+            --on-fill:#101430;      /* the one ink that sits on any bright fill */
+        }
+
+        /* ════ THE BRIDGE ═══════════════════════════════════════════════════
+           The Vault is built from Tailwind utilities — 541 uses of the zinc
+           scale across 20 distinct classes. Rewriting that markup would be
+           weeks of risk for no behaviour change, so the scale is remapped onto
+           the tokens instead: every existing utility inherits the language and
+           not one class name moves.
+           "html body" outranks Tailwind's own single-class rules, which it
+           injects after this — the same trick the skin above already uses.
+           The translucent variants keep their translucency via color-mix
+           rather than being flattened to a solid, or every /60 panel in the
+           Vault would quietly become opaque. */
+        html body .bg-zinc-950 { background-color: var(--ink-0) }
+        html body .bg-zinc-900 { background-color: var(--stock-1) }
+        html body .bg-zinc-800 { background-color: var(--stock-2) }
+        html body .bg-zinc-700 { background-color: var(--stock-3) }
+        html body .bg-zinc-950\/60 { background-color: color-mix(in srgb, var(--ink-0) 60%, transparent) }
+        html body .bg-zinc-900\/60 { background-color: color-mix(in srgb, var(--stock-1) 60%, transparent) }
+        html body .bg-zinc-900\/40 { background-color: color-mix(in srgb, var(--stock-1) 40%, transparent) }
+        html body .bg-zinc-800\/60 { background-color: color-mix(in srgb, var(--stock-2) 60%, transparent) }
+
+        html body .border-zinc-900 { border-color: var(--rule) }
+        html body .border-zinc-800 { border-color: var(--rule) }
+        html body .border-zinc-800\/80 { border-color: color-mix(in srgb, var(--rule) 80%, transparent) }
+        html body .border-zinc-800\/70 { border-color: color-mix(in srgb, var(--rule) 70%, transparent) }
+        html body .border-zinc-700 { border-color: var(--rule-strong) }
+        html body .divide-zinc-800\/70 > :not([hidden]) ~ :not([hidden]) {
+            border-color: color-mix(in srgb, var(--rule) 70%, transparent) }
+
+        html body .text-zinc-100 { color: var(--text) }
+        html body .text-zinc-200 { color: var(--text-2) }
+        html body .text-zinc-300 { color: var(--text-2) }
+        html body .text-zinc-400 { color: var(--muted) }
+        html body .text-zinc-500 { color: var(--muted) }
+        html body .text-zinc-600 { color: var(--faint) }
         html body {
             background: radial-gradient(1100px 520px at 12% -12%, rgba(188, 200, 255,.12), transparent 60%),
                         radial-gradient(900px 480px at 100% -5%, rgba(188, 200, 255,.06), transparent 60%), var(--v-bg) !important;
@@ -42,14 +98,19 @@
         html body > .max-w-6xl { position: relative; z-index: 1; }
         /* raised panels (slightly see-through so the background glows through) */
         html body .bg-zinc-900\/60, html body .bg-zinc-900.border.rounded-2xl {
-            background: linear-gradient(180deg, rgba(24,33,39,.9) 0%, rgba(19,26,30,.9) 100%) !important;
-            border: 1px solid var(--v-line) !important;
+            /* was a teal-slate gradient: rgba(24,33,39,.9) to rgba(19,26,30,.9).
+               Those were the coolest surfaces in HAWK and the reason the Vault
+               read as a different product from the builder. Same lift, token stock. */
+            background: linear-gradient(180deg,
+                color-mix(in srgb, var(--stock-2) 92%, transparent) 0%,
+                color-mix(in srgb, var(--stock-1) 92%, transparent) 100%) !important;
+            border: 1px solid var(--rule) !important;
             box-shadow: var(--v-shadow), inset 0 1px 0 rgba(255,255,255,.05) !important;
         }
         /* recessed wells: inputs and inner boxes */
         html body .bg-zinc-950, html body input, html body select {
-            background-color: #0f1519 !important;
-            border-color: #222d35 !important;
+            background-color: var(--sunk) !important;      /* was #0f1519 */
+            border-color: var(--rule) !important;          /* was #222d35 */
             box-shadow: inset 0 2px 6px rgba(0,0,0,.5), inset 0 -1px 0 rgba(255,255,255,.02) !important;
         }
         html body input:focus, html body select:focus { border-color: var(--v-gold) !important; box-shadow: inset 0 2px 6px rgba(0,0,0,.5), 0 0 0 3px rgba(188, 200, 255,.15) !important; }
@@ -61,7 +122,7 @@
         }
         /* dark buttons */
         html body button.bg-zinc-900, html body label.bg-zinc-900, html body button.bg-zinc-800, html body .bg-zinc-800.rounded-lg {
-            background: linear-gradient(180deg, #1e282e, #151c20) !important;
+            background: linear-gradient(180deg, var(--stock-3), var(--stock-1)) !important;
             border-color: var(--v-line) !important;
             box-shadow: 0 6px 14px -6px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06) !important;
         }
@@ -90,7 +151,7 @@
         /* site menu: the builder's pages + the Vault (gold here, lit on Vault) */
         /* its own row under brand · actions · bankroll (seven pages don't fit beside them) */
         .vault-brand { margin-right: auto; }
-        .sitenav { display: flex; gap: 3px; padding: 4px; border-radius: 14px; background: rgba(15,21,25,.85); border: 1px solid var(--v-line);
+        .sitenav { display: flex; gap: 3px; padding: 4px; border-radius: 14px; background: color-mix(in srgb, var(--sunk) 85%, transparent); border: 1px solid var(--v-line);
             box-shadow: inset 0 1px 0 rgba(255,255,255,.04); order: 5; width: 100%; justify-content: center; flex-wrap: wrap; }
         html body .snav { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px; color: #a1a1aa; font-weight: 700;
             font-size: 12.5px; text-decoration: none; white-space: nowrap; transition: .15s; }
@@ -104,7 +165,7 @@
             html body .snav { flex: 1; flex-direction: column; gap: 1px; font-size: 10px; padding: 5px 1px; min-width: 0; }
             .snav .nl { display: none; } .snav .ns { display: block; }
         }
-        .vgroup { display: flex; gap: 2px; padding: 3px; border-radius: 13px; background: rgba(15,21,25,.85); border: 1px solid var(--v-line); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
+        .vgroup { display: flex; gap: 2px; padding: 3px; border-radius: 13px; background: color-mix(in srgb, var(--sunk) 85%, transparent); border: 1px solid var(--v-line); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
         html body .vbtn { height: 38px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px; border-radius: 10px; font-size: 12.5px; font-weight: 700;
             color: #d4d4d8; background: transparent; border: 0; cursor: pointer; text-decoration: none; white-space: nowrap; }
         html body .vgroup .vbtn:hover { background: rgba(255,255,255,.06); color: #fff; }
@@ -114,7 +175,7 @@
         .vbtn-gold img { width: 18px; height: 18px; filter: brightness(.25) saturate(0); }
         html body .vicon { width: 38px; padding: 0; justify-content: center; }
         .vault-bank { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 8px 0 16px; border-radius: 14px;
-            background: linear-gradient(180deg, #1e282e, #151c20); border: 1px solid rgba(188, 200, 255,.35);
+            background: linear-gradient(180deg, var(--stock-3), var(--stock-1)); border: 1px solid rgba(188, 200, 255,.35);
             box-shadow: 0 10px 24px -10px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06); }
         .vault-bank .lbl { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: #8a8f93; }
         .vault-bank .amt { display: block; font-size: 22px; font-weight: 900; color: #c0cbff; line-height: 1.1; }

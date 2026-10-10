@@ -119,6 +119,16 @@
         html body .stamp.l { color: var(--down); border: 2px solid rgba(255,93,115,.55); background: rgba(255,93,115,.07) }
         html body .stamp.p { color: var(--accent); border: 2px dashed rgba(188,200,255,.5); background: rgba(188,200,255,.10) }
         html body .stamp.c { color: var(--accent); border: 2px solid rgba(134,151,249,.55); background: rgba(188,200,255,.08) }
+        /* provenance by size, the same mechanism the builder uses: a price you were
+           actually offered is a full figure; a closing price is HAWK's reading of
+           the market and is capped small and italic so it cannot pass for a quote. */
+        html body .q { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-variant-numeric: tabular-nums; font-weight: 900; font-size: 15px; color: var(--text) }
+        html body .e { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-variant-numeric: tabular-nums; font-weight: 600; font-size: 12px !important;
+            font-style: italic; color: var(--muted); padding-bottom: 2px; display: inline-block;
+            background-image: repeating-linear-gradient(90deg, #5a5a5a 0 2px, transparent 2px 4px);
+            background-size: 100% 1px; background-repeat: no-repeat; background-position: 0 100% }
         html body {
             background: radial-gradient(1100px 520px at 12% -12%, rgba(188, 200, 255,.12), transparent 60%),
                         radial-gradient(900px 480px at 100% -5%, rgba(188, 200, 255,.06), transparent 60%), var(--v-bg) !important;
@@ -2113,10 +2123,53 @@
                     </div>
                     ${bet.lostEarly ? `<div class="text-[11px] text-red-300 bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2">❌ Settled during the match: ${escHtml(bet.lostEarly)} was lost, so the bet couldn't land.</div>` : ''}
                     ${bet.status === 'PENDING' && bet.needsCheck ? `<div class="text-[11px] text-orange-400 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2">⚠️ HAWK couldn't settle this one: ${escHtml(bet.needsCheck)}. Settle it yourself with what Bet365 paid (✏️ Edit lets you set the exact return).</div>` : ''}
-                    <div class="flex justify-between items-center pt-2 border-t border-zinc-900 text-xs">
-                        <div><span class="text-zinc-400">Stake:</span> <span class="text-white font-bold">€${bet.stake.toFixed(2)}</span><span class="text-zinc-400 ml-3">${bet.status === 'CASHED_OUT' ? 'Cashed Out:' : 'Return:'}</span> <span class="text-[#bcc8ff] font-bold">€${(bet.status === 'CASHED_OUT' ? (bet.cashOutAmount || 0) : bet.potentialReturn).toFixed(2)}</span></div>
-                        ${bet.status === 'PENDING' ? `<div class="flex gap-1"><button onclick="settleBet('${bet.id}', 'WON')" class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg font-bold text-[10px]">Won ✓</button><button onclick="settleBet('${bet.id}', 'LOST')" class="bg-red-500/20 text-red-400 px-3 py-1 rounded-lg font-bold text-[10px]">Lost ✗</button><button onclick="openQuickCashOutModal('${bet.id}')" class="bg-[#8697f9]/20 text-[#bcc8ff] px-3 py-1 rounded-lg font-bold text-[10px]">Cash Out 💰</button></div>` : ''}
-                    </div>
+                    ${(() => {
+                        // THE STUB'S COUNTERFOIL. Below the perforation: what it cost,
+                        // what you took, what the market closed at, and what came back.
+                        //
+                        // "Closed" is the one that has never been shown at ticket level.
+                        // It is stored per leg and only ever rendered as a small arrow
+                        // beside each one — yet beating the close is the fastest honest
+                        // signal that an edge was real, and the only figure on this card
+                        // that is not about luck. It is the product of the legs' closing
+                        // prices, and it is only printed when EVERY leg has one: a
+                        // partial product would read as a combined price and be wrong.
+                        const hl = (bet.legs || []).flatMap(l => (l.hawk && l.hawk.legs) || []);
+                        const closed = hl.filter(h => h.close > 1);
+                        const whole = hl.length > 0 && closed.length === hl.length;
+                        const closeOdds = whole ? closed.reduce((a, h) => a * h.close, 1) : null;
+                        const beat = closeOdds ? bet.odds / closeOdds - 1 : null;
+                        // What actually came back. The old line printed potentialReturn
+                        // whatever the status, which under a past-tense label would say a
+                        // lost ticket "returned" its winnings. A loss returns nothing; a
+                        // void returns the stake; only a pending ticket shows what it
+                        // would pay, and that one is labelled "Returns", not "Returned".
+                        const ret = bet.status === 'CASHED_OUT' ? (bet.cashOutAmount || 0)
+                                  : bet.status === 'LOST' ? 0
+                                  : bet.status === 'VOID' ? bet.stake
+                                  : bet.potentialReturn;
+                        const retCol = bet.status === 'WON' ? 'var(--up)'
+                                     : bet.status === 'LOST' ? 'var(--muted)' : 'var(--accent)';
+                        const cell = (k, v, extra) => `<div><div class="text-[9px] uppercase tracking-[.14em] text-zinc-500 font-extrabold">${k}</div>
+                            <div class="font-bold" style="font-variant-numeric:tabular-nums">${v}</div>
+                            ${extra ? `<div class="text-[10px] text-zinc-500">${extra}</div>` : ''}</div>`;
+                        return `
+                        <div class="perf"><i></i><span>HAWK · ${bet.hawkP ? 'simulated' : 'logged by you'}</span><i></i></div>
+                        <div class="grid grid-cols-4 gap-2 text-xs">
+                            ${cell('Stake', `<span class="text-white" style="font-size:14px">€${bet.stake.toFixed(2)}</span>`)}
+                            ${cell('Took', `<span class="q">${bet.odds.toFixed(2)}</span>`)}
+                            ${cell('Closed', closeOdds
+                                ? `<span class="e">${closeOdds.toFixed(2)}</span>`
+                                : `<span class="text-zinc-600" style="font-size:13px">—</span>`,
+                                closeOdds
+                                  ? (beat >= 0 ? `beat it by ${(100 * beat).toFixed(0)}%` : `${(100 * -beat).toFixed(0)}% under`)
+                                  : (hl.length ? `${closed.length} of ${hl.length} legs priced` : 'no closing price'))}
+                            <div class="text-right"><div class="text-[9px] uppercase tracking-[.14em] text-zinc-500 font-extrabold">${
+                                bet.status === 'CASHED_OUT' ? 'Cashed out' : bet.status === 'PENDING' ? 'Returns' : 'Returned'}</div>
+                                <div class="font-extrabold" style="font-size:19px;color:${retCol};font-variant-numeric:tabular-nums">€${ret.toFixed(2)}</div></div>
+                        </div>
+                        ${bet.status === 'PENDING' ? `<div class="flex gap-1 pt-2"><button onclick="settleBet('${bet.id}', 'WON')" class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg font-bold text-[10px]">Won ✓</button><button onclick="settleBet('${bet.id}', 'LOST')" class="bg-red-500/20 text-red-400 px-3 py-1 rounded-lg font-bold text-[10px]">Lost ✗</button><button onclick="openQuickCashOutModal('${bet.id}')" class="bg-[#8697f9]/20 text-[#bcc8ff] px-3 py-1 rounded-lg font-bold text-[10px]">Cash Out 💰</button></div>` : ''}`;
+                    })()}
                 `;
                 if (bet.status === 'PENDING') { container.appendChild(card); return; }
                 const when = betDay(bet);

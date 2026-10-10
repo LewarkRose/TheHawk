@@ -143,7 +143,10 @@ img{max-width:100%}
 .lpsum{font-size:12px;color:var(--muted)}
 .grid{display:grid;grid-template-columns:290px minmax(0,1fr) 400px;gap:16px;padding:16px 22px;align-items:start}
 @media (max-width:1250px){.grid{grid-template-columns:260px minmax(0,1fr)}.slipcol{grid-column:1/-1}}
-@media (max-width:820px){.grid{grid-template-columns:1fr}}
+/* minmax(0,1fr), not 1fr: a plain 1fr track has an auto minimum, so any child wider
+   than the screen — a nowrap chip strip, a long leg list — stretches the column and
+   the whole page scrolls sideways instead of the child scrolling inside it. */
+@media (max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}}
 /* Phones (one column): the league list only on the builder, folded into one bar once a match is open */
 .fx-toggle{display:none}
 @media (max-width:820px){
@@ -410,6 +413,8 @@ img{max-width:100%}
 .spark i{display:block;width:5px;background:#4c4c4c;border-radius:2px}
 .spark i.hit{background:var(--accent)}
 .qchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+/* Wide enough to wrap without costing much; the strip below takes over on a phone. */
+.scstrip{flex-wrap:wrap;padding-left:0;padding-right:0}
 .qc{font-size:11.5px;padding:3px 8px;border-radius:999px;background:#1f1f1f;border:1px solid #3c3c3c;cursor:pointer;transition:.12s}
 .qc:hover{border-color:var(--accent);color:var(--accent)}
 .qc.in{background:rgba(188, 200, 255,.16);border-color:var(--accent);color:var(--accent)}
@@ -452,6 +457,11 @@ img{max-width:100%}
 .sc-band i{flex:1;height:0;border-top:1px solid rgba(188,200,255,.22)}
 .sc-band b{flex:none;font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
 .sc-band + .sc-league{margin-top:10px}
+/* The competition, on a row that isn't under a league heading. One line: the score
+   column is narrow, and "Argentina Primera" wrapping made those rows half again as
+   tall as the ones around them. */
+.sc-lg{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .sc-hawk{font-size:10.5px;font-weight:600;color:var(--muted);letter-spacing:0;white-space:nowrap;margin-top:1px}
 .sc-hawk b{color:var(--accent);font-weight:900}
 .sc-hawk .ok{color:var(--accent)}.sc-hawk .bad{color:var(--red)}
@@ -565,7 +575,15 @@ img{max-width:100%}
   .sc-team .tn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .sc-score{grid-area:sc;min-width:62px}.sc-hawk{font-size:9.5px}
   .sc-bet{grid-area:bet;flex-direction:column;justify-content:center;gap:3px;min-width:26px}
-  .sc-bell{width:26px;height:26px;font-size:12px;border-radius:8px}}
+  .sc-bell{width:26px;height:26px;font-size:12px;border-radius:8px}
+  /* The day pills wrapped to two rows, the league chips to three, and the band chips
+     to two more — five stacked rows of controls before a single score, which on a
+     412px screen is most of the first view. Each becomes one strip you swipe, the
+     way the league bar everywhere else in HAWK already works. */
+  .scstrip,#scLeagues,#scStatus{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;
+    -webkit-overflow-scrolling:touch}
+  #scLeagues::-webkit-scrollbar,#scStatus::-webkit-scrollbar{display:none}
+  #scLeagues .qc,#scStatus .qc{flex:none;white-space:nowrap}}
 .kelly{margin-top:8px;font-size:13px;padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line)}
 .kelly b{color:var(--gold)}
 .kfrac{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:2px 4px;font-size:12px;margin-left:4px}
@@ -5583,7 +5601,7 @@ function renderScores() {
           title="A goal pops up for matches you have a HAWK bet on, a lineup alert on, or open in the live view — and as a PC / phone notification while HAWK is open in the background">${goalToggleText()}</button>
         <button class="ghost" style="width:auto;margin:0;padding:4px 10px;font-size:12px;text-transform:none;letter-spacing:0" onclick="testNotify()"
           title="Show a test notification now — or find out what's blocking them">📳 Test</button></h3>
-      <div class="leagues" id="scDays" style="flex-wrap:wrap;margin:0 0 10px">${days.map(([d, t]) => `<button class="pill ${d === sc.day ? "on" : ""}" data-day="${d}">${esc(t)}</button>`).join("")}</div>
+      <div class="leagues scstrip" id="scDays" style="margin:0 0 10px">${days.map(([d, t]) => `<button class="pill ${d === sc.day ? "on" : ""}" data-day="${d}">${esc(t)}</button>`).join("")}</div>
       <div class="qchips" id="scLeagues">${scoreChips()}</div>
       <div class="qchips" id="scStatus" style="margin-top:6px">${statusChips()}</div>
     </div>
@@ -5619,8 +5637,12 @@ function renderScores() {
 // The day in three bands. Finished matches used to sit between you and the next
 // kick-off — grouped by league, and leagues run in their own fixed order, so on a
 // busy day everything already played in every league above it was in the way.
+// "Next hour" is kick-off within the hour, plus anything already past its kick-off
+// time that 365Scores hasn't marked started yet — due() — because that is the most
+// imminent thing on the page, not the least.
 const SC_BANDS = [["live", "🔴 Live", (g) => g.status === 3],
-                  ["soon", "🕐 Upcoming", (g) => g.status === 2],
+                  ["next", "⏰ Next hour", (g) => g.status === 2 && (due(g) || soon(g.kickoff))],
+                  ["soon", "🕐 Later", (g) => g.status === 2 && !due(g) && !soon(g.kickoff)],
                   ["done", "✅ Finished", (g) => g.status !== 2 && g.status !== 3]];
 const scBandOf = (g) => (SC_BANDS.find(([, , is]) => is(g)) || SC_BANDS[2])[0];
 // Counted inside whatever league is selected, so the numbers follow the chips above.
@@ -5663,34 +5685,45 @@ function renderScoreList() {
   // heading, so it is dropped — the chip above already says which band you're in.
   const bands = SC_BANDS.filter(([k]) => sc.status === "All" || sc.status === k)
     .map(([k, title]) => [k, title, shown.filter((g) => scBandOf(g) === k)]).filter(([, , l]) => l.length);
-  el.innerHTML = myDayCard(sc.data) + htStrip(sc.data) + (live ? `<div class="note" style="margin:0 0 10px"><span class="dot-live"></span>${live} live — updating every 15 seconds</div>` : "") +
-    bands.map(([, title, list]) => (sc.status === "All" && bands.length > 1
-        ? `<div class="sc-band"><span>${esc(title)}</span><i></i><b>${list.length}</b></div>` : "")
-      + (() => {
-        const groups = {};
-        for (const g of list) (groups[g.league] ||= []).push(g);
-        return Object.entries(groups).sort((a, b) => order(a[0]) - order(b[0])).map(([lg, glist]) => `
+  // The next hour runs in KICK-OFF order with the league on the row, not grouped by
+  // league like the rest. When something starts in eight minutes it belongs at the
+  // top whatever competition it is in; grouping by league buried it under a match
+  // five hours away in whichever league sorts higher.
+  const byTime = (list) => [...list].sort((a, b) => String(a.kickoff || "").localeCompare(String(b.kickoff || "")))
+    .map(g => scoreRow(g, mine, true)).join("");
+  const byLeague = (list) => {
+    const groups = {};
+    for (const g of list) (groups[g.league] ||= []).push(g);
+    return Object.entries(groups).sort((a, b) => order(a[0]) - order(b[0])).map(([lg, glist]) => `
       <div class="sc-league">${leagueLogo(lg)}${esc(lg)}<button class="sc-tbl" data-table="${esc(lg)}" title="The ${esc(lg)} table, live while games are on">📊 Table</button></div>
-      ${glist.map(g => {
-        const state = g.status === 3 ? `<span class="sc-live">${esc(g.clock || "LIVE")}</span>`
-          : g.status === 4 ? `<span class="muted">${/postpon|cancel|abandon/i.test(g.statusText) ? esc(g.statusText) : "FT"}</span>`
-          : g.status === 2 ? (due(g) ? `<span class="sc-soon" title="Past kick-off time — the score shows as soon as 365Scores has the game started">Kick-off</span>`
-            : soon(g.kickoff) ? `<span class="sc-soon">in ${kickIn(g.kickoff)}</span>`
-            : `<span class="muted">${new Date(g.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>`) : `<span class="muted">${esc(g.statusText)}</span>`;
-        const sc0 = g.score[0] == null ? "" : g.score[0], sc1 = g.score[1] == null ? "" : g.score[1];
-        const bet = mine[g.id] ? `<span title="You have a HAWK bet on this match (${esc(mine[g.id].toLowerCase())})">🎟</span>` : "";
-        // Upcoming: a bell for a lineup alert, or "XI ✓" once both lineups are out.
-        const alert = g.status === 3 ? (() => { const f = followState(g.id); return `<button class="sc-bell ${f.on ? "on" : ""}" data-follow="${g.id}" title="${f.bet ? "You have a bet on it — alerts on" : f.on ? "Goal alerts on — tap to stop" : "Goal and red-card alerts for this match"}">${f.on ? "🔔" : "🔕"}</button>`; })()
-          : g.status !== 2 ? "" : g.lineupsConfirmed ? `<span class="sc-xi" title="Lineups confirmed">XI ✓</span>`
-          : `<button class="sc-bell ${isWatched(g.id) ? "on" : ""}" data-bell="${g.id}" title="${isWatched(g.id) ? "Lineup alert on — click to stop" : "Alert me when the lineups are confirmed"}">🔔</button>`;
-        return `<div class="sc-row ${g.status === 3 ? "is-live" : ""}" data-sid="${g.id}" title="${g.status === 3 ? "Open the live view" : g.status === 4 ? "Match report" : "Open in the builder"}">
-          <div class="sc-state">${state}</div>
-          <div class="sc-team ${g.winner === 1 ? "win" : ""}"><img src="${esc(g.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><span class="tn">${esc(g.home)}</span></div>
-          <div class="sc-score">${g.score[0] == null ? "–" : `${sc0} – ${sc1}`}${predLine(g)}</div>
-          <div class="sc-team away ${g.winner === 2 ? "win" : ""}"><span class="tn">${esc(g.away)}</span><img src="${esc(g.awayCrest)}" alt="" onerror="this.style.visibility='hidden'"></div>
-          <div class="sc-bet">${alert}${bet}</div></div>`;
-      }).join("")}`).join("");
-      })()).join("");
+      ${glist.map(g => scoreRow(g, mine, false)).join("")}`).join("");
+  };
+  el.innerHTML = myDayCard(sc.data) + htStrip(sc.data) + (live ? `<div class="note" style="margin:0 0 10px"><span class="dot-live"></span>${live} live — updating every 15 seconds</div>` : "") +
+    bands.map(([k, title, list]) => (sc.status === "All" && bands.length > 1
+        ? `<div class="sc-band"><span>${esc(title)}</span><i></i><b>${list.length}</b></div>` : "")
+      + (k === "next" ? byTime(list) : byLeague(list))).join("");
+}
+// One row in the Scores list. `withLeague` puts the competition on the row itself,
+// for the bands that are not grouped under a league heading.
+function scoreRow(g, mine, withLeague) {
+  const state = g.status === 3 ? `<span class="sc-live">${esc(g.clock || "LIVE")}</span>`
+    : g.status === 4 ? `<span class="muted">${/postpon|cancel|abandon/i.test(g.statusText) ? esc(g.statusText) : "FT"}</span>`
+    : g.status === 2 ? (due(g) ? `<span class="sc-soon" title="Past kick-off time — the score shows as soon as 365Scores has the game started">Kick-off</span>`
+      : soon(g.kickoff) ? `<span class="sc-soon">in ${kickIn(g.kickoff)}</span>`
+      : `<span class="muted">${new Date(g.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>`) : `<span class="muted">${esc(g.statusText)}</span>`;
+  const sc0 = g.score[0] == null ? "" : g.score[0], sc1 = g.score[1] == null ? "" : g.score[1];
+  const bet = mine[g.id] ? `<span title="You have a HAWK bet on this match (${esc(mine[g.id].toLowerCase())})">🎟</span>` : "";
+  // Upcoming: a bell for a lineup alert, or "XI ✓" once both lineups are out.
+  const alert = g.status === 3 ? (() => { const f = followState(g.id); return `<button class="sc-bell ${f.on ? "on" : ""}" data-follow="${g.id}" title="${f.bet ? "You have a bet on it — alerts on" : f.on ? "Goal alerts on — tap to stop" : "Goal and red-card alerts for this match"}">${f.on ? "🔔" : "🔕"}</button>`; })()
+    : g.status !== 2 ? "" : g.lineupsConfirmed ? `<span class="sc-xi" title="Lineups confirmed">XI ✓</span>`
+    : `<button class="sc-bell ${isWatched(g.id) ? "on" : ""}" data-bell="${g.id}" title="${isWatched(g.id) ? "Lineup alert on — click to stop" : "Alert me when the lineups are confirmed"}">🔔</button>`;
+  return `<div class="sc-row ${g.status === 3 ? "is-live" : ""}" data-sid="${g.id}" title="${g.status === 3 ? "Open the live view" : g.status === 4 ? "Match report" : "Open in the builder"}">
+    <div class="sc-state">${state}</div>
+    <div class="sc-team ${g.winner === 1 ? "win" : ""}"><img src="${esc(g.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><span class="tn">${esc(g.home)}</span></div>
+    <div class="sc-score">${g.score[0] == null ? "–" : `${sc0} – ${sc1}`}${predLine(g)}${
+      withLeague ? `<div class="sc-lg" title="${esc(g.league)}">${esc(g.league)}</div>` : ""}</div>
+    <div class="sc-team away ${g.winner === 2 ? "win" : ""}"><span class="tn">${esc(g.away)}</span><img src="${esc(g.awayCrest)}" alt="" onerror="this.style.visibility='hidden'"></div>
+    <div class="sc-bet">${alert}${bet}</div></div>`;
 }
 // HAWK's prediction in the Scores list: home · draw · away %, the likeliest in
 // green, ⚡ when the upset radar says High+. Finished: ✓/✗ for whether the

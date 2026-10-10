@@ -304,15 +304,15 @@ img{max-width:100%}
 /* One row per team, and nothing on it you have to decode: where they are, how
    they've been going, how many points. Everything else is a tap away, because a
    table you have to read across eight columns of is a table you skim instead. */
-.lrow{display:flex;align-items:center;gap:10px;padding:9px 6px;border-top:1px solid var(--line);
+.trow{display:flex;align-items:center;gap:10px;padding:9px 6px;border-top:1px solid var(--line);
   cursor:pointer;transition:.12s;list-style:none}
-.lrow::-webkit-details-marker{display:none}
-.lrow:hover{background:var(--panel2)}
-.lrow .lp{width:30px;flex:none;text-align:right;color:var(--muted);font-size:12.5px;font-weight:700;white-space:nowrap}
-.lrow .lc{width:20px;height:20px;flex:none}
-.lrow .ln{flex:1;min-width:0;color:var(--text);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lrow .lpts{width:28px;flex:none;text-align:right;color:var(--text);font-weight:900;font-size:14px}
-.lteam[open] > .lrow{background:var(--panel2)}
+.trow::-webkit-details-marker{display:none}
+.trow:hover{background:var(--panel2)}
+.trow .lp{width:30px;flex:none;text-align:right;color:var(--muted);font-size:12.5px;font-weight:700;white-space:nowrap}
+.trow .lc{width:20px;height:20px;flex:none}
+.trow .ln{flex:1;min-width:0;color:var(--text);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow .lpts{width:28px;flex:none;text-align:right;color:var(--text);font-weight:900;font-size:14px}
+.lteam[open] > .trow{background:var(--panel2)}
 .lopen{padding:2px 8px 12px 46px;font-size:12.5px;color:var(--muted);line-height:1.75;background:var(--panel)}
 .lopen b{color:var(--text)}
 .lopen .hot{color:var(--accent)}
@@ -344,7 +344,7 @@ img{max-width:100%}
 .rk{flex:none;min-width:70px;text-align:center;font-size:11px;color:var(--muted)}
 .ra{flex:none;font-size:10.5px;color:var(--muted)}
 @media (max-width:560px){.lform i{width:12px;height:12px;line-height:12px;font-size:8px}
-  .lrow .ln{font-size:12.5px}.lopen{padding-left:40px}}
+  .trow .ln{font-size:12.5px}.lopen{padding-left:40px}}
 .tie{margin:8px auto 2px;max-width:440px;padding:8px 12px;border-radius:12px;border:1px solid rgba(153, 169, 255,.35);background:rgba(153, 169, 255,.07);font-size:12.5px;line-height:1.45}
 .tie b{color:var(--gold)}.tie small{display:block;margin-top:3px;font-size:12px;color:var(--text)}.tie small.muted{color:var(--muted)}
 .ip-agg{margin-top:4px;font-size:13px;color:var(--gold)}.ip-agg b{font-weight:900}
@@ -515,12 +515,18 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .ticket .th .odds{font-size:20px;font-weight:900}
 .legs{position:relative;padding:0 14px 6px 14px}
 .leg{position:relative;padding:8px 0 10px 28px;animation:in .35s both}
-    /* The edge says where the leg's price comes from: green Bet365's own,
-       blue the books that price closest to Bet365, grey HAWK's own estimate. */
+    /* The rail says where the leg's price comes from: Bet365's own, the books
+       that price closest to it, or HAWK's estimate.
+       These were dead. `.leg.card` further down sets `border:` as a shorthand at
+       the same specificity and later in the file, which resets border-left — so
+       all three rails were being wiped and the key below pointed at nothing.
+       Naming .card in the selector puts them a class ahead, which is the whole
+       fix; box-shadow would also work but would not sit inside the rounded corner. */
     .leg.priced,.leg.ref,.leg.guess{padding-left:25px;border-radius:3px}
-    .leg.priced{border-left:3px solid var(--accent)}
-    .leg.ref{border-left:3px solid var(--blue)}
-    .leg.guess{border-left:3px solid #4a4a4a}
+    .leg.card.priced,.leg.card.ref,.leg.card.guess{border-left-width:3px;border-left-style:solid}
+    .leg.priced,.leg.card.priced{border-left:3px solid var(--accent)}
+    .leg.ref,.leg.card.ref{border-left:3px solid var(--blue)}
+    .leg.guess,.leg.card.guess{border-left:3px solid #4a4a4a}
     .legkey{display:flex;gap:12px;flex-wrap:wrap;padding:2px 14px 10px;font-size:11px;color:var(--muted)}
     .legkey i{display:inline-block;width:9px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
 .leg::before{content:"";position:absolute;left:8px;top:22px;bottom:-8px;width:2px;background:#2d4a44}
@@ -2600,7 +2606,7 @@ function tableHTML(t, games, highlight, showName) {
     const pos = i + 1, move = moving ? r.pos - pos : 0, dest = r.dest && t.dest[r.dest];
     const g = gpg(r), gd = r.gf - r.ga;
     return `<details class="lteam" ${hl(r.name) ? "open" : ""}>
-      <summary class="lrow">
+      <summary class="trow">
         <span class="lp">${dest ? `<i class="tdst" style="background:${esc(dest.color)}" title="${esc(dest.name)}"></i>` : ""}${pos}${
           move > 0 ? '<b class="up">\u25b2</b>' : move < 0 ? '<b class="dn">\u25bc</b>' : ""}</span>
         <img class="lc" src="${esc(r.crest)}" alt="" onerror="this.style.visibility='hidden'">

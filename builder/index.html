@@ -2959,7 +2959,7 @@ function renderSlip() {
   $("#slip").innerHTML = `
     <button class="build" id="go" style="margin-top:0" ${m ? "" : "disabled"}>${sameOptions() && S.options.list.length > 1
       ? `🔄 BUILD AGAIN — option ${(S.options.at + 1) % S.options.list.length + 1} of ${S.options.list.length}` : "⚡ BUILD MY BET BUILDER"}</button>
-    <details class="tune" id="tune" ${S.auto && !S.tuneOpen ? "" : "open"}><summary>${tuneSummary()}</summary>
+    <details class="tune" id="tune" ${S.tuneOpen ? "open" : ""}><summary>${tuneSummary()}</summary>
     <div class="seg" id="autoSeg" title="Auto: HAWK picks the odds and legs for you">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
     ${S.auto ? `${minOddsControl("auto")}
     <div class="hint">${S.scan.minOdds

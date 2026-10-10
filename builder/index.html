@@ -456,6 +456,25 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   font:700 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.24em;
   color:var(--muted);text-transform:uppercase}
 @media (max-width:420px){.ticket .tear span{letter-spacing:.14em;font-size:8.5px}}
+/* THE HINGE. The ticket is a bounded column: the head and the stub are pinned and
+   only the legs scroll between them, so the chance, the break-even mark and the
+   price box are on screen together however many legs you stack. A single
+   overflow-y column cannot do that — it pushes the price box off the bottom. */
+/* The 250px is the build button, the closed settings fold and the chips that sit
+   above the ticket in this column — measured, not guessed. Open the fold and the
+   ticket simply scrolls with the column, which is the honest fallback. */
+.ticket{display:flex;flex-direction:column;min-height:320px;
+  max-height:calc(100vh - var(--head) - 250px)}
+.ticket .thead{flex:none}
+.ticket .tscroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#3a3846 transparent}
+.ticket .tscroll::-webkit-scrollbar{width:7px}
+.ticket .tscroll::-webkit-scrollbar-thumb{background:#3a3846;border-radius:4px}
+.ticket .tear{flex:none}
+.ticket .stub{flex:none;background:linear-gradient(180deg,rgba(0,0,0,.22),rgba(0,0,0,.10))}
+/* the price box now lives in the stub, so it drops its own panel chrome */
+.ticket .stub .check{margin:0;padding:11px 14px 12px;background:transparent;border:0;
+  border-top:1px solid rgba(255,255,255,.07);border-radius:0}
+@media (max-width:1250px){.ticket{max-height:none}}
 .ticket .th{display:flex;justify-content:space-between;align-items:center;padding:12px 14px}
     /* the header: how often this builder lands, and where the price's break-even sits */
     .ticket .thb{display:flex;align-items:center;gap:14px;padding:12px 14px 13px}
@@ -595,13 +614,14 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* The stub: what you keep below the tear. Sunk slightly, so it reads as the
    other half of the same piece of card rather than a second panel. The border
    is gone because the perforation above is now the divider. */
-.sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px 14px 13px;border-top:0;
-  background:linear-gradient(180deg,rgba(0,0,0,.22),rgba(0,0,0,.10))}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 14px 11px;border-top:0;background:transparent}
 .sum .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 .guess{padding:8px 14px 11px;font-size:12.5px;background:rgba(188, 200, 255,.05)}.guess b{color:var(--text)}
 .sum .v{font-size:20px;font-weight:900}
 .check{margin-top:12px;padding:12px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}
-.check .row{display:grid;grid-template-columns:1.2fr .8fr .9fr;gap:8px}
+/* two fields, not three: the "boost" input was removed long ago but its column
+   was left behind, so a third of this row has been empty ever since. */
+.check .row{display:grid;grid-template-columns:1.3fr .7fr;gap:8px}
 .check label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 .check input{width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--line);background:#12181c;font-size:16px;font-weight:700}
 .verdict{margin-top:10px;padding:10px 12px;border-radius:10px;font-weight:700}
@@ -2992,6 +3012,7 @@ function renderSlip() {
     ${sameOptions() && S.options.list.length > 1 ? `<div class="optbar" id="optbar"><span class="muted">Options</span>${S.options.list.map((o, i) =>
       `<button class="${i === S.options.at ? "on" : ""}" data-opt="${i}" title="${o.legs.length} legs · ${pct(o.p, 1)} to land · Bet365 ≈ ${odds(o.b365 || o.fair)} · fair ${odds(o.fair)}${o.guessed ? ` · ${o.guessed} guessed price${o.guessed > 1 ? "s" : ""}` : " · all priced"}${o.worth >= 1.02 ? " · worth it at Bet365" : ""}">${o.worth >= 1.02 ? "✅ " : o.worth >= 0.95 ? "🤏 " : ""}${i + 1}<small>${o.legs.length} legs · ${odds(o.b365 || o.fair)}${o.guessed ? "" : " ✓"}</small></button>`).join("")}</div>` : ""}
     <div class="ticket">
+      <div class="thead">
       ${(() => {
         // The chance is the headline. The mark on the bar is what the price you'd
         // get needs to land — your typed price if you've checked it, else HAWK's guess.
@@ -3018,19 +3039,24 @@ function renderSlip() {
           </div></div>`;
       })()}
       <div id="call">${easyCall(r)}</div>
-      <div class="legs">${legRows}</div>
-      <div class="legkey"><span><i style="background:var(--accent)"></i>Bet365's price</span>
-        <span><i style="background:var(--blue)"></i>close books' price</span>
-        <span><i style="background:#4a4a4a"></i>HAWK's estimate</span></div>
+      </div>
+      <div class="tscroll">
+        <div class="legs">${legRows}</div>
+        <div class="legkey"><span><i style="background:var(--accent)"></i>Bet365's price</span>
+          <span><i style="background:var(--blue)"></i>close books' price</span>
+          <span><i style="background:#4a4a4a"></i>HAWK's estimate</span></div>
+      </div>
       <div class="tear"><i></i><span>HAWK &middot; 12,000 sims</span><i></i></div>
-      <div class="sum"><div><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${r && r.fair ? odds(r.fair) : "–"}</div></div>
-        <div><div class="k">Worth it from</div><div class="v" style="color:var(--gold)">${worthFrom(r) ? odds(worthFrom(r)) : "–"}</div></div></div>
-      ${guessLine(r)}
+      <div class="stub">
+        <div class="sum"><div><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${r && r.fair ? odds(r.fair) : "–"}</div></div>
+          <div><div class="k">Worth it from</div><div class="v" style="color:var(--gold)">${worthFrom(r) ? odds(worthFrom(r)) : "–"}</div></div></div>
+        ${guessLine(r)}
+        <div class="check"><div class="row">
+          <div><label>Bookmaker's price</label><input id="price" inputmode="decimal" placeholder="e.g. ${(() => { const g = r && b365Guess(r.fair, S.slip.length); return g ? odds(g.mid) : "3.25"; })()}" value="${esc(S.chk.price)}"></div>
+          <div><label>Stake (€)</label><input id="stake" inputmode="decimal" value="${esc(S.chk.stake)}"></div></div>
+          <div id="verdict"></div></div>
+      </div>
     </div>
-    <div class="check"><div class="row">
-      <div><label>Bookmaker's price</label><input id="price" inputmode="decimal" placeholder="e.g. ${(() => { const g = r && b365Guess(r.fair, S.slip.length); return g ? odds(g.mid) : "3.25"; })()}" value="${esc(S.chk.price)}"></div>
-      <div><label>Stake (€)</label><input id="stake" inputmode="decimal" value="${esc(S.chk.stake)}"></div></div>
-      <div id="verdict"></div></div>
     <button class="ghost" id="b365" title="The legs in Bet365's order to tick off, the price box and the verdict — everything for the 40 seconds you're in the Bet365 app">📋 Build it on Bet365</button>
     <button class="ghost" id="pcheck" title="Type the Bet365 price of each leg — HAWK learns Bet365's own prices instead of guessing from Unibet's">💷 Price check (teach HAWK)</button>
     <button class="ghost" id="copy">⧉ Copy slip</button>

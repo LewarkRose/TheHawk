@@ -183,6 +183,74 @@ img{max-width:100%}
   font-weight:900;margin-bottom:5px}
 .hcalm p{margin:0;font-size:12.4px;line-height:1.6;color:#aeb2c4}
 @media (max-width:560px){.hread .lead{font-size:16.5px}}
+/* ═══ THE DAY SHEET ═══════════════════════════════════════════════════════
+   Today as one printed sheet: a race card with the money across its head.
+   The depth is all static — a cut edge, a contact shadow, a cast shadow, and
+   earlier days stacked underneath. Nothing rotates and nothing with a figure
+   on it moves, because the whole page exists to be read. A row presses INTO
+   the paper on hover rather than lifting, which is what paper does. */
+.dswrap{position:relative;margin-bottom:22px}
+.dswrap::before,.dswrap::after{content:"";position:absolute;left:0;right:0;border-radius:7px;background:#121212}
+.dswrap::before{top:7px;bottom:-7px;transform:scaleX(.991);box-shadow:0 14px 26px -18px rgba(0,0,0,.9)}
+.dswrap::after{top:13px;bottom:-13px;transform:scaleX(.981);background:#0f0f0f;opacity:.75;
+  box-shadow:0 18px 30px -20px rgba(0,0,0,.9)}
+.dsheet{position:relative;z-index:2;border-radius:7px;overflow:hidden;background:var(--stock-1);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), inset 0 -1px 0 rgba(0,0,0,.5),
+             0 2px 0 #0e0e0e, 0 3px 0 #0b0b0b, 0 4px 0 #090909,
+             0 6px 10px -5px rgba(0,0,0,.75), 0 30px 52px -26px rgba(0,0,0,.95)}
+.dsheet::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;z-index:3;
+  background:linear-gradient(90deg,var(--accent-d),var(--accent) 45%,var(--accent-d))}
+.dsband{display:grid;grid-template-columns:repeat(3,1fr);
+  background:linear-gradient(180deg,rgba(255,255,255,.022),transparent 70%)}
+.dsband .c{padding:16px 18px;border-right:1px solid var(--rule)}
+.dsband .c:last-child{border-right:0}
+.dsband .k{font:900 9.5px var(--sans,inherit);letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.dsband .v{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
+  font-size:36px;font-weight:700;line-height:.95;margin-top:4px}
+.dshead{display:flex;align-items:center;gap:10px;padding:13px 18px 10px;border-top:1px solid var(--rule);
+  font:900 10px system-ui;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);flex-wrap:wrap}
+.dshead s{text-decoration:none;color:var(--faint);letter-spacing:.1em;font-weight:700}
+.dsrace{width:100%;border-collapse:collapse}
+.dsrace th{text-align:left;font:900 9px system-ui;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);padding:0 18px 9px;border-bottom:1px solid var(--rule)}
+.dsrace td{padding:12px 18px;border-bottom:1px solid #1d1d1d;vertical-align:middle;transition:background .12s,box-shadow .12s}
+.dsrace tr:last-child td{border-bottom:0}
+.dsrace tbody tr{cursor:pointer}
+.dsrace tbody tr:hover td{background:#171717;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.55), inset 0 -1px 0 rgba(255,255,255,.025)}
+.dsrace .ko{font-family:var(--mono,ui-monospace);font-variant-numeric:tabular-nums;color:var(--muted);
+  font-size:12.5px;white-space:nowrap}
+.dsrace .fx{font-weight:800;font-size:14px}
+.dsrace .lg{font-size:11px;color:var(--faint);margin-top:1px}
+.dsrace .vd{font-size:11.5px;font-weight:800;color:var(--muted)}
+.dsrace .vd.yes{color:var(--green)}
+.dsrace .stk{font-size:11px;color:var(--accent);font-weight:800;margin-top:2px}
+/* the torn bottom edge: the sheet is a page off a pad */
+.dstorn{height:10px;position:relative}
+.dstorn::before{content:"";position:absolute;left:0;right:0;top:0;height:10px;
+  background:radial-gradient(circle 7px at 7px -1px, transparent 0 7px, var(--stock-1) 7.5px) 0 0/14px 10px repeat-x}
+.dsbelow{display:grid;grid-template-columns:minmax(0,1fr) 372px;gap:18px}
+@media (max-width:1100px){.dsbelow{grid-template-columns:1fr}.dsband{grid-template-columns:1fr}
+  .dsband .c{border-right:0;border-bottom:1px solid var(--rule)}}
+.dsempty{padding:26px 18px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
+/* provenance on the card, by the same size cap the leg tiles use: a price
+   Bet365 published is a full tabular figure, HAWK's own estimate is capped
+   small and italic so it cannot pass for a quote. */
+.dsrace .q{font-family:var(--mono,ui-monospace);font-variant-numeric:tabular-nums;font-weight:900;
+  font-size:15px;color:var(--text)}
+.dsrace .e{font-family:var(--mono,ui-monospace);font-variant-numeric:tabular-nums;font-weight:600;
+  font-size:12px !important;font-style:italic;color:var(--muted);padding-bottom:2px;display:inline-block;
+  background-image:repeating-linear-gradient(90deg,#5a5a5a 0 2px,transparent 2px 4px);
+  background-size:100% 1px;background-repeat:no-repeat;background-position:0 100%}
+.dsrace .mn{font-family:var(--mono,ui-monospace);font-variant-numeric:tabular-nums}
+.ctitle{display:flex;align-items:center;gap:9px;font:900 10px system-ui;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--accent)}
+.ctitle .ln{flex:1;height:1px;background:var(--rule);display:block}
+.aged{display:inline-flex;align-items:center;gap:7px;font:700 11px system-ui;letter-spacing:0;
+  text-transform:none;color:var(--muted);background:rgba(188,200,255,.08);
+  border:1px solid #242938;border-radius:999px;padding:3px 10px}
+.aged b{color:var(--text)}
+
 /* A restored scan says its own age. Deliberately not styled as a warning — it is
    not an error, it is a fact about the numbers you are looking at. */
 .scanold{margin:8px 0 0;padding:8px 11px;border-radius:9px;font-size:12px;line-height:1.5;
@@ -1602,6 +1670,9 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
   // the three pixels. It is deliberately not persisted: the point is "this is
   // still warm", and a stale yes would be worse than no mark at all.
   built: new Set(),
+  // Today as the printed day sheet. Kept behind a flag so the old two-column
+  // page is one setting away if the card turns out to be wrong in daily use.
+  todaySheet: loadPref("hawk.todaySheet", true),
   chk: { price: "", boost: "", stake: "5" }, moreOpen: false, tuneOpen: loadPref("hawk.tuneOpen", false), radarOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: loadPref("hawk.extras", false), cat: "All", legsMore: false, ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaOpen: new Set(), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
@@ -5927,11 +5998,114 @@ function todayHero(bank, fit, sums, scanned) {
     </div>
   </div>`;
 }
+// THE DAY SHEET. Today printed as one card: the money across its head, then
+// the day's fixtures in kick-off order with HAWK's position beside each one.
+// The card is the scan's own results, so it only claims what has actually been
+// priced — and it carries the scan's age, because a row whose price moved two
+// hours ago is a different thing from one priced a minute ago.
+function dayRows() {
+  const res = ((S.scan.data || {}).results || []).slice();
+  const now = Date.now();
+  return res
+    .filter((r) => !r.kickoff || Date.parse(r.kickoff) > now)
+    .sort((a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""));
+}
+function daySheet(bank, fit) {
+  const rows = dayRows();
+  const d = S.scan.data || {};
+  // what is on the table, and what today has done, straight from the Vault
+  const bets = vaultBets();
+  const atRisk = bets.filter((b) => b.status === "PENDING").reduce((a, b) => a + (b.stake || 0), 0);
+  const back = bets.filter((b) => b.status === "PENDING").reduce((a, b) => a + (b.stake || 0) * (b.odds || 0), 0);
+  const today = localDay(new Date());
+  const settledToday = bets.filter((b) => b.status && b.status !== "PENDING" && b.settledAt
+    && localDay(new Date(b.settledAt)) === today);
+  // What a settled ticket actually paid. The Vault has its own betReturn(); this
+  // side does not, and importing one for three lines would be worse than stating
+  // the rule here: a cash-out pays what the book gave you, a win pays the return
+  // it was logged with, a void gives the stake back, a loss pays nothing.
+  const paid = (b) => b.status === "CASHED_OUT" ? (b.cashOutAmount || 0)
+    : b.status === "WON" ? (b.potentialReturn || (b.stake || 0) * (b.odds || 0))
+    : b.status === "VOID" ? (b.stake || 0) : 0;
+  const dayPL = settledToday.reduce((a, b) => a + paid(b) - (b.stake || 0), 0);
+  // the plan's stake for a fixture, so a row that is worth backing says how much
+  const stakeFor = {};
+  for (const x of fit) if (x.game) stakeFor[String(x.game)] = x.stake;
+
+  const row = (r) => {
+    const { fair, need } = scanNeed(r);
+    const worth = scanWorth(r) >= 1.02;
+    const price = S.scan.prices[scanKey(r)] || r.b365 || null;
+    const stake = stakeFor[String(r.id)];
+    return `<tr data-dsgo="${esc(String(r.id))}|${esc(r.league || "")}">
+      <td class="ko">${esc(fmtKick(r.kickoff).replace(" · ", " "))}</td>
+      <td><div class="fx">${esc(r.home)} v ${esc(r.away)}</div><div class="lg">${esc(r.league || "")}</div></td>
+      <td class="muted" style="font-size:12px">${r.legs && r.legs.length
+        ? `${r.legs.length} legs · lands ${pct(r.p, 0)}` : "—"}</td>
+      <td class="mn" style="font-weight:800">${worthFrom(r) ? odds(worthFrom(r)) : odds(r.fair)}</td>
+      <td>${price ? `<span class="q">${odds(price)}</span>`
+                  : `<span class="e">${odds(r.fair)}</span>`}</td>
+      <td><div class="vd ${worth ? "yes" : ""}">${
+        !price ? "No price in the feed — no call"
+        : worth ? `Worth it at ${odds(price)}`
+        : `Not worth it · ${Math.round(100 * Math.max(0, 1 - scanWorth(r)))}% short`}</div>${
+        stake ? `<div class="stk">stake €${stake.toFixed(2)}</div>` : ""}</td>
+    </tr>`;
+  };
+
+  return `<div class="dswrap"><div class="dsheet">
+    <div class="dsband">
+      <div class="c"><div class="k">Bankroll</div><div class="v">€${bank.toFixed(2)}</div>
+        <div class="note" style="margin-top:6px">${bets.length} tickets logged</div></div>
+      <div class="c"><div class="k">On the table</div><div class="v">€${atRisk.toFixed(2)}</div>
+        <div class="note" style="margin-top:6px">${atRisk > 0
+          ? `returns <b>€${back.toFixed(2)}</b> if they all land${bank > 0 ? ` · ${(100 * atRisk / bank).toFixed(1)}% of bankroll` : ""}`
+          : "nothing running"}</div></div>
+      <div class="c"><div class="k">Today</div>
+        <div class="v" style="color:${dayPL > 0 ? "var(--green)" : dayPL < 0 ? "var(--red)" : "var(--text)"}">${
+          dayPL >= 0 ? "" : "−"}€${Math.abs(dayPL).toFixed(2)}</div>
+        <div class="note" style="margin-top:6px">${settledToday.length
+          ? `${settledToday.length} settled${settledToday.length < 2 ? " · HAWK gives no verdict under 2" : ""}`
+          : "nothing settled yet"}</div></div>
+    </div>
+    <div class="dshead">The card <s>${esc(new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }))} · ${
+      rows.length} fixture${rows.length === 1 ? "" : "s"} · in time order</s>
+      <span style="flex:1"></span>${d.restoredAt ? scanAgeNote().replace(/<div class="scanold">/, '<span class="aged">').replace(/<\/div>/, "</span>") : ""}</div>
+    ${rows.length ? `<table class="dsrace">
+      <thead><tr><th style="width:96px">Kick-off</th><th>Fixture</th><th style="width:170px">HAWK's build</th>
+        <th style="width:104px">Worth it from</th><th style="width:110px">Bet365</th><th style="width:190px">Verdict</th></tr></thead>
+      <tbody>${rows.map(row).join("")}</tbody></table>`
+      : `<div class="dsempty">${(S.scan.data && S.scan.data.total)
+          ? "Every fixture in the last scan has kicked off. Scan again on Picks for what is still to come."
+          : "No scan yet. Run one on Picks and the day's card prints itself here."}</div>`}
+    <div class="dstorn"></div>
+  </div></div>`;
+}
+
 function renderToday() {
   const bank = bankNow(), fit = planStakes(dayPicks(), bank);
   const sums = fit.length ? dayOdds(fit) : null;
   const placed = loadPref(dayKey(), []);
   const scanned = !!(S.scan.data && S.scan.data.total);
+  if (S.todaySheet) {
+    $("#match").innerHTML = `<div class="section" style="border-top:0">
+      ${daySheet(bank, fit)}
+      <div class="dsbelow">
+        <div><div class="ctitle" style="margin-bottom:10px">Running <span class="ln"></span></div>
+          <div id="tdDay"></div></div>
+        <div><div class="ctitle" style="margin-bottom:10px">The board <span class="ln"></span></div>
+          ${paperCard()}</div>
+      </div>
+    </div>`;
+    $("#match").querySelectorAll("[data-dsgo]").forEach((tr) => tr.onclick = () => {
+      const [id, lg] = tr.dataset.dsgo.split("|");
+      if (id) openPick(id, lg);
+    });
+    const day0 = $("#tdDay"); if (day0) day0.innerHTML = myDayCard((S.scores && S.scores.data) || []) ||
+      `<div class="note" style="margin:0">Nothing running. Bets you log show up here as they play.</div>`;
+    scorePaper();
+    return;
+  }
   $("#match").innerHTML = `
     <div class="section" style="border-top:0">
       ${todayHero(bank, fit, sums, scanned)}

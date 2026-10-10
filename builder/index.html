@@ -301,6 +301,44 @@ img{max-width:100%}
 .mv{font-family:var(--mono,ui-monospace);font-variant-numeric:tabular-nums;font-weight:800;font-size:14px;margin-top:1px}
 @media (max-width:700px){.sheet-grid{grid-template-columns:1fr}}
 
+/* THE STUB. The same card .ticket prints, as a standalone object — a ticket
+   already placed rather than one being built. Declared here because the Vault
+   has its own copy and these two must not drift: if one gains a tooth or loses
+   an edge, a ticket stops looking like itself halfway across the app. */
+.stub{position:relative;border-radius:5px;padding:15px;border:0;
+  background:repeating-linear-gradient(135deg,rgba(255,255,255,.012) 0 2px,transparent 2px 5px),
+             linear-gradient(180deg,#272533 0%,#211f2b 46%,#1d1b26 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 0 0 1px rgba(188,200,255,.11),
+             0 2px 0 #141219,0 3px 0 #100e14,
+             0 8px 12px -6px rgba(0,0,0,.8),0 26px 42px -24px rgba(0,0,0,.95)}
+.stub::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;border-radius:5px 5px 0 0;
+  background:linear-gradient(90deg,var(--accent-d),var(--accent) 45%,var(--accent-d))}
+.stub .perf{position:relative;display:flex;align-items:center;gap:10px;margin:12px 0}
+.stub .perf i{flex:1;height:0;border-top:2px dashed rgba(188,200,255,.26)}
+.stub .perf::before,.stub .perf::after{content:"";position:absolute;top:50%;margin-top:-9px;
+  width:18px;height:18px;border-radius:50%;background:var(--bg);box-shadow:inset 0 1px 2px rgba(0,0,0,.8)}
+.stub .perf::before{left:-24px}
+.stub .perf::after{right:-24px}
+.stub .perf span{flex:none;white-space:nowrap;font:700 8.5px var(--mono,ui-monospace);
+  letter-spacing:.22em;color:var(--muted);text-transform:uppercase}
+
+/* A RUNNING TICKET, wherever you meet it — Today, Live, or the Vault — is the
+   same printed stub. Laid out for the width it gets rather than squeezed into
+   a row, so the legs and the cash-out call are readable on the pub screen. */
+.myday .myrun{margin:0 0 12px}
+.myday .myrun:last-of-type{margin-bottom:0}
+.mrh{display:flex;align-items:flex-start;gap:12px;margin-top:4px}
+.mrf{font-size:15px;font-weight:900;line-height:1.25}
+.mrlive{flex:none;display:inline-flex;align-items:center;gap:5px;font:800 11px system-ui;
+  padding:3px 9px;border-radius:999px;color:var(--red);
+  border:1px solid rgba(255,93,115,.35);background:rgba(255,93,115,.09)}
+.mrlegs{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.mrfoot{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.lab2{font:900 9.5px system-ui;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.mrbig{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
+  font-weight:700;font-size:23px;line-height:1.05;margin-top:2px}
+@media (max-width:640px){.mrfoot{flex-direction:column;gap:8px}}
+
 /* A restored scan says its own age. Deliberately not styled as a warning — it is
    not an error, it is a fact about the numbers you are looking at. */
 .scanold{margin:8px 0 0;padding:8px 11px;border-radius:9px;font-size:12px;line-height:1.5;
@@ -6268,13 +6306,30 @@ function myDayCard(games) {
       return `<span class="myleg ${st}">${esc(String(h.label || "").slice(0, 34))}${clock && !st ? ` · ${esc(clock)}` : ""}</span>`;
     }).join("");
     const left = legs.filter((h) => !(h.result === "won" || h.userDone) && h.result !== "lost").length;
-    return `<div class="mybet"><div class="top">
-      <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:800">${esc((b.legs[0] || {}).fixture || "Your bet")}${
-        b.legs.length > 1 ? ` <span class="muted" style="font-weight:600">+${b.legs.length - 1} more</span>` : ""}</div>
-        <div class="muted" style="font-size:11px">€${(+b.stake || 0).toFixed(2)} at ${odds(b.odds)} · ${left ? `${left} leg${left === 1 ? "" : "s"} to go` : "all legs landed"}</div></div>
-      <div style="text-align:right;flex:none"><div class="muted" style="font-size:10px;letter-spacing:.12em">RETURNS</div>
-        <div class="big" style="color:var(--gold)">€${(+b.potentialReturn || 0).toFixed(2)}</div></div></div>
-      <div>${chips}</div></div>`;
+    // A running ticket is the same printed stub the builder and the Vault use,
+    // so a ticket looks the same wherever you meet it. Below the perforation is
+    // HAWK's own value for holding on — never a cash-out offer, because Bet365's
+    // offer is in no feed HAWK reads and inventing one would be the worst lie
+    // this app could tell.
+    const live = legs.map((h) => clockOf(h.game)).find(Boolean) || "";
+    const hold = (+b.hawkP || +b.hawkChance || 0) * (+b.potentialReturn || 0);
+    return `<div class="stub myrun">
+      <div class="mrh">
+        <div style="flex:1;min-width:0"><div class="mrf">${esc((b.legs[0] || {}).fixture || "Your bet")}${
+          b.legs.length > 1 ? ` <span class="muted" style="font-weight:600">+${b.legs.length - 1} more</span>` : ""}</div>
+          <div class="muted" style="font-size:11.5px;margin-top:2px">€${(+b.stake || 0).toFixed(2)} at <span class="q" style="font-size:13px">${odds(b.odds)}</span> · ${
+            left ? `${left} leg${left === 1 ? "" : "s"} to go` : "all legs landed"}</div></div>
+        ${live ? `<span class="mrlive">● ${esc(live)}</span>` : ""}
+      </div>
+      <div class="mrlegs">${chips}</div>
+      <div class="perf"><i></i><span>HAWK &middot; ${(HAWK.N_SIMS || 12000).toLocaleString()} sims</span><i></i></div>
+      <div class="mrfoot">
+        <div><div class="lab2">Returns</div><div class="mrbig">€${(+b.potentialReturn || 0).toFixed(2)}</div></div>
+        ${hold > 0 ? `<div style="text-align:right"><div class="lab2">Holding is worth</div>
+          <div class="mrbig" style="color:var(--accent)">€${hold.toFixed(2)}</div>
+          <div class="muted" style="font-size:10.5px">HAWK's own figure — it cannot see Bet365's offer</div></div>` : ""}
+      </div>
+    </div>`;
   }).join("");
   return `<div class="myday">
     <div class="mh"><span class="dot-live"></span><h4>Your day</h4><span style="flex:1"></span>

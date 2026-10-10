@@ -3174,16 +3174,10 @@
   }
 
 
-  const valueJob = newJob();
-  function startValue(body) {
-    if (valueJob.running) return jobStatus(valueJob);
-    Object.assign(valueJob, newJob(), { running: true, params: windowParams(body) });
-    runFixtureJob(valueJob, (league, f, json, e) => {
-      const info = fixtureInfo(league, f, json);
-      for (const row of priceRows(e)) valueJob.results.push({ ...info, ...row });
-    });
-    return jobStatus(valueJob);
-  }
+  // startValue/valueStatus/stopValue drove the retired 💰 Value page: they swept every
+  // fixture for quoted lines whose price beat HAWK's fair odds, which is the single-leg
+  // edge this app's own record says does not predict. priceRows stays on _internals,
+  // where it is a debugging handle rather than something the pages read.
 
   global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, INTL: [...INTL], MODEL_VERSION, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, refOff, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
                   // a scan runs a lighter simulation than opening a match does, and the
@@ -3192,7 +3186,6 @@
                   scores, matchReport, ticketLive, gameEvents, halfStats, readLeg, isPlayerText, nameSimilarity, kambiLive, tables,
                   startMonster, monsterStatus: () => jobStatus(monster), stopMonster: () => { monster.stop = true; return jobStatus(monster); },
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
-                  startValue, valueStatus: () => jobStatus(valueJob), stopValue: () => { valueJob.stop = true; return jobStatus(valueJob); },
                   meta: () => data("meta.json"),
                   form, cupRounds,
                   _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas, espnLineups, matchPlayer, playerRows,

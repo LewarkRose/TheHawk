@@ -1078,6 +1078,82 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .legstep button:disabled{color:var(--muted);cursor:default}
     .legstep b{font-size:12px;font-weight:700;padding:0 2px;white-space:nowrap;min-width:82px;text-align:center}
     /* Acca: one row per part, the full card behind a tap (see accaRow) */
+/* ---------- 🧩 THE ACCA, AS A DEPARTURE BOARD ----------
+   Two things shared this page as equal stacked sections: the acca you are
+   assembling and a generator that builds one for you. They are different jobs and
+   only one is ever the one you're doing, so they are tabs now.
+   Your acca is then printed in kick-off order with a column HAWK never had: what
+   the whole acca is worth once each match is on it. An acca's real question is
+   which leg is costing me, and that was arithmetic you had to do yourself from a
+   column of per-match percentages. Watching 16% become 3.2% become 0.64% down the
+   page answers it without a calculation, and the ✕ is on the same row. */
+.ac-tabs{display:flex;gap:4px;padding:4px 4px 0;border-bottom:1px solid rgba(188,200,255,.16)}
+.ac-tab{flex:none;padding:10px 15px;border:0;border-radius:9px 9px 0 0;cursor:pointer;background:transparent;
+  font-weight:700;font-size:13px;color:var(--muted);font-family:inherit}
+.ac-tab:hover{color:var(--text)}
+.ac-tab.on{color:var(--text);background:rgba(188,200,255,.1);box-shadow:inset 0 -2px 0 var(--accent)}
+.ac-tab .c{display:inline-grid;place-items:center;min-width:17px;height:17px;padding:0 5px;margin-left:6px;
+  border-radius:999px;background:var(--accent);color:#13131a;font-size:10.5px;font-weight:800}
+.db-top{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;padding:14px 14px 11px;
+  border-bottom:2px solid rgba(188,200,255,.22)}
+.db-top h4{margin:0;font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
+  font-size:23px;font-weight:700;letter-spacing:.01em}
+.db-stats{display:flex;gap:20px;flex-wrap:wrap;margin-left:auto}
+.db-top .r{text-align:right}
+.db-top .r .n{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:24px;
+  font-weight:700;font-variant-numeric:tabular-nums;line-height:1;color:var(--gold)}
+/* The row is a <summary>, and .arow>summary already styles those as a flex bar with
+   its own gap and padding — more specific than a bare .dbr, so the grid never took
+   and the row would not collapse below its content on a phone. These carry the
+   specificity to win, and the board's rows run continuously rather than as the
+   separate rounded cards .arow draws. */
+.dbh,.dbr{display:grid;grid-template-columns:50px minmax(0,1fr) 56px 94px 32px;align-items:start}
+.arows .arow{border:0;border-radius:0;background:transparent;margin-bottom:0;overflow:visible}
+.arows .arow > summary.dbr{display:grid;gap:0;padding:11px 14px}
+.arows .arow[open] > summary.dbr{background:rgba(188,200,255,.06);border-bottom:1px solid rgba(188,200,255,.18)}
+.arows .arow .fcard{border:0;margin:0 14px 12px;border-radius:12px}
+.dbh{padding:8px 14px;font:700 8.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;
+  color:var(--muted);text-transform:uppercase;border-bottom:1px solid rgba(188,200,255,.16)}
+.dbh span:nth-child(3),.dbh span:nth-child(4){text-align:right}
+.dbr{padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer}
+.dbr:hover{background:rgba(188,200,255,.03)}
+.dbr .ko{font:11.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);padding-top:2px}
+.dbr .mt{min-width:0}
+.dbr .mt > b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* the weak-link tag rides inside that line, so it must not inherit its block display */
+.dbr .mt .weaktag{display:inline-block;vertical-align:1px;font-size:9px;font-weight:800;padding:1px 5px;
+  border-radius:5px;letter-spacing:.06em;text-transform:uppercase;color:var(--red);
+  background:rgba(255,93,115,.12);border:1px solid rgba(255,93,115,.4)}
+/* display:block is load-bearing: as an inline span, overflow:hidden does not clip it
+   and the nowrap leg list sets the whole page's min-content width on a phone. */
+.dbr .mt .lg{display:block;min-width:0;font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.5;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dbr .mp{text-align:right;font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
+  font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;padding-top:1px}
+.run{text-align:right;padding-top:1px}
+.run .n{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:19px;
+  font-weight:700;font-variant-numeric:tabular-nums;color:var(--gold)}
+.run .b{height:4px;border-radius:2px;background:#26262e;margin-top:5px;overflow:hidden}
+.run .b i{display:block;height:100%;background:linear-gradient(90deg,var(--accent-d),var(--accent))}
+.run .d{font:700 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--red);margin-top:5px}
+.dbr .x{text-align:right;color:var(--muted);font-size:14px;padding-top:2px;background:0;border:0;cursor:pointer}
+.dbr .x:hover{color:var(--red)}
+.dbr.weak{background:rgba(255,93,115,.05)}
+.dbr.gone{opacity:.55}
+.dbnote{font-size:11.5px;color:var(--muted);line-height:1.6;padding:11px 14px 0}
+.dbnote b{color:var(--text)}
+.ac-pane{padding:0 14px 14px}
+@media (max-width:620px){
+  .dbh,.dbr{grid-template-columns:42px minmax(0,1fr) 46px 74px 26px}
+  .dbh,.db-top,.dbnote,.arows .arow > summary.dbr{padding-left:10px;padding-right:10px}
+  .ac-pane{padding:0 10px 12px}
+  /* four figures side by side need about 400px of their own; below that they go two
+     by two under the title rather than pushing the page sideways. */
+  .db-top h4{width:100%}
+  .db-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 14px;
+    width:100%;min-width:0;margin-left:0}
+  .db-top .r{text-align:left}
+}
     .arows{margin-top:12px}
     .arow{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:7px;overflow:hidden}
     .arow>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:11px;padding:10px 13px}
@@ -1835,6 +1911,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
   todaySheet: loadPref("hawk.todaySheet", true),
   chk: { price: "", boost: "", stake: "5" }, moreOpen: false, tuneOpen: loadPref("hawk.tuneOpen", false), radarOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: loadPref("hawk.extras", false), cat: "All", legsMore: false, ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaOpen: new Set(), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
+            accaTab: loadPref("hawk.accaTab", "yours"),
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },   // perMatch is always 1: one Bet365-priced leg per match, so the acca has no builder cut
@@ -4952,10 +5029,20 @@ function showAcca() {
 function renderAcca() {
   const mo = S.monster;
   const sel = (id, opts, cur) => `<select id="${id}">${opts.map(([val, t]) => `<option value="${val}" ${String(val) === String(cur) ? "selected" : ""}>${t}</option>`).join("")}</select>`;
+  // Both panes stay in the DOM when hidden: updateMonster and renderAccaBody write
+  // into them from elsewhere (a Monster "use as my acca" fills the other tab), and
+  // they bail out if their box is missing.
+  const n = accaLegCount(), tab = S.accaTab === "monster" ? "monster" : "yours";
   $("#match").innerHTML = `
-    <div class="section" style="border-top:0"><h3>🧩 Your acca</h3><div id="accaBody"></div></div>
-    <div class="section">
-      <h3>👹 Monster Acca</h3>
+    <div class="section" style="border-top:0;padding:0">
+      <div class="ac-tabs">
+        <button class="ac-tab ${tab === "yours" ? "on" : ""}" data-actab="yours">🧩 Your acca${n ? `<span class="c">${n}</span>` : ""}</button>
+        <button class="ac-tab ${tab === "monster" ? "on" : ""}" data-actab="monster">👹 Monster Acca</button>
+      </div>
+      <div id="accaBody" ${tab === "yours" ? "" : "hidden"}></div>
+    </div>
+    <div id="monPane" ${tab === "monster" ? "" : "hidden"}>
+    <div class="section" style="border-top:0">
       <div class="note" style="margin-top:0">HAWK checks every fixture in the window and takes the best leg — or a small builder — from each match.
         With <b>1 leg per match</b> it only uses legs Bet365 prices, picking the ones where Bet365 pays closest to (or more than) HAWK's fair odds,
         so you see the acca's real Bet365 price and whether it's worth it.</div>
@@ -4972,7 +5059,12 @@ function renderAcca() {
       <div class="opts" style="justify-content:flex-start"><button class="build" id="monGo" style="width:auto;margin:0;padding:10px 20px"></button></div>
       <div id="monProg"></div>
     </div>
-    <div class="section" id="monRes"></div>`;
+    <div class="section" id="monRes"></div>
+    </div>`;
+  $("#match").querySelector(".ac-tabs").onclick = (e) => {
+    const b = e.target.closest("[data-actab]"); if (!b) return;
+    setAccaTab(b.dataset.actab);
+  };
   bindLeaguePicker("monLeagues", mo.leagues, "hawk.monsterLeagues");
   $("#match").querySelectorAll("[data-foldkey]").forEach((f) => { f.ontoggle = () => savePref(f.dataset.foldkey, f.open); });
   $("#mLegs").onchange = (e) => { mo.legs = +e.target.value; updateMonster(); };
@@ -4985,6 +5077,16 @@ function renderAcca() {
   $("#monRes").onclick = (e) => { if (e.detail === 0) monsterClick(e); };
   renderAccaBody();
   updateMonster();
+}
+// Switching tabs only shows and hides — neither pane is rebuilt, so a Monster scan
+// keeps running and your acca keeps its open rows while you look at the other one.
+function setAccaTab(tab) {
+  S.accaTab = tab === "monster" ? "monster" : "yours";
+  savePref("hawk.accaTab", S.accaTab);
+  const body = $("#accaBody"), mon = $("#monPane");
+  if (body) body.hidden = S.accaTab !== "yours";
+  if (mon) mon.hidden = S.accaTab !== "monster";
+  document.querySelectorAll("[data-actab]").forEach((b) => b.classList.toggle("on", b.dataset.actab === S.accaTab));
 }
 
 // One match in the acca / Monster Acca, as a 3D card like the slip's legs:
@@ -5069,25 +5171,42 @@ function monLeagueLabel(sel) {
   if (on.length <= 2) return on.join(" + ");
   return `${on.length} leagues`;
 }
-function accaRow(pt, i, weak) {
-  const l = pt.legs[0], many = pt.legs.length > 1;
-  const price = partPrice(pt) || (many ? pt.fair : l.bookPrice);
-  const label = many ? `${esc(l.label)} <span class="muted">+ ${pt.legs.length - 1} more</span>` : esc(l.label);
+// One departure on the board. `run` is the acca's chance with every match up to and
+// including this one on it, and `first` is the chance of the earliest match alone —
+// the bar's full width — so the bar is each row's share of where the acca started.
+function accaRow(pt, i, weak, run, first) {
+  const many = pt.legs.length > 1;
+  const started = pt.kickoff && new Date(pt.kickoff).getTime() < Date.now();
+  const legs = pt.legs.map((l) => esc(l.label)).join(" · ");
   const open = S.accaOpen.has(i);
+  // What this match cost the acca: the factor the running chance was divided by.
+  // Shown from the second row on, because the first one has nothing to divide.
+  const cost = i > 0 && pt.p > 0 ? 1 / pt.p : 0;
   return `<details class="arow" data-arowkey="${i}" ${open ? "open" : ""}>
-    <summary>
-      <button class="linkbtn arm" data-arm="${i}" title="Take it out of the acca">✕</button>
-      <div class="m"><b>${label}</b>
-        <span>${esc(pt.home)} v ${esc(pt.away)} · ${esc(pt.league || "")}${many ? ` · builder, ${pt.legs.length} legs` : ""}${
-          weak ? ` · <b class="weaktag">weak link</b>` : ""}</span></div>
-      <div class="c">${pct(pt.p, 0)}</div>
-      <div class="o">${price > 1 ? odds(price) : "–"}</div>
+    <summary class="dbr ${weak ? "weak" : ""} ${started ? "gone" : ""}"
+      title="${esc(pt.home)} v ${esc(pt.away)} — tap for the full card">
+      <span class="ko">${pt.kickoff ? esc(fmtKick(pt.kickoff)) : ""}${started ? "<br>started" : ""}</span>
+      <span class="mt"><b>${esc(pt.home)} v ${esc(pt.away)}${weak ? ` <span class="weaktag" title="The match least likely to land — the one to drop first">weak link</span>` : ""}</b>
+        <span class="lg">${legs}</span></span>
+      <span class="mp" title="How often this match's ${many ? `${pt.legs.length} legs land together` : "leg lands"}">${pct(pt.p, pt.p < 0.1 ? 1 : 0)}</span>
+      <span class="run" title="The whole acca's chance with this match and everything above it on it">
+        <span class="n">${pct(run, run < 0.1 ? 2 : 1)}</span>
+        <span class="b"><i style="width:${Math.max(1, Math.min(100, 100 * run / (first || 1))).toFixed(1)}%"></i></span>
+        ${cost > 1.05 ? `<span class="d">÷ ${cost.toFixed(1)}</span>` : ""}</span>
+      <button class="x" data-arm="${i}" title="Take it out of the acca">✕</button>
     </summary>
     ${open ? partRow(pt, `<div><button class="linkbtn" data-aopen="${i}">edit in the builder</button></div>`) : ""}
   </details>`;
 }
+// The tab carries the leg count, so it has to follow every add and remove.
+function syncAccaTabCount() {
+  const b = document.querySelector('[data-actab="yours"]'); if (!b) return;
+  const n = accaLegCount();
+  b.innerHTML = `🧩 Your acca${n ? `<span class="c">${n}</span>` : ""}`;
+}
 function renderAccaBody() {
   const el = $("#accaBody"); if (!el) return;
+  syncAccaTabCount();
   if (!S.acca.length) {
     el.innerHTML = `<div class="note">Empty. Add a builder from any match with <b>➕ Add to acca</b> under the slip, from <b>⚡ Best builders</b>,
       or let HAWK build a Monster Acca below.</div>`;
@@ -5102,29 +5221,47 @@ function renderAccaBody() {
   // number that changed is in front of you. It used to sit below every leg card,
   // which on a ten-leg acca was 2,700px away from the leg you just touched.
   // Each part is a row now; its full card is one tap away, as on Picks.
+  // S.acca is kept in kick-off order, so the running chance compounds down the board
+  // in the order the matches actually play.
+  let run = 1;
+  const runs = S.acca.map((pt) => (run *= pt.p || 0));
+  const first = runs[0] || 1;
+  // What dropping the weakest buys back. Only quotable as a price when every part
+  // is a single with a Bet365 price — a builder's price is Bet365's to set, not ours
+  // to divide out.
+  const without = weakPt && weakPt.p > 0 ? t.p / weakPt.p : null;
+  const wPrice = t.known && weakPt && partPrice(weakPt) ? t.known / partPrice(weakPt) : null;
   el.innerHTML = `
-    <div class="tiles">
-      <div class="tile"><div class="k">Legs</div><div class="v">${t.legs} <span class="muted" style="font-size:12px">in ${S.acca.length} match${S.acca.length === 1 ? "" : "es"}</span></div></div>
-      <div class="tile"><div class="k">Chance to land</div><div class="v">${pct(t.p, t.p < 0.1 ? 2 : 1)}</div></div>
-      <div class="tile"><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${odds(t.fair)}</div></div>
-      <div class="tile"><div class="k">Bet365 price</div><div class="v">${t.known ? odds(t.known) : "–"}</div></div>
-      <div class="tile" title="What this acca returns per €1 staked over many bets like it: its chance times the price."><div class="k">Keeps per €1</div>
-        <div class="v" style="color:${t.known && t.p * t.known >= 1 ? "var(--accent)" : "var(--gold)"}">${t.known && t.p ? "€" + (t.p * t.known).toFixed(2) : "–"}</div></div>
+    <div class="db-top">
+      <h4>${t.legs} leg${t.legs === 1 ? "" : "s"} <span class="muted" style="font-size:13px;font-weight:400">in ${S.acca.length} match${S.acca.length === 1 ? "" : "es"}</span></h4>
+      <div class="db-stats">
+        <div class="r"><div class="k">Lands</div><div class="n">${pct(t.p, t.p < 0.1 ? 2 : 1)}</div></div>
+        <div class="r"><div class="k">Fair odds</div><div class="n">${odds(t.fair)}</div></div>
+        <div class="r"><div class="k">Bet365</div><div class="n" style="color:${t.known ? "var(--text)" : "var(--muted)"}">${t.known ? odds(t.known) : "–"}</div></div>
+        <div class="r" title="What this acca returns per €1 staked over many bets like it: its chance times the price."><div class="k">Keeps per €1</div>
+          <div class="n" style="color:${t.known && t.p * t.known >= 1 ? "var(--accent)" : t.known ? "var(--red)" : "var(--muted)"}">${
+            t.known && t.p ? "€" + (t.p * t.known).toFixed(2) : "–"}</div></div>
+      </div>
     </div>
-    <div class="check"><div class="row">
-      <div><label>Acca price</label><input id="aPrice" inputmode="decimal" placeholder="${t.known ? odds(t.known) : "e.g. 25.00"}" value="${esc(c.price)}"></div>
-      <div><label>Stake (€)</label><input id="aStake" inputmode="decimal" value="${esc(c.stake)}"></div></div>
-      <div id="accaVerdict"></div></div>
-    <div class="abtns"><button class="ghost" id="aCopy">📋 Copy acca</button><button class="ghost vault" id="aVault">🦅 Send to Vault</button>
-      <button class="ghost" id="aClear">🗑 Clear</button></div>
-    <div class="arows">${S.acca.map((pt, i) => accaRow(pt, i, pt === weakPt)).join("")}</div>
-    <div class="note">${builders ? `${builders} of these ${builders === 1 ? "is a" : "are"} same-match builder${builders === 1 ? "" : "s"}: Bet365 prices each builder itself, so type the acca price Bet365 shows. ` : ""}
-      Bet365 prices on single legs are re-checked every 3 minutes while HAWK is open. ▲/▼ = moved since you added it.</div>`;
+    <div class="dbh"><span>Kick-off</span><span>Match</span><span>This one</span><span>Acca so far</span><span></span></div>
+    <div class="arows">${S.acca.map((pt, i) => accaRow(pt, i, pt === weakPt, runs[i], first)).join("")}</div>
+    <div class="ac-pane">
+      ${weakPt && S.acca.length > 1 ? `<div class="dbnote">Drop <b>${esc(weakPt.home)} v ${esc(weakPt.away)}</b> and the acca goes back to <b>${
+        pct(without, without < 0.1 ? 2 : 1)}</b>${wPrice ? ` at about <b>${odds(wPrice)}</b>` : ""}. Each bar is the acca's chance once that match is on it, against the first match alone.</div>` : ""}
+      <div class="check" style="margin-top:12px"><div class="row">
+        <div><label>Acca price</label><input id="aPrice" inputmode="decimal" placeholder="${t.known ? odds(t.known) : "e.g. 25.00"}" value="${esc(c.price)}"></div>
+        <div><label>Stake (€)</label><input id="aStake" inputmode="decimal" value="${esc(c.stake)}"></div></div>
+        <div id="accaVerdict"></div></div>
+      <div class="abtns"><button class="ghost" id="aCopy">📋 Copy acca</button><button class="ghost vault" id="aVault">🦅 Send to Vault</button>
+        <button class="ghost" id="aClear">🗑 Clear</button></div>
+      <div class="note">${builders ? `${builders} of these ${builders === 1 ? "is a" : "are"} same-match builder${builders === 1 ? "" : "s"}: Bet365 prices each builder itself, so type the acca price Bet365 shows. ` : ""}
+        Bet365 prices on single legs are re-checked every 3 minutes while HAWK is open. ▲/▼ = moved since you added it.</div>
+    </div>`;
   for (const [id, key] of [["aPrice", "price"], ["aStake", "stake"]])
     $("#" + id).oninput = (e) => { c[key] = e.target.value; accaVerdict(); };
   $("#aCopy").onclick = copyAcca; $("#aVault").onclick = sendAccaToVault;
   bindFlips(el, S.flipped);
-  $("#aClear").onclick = () => { if (confirm("Clear your acca?")) { S.acca = []; S.accaChk.price = ""; saveAcca(); renderAccaBody(); } };
+  $("#aClear").onclick = () => { if (confirm("Clear your acca?")) { S.acca = []; S.accaChk.price = ""; saveAcca(); renderAccaBody(); renderAccaBtn(); } };
   el.addEventListener("toggle", (e) => {
     if (!e.target.classList.contains("arow")) return;
     const i = +e.target.dataset.arowkey;
@@ -5137,8 +5274,10 @@ function renderAccaBody() {
   el.onclick = (e) => {
     const rm = e.target.closest("[data-arm]");
     // Removing shifts every index after it, so the open set is rebuilt, not patched.
+    // renderAccaBtn too: the count on the page menu's Acca button used to go stale
+    // the moment you took a match out, and only came back on a full re-render.
     if (rm) { e.preventDefault(); e.stopPropagation(); S.acca.splice(+rm.dataset.arm, 1);
-      S.accaOpen = new Set(); saveAcca(); renderAccaBody(); updateMonster(); return; }
+      S.accaOpen = new Set(); saveAcca(); renderAccaBody(); renderAccaBtn(); updateMonster(); return; }
     const op = e.target.closest("[data-aopen]");
     if (op) { const pt = S.acca[+op.dataset.aopen]; openPart(pt); }
   };
@@ -5273,9 +5412,13 @@ function updateMonster(force = false) {
   if (!force && box.dataset.html === html) return;   // nothing changed: keep the buttons you're about to tap
   box.innerHTML = html; box.dataset.html = html;
   bindFlips(box, S.flipped);
+  // Both of these fill the other tab, so they switch to it — otherwise you press a
+  // button, the pane you're looking at doesn't change, and nothing says it worked.
   $("#monUse").onclick = () => { if (S.acca.length && !confirm("Replace your current acca with this one?")) return;
-    S.acca = []; picked.forEach(r => putPart(makePart(r, r.legs, r.p))); S.accaChk.price = ""; renderAccaBody(); updateMonster(); toast(`🧩 Your acca: ${t.legs} legs.`); };
-  $("#monAdd").onclick = () => { picked.forEach(r => putPart(makePart(r, r.legs, r.p))); renderAccaBody(); toast(`🧩 Added — your acca has ${accaLegCount()} legs.`); };
+    S.acca = []; picked.forEach(r => putPart(makePart(r, r.legs, r.p))); S.accaChk.price = "";
+    renderAccaBody(); updateMonster(); renderAccaBtn(); setAccaTab("yours"); toast(`🧩 Your acca: ${t.legs} legs.`); };
+  $("#monAdd").onclick = () => { picked.forEach(r => putPart(makePart(r, r.legs, r.p)));
+    renderAccaBody(); renderAccaBtn(); setAccaTab("yours"); toast(`🧩 Added — your acca has ${accaLegCount()} legs.`); };
 }
 // "Other leg" (1 leg per match): the next-best Bet365 leg from the same match,
 // round and round. If this ticket is already your acca, that part changes too.

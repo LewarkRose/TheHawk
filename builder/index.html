@@ -146,6 +146,21 @@ img{max-width:100%}
 .fx .when{grid-row:1/3;grid-column:2;align-self:center;text-align:right;color:var(--muted);font-size:12px}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em}
 .badge.live{background:rgba(255,93,115,.15);color:var(--red)}
+/* HAWK'S READ — the match argued in English before any figure. Set off by a rule
+   rather than boxed, so it reads as writing rather than as another panel. */
+.hread{border-left:3px solid var(--accent);padding:0 0 0 14px;margin:14px 0 18px}
+.hread .rk{font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);
+  font-weight:900;display:flex;align-items:center;gap:7px;margin-bottom:7px;flex-wrap:wrap}
+.hread .rk s{text-decoration:none;color:#5f5f5f;letter-spacing:.1em}
+.hread .lead{font-size:18.5px;line-height:1.3;font-weight:800;letter-spacing:-.012em;margin-bottom:9px}
+.hread p{margin:0 0 9px;font-size:13.2px;line-height:1.62;color:#c6c6c6;max-width:68ch}
+.hread p b{color:var(--text);font-weight:800}
+.hcalm{border:1px solid #242938;background:rgba(188,200,255,.045);border-radius:11px;
+  padding:10px 12px;margin:11px 0 0;max-width:68ch}
+.hcalm .ct{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent-d);
+  font-weight:900;margin-bottom:5px}
+.hcalm p{margin:0;font-size:12.4px;line-height:1.6;color:#aeb2c4}
+@media (max-width:560px){.hread .lead{font-size:16.5px}}
 /* A started match leaves the builder for the live view. That was only ever said
    in a title attribute, so a mouse that did not hover got bounced with no warning. */
 .goeslive{display:block;margin-top:3px;font-size:9.5px;letter-spacing:.06em;color:var(--muted)}
@@ -1929,6 +1944,58 @@ function renderMatch() {
     : bk != null && own != null
       ? `${who}: bookmakers ${bk}%, HAWK's own stats ${own}% → HAWK ${hp[fi]}%. HAWK listens mostly to the bookmakers (they know injuries, team news and where the money is) and nudges a little towards its own stats.`
     : `Mostly the bookmakers' chances, nudged a little towards HAWK's own stats.`;
+  // HAWK'S READ. The match argued in English before a single figure is shown.
+  // Every number in it is the same one the panels below render, pulled from the
+  // same variables — so it cannot drift from them, which is the failure every
+  // prototype of this had: prose written once against a ticket that then changed.
+  const hread = (() => {
+    const gap = own != null && bk != null ? own - bk : null;
+    const favName = fi === 0 ? m.home : fi === 2 ? m.away : null;
+    const dogName = fi === 0 ? m.away : fi === 2 ? m.home : null;
+    const tot = e.goals[0] + e.goals[1], cards = e.cards[0] + e.cards[1];
+    const b = (x) => `<b>${x}</b>`;
+
+    let lead;
+    if (fi === 1)
+      lead = `HAWK makes the draw the likeliest single result here at ${hp[1]}% — which is worth knowing and rarely worth backing on its own.`;
+    else if (gap == null)
+      lead = `${favName} are the right side at ${hp[fi]}%, but HAWK is working from one source here, so treat the margin loosely.`;
+    else if (Math.abs(gap) <= 2)
+      lead = `${favName} should win this, and nothing in the market disagrees — so the bet is not in the result, it is in the volume.`;
+    else if (gap > 0)
+      lead = `HAWK rates ${favName} ${gap} points above the bookmakers, and that gap is the only thing on this match it is not simply agreeing with the price about.`;
+    else
+      lead = `The bookmakers rate ${favName} ${-gap} points higher than HAWK's own stats do. On this one HAWK is the cautious side of the argument.`;
+
+    const ps = [];
+    if (bk != null && own != null)
+      ps.push(`<p>HAWK's own ratings give ${esc(fi === 1 ? "the draw" : who.replace(" to win", ""))} ${b(own + "%")} from goals and xG; ${
+        p.market && p.market.sources ? b(p.market.sources) + " bookmakers" : "the bookmakers"} say ${b(bk + "%")}${
+        p.polymarket ? ` and Polymarket ${b(pct100([p.polymarket.home, p.polymarket.draw, p.polymarket.away])[fi] + "%")}` : ""
+      }. Blended, ${b(hp[fi] + "%")} — ${Math.abs(gap || 0) <= 2 ? "there is no gap to trade on the match winner" : "that disagreement is where any edge on the result would have to come from"}.</p>`);
+
+    ps.push(`<p>Where the simulations do say something is the shape of the game. Across 12,000 runs that is ${
+      b(e.goals[0].toFixed(2))} goals to ${b(e.goals[1].toFixed(2))}, ${b(e.sot[0].toFixed(1))}–${b(e.sot[1].toFixed(1))
+      } on target, ${b(e.corners.toFixed(1))} corners and ${b(cards.toFixed(1))} cards${
+      m.referee && m.referee.name && m.referee.avg ? ` with ${esc(m.referee.name)} refereeing at ${b(m.referee.avg.toFixed(2))} a game` : ""}.</p>`);
+
+    ps.push(`<p>So the legs worth stacking are the ones that follow from ${
+      tot >= 2.9 ? `a game with goals in it — ${b(tot.toFixed(2))} expected between them`
+      : tot <= 2.2 ? `a tight game — only ${b(tot.toFixed(2))} goals expected between them`
+      : `an ordinary scoreline — ${b(tot.toFixed(2))} goals expected`}${
+      favName ? `, and from ${esc(favName)} doing ${esc(favName)} things at volume` : ""} — not from calling the score.</p>`);
+
+    const predictedXI = Object.values(m.lineups || {}).some((lu) => lu && lu.status !== "Confirmed");
+    let calm = "";
+    if (m.started)
+      calm = `<div class="hcalm"><div class="ct">Careful with</div><p>This match has already kicked off. Everything above is the pre-match model and takes no account of what has happened since.</p></div>`;
+    else if (predictedXI)
+      calm = `<div class="hcalm"><div class="ct">Careful with</div><p>Lineups are predicted, not confirmed. HAWK assumes the named starters start, and most bookmakers void a player's legs if he does not play — check yours. Rebuild once the sheets land, about an hour before kick-off.</p></div>`;
+
+    return `<div class="hread"><div class="rk">HAWK's read <s>The match · before any number</s></div>
+      <div class="lead">${esc(lead)}</div>${ps.join("")}${calm}</div>`;
+  })();
+
   $("#match").innerHTML = `
     <div class="hero">
       <div class="vs">
@@ -1947,6 +2014,7 @@ function renderMatch() {
           <div class="muted">${esc(tbl("away"))}${m.form.away ? " · " + formHTML(m.form.away, true) : ""}</div>${chip("away")}</div>
       </div>
     </div>
+    ${hread}
     <div class="section">
       <h3>Win probability <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:600">— 🦅 HAWK</span></h3>
       <div class="bar3" title="HAWK's chances: its own ratings blended with the market (the bookmakers get most of the weight)">

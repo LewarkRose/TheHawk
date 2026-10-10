@@ -486,6 +486,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .tbar .track{position:relative;height:8px;border-radius:4px;background:#1f1f1f;overflow:hidden}
     .tbar .track i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--accent-d),var(--accent))}
     .tbar .track b{position:absolute;top:-3px;width:2px;height:14px;background:var(--red);border-radius:1px}
+    /* dashed while the price behind it is HAWK's own guess, solid once a real
+       Bet365 price has been typed — so the page says out loud how provisional
+       its own verdict currently is, instead of burying it in a note */
+    .tbar .track b.guess{background:repeating-linear-gradient(180deg,var(--red) 0 3px,transparent 3px 6px);border-radius:0}
     .tbar .bnote{margin-top:5px;font-size:11px;color:var(--muted)}
 .ticket .th b{color:var(--accent);font-style:italic;letter-spacing:.04em;font-size:15px}
 .ticket .th .odds{font-size:20px;font-weight:900}
@@ -584,6 +588,18 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .leg .tile .tk{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800;display:flex;align-items:center;gap:4px}
 .leg .tile .tv{font-size:18px;font-weight:900;line-height:1.25;white-space:nowrap}.leg .tile .tv small{font-size:10.5px;font-weight:700;color:var(--muted)}
 .leg .tile .tm{font-size:12px;color:var(--muted);margin-right:2px}
+/* PROVENANCE BY SIZE. A price Bet365 published — or one you read off Bet365 and
+   typed in — gets the full 18px figure above. A price converted from another
+   book steps down. HAWK's own estimate is capped small and set in italic mono,
+   so it is physically unable to look like a quote. !important because the cap is
+   the whole mechanism: the colour rail under the legs is already dead from a
+   later shorthand overwriting it, and this must not go the same way. */
+.leg .tile .tv.conv{font-size:15px !important;font-weight:800;color:#c9c9c9}
+.leg .tile .tv.est{font-size:13px !important;font-weight:600;font-style:italic;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);
+  padding-bottom:2px;display:inline-block;
+  background-image:repeating-linear-gradient(90deg,#5a5a5a 0 2px,transparent 2px 4px);
+  background-size:100% 1px;background-repeat:no-repeat;background-position:0 100%}
 .leg .tile .ts{font-size:10.5px;color:var(--muted);line-height:1.3;overflow:hidden;text-overflow:ellipsis}
 .leg .tile.good{border-color:rgba(188, 200, 255,.45);background:rgba(188, 200, 255,.07)}.leg .tile.good .ts{color:var(--accent)}
 .leg .tile.ok .ts{color:var(--text)}
@@ -2664,9 +2680,10 @@ function legPrice(l) {
 function legPriceRow(l) {
   const pr = legPrice(l), src = pr && pr.src, dead = pr && pr.price && pr.price <= HAWK.DEAD_PRICE;
   const ev = pr && pr.price ? pr.price * l.p - 1 : null;
+  // Stated as a fact about HAWK's own price, not as an edge — see legTiles.
   const verdict = !pr || !pr.price ? "" : dead ? `<span class="vt dead">pays next to nothing</span>`
-    : ev >= 0.02 ? `<span class="vt good">value +${(100 * ev).toFixed(0)}%</span>` : ev >= -0.02 ? `<span class="vt ok">fair price</span>`
-    : `<span class="vt">${(100 * -ev).toFixed(0)}% under fair</span>`;
+    : ev >= 0.02 ? `<span class="vt">above HAWK's price</span>` : ev >= -0.02 ? `<span class="vt">level with HAWK's price</span>`
+    : `<span class="vt">below HAWK's price</span>`;
   const srcTag = { bet365: "", typed: ` <span class="muted" title="The price you typed">✓ yours</span>`,
                    priced: ` <span class="muted" title="From ${esc(l.refBook || "Unibet")}'s real price (${odds(l.refPrice)}), turned into Bet365's">≈</span>`,
                    guess: ` <span class="muted" title="HAWK's guess — no bookmaker prices this leg. It gets better from the Bet365 builder prices you type in">guess</span>` }[src] || "";
@@ -2728,14 +2745,27 @@ function legTiles(l, row, n) {
   const pr = legPrice(l), has = pr && pr.price, ev = has ? pr.price * l.p - 1 : null, dead = has && pr.price <= HAWK.DEAD_PRICE;
   const chance = `<div class="tile"><div class="tk">Chance</div><div class="tv">${pct(l.p)}</div>
     <div class="ts">${row && n > 0 ? `${pct(row.cond)} with the above` : "on its own"}${l.ep && l.pNoEp != null ? ` <span class="epb" title="Includes Bet365's Early Payout: +${pct(Math.max(0, l.p - l.pNoEp), 1)}">EP</span>` : ""}</div></div>`;
-  const tone = !has ? "" : dead ? "dead" : ev >= 0.02 ? "good" : ev >= -0.02 ? "ok" : ev >= -0.12 ? "" : "poor";
-  const verdict = !has ? "no price yet" : dead ? "pays next to nothing" : ev >= 0.02 ? `value +${(100 * ev).toFixed(0)}%` : ev >= -0.02 ? "fair price" : `${(100 * -ev).toFixed(0)}% under fair`;
+  // No verdict on a single leg. Measured on this app's own record: where HAWK
+  // disagrees with Bet365 about one leg, Bet365 is usually the one standing
+  // closer to what happened — so "value +7%" was selling a thing that was looked
+  // for and not found. The relationship to HAWK's own price is still stated,
+  // because it is a fact; it is just no longer dressed as an edge. A dead price
+  // stays flagged, since that is about the price itself and not a disagreement.
+  const tone = !has ? "" : dead ? "dead" : "";
+  const verdict = !has ? "no price yet" : dead ? "pays next to nothing"
+    : ev >= 0.02 ? "above HAWK's price" : ev >= -0.02 ? "level with HAWK's price" : "below HAWK's price";
+  // Provenance is carried by TYPE, not by a glyph in a tooltip. A price Bet365
+  // published, or one you read off Bet365 yourself, gets the full figure. A price
+  // converted from another book is a step down. HAWK's own estimate is capped
+  // small and italic, so it cannot wear a quote's clothes — and unlike the colour
+  // rail under the legs, a later shorthand cannot quietly switch it off.
+  const src = !pr ? "" : pr.src === "guess" ? "est" : pr.src === "priced" ? "conv" : "";
   const mark = pr && pr.src === "priced" ? `<span class="tm" title="From ${esc(l.refBook || "Unibet")}'s real price (${odds(l.refPrice)}), turned into Bet365's">≈</span>`
     : pr && pr.src === "guess" && has ? `<span class="tm" title="HAWK's guess — no bookmaker prices this leg">~</span>` : pr && pr.src === "typed" ? `<span class="tm" title="The price you typed">✓</span>` : "";
   const edit = l.kind === "player" && pr && pr.src !== "bet365"
     ? (S.ppEdit === l.id ? ` <input class="pp-in" data-pprice="${esc(l.id)}" inputmode="decimal" placeholder="${has ? odds(pr.price) : "price"}">`
                          : ` <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Type this leg's Bet365 price (optional)">✎</button>`) : "";
-  const bet = `<div class="tile ${tone}"><div class="tk">Bet365${edit}</div><div class="tv">${mark}${has ? odds(pr.price) : "—"}</div><div class="ts">${verdict}</div></div>`;
+  const bet = `<div class="tile ${tone}"><div class="tk">Bet365${edit}</div><div class="tv ${src}">${mark}${has ? odds(pr.price) : "—"}</div><div class="ts">${verdict}</div></div>`;
   let third;
   if (l.kind === "player" && l.games >= 3) {
     const r5 = (l.recent || []).slice(0, 5), h5 = r5.filter(v => v >= l.threshold).length, rate = l.hits / l.games;
@@ -3029,9 +3059,12 @@ function renderSlip() {
             return `<div class="tpct"><div class="num">${Math.floor(t / 10)}<small>.${t % 10}%</small></div><div class="lab">LANDS</div></div>`;
           })()}
           <div class="tbar">
-            <div class="track"><i style="width:${w(p)}%"></i>${need ? `<b style="left:${w(need)}%"></b>` : ""}</div>
-            <div class="bnote">${need ? `red mark = what <b style="color:var(--text)">${odds(price)}</b> needs (${(100 * need).toFixed(0)}%)${
-              typed > 1 ? "" : " — HAWK's guess until you type Bet365's price"}` : "Add legs and HAWK works out the chance."}</div>
+            <div class="track"><i style="width:${w(p)}%"></i>${need ? `<b class="${typed > 1 ? "" : "guess"}" style="left:${w(need)}%"></b>` : ""}</div>
+            <div class="bnote">${need
+              ? (typed > 1
+                  ? `Solid mark — what the <b style="color:var(--text)">${odds(price)}</b> you typed needs (${(100 * need).toFixed(0)}%).`
+                  : `Dashed mark — HAWK's guess at Bet365's price (<b style="color:var(--text)">${odds(price)}</b>, ${(100 * need).toFixed(0)}%). Type the real one below and it goes solid.`)
+              : "Add legs and HAWK works out the chance."}</div>
           </div>
           <div style="flex:none;text-align:right">
             <div class="muted" style="font-size:10px;letter-spacing:.14em">BET365 &asymp;</div>
@@ -4508,7 +4541,12 @@ function partRow(pt, actions) {
     <div class="tiles">
       <div class="tile"><div class="tk">Chance</div><div class="tv">${pct(pt.p, pt.p < 0.1 ? 1 : 0)}</div><div class="ts">${single ? "this leg" : `${pt.legs.length} legs together`}</div></div>
       <div class="tile ${tone}"><div class="tk">Bet365</div><div class="tv">${price ? odds(price) : "—"}</div>
-        <div class="ts">${price ? (ev >= 0.02 ? `value +${(100 * ev).toFixed(0)}%` : ev >= -0.02 ? "fair price" : `${(100 * -ev).toFixed(0)}% under fair`) : "Bet365 prices the builder"}</div></div>
+        <div class="ts">${!price ? "Bet365 prices the builder"
+          : single
+            // one leg on its own: no edge claim, because there isn't one to claim
+            ? (ev >= 0.02 ? "above HAWK's price" : ev >= -0.02 ? "level with HAWK's price" : "below HAWK's price")
+            // a whole builder is a different thing — that comparison is the point of the app
+            : (ev >= 0.02 ? `value +${(100 * ev).toFixed(0)}%` : ev >= -0.02 ? "fair price" : `${(100 * -ev).toFixed(0)}% under fair`)}</div></div>
       <div class="tile"><div class="tk">Fair odds</div><div class="tv">${odds(pt.fair || (pt.p > 0 ? 1 / pt.p : null))}</div>
         <div class="ts">${moved ? `<span class="${pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "dn" : "up"}">${pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "▼" : "▲"} from ${odds(pt.legs[0].bookOpen)}</span>` : "HAWK's price"}</div></div>
     </div>

@@ -72,7 +72,7 @@ img{max-width:100%}
 /* header: row 1 = logo · pages · alerts + Vault, row 2 = leagues */
 :root{--head:92px}
 .top{position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line);
-  background:linear-gradient(180deg,rgba(18,26,30,.97),rgba(13,17,20,.95));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+  background:linear-gradient(180deg,rgba(25, 25, 25,.97),rgba(13,17,20,.95));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .topbar{display:flex;align-items:center;gap:18px;padding:10px 22px 8px}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);flex-shrink:0}
 .brand .logo{width:78px;height:78px;filter:drop-shadow(0 0 12px rgba(188, 200, 255,.35));transition:transform .2s}
@@ -152,7 +152,7 @@ img{max-width:100%}
   body:not([data-view="match"]) .slipcol{display:none!important}
   .fixtures{position:static;max-height:none}
   .fx-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:11px 12px;border-radius:12px;border:1px solid #272d51;cursor:pointer;
-    background:linear-gradient(180deg,#1b2a27,#151515);color:var(--text);font:600 14px inherit;text-align:left;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+    background:linear-gradient(180deg,#262626,#151515);color:var(--text);font:600 14px inherit;text-align:left;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
   .fx-toggle span{color:var(--muted);font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fx-toggle i{font-style:normal;color:var(--accent);transition:transform .2s}
   .fixtures:not(.folded) .fx-toggle{margin-bottom:10px}.fixtures:not(.folded) .fx-toggle i{transform:rotate(180deg)}
   .fixtures.folded{padding:6px}.fixtures.folded .ltree,.fixtures.folded #fixtures{display:none}
@@ -267,20 +267,20 @@ img{max-width:100%}
 .empty{padding:60px 30px;text-align:center;color:var(--muted)}
 .empty h2{color:var(--text);margin:10px 0 6px;font-size:22px}
 .ip-bell{position:absolute;top:12px;right:12px;z-index:2;display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;cursor:pointer;
-  font:700 12px inherit;color:var(--muted);background:linear-gradient(180deg,#25333a,#1a2328);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 4px 10px -4px rgba(0,0,0,.6)}
+  font:700 12px inherit;color:var(--muted);background:linear-gradient(180deg,#313131,#212121);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 4px 10px -4px rgba(0,0,0,.6)}
 .ip-bell.on{color:#131731;background:linear-gradient(180deg,#dae1ff,#b1bfff);border-color:#8494ef;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 12px -4px rgba(153, 169, 255,.6)}
 .ip-bell:hover{filter:brightness(1.1)}
 @media (max-width:560px){.ip-bell{top:7px;right:7px;width:30px;height:30px;padding:0;justify-content:center;font-size:14px}.ip-bell span{display:none}}
 .hero{position:relative}
 .hero{padding:22px 24px;border-radius:16px 16px 0 0;
-  background:radial-gradient(1200px 200px at 50% -60px,rgba(188, 200, 255,.18),transparent),linear-gradient(180deg,#18242a,#141414)}
+  background:radial-gradient(1200px 200px at 50% -60px,rgba(188, 200, 255,.18),transparent),linear-gradient(180deg,#222222,#141414)}
 .vs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px}
 .side{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
 .side img{width:64px;height:64px;filter:drop-shadow(0 6px 12px rgba(0,0,0,.4))}
 .side .nm{font-size:18px;font-weight:800}
 .mid{text-align:center}
 .mid .ko{font-size:13px;color:var(--muted)}
-.mid .x{font-size:28px;font-weight:900;color:#3d4d58;letter-spacing:.1em}
+.mid .x{font-size:28px;font-weight:900;color:#4a4a4a;letter-spacing:.1em}
 .chips{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:6px}
 .section{padding:16px 24px;border-top:1px solid var(--line)}
 .section h3{margin:0 0 12px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
@@ -316,13 +316,13 @@ img{max-width:100%}
 .pl .ph img{width:40px;height:40px;object-fit:cover}
 .pl .top1{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 .pl .nm{font-weight:700}
-.pos{font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;background:#2b3842;color:#b9c7d1;margin-left:6px}
+.pos{font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;background:#363636;color:#b9c7d1;margin-left:6px}
 .rates{font-size:12px;color:var(--muted)}
 .spark{display:flex;gap:2px;align-items:flex-end;height:18px}
-.spark i{display:block;width:5px;background:#35505e;border-radius:2px}
+.spark i{display:block;width:5px;background:#4c4c4c;border-radius:2px}
 .spark i.hit{background:var(--accent)}
 .qchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
-.qc{font-size:11.5px;padding:3px 8px;border-radius:999px;background:#1f1f1f;border:1px solid #2e3e49;cursor:pointer;transition:.12s}
+.qc{font-size:11.5px;padding:3px 8px;border-radius:999px;background:#1f1f1f;border:1px solid #3c3c3c;cursor:pointer;transition:.12s}
 .qc:hover{border-color:var(--accent);color:var(--accent)}
 .qc.in{background:rgba(188, 200, 255,.16);border-color:var(--accent);color:var(--accent)}
 .qc b{font-weight:800;opacity:.7;margin-left:2px}
@@ -334,16 +334,16 @@ img{max-width:100%}
 .lrow{display:grid;grid-template-columns:1fr 64px 56px 64px 30px;gap:8px;align-items:center;padding:7px 10px;border-radius:9px}
 .lhead{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:0 10px 4px}
 .lrow:hover{background:var(--panel2)}
-.pb{height:5px;border-radius:3px;background:#24313a;overflow:hidden}
+.pb{height:5px;border-radius:3px;background:#2f2f2f;overflow:hidden}
 .pb span{display:block;height:100%;background:linear-gradient(90deg,var(--accent-d),var(--accent))}
 .add{width:26px;height:26px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);cursor:pointer}
 .add:hover{border-color:var(--accent);color:var(--accent)}
 /* slip */
 /* The slip sticks beside the match and scrolls on its own when the ticket is long. */
 .slipcol{position:sticky;top:calc(var(--head) + 10px);max-height:calc(100vh - var(--head) - 24px);overflow-y:auto;border-radius:16px;
-  scrollbar-width:thin;scrollbar-color:#2f3d47 transparent}
+  scrollbar-width:thin;scrollbar-color:#3b3b3b transparent}
 .slipcol::-webkit-scrollbar{width:8px}
-.slipcol::-webkit-scrollbar-thumb{background:#2f3d47;border-radius:8px}
+.slipcol::-webkit-scrollbar-thumb{background:#3b3b3b;border-radius:8px}
 @media (max-width:1250px){.slipcol{position:static;max-height:none;overflow:visible}}
 .bp{font-size:12px;color:var(--muted)}
 .bp b{color:var(--text);font-weight:700}
@@ -376,7 +376,7 @@ img{max-width:100%}
 .co-worth b{color:var(--gold)}
 .co-offer{margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .co-offer label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
-.co-offer input{width:120px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:#12181c;font-size:16px;font-weight:700}
+.co-offer input{width:120px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:#171717;font-size:16px;font-weight:700}
 .badge.soon{background:rgba(153, 169, 255,.14);color:var(--gold)}
 .kick-cd{margin-top:6px;font-size:13px;color:var(--gold);font-weight:600}
 .sc-tbl{margin-left:auto;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font:700 11.5px inherit;cursor:pointer;text-transform:none;letter-spacing:0}
@@ -530,7 +530,7 @@ img{max-width:100%}
 input[type=range]{width:100%;accent-color:var(--accent)}
 .seg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:3px;margin:10px 0}
 .seg button{border:0;background:transparent;padding:7px;border-radius:8px;cursor:pointer;color:var(--muted);font-weight:600}
-.seg button.on{background:#27353f;color:var(--text)}
+.seg button.on{background:#333333;color:var(--text)}
 .hint{font-size:12px;color:var(--muted);margin:-4px 2px 10px}
 .opts{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
 .opts select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px 6px}
@@ -624,7 +624,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .leg.guess,.leg.card.guess{border-left:3px solid #4a4a4a}
     .legkey{display:flex;gap:12px;flex-wrap:wrap;padding:2px 14px 10px;font-size:11px;color:var(--muted)}
     .legkey i{display:inline-block;width:9px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
-.leg::before{content:"";position:absolute;left:8px;top:22px;bottom:-8px;width:2px;background:#2d4a44}
+.leg::before{content:"";position:absolute;left:8px;top:22px;bottom:-8px;width:2px;background:#434343}
 .leg:last-child::before{display:none}
 .leg .ck{position:absolute;left:0;top:9px;width:18px;height:18px;border-radius:50%;background:var(--accent);color:#03261b;
   display:grid;place-items:center;font-size:11px;font-weight:900}
@@ -634,7 +634,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .leg .b365{font-size:11.5px;color:var(--gold);margin-top:2px}.leg .b365 b{font-weight:800}
 /* scorecard leg: face + name + verdict, three tiles, a short why, icon buttons — raised, 3D */
 .leg.card{padding:12px;margin:0 0 10px;border-radius:14px;border:1px solid #272d51;
-  background:linear-gradient(180deg,#1b2a27 0%,#151515 100%);
+  background:linear-gradient(180deg,#262626 0%,#151515 100%);
   box-shadow:0 14px 26px -14px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.06),inset 0 -1px 0 rgba(0,0,0,.35)}
 .leg.card::before{display:none}
 .leg.card{animation-fill-mode:backwards}   /* (so the rise-in animation doesn't hold the transform the tilt needs) */
@@ -642,7 +642,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .leg.card .sc-head{display:flex;align-items:center;gap:10px}
 .leg.card .sc-name{flex:1;min-width:0}.leg.card .sc-head .lb{font-weight:800;line-height:1.25}
 .lface{position:relative;flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;
-  background:radial-gradient(circle at 35% 30%,#2b3d3a,#131b1d);border:2px solid var(--accent);
+  background:radial-gradient(circle at 35% 30%,#393939,#191919);border:2px solid var(--accent);
   box-shadow:0 6px 12px -4px rgba(0,0,0,.7),0 0 0 3px rgba(188, 200, 255,.12)}
 .lface.away{border-color:var(--blue);box-shadow:0 6px 12px -4px rgba(0,0,0,.7),0 0 0 3px rgba(226,232,240,.12)}
 .lface img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:top}
@@ -653,7 +653,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   font-size:10px;font-weight:900;background:var(--accent);color:#0f1326;border:2px solid #151515;box-shadow:0 2px 4px rgba(0,0,0,.5)}
 .lface.away .no{background:var(--blue);color:#111111}
 .verdict{flex:none;align-self:flex-start;font-size:11px;font-weight:800;letter-spacing:.02em;padding:3px 9px;border-radius:999px;white-space:nowrap;
-  color:var(--muted);background:linear-gradient(180deg,#26333a,#1c262c);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 3px 6px -3px rgba(0,0,0,.6)}
+  color:var(--muted);background:linear-gradient(180deg,#313131,#242424);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 3px 6px -3px rgba(0,0,0,.6)}
 .verdict.good{color:#0f1326;background:linear-gradient(180deg,#3cf0b6,#12c58c);border-color:#8697f9;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px -4px rgba(188, 200, 255,.6)}
 .verdict.warn{color:#131731;background:linear-gradient(180deg,#dae1ff,#b1bfff);border-color:#8494ef;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px -4px rgba(153, 169, 255,.5)}
 .verdict.bad{color:#fff;background:linear-gradient(180deg,#ff7a8c,#e0455b);border-color:#b8324a;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 4px 10px -4px rgba(255,93,115,.55)}
@@ -760,7 +760,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
    was left behind, so a third of this row has been empty ever since. */
 .check .row{display:grid;grid-template-columns:1.3fr .7fr;gap:8px}
 .check label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
-.check input{width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--line);background:#12181c;font-size:16px;font-weight:700}
+.check input{width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--line);background:#171717;font-size:16px;font-weight:700}
 .verdict{margin-top:10px;padding:10px 12px;border-radius:10px;font-weight:700}
 .verdict.good{background:rgba(188, 200, 255,.14);color:var(--accent)}
 .verdict.bad{background:rgba(255,93,115,.12);color:var(--red)}
@@ -778,7 +778,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .vcard{margin-top:12px;padding:12px;border-radius:12px;border:1px dashed var(--line)}
 .vcard h4{margin:0 0 6px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .skel{padding:40px 24px}
-.skel .ln{height:14px;border-radius:7px;background:linear-gradient(90deg,#1c252b,#243039,#1c252b);background-size:200% 100%;
+.skel .ln{height:14px;border-radius:7px;background:linear-gradient(90deg,#242424,#2e2e2e,#242424);background-size:200% 100%;
   animation:shine 1.4s linear infinite;margin:12px 0}
 .loading-msg{color:var(--accent);font-weight:700;margin-bottom:10px}
 #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1f1f1f;border:1px solid var(--line);
@@ -789,7 +789,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* With My bets open the alerts were landing on top of your own bets. */
 @media (min-width:1400px){body.drawer-open #goalfeed{right:412px}}
 .goal-card{pointer-events:auto;position:relative;overflow:hidden;cursor:pointer;padding:12px 14px 14px;border-radius:16px;
-  background:linear-gradient(135deg,#10251f 0%,#121212 60%);border:1px solid rgba(188, 200, 255,.55);
+  background:linear-gradient(135deg,#202020 0%,#121212 60%);border:1px solid rgba(188, 200, 255,.55);
   box-shadow:0 18px 40px rgba(0,0,0,.5),0 0 0 1px rgba(188, 200, 255,.15),0 0 28px rgba(188, 200, 255,.25);animation:goalIn .55s cubic-bezier(.2,1.4,.4,1)}
 .goal-card.off{border-color:rgba(255,138,138,.55);background:linear-gradient(135deg,#2a1717 0%,#121212 60%);box-shadow:0 18px 40px rgba(0,0,0,.5)}
 .goal-card.bye{animation:goalOut .5s ease forwards}
@@ -818,7 +818,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .goal-card.t-bad .g-word{color:#ff6b7f;text-shadow:0 0 16px rgba(255,93,115,.5)}.goal-card.t-bad .g-bar i{background:#ff6b7f}
 .goal-card.t-warn{border-color:rgba(153, 169, 255,.6);background:linear-gradient(135deg,#202334 0%,#121212 60%);box-shadow:0 18px 40px rgba(0,0,0,.5),0 0 26px rgba(153, 169, 255,.2)}
 .goal-card.t-warn .g-word{color:var(--gold);text-shadow:0 0 16px rgba(153, 169, 255,.5)}.goal-card.t-warn .g-bar i{background:var(--gold)}
-.goal-card.t-info{border-color:rgba(226,232,240,.55);background:linear-gradient(135deg,#12202e 0%,#121212 60%)}
+.goal-card.t-info{border-color:rgba(226,232,240,.55);background:linear-gradient(135deg,#1f1f1f 0%,#121212 60%)}
 .goal-card.t-info .g-word{color:var(--blue);text-shadow:none}.goal-card.t-info .g-bar i{background:var(--blue)}
 @keyframes goalIn{from{opacity:0;transform:translateX(60px) scale(.9)}to{opacity:1;transform:none}}
 @keyframes goalOut{to{opacity:0;transform:translateX(60px)}}
@@ -856,7 +856,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .pop .row button{border:0;background:transparent;color:var(--muted);cursor:pointer}
 .fx .bellmark{color:var(--gold);font-size:12px;margin-left:4px}
 /* best builders scan */
-.prog{height:8px;border-radius:5px;background:#24313a;overflow:hidden;margin-top:12px}
+.prog{height:8px;border-radius:5px;background:#2f2f2f;overflow:hidden;margin-top:12px}
 .prog span{display:block;height:100%;background:linear-gradient(90deg,var(--accent-d),var(--accent));transition:width .4s}
 .scard{display:flex;gap:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;
   background:var(--panel2);margin-bottom:10px;cursor:pointer;transition:.15s;animation:in .3s both}
@@ -865,7 +865,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .scard .rail{flex:none;width:6px;background:var(--muted);opacity:.55}
     .scard .rail.ok{background:linear-gradient(180deg,var(--accent),var(--accent-d));opacity:1}
     .scard .rail.fair{background:linear-gradient(180deg,var(--gold),#8c98d4);opacity:1}
-    .scard .rail.bad{background:linear-gradient(180deg,#3c4a54,#2b363e);opacity:1}
+    .scard .rail.bad{background:linear-gradient(180deg,#484848,#343434);opacity:1}
     /* price not known yet: neither good nor bad until Bet365 says */
     .scard .rail.check{background:linear-gradient(180deg,var(--blue),#94a3b8);opacity:1}
     .badge.check{background:rgba(226,232,240,.14);color:var(--blue)}
@@ -882,7 +882,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     /* the bar: how often it lands, with the mark showing what the price needs */
     .sbar .track{position:relative;height:10px;border-radius:5px;background:#1f1f1f;overflow:hidden}
     .sbar .track i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:linear-gradient(90deg,var(--accent-d),var(--accent))}
-    .sbar .track i.bad{background:linear-gradient(90deg,#3c4a54,#4a4a4a)}
+    .sbar .track i.bad{background:linear-gradient(90deg,#484848,#4a4a4a)}
     .sbar .track b{position:absolute;top:-3px;width:2px;height:16px;background:#fff;border-radius:1px}
     .sbar .bnote{display:flex;justify-content:space-between;gap:10px;margin-top:5px;font-size:11px;color:var(--muted)}
     /* The legs multiplied against what Bet365 pays: the correlation tax, as a
@@ -1098,7 +1098,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .tdhead{display:flex;align-items:center;gap:12px;margin-bottom:12px}
     .tdhead .bank{text-align:right}
     .tdhead .bank .n{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:26px;line-height:1;font-weight:700;color:var(--accent)}
-    .tdplan{padding:14px 15px;border-radius:16px;border:1px solid var(--accent);background:linear-gradient(180deg,#1a2a2c,#172024);margin-bottom:13px}
+    .tdplan{padding:14px 15px;border-radius:16px;border:1px solid var(--accent);background:linear-gradient(180deg,#272727,#1e1e1e);margin-bottom:13px}
     .tdstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
     .tdstats .k{font-size:10px;letter-spacing:.12em;color:var(--muted)}
     .tdstats .v{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:26px;line-height:1.05;font-weight:700}
@@ -1191,7 +1191,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .sdo.ok{color:var(--accent)} .sdo.fair{color:var(--gold)} .sdo.bad{color:var(--muted)}
 .scard .teams{display:flex;align-items:center;gap:7px;font-weight:800;flex-wrap:wrap}
 .scard .teams img{width:20px;height:20px}
-.lchip{display:inline-block;font-size:11.5px;padding:3px 9px;border-radius:7px;background:#1f1f1f;border:1px solid #2e3e49;margin:0}
+.lchip{display:inline-block;font-size:11.5px;padding:3px 9px;border-radius:7px;background:#1f1f1f;border:1px solid #3c3c3c;margin:0}
 .lchip.pl{border-color:rgba(226,232,240,.45)}
     /* the weak link: the leg least likely to land, so you know which to swap */
     .lchip.weak{border-color:rgba(153, 169, 255,.55);background:rgba(153, 169, 255,.08)}
@@ -1313,7 +1313,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .pm.away .shirt{background:var(--blue);color:#111111}
 /* faces: the photo in a team-coloured ring, the shirt number as a badge */
 .pm .shirt{position:relative}
-.pm .shirt.face{width:36px;height:36px;background:#0d1a16;border-width:2.5px}
+.pm .shirt.face{width:36px;height:36px;background:#171717;border-width:2.5px}
 .pm.home .shirt.face{border-color:var(--accent)}.pm.away .shirt.face{border-color:var(--blue)}
 .pm .shirt.face img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:top}
 .pm .shirt.face .no{position:absolute;right:-7px;bottom:-4px;min-width:17px;height:17px;padding:0 3px;border-radius:9px;display:grid;place-items:center;
@@ -1321,7 +1321,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .pm.home .shirt.face .no{background:var(--accent);color:#0f1326}.pm.away .shirt.face .no{background:var(--blue);color:#111111}
 .pm.subon .shirt.face,.pm.subon .shirt{border-color:var(--gold)}
 .pm .nm{font-size:10.5px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pm .tg{font-size:9.5px;font-weight:800;color:#fff;background:rgba(4,12,10,.62);padding:0 5px;border-radius:6px;white-space:nowrap}
+.pm .tg{font-size:9.5px;font-weight:800;color:#fff;background:rgba(10, 10, 10,.62);padding:0 5px;border-radius:6px;white-space:nowrap}
 .lu-legend{font-size:11.5px;color:var(--muted);margin:8px 2px 0}
 .lu-teams{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
 .lu-tname{font-weight:800;display:flex;align-items:center;gap:7px;margin-bottom:6px}
@@ -1438,7 +1438,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   .slip-bar button:hover{color:var(--text);border-color:#3a3a3a}
   body.slip-away:not([data-view="match"]) .slipcol{display:none}
   body.slip-away:not([data-view="match"]) .slip-back{display:block;position:fixed;right:0;top:45%;z-index:14;padding:12px 8px;border-radius:12px 0 0 12px;border:1px solid #272d51;border-right:0;
-    background:linear-gradient(180deg,#1d2b30,#152024);color:var(--accent);font-weight:800;font-size:12px;cursor:pointer;writing-mode:vertical-rl;box-shadow:-8px 0 20px -8px rgba(0,0,0,.7)}
+    background:linear-gradient(180deg,#282828,#1e1e1e);color:var(--accent);font-weight:800;font-size:12px;cursor:pointer;writing-mode:vertical-rl;box-shadow:-8px 0 20px -8px rgba(0,0,0,.7)}
   body.drawer-open .slip-back{right:390px}
 }
 /* Only the builder pages keep the league column when the slip is away. Today,
@@ -1448,7 +1448,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* 🎟 My bets drawer (wide screens): swings in from the right and stays open beside the builder */
 .bdrawer{display:none}
 body.drawer-open .bdrawer{display:block;position:fixed;right:0;bottom:0;width:390px;z-index:20;overflow:auto;padding:16px 16px 22px;
-  background:linear-gradient(180deg,#18242a,#12191d);border-left:1px solid var(--line);box-shadow:-24px 0 48px -20px rgba(0,0,0,.8)}
+  background:linear-gradient(180deg,#222222,#181818);border-left:1px solid var(--line);box-shadow:-24px 0 48px -20px rgba(0,0,0,.8)}
 .bdrawer.anim{transform-origin:100% 50%;animation:bdIn .55s cubic-bezier(.2,.8,.2,1) both}
 @keyframes bdIn{from{opacity:0;transform:perspective(1400px) rotateY(-32deg) translateX(70px)}to{opacity:1;transform:none}}
 .bdrawer .mb-card{position:relative;background:linear-gradient(180deg,#202020,#171717);border-color:#2b2b2b;

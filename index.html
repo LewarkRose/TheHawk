@@ -78,6 +78,47 @@
         html body .text-zinc-400 { color: var(--muted) }
         html body .text-zinc-500 { color: var(--muted) }
         html body .text-zinc-600 { color: var(--faint) }
+
+        /* ════ THE STUB ═════════════════════════════════════════════════════
+           A logged ticket is the same piece of card the builder prints, torn
+           off and stamped. Same stock, same cut edge, same perforation — so a
+           ticket looks the same before and after it settles, which is the whole
+           idea. The stamp sits off-square because stamps do. */
+        html body .stub {
+            position: relative; border-radius: 5px; padding: 15px; border: 0 !important;
+            background:
+                repeating-linear-gradient(135deg, rgba(255,255,255,.012) 0 2px, transparent 2px 5px),
+                linear-gradient(180deg, #272533 0%, #211f2b 46%, #1d1b26 100%) !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,.07), inset 0 0 0 1px rgba(188,200,255,.11),
+                0 2px 0 #141219, 0 3px 0 #100e14,
+                0 8px 12px -6px rgba(0,0,0,.8), 0 26px 42px -24px rgba(0,0,0,.95) !important;
+        }
+        html body .stub::before {
+            content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+            border-radius: 5px 5px 0 0;
+            background: linear-gradient(90deg, var(--accent-d), var(--accent) 45%, var(--accent-d));
+        }
+        html body .stub .perf { position: relative; display: flex; align-items: center; gap: 10px; margin: 12px 0 }
+        html body .stub .perf i { flex: 1; height: 0; border-top: 2px dashed rgba(188,200,255,.26) }
+        html body .stub .perf::before, html body .stub .perf::after {
+            content: ""; position: absolute; top: 50%; margin-top: -9px; width: 18px; height: 18px;
+            border-radius: 50%; background: var(--ink-0); box-shadow: inset 0 1px 2px rgba(0,0,0,.8);
+        }
+        html body .stub .perf::before { left: -24px }
+        html body .stub .perf::after  { right: -24px }
+        html body .stub .perf span {
+            flex: none; white-space: nowrap; letter-spacing: .22em; text-transform: uppercase;
+            font: 700 8.5px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted);
+        }
+        html body .stamp {
+            display: inline-block; font: 900 13px system-ui; letter-spacing: .18em;
+            padding: 5px 11px; border-radius: 4px; transform: rotate(-7deg); opacity: .92;
+        }
+        html body .stamp.w { color: var(--up); border: 2px solid rgba(62,196,109,.6); background: rgba(62,196,109,.08) }
+        html body .stamp.l { color: var(--down); border: 2px solid rgba(255,93,115,.55); background: rgba(255,93,115,.07) }
+        html body .stamp.p { color: var(--accent); border: 2px dashed rgba(188,200,255,.5); background: rgba(188,200,255,.10) }
+        html body .stamp.c { color: var(--accent); border: 2px solid rgba(134,151,249,.55); background: rgba(188,200,255,.08) }
         html body {
             background: radial-gradient(1100px 520px at 12% -12%, rgba(188, 200, 255,.12), transparent 60%),
                         radial-gradient(900px 480px at 100% -5%, rgba(188, 200, 255,.06), transparent 60%), var(--v-bg) !important;
@@ -2008,10 +2049,13 @@
             const pendingN = filtered.filter(b => b.status === 'PENDING').length, days = new Map();
             if (pendingN && pendingN < filtered.length) container.insertAdjacentHTML('beforeend', `<div class="vsec">Running (${pendingN})</div>`);
             filtered.forEach(bet => {
-                let badge = bet.status === 'PENDING' ? '<span class="bg-sky-500/10 text-sky-400 border border-sky-500/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">PENDING</span>' :
-                            bet.status === 'WON' ? '<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">WON</span>' :
-                            bet.status === 'CASHED_OUT' ? '<span class="bg-[#8697f9]/10 text-[#bcc8ff] border border-[#8697f9]/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">CASHED OUT</span>' :
-                            '<span class="bg-red-500/10 text-red-400 border border-red-500/30 px-2.5 py-1 rounded-lg text-[10px] font-bold">LOST</span>';
+                // The status is a stamp pressed on the stub, not a pill beside it.
+                // Pending is the only one drawn with a dashed border: nothing has
+                // been decided yet, so it should not look like a verdict.
+                let badge = bet.status === 'PENDING' ? '<span class="stamp p">RUNNING</span>' :
+                            bet.status === 'WON' ? '<span class="stamp w">WON</span>' :
+                            bet.status === 'CASHED_OUT' ? '<span class="stamp c">CASHED OUT</span>' :
+                            '<span class="stamp l">LOST</span>';
 
                 const kind = ticketType(bet);
                 const typeBadge = kind === 'Mixed'
@@ -2021,7 +2065,7 @@
                         : '<span class="bg-[#8697f9]/15 text-[#bcc8ff] px-2 py-0.5 rounded text-[10px] font-bold">Bet Builder</span>';
 
                 const card = document.createElement('div');
-                card.className = "bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-3 tilt";
+                card.className = "stub space-y-3";
                 card.innerHTML = `
                     <div class="flex justify-between items-center pb-2 border-b border-zinc-900 text-xs">
                         <div class="flex items-center gap-2 flex-wrap"><span class="text-zinc-400">${bet.date}</span><span class="text-[#bcc8ff] font-bold">Odds: ${bet.odds.toFixed(2)}</span>${typeBadge}${

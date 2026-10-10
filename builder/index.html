@@ -3986,10 +3986,10 @@ function renderScan() {
         <label title="Most likely: the legs likeliest to land together. Value first: legs where Bet365's own price beats HAWK's fair odds — the same reason a pick turns up on the green board, built into the builder.">Built from <select id="scanPicks">${
           [["likely", "🎯 Likeliest legs"], ["value", "💰 Legs with value"]].map(([v, t]) =>
           `<option value="${v}" ${v === S.picks ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-        <label>Sort by <select id="srt">${[["worth", "Worth it at Bet365"], ["lands", "Most likely to land"], ["legs", "Fewest legs"], ["kickoff", "Kick-off time"], ["value", "Single legs with value"]].map(([k, t]) =>
+        <label>Sort by <select id="srt">${[["worth", "Worth it at Bet365"], ["lands", "Most likely to land"], ["legs", "Fewest legs"], ["kickoff", "Kick-off time"], ["value", "Single legs HAWK rates above the price"]].map(([k, t]) =>
           `<option value="${k}" ${k === sc.sort ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Single bets at Bet365's own price — one leg, no builder cut. Off because you build.">
-          <input type="checkbox" id="scanSingles" ${sc.showSingles ? "checked" : ""}> Show single bets</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Single legs at Bet365's own price where HAWK's chance sits above what the price implies. Off by default: you build, and on your own record that gap has not predicted a winner.">
+          <input type="checkbox" id="scanSingles" ${sc.showSingles ? "checked" : ""}> Show single legs</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Only show a match when HAWK would actually back the builder \u2014 the price it expects from Bet365 beats what the ticket is worth. Most matches won't have one.">
           <input type="checkbox" id="scanWorthOnly" ${sc.onlyWorth ? "checked" : ""}> Only ones worth backing</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="scanConf" ${sc.confirmed ? "checked" : ""}> Lineups confirmed only</label>
@@ -4299,8 +4299,12 @@ function theLeg(results) {
       : `Built only from legs Bet365 prices itself, so the ${odds(price)} is those prices multiplied, not a guess.`}</div>
   </div>`;
 }
-// Single bets worth it at Bet365's own price, across every match in the scan.
-// No builder cut and no guessing: the price is Bet365's, so ✅ means ✅.
+// Legs where HAWK's own chance sits above what Bet365's price implies, across
+// every match in the scan. The prices here are Bet365's own — no builder cut and
+// nothing guessed — so the numbers are solid. What is NOT solid is reading the
+// gap between them as an edge: measured on this app's settled record, where HAWK
+// disagrees with Bet365 about a single leg, Bet365 is usually the one standing
+// closer to what happened. So both numbers are shown and neither is called value.
 const SINGLE_MIN_ODDS = 2;
 function singlesBoard(results) {
   const rows = [];
@@ -4308,26 +4312,27 @@ function singlesBoard(results) {
     rows.push({ ...s, home: r.home, away: r.away, id: r.id, league: r.league, kickoff: r.kickoff });
   rows.sort((a, b) => b.edge - a.edge);
   if (!rows.length) return "";
-  return `<div class="co-card" style="margin:0 0 12px"><b>✅ Worth it at Bet365 — single bets from ${odds(SINGLE_MIN_ODDS)}</b>
-    <div class="note" style="margin:4px 0 8px">Bet365's own price, so there's nothing to check and no builder cut. One leg, one price.</div>
+  return `<div class="co-card" style="margin:0 0 12px"><b>Single legs HAWK rates above the price — from ${odds(SINGLE_MIN_ODDS)}</b>
+    <div class="note" style="margin:4px 0 8px">Bet365's own price, so there is nothing to check and no builder cut. Both chances are shown because the gap between them is not an edge: measured on your own settled record, where HAWK disagrees with Bet365 about one leg, Bet365 is usually closer.</div>
     ${rows.slice(0, 8).map(x => `<div class="sc-ht" data-htgo="${esc(x.id)}|${esc(x.league)}">
       <span><b>${odds(x.price)}</b> ${esc(x.label)} <span class="muted">· ${esc(x.home)} v ${esc(x.away)} ${esc(fmtKick(x.kickoff))}</span></span>
-      <span class="muted">lands ${pct(x.p, 0)} · <b style="color:var(--accent)">+${(100 * x.edge).toFixed(0)}% value</b></span></div>`).join("")}</div>`;
+      <span class="muted">HAWK <b style="color:var(--text)">${pct(x.p, 0)}</b> · price implies <b style="color:var(--text)">${pct(1 / x.price, 0)}</b></span></div>`).join("")}</div>`;
 }
 // One pick per match, for every match scanned: Bet365's own price on the result,
-// double chance or handicap leg that's worth the most. Green = worth backing,
-// grey = the price is under what it's worth (bet it if you fancy it, but it costs).
+// double chance or handicap leg HAWK rates highest against its price. Both
+// chances are shown rather than the gap between them — see singlesBoard for why
+// that gap is not an edge on a single leg.
 function pickBoard(results) {
   const rows = results.filter(r => r.pick).map(r => ({ ...r.pick, home: r.home, away: r.away, id: r.id, league: r.league, kickoff: r.kickoff }));
   if (!rows.length) return "";
   rows.sort((a, b) => b.edge - a.edge);
-  const good = rows.filter(x => x.edge >= 0.02).length;
+  const above = rows.filter(x => x.edge >= 0.02).length;
   return `<details class="tr-fold co-card" style="margin:0 0 12px" ${S.scan.picksOpen ? "open" : ""} id="pickBoard"><summary><b>🎯 One pick per match</b>
-      <span class="muted"> — ${rows.length} matches · ${good} worth backing</span></summary>
-    <div class="note" style="margin:4px 0 8px">Bet365's own price on the result, double chance or handicap it rates best. Green ones beat what they're worth; the rest are there so you have a pick in every game.</div>
+      <span class="muted"> — ${rows.length} matches · ${above} HAWK rates above the price</span></summary>
+    <div class="note" style="margin:4px 0 8px">Bet365's own price on the result, double chance or handicap HAWK rates highest against it. One per game, so there is a pick in every match — being above the price is not on its own a reason to back it.</div>
     ${rows.map(x => `<div class="sc-ht" data-htgo="${esc(x.id)}|${esc(x.league)}">
       <span><b>${odds(x.price)}</b> ${esc(x.label)} <span class="muted">· ${esc(x.home)} v ${esc(x.away)} ${esc(fmtKick(x.kickoff))}</span></span>
-      <span class="muted">lands ${pct(x.p, 0)} · <b style="color:${x.edge >= 0.02 ? "var(--accent)" : x.edge >= -0.03 ? "var(--gold)" : "var(--muted)"}">${x.edge >= 0 ? "+" : ""}${(100 * x.edge).toFixed(0)}%</b></span></div>`).join("")}</details>`;
+      <span class="muted">HAWK <b style="color:var(--text)">${pct(x.p, 0)}</b> · price implies <b style="color:var(--text)">${pct(1 / x.price, 0)}</b></span></div>`).join("")}</details>`;
 }
 // One match's builder. The chance it lands is the headline; under it a bar
 // with a mark where the price's break-even sits, so you can see whether it

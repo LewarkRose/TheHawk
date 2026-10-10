@@ -1892,7 +1892,9 @@ function savePref(key, value) {
   }
 }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
-            target: 3.25, style: "Balanced", focus: "Mix", maxLegs: loadPref("hawk.maxLegs", 4), auto: loadPref("hawk.auto", false),
+            // focus was saved on every change and then never read back, so the builder
+            // reset to Mix on every reload and the saved value did nothing.
+            target: 3.25, style: "Balanced", focus: loadPref("hawk.focus", "Mix"), maxLegs: loadPref("hawk.maxLegs", 4), auto: loadPref("hawk.auto", false),
             // Open by default: every market Bet365 offers, props included. It was
             // on for a few hours on 20 Sep and that was too blunt — 365Scores
             // carries no Bet365 price for ANY player prop, so "priced legs only"
@@ -1915,7 +1917,14 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", data: null, timer: null, error: null },
             monster: { leagues: null, hours: 48, legs: 10, perMatch: 1, style: "Banker", data: null, timer: null, skip: new Set() },   // perMatch is always 1: one Bet365-priced leg per match, so the acca has no builder cut
-            view: "match", allLeagues: [], scan: { leagues: null, hours: 24, sort: loadPref("hawk.scanSort", "lands"), confirmed: loadPref("hawk.scanConfirmed", false), setOpen: false, autoAt: null, onlyWorth: loadPref("hawk.onlyWorth", false), exactLegs: loadPref("hawk.exactLegs", 0), options: loadPref("hawk.scanOpts", 1), showSingles: loadPref("hawk.showSingles", false), showBet: loadPref("hawk.scanShowBet", false), minOdds: loadPref("hawk.minOdds", 2), prices: loadPref("hawk.scanPrices", {}), openRows: new Set(), data: null, timer: null },
+            // Picks keeps its OWN priced/focus. They used to be the builder's, so ticking
+            // "Bet365-priced legs only" on Picks — reasonable there, you want real prices
+            // for a scan — silently stripped every player prop from the builder too, on a
+            // different page, and nothing in either place said so. Seeded from the
+            // builder's values, so the first load after this behaves exactly as before.
+            view: "match", allLeagues: [], scan: { priced: loadPref("hawk.scanPriced", loadPref("hawk.priced", false)),
+                                                   focus: loadPref("hawk.scanFocus", loadPref("hawk.focus", "Mix")),
+                                                   leagues: null, hours: 24, sort: loadPref("hawk.scanSort", "lands"), confirmed: loadPref("hawk.scanConfirmed", false), setOpen: false, autoAt: null, onlyWorth: loadPref("hawk.onlyWorth", false), exactLegs: loadPref("hawk.exactLegs", 0), options: loadPref("hawk.scanOpts", 1), showSingles: loadPref("hawk.showSingles", false), showBet: loadPref("hawk.scanShowBet", false), minOdds: loadPref("hawk.minOdds", 2), prices: loadPref("hawk.scanPrices", {}), openRows: new Set(), data: null, timer: null },
             watch: [] };
 const FOCUS_LABELS = { Mix: "Mix", Players: "Player props", Match: "Match stats", Stats: "no result leg" };
 // Display names for the builder styles (the keys are what the server expects).
@@ -4332,7 +4341,7 @@ function renderScan() {
           `<option value="${h}" ${h === sc.hours ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label title="Mix keeps player legs in every builder. Match stats drops them for goals, corners, cards and shots on target. Player props goes the other way.">Made of <select id="scanFocus">${
           [["Mix", "\ud83d\udd00 Mix"], ["Match", "\u26bd Match stats"], ["Stats", "\ud83d\udcca No result leg"], ["Players", "\ud83d\udc5f Player props"]].map(([v, t]) =>
-          `<option value="${v}" ${v === S.focus ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+          `<option value="${v}" ${v === sc.focus ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Every builder opens with the favourite to win (or their double chance). Off, HAWK is free to build without a result leg at all.">
           <input type="checkbox" id="scanFav" ${S.favourite ? "checked" : ""}> Start with the favourite</label>
         <label title="Ask for a number of legs and HAWK stacks until it has that many \u2014 the price is whatever that comes to.">Legs <select id="exactLegs">${
@@ -4352,8 +4361,8 @@ function renderScan() {
           <input type="checkbox" id="scanWorthOnly" ${sc.onlyWorth ? "checked" : ""}> Only ones worth backing</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="scanConf" ${sc.confirmed ? "checked" : ""}> Lineups confirmed only</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Only legs Bet365 publishes a price for: result, double chance, goals, cards, corners, shots on target. Measured blind on twelve builders — these come in at 0.924 of fair, while a build containing a player prop comes in at 0.741. The prop costs about a fifth of the ticket, every time.">
-          <input type="checkbox" id="scanPriced" ${S.priced ? "checked" : ""}> Bet365-priced legs only${
-            S.priced ? "" : ` <b style="color:var(--gold)">· props cost ~20%</b>`}</label>
+          <input type="checkbox" id="scanPriced" ${sc.priced ? "checked" : ""}> Bet365-priced legs only${
+            sc.priced ? "" : ` <b style="color:var(--gold)">· props cost ~20%</b>`}</label>
       </div>
       </details>
       <div id="scanProg"></div>
@@ -4374,8 +4383,8 @@ function renderScan() {
   $("#scanSingles").onchange = (e) => { sc.showSingles = e.target.checked; savePref("hawk.showSingles", sc.showSingles); updateScan(); };
   $("#scanWorthOnly").onchange = async (e) => { sc.onlyWorth = e.target.checked; savePref("hawk.onlyWorth", sc.onlyWorth);
     renderScan(); await rescan(); };
-  $("#scanFocus").onchange = async (e) => { S.focus = ["Mix","Match","Stats","Players"].includes(e.target.value) ? e.target.value : "Mix";
-    savePref("hawk.focus", S.focus); renderScan(); await rescan(); };
+  $("#scanFocus").onchange = async (e) => { sc.focus = ["Mix","Match","Stats","Players"].includes(e.target.value) ? e.target.value : "Mix";
+    savePref("hawk.scanFocus", sc.focus); renderScan(); await rescan(); };
   $("#scanFav").onchange = async (e) => { S.favourite = e.target.checked; savePref("hawk.fav", S.favourite);
     renderScan(); await rescan(); };
   $("#exactLegs").onchange = async (e) => { sc.exactLegs = +e.target.value; savePref("hawk.exactLegs", sc.exactLegs);
@@ -4447,7 +4456,7 @@ function renderScan() {
   $("#scanRes").addEventListener("click", (e) => { if (!e.target.closest("[data-showbet]")) return;
     e.stopPropagation(); S.scan.showBet = !S.scan.showBet; savePref("hawk.scanShowBet", S.scan.showBet); updateScan(); }, true);
   $("#scanConf").onchange = (e) => { sc.confirmed = e.target.checked; savePref("hawk.scanConfirmed", sc.confirmed); updateScan(); };
-  $("#scanPriced").onchange = async (e) => { S.priced = e.target.checked; savePref("hawk.priced", S.priced);
+  $("#scanPriced").onchange = async (e) => { sc.priced = e.target.checked; savePref("hawk.scanPriced", sc.priced);
     renderScan(); await rescan(); };
   $("#scanGo").onclick = toggleScan;
   $("#scanRes").onclick = (e) => {
@@ -4701,9 +4710,9 @@ function scanSummary() {
   const when = (KICKOFF_WINDOWS.find(([h]) => h === sc.hours) || [0, "24 hours"])[1];
   const odds = sc.minOdds ? `${sc.minOdds.toFixed(2)}+` : S.auto ? "any odds" : `target ${S.target.toFixed(2)}`;
   const n = (S.scan.data && (S.scan.data.results || []).length) || 0, total = (S.scan.data && S.scan.data.total) || 0;
-  const made = { Mix: null, Match: "match stats", Stats: "no result leg", Players: "player props" }[S.focus];
+  const made = { Mix: null, Match: "match stats", Stats: "no result leg", Players: "player props" }[sc.focus];
   return [String(when).toLowerCase(), sc.exactLegs ? `${sc.exactLegs} legs` : odds, made, `${sc.leagues.size} leagues`, sc.onlyWorth ? "worth backing only" : null,
-          sc.confirmed ? "XI confirmed" : null, S.priced ? "priced legs" : null,
+          sc.confirmed ? "XI confirmed" : null, sc.priced ? "no player props" : null,
           // A scan simulates each match fewer times than opening it does. Saying so
           // here stops the same "12,000 sims" being claimed for both.
           `${(HAWK.SCAN_SIMS || 4000).toLocaleString()} runs a match`,
@@ -4951,8 +4960,8 @@ async function toggleScan() {
     if (S.scan.data && S.scan.data.running) S.scan.data = await api("/api/scan/stop", {});
     else {
       if (!S.scan.leagues.size) return toast("Pick at least one league.");
-      S.scan.data = await api("/api/scan", { leagues: [...S.scan.leagues], hours: hoursFor(S.scan.hours), target: S.target, auto: S.auto, priced: S.priced, minOdds: S.scan.minOdds, onlyWorth: S.scan.onlyWorth, exactLegs: S.scan.exactLegs, options: S.scan.options,
-                                             style: S.style, focus: S.focus, maxLegs: S.maxLegs, extras: S.extras, picks: S.picks });
+      S.scan.data = await api("/api/scan", { leagues: [...S.scan.leagues], hours: hoursFor(S.scan.hours), target: S.target, auto: S.auto, priced: S.scan.priced, minOdds: S.scan.minOdds, onlyWorth: S.scan.onlyWorth, exactLegs: S.scan.exactLegs, options: S.scan.options,
+                                             style: S.style, focus: S.scan.focus, maxLegs: S.maxLegs, extras: S.extras, picks: S.picks });
     }
   } catch (err) { toast(err.message); }
   updateScan();
@@ -5338,6 +5347,10 @@ function sendAccaToVault() {
 }
 
 /* ---------- Monster Acca ---------- */
+// The Monster still borrows the BUILDER's focus and extras — the last place one
+// page's setting reaches into another. Left as it was rather than changed quietly:
+// it has no focus control of its own, so it has to follow something, and giving it
+// one is new UI on the Acca page rather than a bug fix.
 function monsterParams() { const mo = S.monster; return { leagues: [...mo.leagues], hours: hoursFor(mo.hours), perMatch: mo.perMatch, style: mo.style, focus: S.focus, extras: S.extras }; }
 function monsterStale() {  // settings changed since the last build
   const p = S.monster.data && S.monster.data.params, want = monsterParams();

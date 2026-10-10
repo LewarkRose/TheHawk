@@ -427,7 +427,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* The ticket is a physical object: a printed stub with a perforation across it,
    not a panel. Corners are nearly square because tickets are cut, not rounded;
    the lift comes from a real shadow rather than a border; and the faint diagonal
-   tooth is paper grain. Nothing here tilts — every figure on it has to be read. */
+   tooth is paper grain. The card itself never tilts — a figure has to be read.
+   (The leg cards inside it still carry .tilt3d from before; that is older and
+   deliberate, not an oversight of this rule.) */
 .ticket{position:relative;margin-top:14px;border-radius:5px;border:0;overflow:hidden;isolation:isolate;
   background:
     repeating-linear-gradient(135deg,rgba(255,255,255,.012) 0 2px,transparent 2px 5px),
@@ -438,16 +440,19 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .ticket::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;z-index:2;
   background:linear-gradient(90deg,var(--accent-d),var(--accent) 45%,var(--accent-d))}
 /* THE PERFORATION. Two holes punched through the edges and a dashed score between
-   them, with the fold line labelled. Everything under it is the stub you keep. */
-.ticket .tear{position:relative;height:0;margin:12px 0 0;
-  border-top:2px dashed rgba(188,200,255,.26)}
-.ticket .tear::before,.ticket .tear::after{content:"";position:absolute;top:-10px;
-  width:20px;height:20px;border-radius:50%;background:var(--bg);
+   them, with the fold line labelled. Everything under it is the stub you keep.
+   The score is drawn as two line segments either side of the label rather than one
+   border with the label painted over it: the card is a gradient, so any solid
+   colour behind the text only matches at one height and shows as a lighter patch
+   at every other. Segments need no background and are right at any height. */
+.ticket .tear{position:relative;display:flex;align-items:center;gap:10px;margin:12px 0 0}
+.ticket .tear i{flex:1;height:0;border-top:2px dashed rgba(188,200,255,.26)}
+.ticket .tear::before,.ticket .tear::after{content:"";position:absolute;top:50%;
+  margin-top:-10px;width:20px;height:20px;border-radius:50%;background:var(--bg);
   box-shadow:inset 0 1px 2px rgba(0,0,0,.8)}
 .ticket .tear::before{left:-10px}
 .ticket .tear::after{right:-10px}
-.ticket .tear span{position:absolute;left:50%;top:-7px;transform:translateX(-50%);
-  padding:0 10px;background:#211f2b;white-space:nowrap;
+.ticket .tear span{flex:none;white-space:nowrap;
   font:700 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.24em;
   color:var(--muted);text-transform:uppercase}
 @media (max-width:420px){.ticket .tear span{letter-spacing:.14em;font-size:8.5px}}
@@ -2966,7 +2971,7 @@ function renderSlip() {
     ${recipeLine()}
     <div class="rchips" id="rchips">
       <button data-cyc="style" title="How likely each leg should be">${STYLES[S.style].label}</button>
-      <button data-cyc="focus" title="What the builder is made of">${{ Mix: "Mix of markets", Players: "Player props", Match: "Match stats" }[S.focus]}</button>
+      <button data-cyc="focus" title="What the builder is made of">${{ Mix: "Mix of markets", Players: "Player props", Match: "Match stats", Stats: "No result leg" }[S.focus]}</button>
       <button data-cyc="picks" title="How HAWK chooses between legs">${S.picks === "value" ? "Best value" : "Most likely"}</button>
       <span class="legstep" title="The most legs HAWK will use. More legs reach a bigger price, but the builder lands less often — and a price you've asked for may need more legs than this to be reachable at all.">
         <button data-legs="-1" aria-label="Fewer legs" ${S.maxLegs <= LEG_STEPS[0] ? "disabled" : ""}>−</button>
@@ -2995,7 +3000,13 @@ function renderSlip() {
         const need = price > 1 ? 1 / price : 0;
         const w = (x) => Math.max(1.5, Math.min(100, 100 * x)).toFixed(1);
         return `<div class="th thb">
-          <div class="tpct"><div class="num">${Math.floor(100 * p)}<small>.${Math.round(1000 * p) % 10}%</small></div><div class="lab">LANDS</div></div>
+          ${(() => {
+            // Rounded ONCE, to tenths, then split. Computing the whole number and
+            // the decimal separately let the decimal round up past the integer
+            // without carrying: p=0.6998 printed 69.0% instead of 70.0%.
+            const t = Math.round(1000 * p);
+            return `<div class="tpct"><div class="num">${Math.floor(t / 10)}<small>.${t % 10}%</small></div><div class="lab">LANDS</div></div>`;
+          })()}
           <div class="tbar">
             <div class="track"><i style="width:${w(p)}%"></i>${need ? `<b style="left:${w(need)}%"></b>` : ""}</div>
             <div class="bnote">${need ? `red mark = what <b style="color:var(--text)">${odds(price)}</b> needs (${(100 * need).toFixed(0)}%)${
@@ -3011,7 +3022,7 @@ function renderSlip() {
       <div class="legkey"><span><i style="background:var(--accent)"></i>Bet365's price</span>
         <span><i style="background:var(--blue)"></i>close books' price</span>
         <span><i style="background:#4a4a4a"></i>HAWK's estimate</span></div>
-      <div class="tear"><span>HAWK &middot; 12,000 sims</span></div>
+      <div class="tear"><i></i><span>HAWK &middot; 12,000 sims</span><i></i></div>
       <div class="sum"><div><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${r && r.fair ? odds(r.fair) : "–"}</div></div>
         <div><div class="k">Worth it from</div><div class="v" style="color:var(--gold)">${worthFrom(r) ? odds(worthFrom(r)) : "–"}</div></div></div>
       ${guessLine(r)}

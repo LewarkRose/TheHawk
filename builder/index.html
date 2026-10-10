@@ -1523,7 +1523,9 @@ a.nav{text-decoration:none}
      whenever engine.js or hawk-settle.js changes: without it the browser keeps
      the old file and the page quietly disagrees with itself. That cost an
      evening of tests that were checking stale code. -->
-<script src="engine.js?v=20260923b"></script>
+<!-- Bump this whenever engine.js changes, or browsers keep the old one: the
+     query string is the only thing telling them the file is not the same. -->
+<script src="engine.js?v=20261010a"></script>
 <script src="hawk-settle.js?v=20260923a"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
@@ -1974,7 +1976,8 @@ function renderMatch() {
         p.polymarket ? ` and Polymarket ${b(pct100([p.polymarket.home, p.polymarket.draw, p.polymarket.away])[fi] + "%")}` : ""
       }. Blended, ${b(hp[fi] + "%")} — ${Math.abs(gap || 0) <= 2 ? "there is no gap to trade on the match winner" : "that disagreement is where any edge on the result would have to come from"}.</p>`);
 
-    ps.push(`<p>Where the simulations do say something is the shape of the game. Across 12,000 runs that is ${
+    ps.push(`<p>Where the simulations do say something is the shape of the game. Across ${
+      b((m.sims || 12000).toLocaleString())} runs that is ${
       b(e.goals[0].toFixed(2))} goals to ${b(e.goals[1].toFixed(2))}, ${b(e.sot[0].toFixed(1))}–${b(e.sot[1].toFixed(1))
       } on target, ${b(e.corners.toFixed(1))} corners and ${b(cards.toFixed(1))} cards${
       m.referee && m.referee.name && m.referee.avg ? ` with ${esc(m.referee.name)} refereeing at ${b(m.referee.avg.toFixed(2))} a game` : ""}.</p>`);
@@ -3159,7 +3162,7 @@ function renderSlip() {
           <span><i style="background:var(--blue)"></i>close books' price</span>
           <span><i style="background:#4a4a4a"></i>HAWK's estimate</span></div>
       </div>
-      <div class="tear"><i></i><span>HAWK &middot; 12,000 sims</span><i></i></div>
+      <div class="tear"><i></i><span>HAWK &middot; ${(m && m.sims || 12000).toLocaleString()} sims</span><i></i></div>
       <div class="stub">
         <div class="sum"><div><div class="k">Fair odds</div><div class="v" style="color:var(--gold)">${r && r.fair ? odds(r.fair) : "–"}</div></div>
           <div><div class="k">Worth it from</div><div class="v" style="color:var(--gold)">${worthFrom(r) ? odds(worthFrom(r)) : "–"}</div></div></div>
@@ -4347,6 +4350,9 @@ function scanSummary() {
   const made = { Mix: null, Match: "match stats", Stats: "no result leg", Players: "player props" }[S.focus];
   return [String(when).toLowerCase(), sc.exactLegs ? `${sc.exactLegs} legs` : odds, made, `${sc.leagues.size} leagues`, sc.onlyWorth ? "worth backing only" : null,
           sc.confirmed ? "XI confirmed" : null, S.priced ? "priced legs" : null,
+          // A scan simulates each match fewer times than opening it does. Saying so
+          // here stops the same "12,000 sims" being claimed for both.
+          `${(HAWK.SCAN_SIMS || 4000).toLocaleString()} runs a match`,
           total ? `${n} of ${total} matches` : null].filter(Boolean).join(" · ");
 }
 // "12345" is a match's best builder, "12345#2" the second way HAWK found to

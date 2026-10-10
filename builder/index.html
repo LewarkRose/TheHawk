@@ -1176,6 +1176,67 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .bchip.up{background:rgba(188, 200, 255,.1);border-color:rgba(188, 200, 255,.4);color:var(--accent)}
     .bchip.dn{background:rgba(255,93,115,.09);border-color:rgba(255,93,115,.38);color:var(--red)}
     .brain .bfoot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 13px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+
+/* ---------- 📋 THE BOARD, AS A LEDGER ----------
+   The board used to print a verdict word per row — "spot on", "a shade cautious" —
+   which read fine one row at a time and hid the only finding on the page: the gap
+   runs one way down the bands, from +1.5 points on long shots to −1.2 on
+   near-certainties. A word per row cannot show a shape. Four ruled columns with
+   tabular figures and the gap drawn against a centre rule can, and you read it
+   down the page in one go. The verdict's significance test survives as the bar's
+   colour: grey unless the gap is past chance AND at least a point, so a two-point
+   swing on 300 legs doesn't look like one on 30,000. */
+/* A ledger is read in columns, so the label must not stretch the figures apart on a
+   wide screen — past about 1040px the gap bar ends up a thumbnail at the far right
+   of an empty acre. */
+.bd-sheet{max-width:1040px;margin:0 auto}
+.bd-mast{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;padding:16px 16px 13px;
+  border-bottom:2px solid rgba(188,200,255,.22)}
+.bd-mast h3{margin:0;font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
+  font-size:25px;font-weight:700;letter-spacing:.01em}
+.bd-recs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:1px solid rgba(188,200,255,.16)}
+.bd-recs > div{padding:13px 16px;min-width:0}
+.bd-recs > div + div{border-left:1px solid rgba(188,200,255,.13)}
+.bd-recs .k{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.bd-recs .n{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
+  font-size:28px;line-height:1;font-weight:700;font-variant-numeric:tabular-nums;margin-top:5px}
+.bd-recs .sub{font-size:11.5px;color:var(--muted);margin-top:3px}
+.bd-recs .ask{font-size:10.5px;color:var(--muted);margin-top:7px;line-height:1.45}
+.bd-head,.bd-row{display:grid;grid-template-columns:minmax(0,1fr) 52px 56px 124px 62px;align-items:center}
+.bd-head span:not(:first-child),.bd-row span:not(:first-child){text-align:right}
+.bd-head{padding:9px 16px;font:700 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.16em;color:var(--muted);text-transform:uppercase;border-bottom:1px solid rgba(188,200,255,.16)}
+.bd-sec{padding:15px 16px 6px;font:700 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.2em;color:var(--accent);text-transform:uppercase}
+.bd-sec small{display:block;font-family:system-ui,sans-serif;font-weight:400;letter-spacing:0;
+  text-transform:none;color:var(--muted);font-size:11px;margin-top:5px;line-height:1.5}
+.bd-row{padding:7px 16px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.045)}
+.bd-row:hover{background:rgba(188,200,255,.035)}
+.bd-row .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-row .lbl i{font-style:normal;color:var(--muted);font-size:10.5px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.bd-row .v{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;
+  font-variant-numeric:tabular-nums;color:var(--muted)}
+.bd-row .v.hit{color:var(--text)}
+.bd-row .nn{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:var(--muted)}
+/* the gap column: a bar either side of a centre rule, so the shape reads down the page */
+.bd-bar{position:relative;height:13px}
+.bd-bar::before{content:"";position:absolute;left:50%;top:-1px;bottom:-1px;width:1px;background:rgba(188,200,255,.3)}
+.bd-bar i{position:absolute;top:3px;height:7px;border-radius:1px;background:#4e4e58}
+.bd-bar i.p{left:50%}
+.bd-bar i.m{right:50%}
+.bd-bar i.p.sig{background:var(--accent)}
+.bd-bar i.m.sig{background:var(--red)}
+.bd-foot{padding:13px 16px 16px;font-size:11px;color:var(--muted);
+  border-top:1px solid rgba(188,200,255,.16);line-height:1.6}
+@media (max-width:620px){
+  .bd-recs{grid-template-columns:1fr}
+  .bd-recs > div + div{border-left:0;border-top:1px solid rgba(188,200,255,.13)}
+  .bd-head,.bd-row{grid-template-columns:minmax(0,1fr) 44px 46px 62px 50px}
+  .bd-head,.bd-row{padding-left:11px;padding-right:11px}
+  .bd-sec,.bd-mast,.bd-foot{padding-left:11px;padding-right:11px}
+  .bd-row{font-size:12.5px}
+}
     /* check mode: the price box and verdict under the Bet365 list */
     .cm{margin-top:12px;padding:13px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
     .cm .lab{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
@@ -5901,40 +5962,51 @@ function boardStat(n, p, won) {
   const said = p / n, hit = won / n, sd = Math.sqrt(n * said * (1 - said));
   return { n, said, hit, gap: hit - said, z: sd ? (won - p) / sd : 0 };
 }
-// A verdict you can read at a glance instead of two percentages to subtract.
-// The wording is about HAWK's honesty, not about profit: "better than it says"
-// means it lands more often than it claims, which is good for you but still an
-// error — it's being too careful. The price decides whether a leg is worth
-// backing; this only says whether the percentage can be believed.
-function boardVerdict(s) {
-  if (!s || !s.n) return { icon: "·", word: "nothing yet", tone: "var(--muted)" };
-  // Size first, then significance. On 48,000 legs a gap of one point clears any
-  // significance test going, so judging on that alone painted almost every row
-  // green and said nothing. A point either way is a rounding error you'd never
-  // feel; three points is a market worth looking at.
-  const pts = 100 * s.gap, big = Math.abs(s.z) >= 1.96;
-  if (!big || Math.abs(pts) < 1) return { icon: "✔️", word: "spot on", tone: "var(--text)" };
-  if (pts >= 3) return { icon: "✅", word: "much better than it says", tone: "var(--accent)" };
-  if (pts >= 1) return { icon: "🟢", word: "a shade cautious", tone: "var(--text)" };
-  if (pts <= -3) return { icon: "❌", word: "claims well over the odds", tone: "var(--red)" };
-  return { icon: "🟠", word: "a shade high", tone: "var(--gold)" };
-}
-function boardRow(label, s, note) {
+// A ledger row: label, what HAWK said, what landed, the gap as a bar, the count.
+//
+// This replaced a verdict word per row — "spot on", "a shade cautious", "claims
+// well over the odds". The words were honest and said nothing, because the thing
+// worth seeing is the gap's SHAPE down the bands, and a word per row cannot carry
+// a shape. The bar can: scaled so 2.5 points fills its half (wider than any gap on
+// the board, so nothing clips), drawn either side of a centre rule.
+//
+// Its significance test survives as the bar's colour. Size first, then
+// significance: on 48,000 legs a gap of one point clears any significance test
+// going, so colouring on that alone painted almost every row and said nothing. A
+// point either way is a rounding error you would never feel, so a bar takes a
+// colour only at a point or more AND past chance. Grey means real but small, or
+// too few legs to tell — a two-point swing on 300 legs is not the same finding as
+// one on 30,000 and must not look like it.
+//
+// All of it is about HAWK's honesty, not profit: landing more often than it claims
+// is good for you but still an error, it being too careful. The price decides
+// whether a leg is worth backing; this only says whether the percentage is believable.
+const BD_FULL = 2.5;
+// Legs inside one match are not independent trials — the same lineup, referee and
+// scoreline drive all 400 of them — so the z-test over legs is only meaningful once
+// a row spans enough separate matches. A single Danish Superliga game put 379 legs
+// on the board and earned a confident red bar off one afternoon. Rows that can't
+// clear this stay grey however wide their bar.
+const BD_MIN_MATCHES = 10;
+function boardRow(label, s, note, trusted = true) {
   if (!s) return "";
-  const v = boardVerdict(s), gap = 100 * s.gap;
-  return `<div class="prow" title="HAWK said ${(100 * s.said).toFixed(1)}%, it landed ${(100 * s.hit).toFixed(1)}% over ${s.n.toLocaleString()} legs">
-    <span class="tick" style="flex:none;width:22px">${v.icon}</span>
-    <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(label)}</span>
-    <span style="flex:none;color:${v.tone};font-weight:700;font-size:12px">${v.word}</span>
-    <span class="muted" style="flex:none;width:112px;text-align:right;font-size:10.5px">${
-      (100 * s.hit).toFixed(1)}% v ${(100 * s.said).toFixed(1)}% said${gap >= 0 ? " ▲" : " ▼"}</span>
-    <span class="muted" style="flex:none;width:52px;text-align:right;font-size:10.5px">${note || s.n.toLocaleString()}</span></div>`;
+  const pts = 100 * s.gap, w = Math.min(50, Math.abs(pts) * (50 / BD_FULL));
+  const sig = trusted && Math.abs(s.z) >= 1.96 && Math.abs(pts) >= 1;
+  const bar = Math.abs(pts) < 0.05 ? ""
+    : `<i class="${pts > 0 ? "p" : "m"}${sig ? " sig" : ""}" style="width:${w.toFixed(1)}%"></i>`;
+  return `<div class="bd-row" title="HAWK said ${(100 * s.said).toFixed(1)}%, it landed ${(100 * s.hit).toFixed(1)}% over ${
+    s.n.toLocaleString()} legs — ${pts >= 0 ? "+" : ""}${pts.toFixed(1)} points${
+    !trusted ? ", over too few separate matches to read as more than one afternoon"
+    : sig ? ", past what chance explains at this many legs" : ", within what chance explains at this many legs"}">
+    <span class="lbl">${esc(label)}${note ? ` <i>${esc(note)}</i>` : ""}</span>
+    <span class="v">${(100 * s.said).toFixed(1)}</span>
+    <span class="v hit">${(100 * s.hit).toFixed(1)}</span>
+    <span class="bd-bar">${bar}</span>
+    <span class="nn">${s.n.toLocaleString()}</span></div>`;
 }
 function boardTable(title, rows, hint) {
   if (!rows) return "";
-  return `<div style="margin-top:14px"><div class="muted" style="font-size:10px;letter-spacing:.13em">${esc(title)}</div>
-    ${hint ? `<div class="muted" style="font-size:11px;margin:3px 0 2px">${hint}</div>` : ""}
-    ${rows}</div>`;
+  return `<div class="bd-sec">${esc(title)}${hint ? `<small>${hint}</small>` : ""}</div>${rows}`;
 }
 function renderBoard() {
   S.view = "board";
@@ -5947,67 +6019,72 @@ function renderBoard() {
   const pl = settled.reduce((a, b) => a + ret(b) - (+b.stake || 0), 0);
   const overall = g && g.bands ? boardStat(g.bands.reduce((a, b) => a + b.n, 0), g.bands.reduce((a, b) => a + b.p, 0),
                                            g.bands.reduce((a, b) => a + b.won, 0)) : null;
-  const tile = (key, big, sub, ask, tone) => `<div class="btile" style="text-align:left">
-    <div class="k" style="margin-bottom:4px">${key}</div>
+  const rec = (key, big, sub, ask, tone) => `<div>
+    <div class="k">${key}</div>
     <div class="n" style="color:${tone || "var(--accent)"}">${big}</div>
-    <div class="muted" style="font-size:11.5px;margin-top:3px">${sub}</div>
-    <div class="muted" style="font-size:10.5px;margin-top:6px;line-height:1.45">${ask}</div></div>`;
+    <div class="sub">${sub}</div>
+    <div class="ask">${ask}</div></div>`;
 
   const byRows = (obj, min) => Object.entries(obj || {})
     .map(([k, v]) => [k, boardStat(v.n, v.p, v.won), v])
     .filter(([, s]) => s && s.n >= min)
     .sort((a, b) => b[1].n - a[1].n)
-    .map(([k, s, v]) => boardRow(k, s, v.matches ? `${v.matches} m` : null)).join("");
+    .map(([k, s, v]) => boardRow(k, s, v.matches ? `${v.matches} m` : null,
+                                 !v.matches || v.matches >= BD_MIN_MATCHES)).join("");
 
   $("#match").innerHTML = `
-    <div class="section" style="border-top:0">
-      <h3>📋 HAWK's board</h3>
-      <div class="note" style="margin-top:0">Three records, and they answer different questions. Only the first has the volume to prove anything.</div>
-      <div class="btiles" style="grid-template-columns:repeat(auto-fit,minmax(178px,1fr))">
-        ${tile("HAWK ON EVERY MATCH", overall ? `${boardVerdict(overall).icon} ${(100 * overall.hit).toFixed(1)}%` : "—",
-          overall ? `said ${(100 * overall.said).toFixed(1)}% · ${overall.n.toLocaleString()} legs` : "not built yet",
-          overall ? `<b style="color:${boardVerdict(overall).tone}">${boardVerdict(overall).word}</b> — are its percentages honest? Graded on every match in HAWK's leagues, whether you bet or not.`
-            : "Are its percentages honest? Graded on every match in HAWK's leagues, whether you bet or not.")}
-        ${tile("PICKS FROM YOUR SCANS", done.length ? `€${keep.toFixed(2)}` : `${auto.length || 0}`,
+    <div class="section" style="border-top:0;padding:0">
+      <div class="bd-sheet">
+      <div class="bd-mast">
+        <h3>📋 HAWK's board</h3>
+        ${g ? `<div class="muted" style="font-size:11px;margin-left:auto;text-align:right;line-height:1.5">
+          ${g.matches.toLocaleString()} matches graded · ${g.waiting || 0} waiting on results<br>
+          built ${esc(String(g.updated || "").slice(0, 16).replace("T", " "))}</div>` : ""}
+      </div>
+      <div class="bd-recs">
+        ${rec("Every match", overall ? `${(100 * overall.hit).toFixed(1)}%` : "—",
+          overall ? `landed, against ${(100 * overall.said).toFixed(1)}% said · ${overall.n.toLocaleString()} legs` : "not built yet",
+          "Are its percentages honest? Graded on every match in HAWK's leagues, whether you bet or not — the only record here with the volume to prove anything.")}
+        ${rec("Picks from your scans", done.length ? `€${keep.toFixed(2)}` : `${auto.length || 0}`,
           done.length ? `per €1 · ${won.length} of ${done.length} landed` : "none settled yet",
-          "Would following it have paid, at the price HAWK expects Bet365 to show?", keep >= 1 ? "var(--accent)" : "var(--gold)")}
-        ${tile("YOUR BETS", `${bets.length}`,
+          "Would following it have paid, at the price HAWK expects Bet365 to show?", done.length && keep >= 1 ? "var(--accent)" : "var(--gold)")}
+        ${rec("Your bets", `${bets.length}`,
           settled.length ? `${settled.length} settled · ${pl >= 0 ? "+" : "−"}€${Math.abs(pl).toFixed(2)}` : "nothing settled yet",
           "Did you make money? The smallest sample here — read it last.", pl >= 0 ? "var(--accent)" : "var(--red)")}
       </div>
-      ${g ? `<div class="muted" style="font-size:11px;margin-top:10px">${g.matches.toLocaleString()} matches graded · ${
-        g.waiting || 0} waiting on results · built ${esc(String(g.updated || "").slice(0, 16).replace("T", " "))}</div>` : ""}
-    </div>
-    ${g ? `<div class="section">
-      <h3>Is it calibrated?</h3>
-      <div class="note" style="margin-top:0">Of the legs HAWK called 60%, did 60% land? A market can be well calibrated and still not be worth backing — that depends on the price.</div>
-      <div class="bchips" style="margin-top:8px">
-        <span class="bchip up" title="Lands at least 3 points more often than HAWK claims">✅ much better than it says</span>
-        <span class="bchip" title="Within a point either way, or too few legs to tell">✔️ spot on</span>
-        <span class="bchip dn" title="Lands at least 3 points less often than HAWK claims">❌ claims well over the odds</span>
-        <span class="bchip" title="One to three points out — real, but small">🟢 🟠 a shade either way</span>
+      ${g ? `
+      <div class="bd-head"><span>&nbsp;</span><span>Said</span><span>Landed</span><span>Gap</span><span>Legs</span></div>
+      ${boardTable("By how likely HAWK said it was",
+        (g.bands || []).map((b) => boardRow(`${Math.round(100 * b.lo)}–${Math.round(100 * Math.min(1, b.hi))}%`,
+          boardStat(b.n, b.p, b.won))).join(""),
+        "Of the legs HAWK called 60%, did 60% land? Read this block top to bottom: the gap runs one way down it, so HAWK undersells long shots and oversells near-certainties. That is a shape, not noise.")}
+      ${boardTable("By market", byRows(g.byKey, 200),
+        "200 legs minimum. A market can be perfectly calibrated and still not be worth backing — that is the price's job, not this page's.")}
+      ${boardTable("By league", byRows(g.byLeague, 200),
+        `Matches, not legs, decide whether a league's number means anything — the 400-odd legs in one game all turn on the same lineup and the same scoreline. Under ${BD_MIN_MATCHES} matches a row stays grey however long its bar.`)}
+      <div class="bd-foot">The bar takes a colour only where the gap is at least a point AND past what chance explains for that many legs; grey means real but small, or too little to tell. Full width is 2.5 points either way.<br>
+        Corrections already in force are applied before you ever see a chance, so a gap here is not money leaking.</div>`
+      : `<div class="bd-foot">HAWK's graded board hasn't loaded. It's built by the site every few hours.</div>`}
       </div>
-      ${boardTable("BY HOW LIKELY HAWK SAID IT WAS", (g.bands || []).map((b) =>
-        boardRow(`${Math.round(100 * b.lo)}–${Math.round(100 * Math.min(1, b.hi))}%`, boardStat(b.n, b.p, b.won))).join(""))}
-      ${boardTable("BY MARKET", byRows(g.byKey, 200), "Green or red means the gap is past chance for that many legs.")}
-      ${boardTable("BY LEAGUE", byRows(g.byLeague, 200), "Matches, not legs, decide whether a league's number means anything.")}
-    </div>` : `<div class="section"><div class="note">HAWK's graded board hasn't loaded. It's built by the site every few hours.</div></div>`}
-    ${(L.changes || []).length ? `<div class="section">
-      <h3>Corrections in force</h3>
-      <div class="note" style="margin-top:0">Where the board says HAWK runs high or low, its chances are shifted before you ever see them — so a gap above doesn't mean money is leaking.</div>
-      <div class="bchips" style="margin-top:8px">${(L.changes || []).map((c) =>
+    </div>
+    ${(L.changes || []).length ? `<div class="section" style="padding:0"><div class="bd-sheet">
+      <div class="bd-sec" style="padding-top:16px">Corrections in force<small>Where the board above says HAWK runs high or low, its chances are shifted by this much before you ever see them.</small></div>
+      <div class="bchips" style="padding:8px 16px 16px">${(L.changes || []).map((c) =>
         `<span class="bchip ${c.pts >= 0 ? "up" : "dn"}">${esc(c.market)} <b>${c.pts >= 0 ? "+" : ""}${c.pts.toFixed(1)}</b></span>`).join("")}</div>
-    </div>` : ""}
-    ${g && (g.recent || []).length ? `<div class="section">
-      <h3>Recently graded</h3>
-      <div class="prows">${g.recent.slice(0, 20).map((r) => {
-        const hit = r.got, said = r.said;
-        return `<div class="prow"><span class="tick ${hit >= said ? "won" : "lost"}">${hit >= said ? "✓" : "✕"}</span>
-          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.home)} ${esc(r.score || "")} ${esc(r.away)}
-            <span class="muted">· ${esc(r.league || "")}</span></span>
-          <span class="muted" style="flex:none;font-size:11px">said ${Math.round(100 * said)}% · landed ${Math.round(100 * hit)}% · ${r.n} legs</span></div>`;
-      }).join("")}</div>
-    </div>` : ""}`;
+    </div></div>` : ""}
+    ${g && (g.recent || []).length ? `<div class="section" style="padding:0"><div class="bd-sheet">
+      <div class="bd-sec" style="padding-top:16px">Recently graded<small>The last matches to settle, each one a whole card of legs rather than a bet.</small></div>
+      ${g.recent.slice(0, 20).map((r) => {
+        const pts = 100 * (r.got - r.said), w = Math.min(50, Math.abs(pts) * (50 / 12));
+        return `<div class="bd-row" title="HAWK said ${Math.round(100 * r.said)}% across ${r.n} legs in this match; ${Math.round(100 * r.got)}% landed">
+          <span class="lbl">${esc(r.home)} ${esc(r.score || "")} ${esc(r.away)} <i>${esc(r.league || "")}</i></span>
+          <span class="v">${(100 * r.said).toFixed(0)}</span>
+          <span class="v hit">${(100 * r.got).toFixed(0)}</span>
+          <span class="bd-bar">${Math.abs(pts) < 0.5 ? "" : `<i class="${pts > 0 ? "p" : "m"}" style="width:${w.toFixed(1)}%"></i>`}</span>
+          <span class="nn">${r.n}</span></div>`;
+      }).join("")}
+      <div class="bd-foot">One match is far too small to judge HAWK by — these are here to show the board filling up, not to be read as a verdict, so no bar here is coloured for significance. Full width is 12 points either way.</div>
+    </div></div>` : ""}`;
 }
 function showBoard() {
   document.querySelectorAll(".fx").forEach((f) => f.classList.remove("on"));

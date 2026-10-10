@@ -625,13 +625,22 @@ input[type=range]{width:100%;accent-color:var(--accent)}
    only the legs scroll between them, so the chance, the break-even mark and the
    price box are on screen together however many legs you stack. A single
    overflow-y column cannot do that — it pushes the price box off the bottom. */
-/* The 250px is the build button, the closed settings fold and the chips that sit
-   above the ticket in this column — measured, not guessed. Open the fold and the
-   ticket simply scrolls with the column, which is the honest fallback. */
-.ticket{display:flex;flex-direction:column;min-height:320px;
-  max-height:calc(100vh - var(--head) - 250px)}
+/* Cap the LEG LIST, not the ticket.
+   Capping the ticket pinned the head and the stub and gave the legs whatever
+   was left — which, once a price is typed and the verdict paragraph appears,
+   was 47px of a 1,633px list. Three per cent of the thing you are reading.
+   The head and the stub are only as tall as they need to be; the legs get a
+   band of their own and scroll inside it, so the stub still follows the legs
+   immediately however many you stack, which was the point of the hinge. */
+.ticket{display:flex;flex-direction:column}
 .ticket .thead{flex:none}
-.ticket .tscroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#3a3846 transparent}
+/* The floor is one whole leg card, not a fraction of one. A scorecard leg runs
+   to about 330px — face, name, verdict, three tiles, the why and its buttons —
+   so a band shorter than that always cuts one in half, which reads as broken
+   rather than as scrollable. Taller screens get more; the ceiling stops a long
+   build pushing the stub off the bottom, which is what the hinge is for. */
+.ticket .tscroll{flex:none;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#3a3846 transparent;
+  max-height:clamp(344px, calc(100vh - var(--head) - 430px), 620px)}
 .ticket .tscroll::-webkit-scrollbar{width:7px}
 .ticket .tscroll::-webkit-scrollbar-thumb{background:#3a3846;border-radius:4px}
 .ticket .tear{flex:none}

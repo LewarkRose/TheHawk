@@ -1,7 +1,7 @@
 ﻿{
   "version": "0.0.1",
   "configurations": [
-    { "name": "hawk-preview", "runtimeExecutable": "python", "runtimeArgs": ["-m", "http.server", "8731"], "port": 8731 },
+    { "name": "hawk-preview", "runtimeExecutable": "C:/Program Files/Blender Foundation/Blender 5.0/5.0/python/bin/python.exe", "runtimeArgs": ["-m", "http.server", "8731"], "port": 8731 },
     { "name": "editorial-preview", "runtimeExecutable": "python", "runtimeArgs": ["-m", "http.server", "8742", "--directory", "C:/Users/lewzu/AppData/Local/Temp/claude/C--Users-lewzu-Documents-GitHub-TheHawk/79d09207-bcf4-4bde-8241-da2732691402/scratchpad"], "port": 8742 },
     { "name": "colour-preview", "runtimeExecutable": "C:/Program Files/Blender Foundation/Blender 5.0/5.0/python/bin/python.exe", "runtimeArgs": ["-m", "http.server", "8755", "--directory", "C:/Users/lewzu/AppData/Local/Temp/claude/C--Users-lewzu-Documents-GitHub-TheHawk/79d09207-bcf4-4bde-8241-da2732691402/scratchpad/colsite"], "port": 8755 }
   ]

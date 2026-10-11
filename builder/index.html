@@ -685,40 +685,23 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   font:700 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.24em;
   color:var(--muted);text-transform:uppercase}
 @media (max-width:420px){.ticket .tear span{letter-spacing:.14em;font-size:8.5px}}
-/* THE HINGE. The ticket is a bounded column: the head and the stub are pinned and
-   only the legs scroll between them, so the chance, the break-even mark and the
-   price box are on screen together however many legs you stack. A single
-   overflow-y column cannot do that — it pushes the price box off the bottom. */
-/* Cap the LEG LIST, not the ticket.
-   Capping the ticket pinned the head and the stub and gave the legs whatever
-   was left — which, once a price is typed and the verdict paragraph appears,
-   was 47px of a 1,633px list. Three per cent of the thing you are reading.
-   The head and the stub are only as tall as they need to be; the legs get a
-   band of their own and scroll inside it, so the stub still follows the legs
-   immediately however many you stack, which was the point of the hinge. */
+/* THE HINGE, REMOVED.
+   The legs used to scroll inside a capped band so the chance, the break-even mark
+   and the price box stayed on screen together. It never paid for itself: the slip
+   column already scrolls, so the band put a second scrollbar inside the first, and
+   on a 900px screen the ticket overflowed its column anyway and both ends scrolled
+   regardless. One scroll region beats two. The ticket is now whatever height it
+   needs and the slip column carries it, which is what it was already doing.
+   (Kept for the record: capping the TICKET instead of the leg list was worse still
+   — head and stub pinned, legs left with 47px of a 1,633px list.) */
 .ticket{display:flex;flex-direction:column}
 .ticket .thead{flex:none}
-/* The floor is one whole leg card, not a fraction of one. A scorecard leg runs
-   to about 330px — face, name, verdict, three tiles, the why and its buttons —
-   so a band shorter than that always cuts one in half, which reads as broken
-   rather than as scrollable. Taller screens get more; the ceiling stops a long
-   build pushing the stub off the bottom, which is what the hinge is for. */
-/* The 430px budget here was wrong: it covered the tear and the stub but never the
-   head, which runs to 235px once a price is typed and the call appears. The ticket
-   therefore came to 1,003px inside a column capped at 784px on a 900px screen, so
-   the head and stub both scrolled and the hinge bought nothing. 560px is the real
-   figure — head, tear and the compacted stub — which fits on a tall screen. On a
-   short one the floor below still wins, and the column scrolls as it always did. */
-.ticket .tscroll{flex:none;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#3a3846 transparent;
-  max-height:clamp(344px, calc(100vh - var(--head) - 560px), 620px)}
-.ticket .tscroll::-webkit-scrollbar{width:7px}
-.ticket .tscroll::-webkit-scrollbar-thumb{background:#3a3846;border-radius:4px}
+.ticket .tscroll{flex:none}
 .ticket .tear{flex:none}
 .ticket .stub{flex:none;background:linear-gradient(180deg,rgba(0,0,0,.22),rgba(0,0,0,.10))}
 /* the price box now lives in the stub, so it drops its own panel chrome */
 .ticket .stub .check{margin:0;padding:11px 14px 12px;background:transparent;border:0;
   border-top:1px solid rgba(255,255,255,.07);border-radius:0}
-@media (max-width:1250px){.ticket{max-height:none}}
 .ticket .th{display:flex;justify-content:space-between;align-items:center;padding:12px 14px}
     /* the header: how often this builder lands, and where the price's break-even sits */
     .ticket .thb{display:flex;align-items:center;gap:14px;padding:12px 14px 13px}
@@ -1489,6 +1472,18 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .weaktag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:800;
       letter-spacing:.04em;text-transform:uppercase;color:var(--gold);background:rgba(153, 169, 255,.1);border:1px solid rgba(153, 169, 255,.45)}
     .leg.weakleg [data-swap]{border-color:rgba(153, 169, 255,.5);color:var(--gold)}
+    /* the line stepper: same bet, one notch along the ladder */
+    .step{display:flex;align-items:center;gap:7px;margin-top:10px;padding-top:9px;
+      border-top:1px dotted rgba(255,255,255,.1)}
+    .step .lab{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin-right:auto}
+    .step .sbtn{display:grid;place-items:center;width:34px;height:30px;border-radius:8px;cursor:pointer;
+      background:var(--panel2);border:1px solid rgba(188,200,255,.3);color:var(--accent);
+      font:700 17px/1 inherit;transition:.12s;padding:0}
+    .step .sbtn:hover{background:rgba(188,200,255,.16);border-color:var(--accent)}
+    .step .sbtn.off{opacity:.3;cursor:not-allowed;border-color:var(--line);color:var(--muted)}
+    .step .sbtn.off:hover{background:var(--panel2);border-color:var(--line)}
+    .step .nxt{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--muted);
+      font-variant-numeric:tabular-nums;min-width:46px;text-align:center}
 .bigodds{font-size:24px;font-weight:900;color:var(--gold)}
 .sprice{display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:12px;color:var(--muted);margin:4px 0;cursor:text}
 .sprice input{width:78px;padding:6px 8px;font-size:16px;font-weight:800;text-align:center;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text)}
@@ -3474,6 +3469,7 @@ function renderSlip() {
           <span class="verdict ${vd.tone}" title="${esc(vd.why)}">${vd.label}</span></div>
         ${l.b365 ? `<div class="b365" title="Bet365's corners and cards lines are 3-way (Over / Exactly / Under): its &quot;Over 3&quot; means 4 or more">On Bet365 pick: <b>${esc(l.b365)}</b></div>` : ""}
         ${legTiles(l, row, n)}
+        ${lineStep(l)}
       </div>
       <div class="fb"><div class="fb-h">${legFace(l)}<div class="lb">${esc(l.label)}</div><span class="verdict ${vd.tone}">${vd.label}</span></div>
         <div class="why wlist">${whyShort(l, row, n)}</div></div>
@@ -3638,6 +3634,13 @@ function renderSlip() {
   $("#go").onclick = build;
   $("#slip").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => removeLeg(b.dataset.rm));
   $("#slip").querySelectorAll("[data-swap]").forEach(b => b.onclick = () => swapLeg(b.dataset.swap));
+  // The stepper sits on a .fcard, whose own click flips it — so the press must stop
+  // there or you change the line and get the back of the card at the same time.
+  $("#slip").querySelectorAll("[data-line]").forEach(b => b.onclick = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const card = b.closest("[data-fid]");
+    stepLine(card ? card.dataset.fid : null, b.dataset.line);
+  });
   $("#slip").querySelectorAll("[data-no365]").forEach(b => b.onclick = () => notOnBet365(b.dataset.no365));
   bindFlips($("#slip"), S.flipped);
   $("#slip").querySelectorAll("[data-on365]").forEach(b => b.onclick = () => {
@@ -4317,6 +4320,52 @@ function no365Note() {
   if (!mine.length) return "";
   return `<div class="note">🚫 Not on Bet365 in ${esc(league)}: ${mine.map(k => { const mk = k.slice(league.length + 1);
     return `${esc(mk)} <button class="linkbtn muted" data-on365="${esc(k)}" title="It is on Bet365 after all — let HAWK use it again">✕</button>`; }).join(" · ")}</div>`;
+}
+// THE LINE LADDER. Every leg id that has a line ends in that line's number and is
+// otherwise identical to its neighbours: sot:u10.5 sits between sot:u9.5 and
+// sot:u11.5; p:home:0:shots1 between nothing and p:home:0:shots2; tcorners:home:o2.5
+// among its own. So the siblings of a leg are every leg sharing the id up to that
+// trailing number, in the same market — which covers match totals, team totals,
+// corners, cards, offsides, shots on target, the handicap, the winning margin and
+// every player prop, without a list of markets to keep in step.
+//
+// It fails closed, which is the point: res:home, btts:yes, dc:away and the rest end
+// in no number, match nothing, and simply get no stepper. The market has to match
+// too — Clean Sheet is cs:home and Correct Score is cs:0-0, and without that check
+// a clean sheet would step onto a scoreline.
+const LINE_ID = /^(.*?)(\d+(?:\.\d+)?)$/;
+function lineSiblings(leg) {
+  if (!leg) return [];
+  const m = LINE_ID.exec(leg.id);
+  if (!m) return [];
+  const stem = m[1];
+  return Object.values(S.legs)
+    .filter((x) => x.market === leg.market && x.id.startsWith(stem) && LINE_ID.test(x.id)
+                   && LINE_ID.exec(x.id)[1] === stem)
+    .sort((a, b) => parseFloat(LINE_ID.exec(a.id)[2]) - parseFloat(LINE_ID.exec(b.id)[2]));
+}
+// The step row: what the line is now, and the two legs either side of it.
+function lineStep(l) {
+  const sibs = lineSiblings(l);
+  if (sibs.length < 2) return "";
+  const i = sibs.findIndex((x) => x.id === l.id);
+  const at = LINE_ID.exec(l.id)[2];
+  const btn = (to, sign) => to
+    ? `<button class="sbtn" data-line="${esc(to.id)}" title="${esc(to.label)} — HAWK makes it ${pct(to.p)}">${sign}</button>`
+    : `<button class="sbtn off" disabled title="No ${sign === "−" ? "lower" : "higher"} line in this market">${sign}</button>`;
+  return `<div class="step"><span class="lab">Line</span>
+    ${btn(sibs[i - 1], "−")}<span class="nxt">${esc(at)}</span>${btn(sibs[i + 1], "+")}</div>`;
+}
+// Swap one line for its neighbour, keeping everything else about the slip. The leg
+// keeps its place and its lock: this is the same bet a notch along, not a new one.
+async function stepLine(fromId, toId) {
+  if (!S.legs[toId] || !S.slip.includes(fromId)) return;
+  if (S.slip.includes(toId)) return toast("That line is already on the slip.");
+  S.slip = S.slip.map((x) => (x === fromId ? toId : x));
+  if (S.locked.delete(fromId)) S.locked.add(toId);
+  S.flipped.delete(fromId);
+  await evaluateSlip();
+  toast(`${S.legs[fromId].label} → ${S.legs[toId].label}`);
 }
 async function swapLeg(id) {
   if (!S.match) return;

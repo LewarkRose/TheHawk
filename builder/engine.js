@@ -1809,6 +1809,12 @@
   function autoBuild(legs, target, style = "Balanced", maxLegs = 10, locked = [], banned = new Set(), favourite = true, focus = "Mix", extras = false, picks = "likely", known = new Set()) {
     const [lo, hi] = STYLES[style] || STYLES.Balanced;
     let [minPlayers, maxMatch] = FOCUS[focus] || FOCUS.Mix;
+    // Players asks for four player legs and at most two match ones. On a four-leg
+    // build that opens with a result leg the floor is unreachable, so the search
+    // found nothing, the fallback below dropped the floor to zero, and "Player
+    // props" handed back a builder with no player in it. Scale the floor to the
+    // build actually asked for: four legs, two of them match legs, means two.
+    minPlayers = Math.min(minPlayers, Math.max(1, maxLegs - maxMatch));
     const all = Object.values(legs);
     if (!all.length) return evaluate(legs, []);
     const n = all[0].arr.length;
@@ -1894,7 +1900,11 @@
       // price: fewer player legs instead (a priced match leg next).
       if (best && bestPass === passes.length - 1 && want === "player" && focus === "Mix" && minPlayers > nPlayers) { minPlayers = nPlayers; continue; }
       if (!best) {
-        if (want === "player" && nMatch < maxMatch && focus !== "Match" && minPlayers > 0) { minPlayers = 0; continue; }
+        // Mix may trade a player leg for a match one — that is what a mix is. Players
+        // may not: zeroing the floor here is how "Player props" came back with no
+        // player leg in it, silently, with the setting still showing. If it cannot be
+        // built it comes back short or empty, and the page says so.
+        if (want === "player" && nMatch < maxMatch && focus === "Mix" && minPlayers > 0) { minPlayers = 0; continue; }
         break;
       }
       chosen.push(best);
@@ -2207,6 +2217,16 @@
     }
     let pool = [...found.values()];
     if (!pool.length) return [run(styles[0], params.picks === "value" ? "value" : "likely", base)];
+    // Honour the focus in the LIST, not just in each search. A build that gave up
+    // early comes back short — one leg, sometimes none of what you asked for — and
+    // the scorer below liked those best, because a single leg carries almost no
+    // bookmaker margin. So "Player props" led with a lone match leg. A builder needs
+    // two legs to be a builder, and under Players at least one of them is a player.
+    const nPlayers = (t) => t.legs.filter((l) => playerKey(e.legs[l.id] || l)).length;
+    const wanted = pool.filter((t) => t.legs.length >= 2
+      && (params.focus !== "Players" || nPlayers(t) > 0)
+      && (params.focus !== "Match" || nPlayers(t) === 0));
+    if (wanted.length) pool = wanted;
     const close = pool.filter(near);
     if (close.length) pool = close;
     // Score: value at Bet365 counts most, then the chance to land, then few guessed prices and a price close to the target.

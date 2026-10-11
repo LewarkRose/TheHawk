@@ -1809,12 +1809,13 @@
   function autoBuild(legs, target, style = "Balanced", maxLegs = 10, locked = [], banned = new Set(), favourite = true, focus = "Mix", extras = false, picks = "likely", known = new Set()) {
     const [lo, hi] = STYLES[style] || STYLES.Balanced;
     let [minPlayers, maxMatch] = FOCUS[focus] || FOCUS.Mix;
-    // Players asks for four player legs and at most two match ones. On a four-leg
-    // build that opens with a result leg the floor is unreachable, so the search
-    // found nothing, the fallback below dropped the floor to zero, and "Player
-    // props" handed back a builder with no player in it. Scale the floor to the
-    // build actually asked for: four legs, two of them match legs, means two.
-    minPlayers = Math.min(minPlayers, Math.max(1, maxLegs - maxMatch));
+    // Players asks for four player legs. A four-leg build that opens with a result
+    // leg can never hold four, so the search found nothing, the fallback below
+    // dropped the floor to zero, and "Player props" handed back a builder with no
+    // player in it. Clamp the floor to what the build can physically hold, leaving
+    // room for the opening result leg — and only ever downwards, so Mix's floor of
+    // two is untouched at any size it was already reachable at.
+    minPlayers = Math.max(1, Math.min(minPlayers, maxLegs - 1));
     const all = Object.values(legs);
     if (!all.length) return evaluate(legs, []);
     const n = all[0].arr.length;

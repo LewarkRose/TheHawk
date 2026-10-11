@@ -1800,6 +1800,27 @@ a.nav{text-decoration:none}
   .spct .num{font-size:38px}
   .scard .sbody{padding:11px 12px}
 }
+
+/* TOUCH — no sticky hover.
+   A finger leaves :hover on whatever it last landed on, and it stays there until you
+   touch something else. Scroll the Live list with your thumb on a match and that
+   match keeps a box around it long after it has moved up the screen, looking like
+   HAWK has singled it out. Reported on the scores; true of every list in here.
+   Hover styling is for pointers that can hover. A tap still gets :active, and the
+   row opens anyway, so nothing is lost. Last in the sheet so it wins on order. */
+@media (hover:none){
+  .fx:hover,.lrow:hover,.sc-row:hover,.trow:hover,.rg:hover,.rnd>summary:hover,
+  .dbr:hover,.arow>summary:hover,.srow>summary:hover,.mfold>summary:hover,
+  .bd-row:hover,.h2h-row:hover,.lt-grp:hover,.lt-lg:hover,.mm:hover{
+    background:transparent;border-color:transparent}
+  /* the states that are NOT hover and must survive it */
+  .sc-row.is-live:hover{background:rgba(255,93,115,.05)}
+  .arows .arow>summary.dbr.weak:hover{background:rgba(255,93,115,.05)}
+  .arows .arow[open]>summary.dbr:hover{background:rgba(188,200,255,.06);border-bottom-color:rgba(188,200,255,.18)}
+  .lt-grp:hover{color:inherit}
+  .qc:hover{border-color:#3c3c3c;color:inherit}
+  .qc.in:hover{border-color:var(--accent);color:var(--accent)}
+}
 </style>
 </head>
 <body>

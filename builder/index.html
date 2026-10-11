@@ -1076,6 +1076,16 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       color:var(--text);font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
     .rchips button:hover{border-color:var(--accent)}
     .rchips button.on{border-color:rgba(188, 200, 255,.45);background:rgba(188, 200, 255,.1);color:var(--accent)}
+    /* A cycle button shows the setting you are ON, not a setting you could choose.
+       Without the label on it, "Player props" read as a thing to add rather than
+       the mode already in force — so a builder full of props looked like a bug.
+       Name what it controls above the value, the way the leg tiles do. */
+    .rchips button.cyc{display:inline-grid;gap:1px;justify-items:start;text-align:left;
+      padding:5px 13px;border-radius:14px;line-height:1.15}
+    .rchips button.cyc i{font-style:normal;font-size:9px;letter-spacing:.13em;text-transform:uppercase;
+      color:var(--muted);font-weight:700}
+    .rchips button.cyc b{font-size:12.5px;font-weight:700;color:var(--text)}
+    .rchips button.cyc:hover b{color:var(--accent)}
     /* Max legs: a stepper, not a chip. As a chip it looked like a label and
        nobody tapped it, so the cap stayed at its default and quietly stopped
        the bigger prices being reachable at all. */
@@ -1904,7 +1914,7 @@ a.nav{text-decoration:none}
      evening of tests that were checking stale code. -->
 <!-- Bump this whenever engine.js changes, or browsers keep the old one: the
      query string is the only thing telling them the file is not the same. -->
-<script src="engine.js?v=20261011a"></script>
+<script src="engine.js?v=20261011c"></script>
 <script src="hawk-settle.js?v=20260923a"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
@@ -1969,6 +1979,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
   chk: { price: "", boost: "", stake: "5" }, moreOpen: false, tuneOpen: loadPref("hawk.tuneOpen", false), radarOpen: false, p3d: loadPref("hawk.p3d", { flat: false }), p3dView: { rx: matchMedia("(max-width:560px)").matches ? 40 : 48, rz: 0 }, extras: loadPref("hawk.extras", false), cat: "All", legsMore: false, ep: loadPref("hawk.ep", true), subOn: loadPref("hawk.subOn", true), flipped: new Set(),            live: { on: loadPref("hawk.liveOdds", true), timer: null, checked: null, busy: false },
             acca: loadPref("hawk.acca", []), accaOpen: new Set(), accaChk: { price: "", boost: "", stake: "5" }, alerts: loadPref("hawk.priceAlerts", []),
             accaTab: loadPref("hawk.accaTab", "yours"),
+            buildOpts: loadPref("hawk.buildOpts", 5),   // how many builders Build offers
             inplay: null, kellyFrac: loadPref("hawk.kellyFrac", 0.25), picks: loadPref("hawk.picks", "likely"),
             scores: { day: null, league: "All", status: loadPref("hawk.scoreStatus", "All"), data: null, timer: null, error: null },
             // focus/extras are the Monster's own too, seeded from the builder's. perMatch
@@ -2013,6 +2024,7 @@ const oddsToSlider = (o) => 100 * Math.log(o / 1.5) / Math.log(25 / 1.5);
 // payout itself; past that it snaps to quarters, because 4.25+ and 4.27+ are the
 // same bet and a price you can't read back is no use.
 const LEG_STEPS = [3, 4, 5, 6, 8, 10, 12];   // 12 is the engine's own ceiling
+const BUILD_OPTS = [3, 5, 8, 12];            // builders Build offers; 12 is the engine's cap
 const MIN_ODDS_CHIPS = [0, 2, 3, 5, 10];
 const MIN_ODDS_ANY = 4;                       // slider positions below this mean "any odds"
 const minOddsToSlider = (o) => (o ? oddsToSlider(o) : 0);
@@ -3509,13 +3521,18 @@ function renderSlip() {
     <input type="range" min="0" max="100" step="0.5" value="${oddsToSlider(S.target)}" id="rng" ${S.auto ? 'style="display:none"' : ""}>
     ${recipeLine()}
     <div class="rchips" id="rchips">
-      <button data-cyc="style" title="How likely each leg should be">${STYLES[S.style].label}</button>
-      <button data-cyc="focus" title="What the builder is made of">${{ Mix: "Mix of markets", Players: "Player props", Match: "Match stats", Stats: "No result leg" }[S.focus]}</button>
-      <button data-cyc="picks" title="How HAWK chooses between legs">${S.picks === "value" ? "Best value" : "Most likely"}</button>
+      <button class="cyc" data-cyc="style" title="How likely each leg should be — click to change"><i>Legs</i><b>${STYLES[S.style].label}</b></button>
+      <button class="cyc" data-cyc="focus" title="What the builder is made of — click to change"><i>Made of</i><b>${{ Mix: "Mix of markets", Players: "Player props", Match: "Match stats", Stats: "No result leg" }[S.focus]}</b></button>
+      <button class="cyc" data-cyc="picks" title="How HAWK chooses between legs — click to change"><i>Picks</i><b>${S.picks === "value" ? "Best value" : "Most likely"}</b></button>
       <span class="legstep" title="The most legs HAWK will use. More legs reach a bigger price, but the builder lands less often — and a price you've asked for may need more legs than this to be reachable at all.">
         <button data-legs="-1" aria-label="Fewer legs" ${S.maxLegs <= LEG_STEPS[0] ? "disabled" : ""}>−</button>
         <b>Max ${S.maxLegs} legs</b>
         <button data-legs="1" aria-label="More legs" ${S.maxLegs >= LEG_STEPS[LEG_STEPS.length - 1] ? "disabled" : ""}>+</button>
+      </span>
+      <span class="legstep" title="How many different builders Build offers before it starts repeating. HAWK already searches far more tickets than it shows, so asking for more costs no extra simulation — press Build again to walk through them.">
+        <button data-opts="-1" aria-label="Fewer options" ${S.buildOpts <= BUILD_OPTS[0] ? "disabled" : ""}>−</button>
+        <b>${S.buildOpts} options</b>
+        <button data-opts="1" aria-label="More options" ${S.buildOpts >= BUILD_OPTS[BUILD_OPTS.length - 1] ? "disabled" : ""}>+</button>
       </span>
       <button data-cyc="priced" class="${S.priced ? "on" : ""}" title="${S.priced
         ? "On: only legs Bet365 publishes a price for. Bet365 never publishes player-prop prices in any feed HAWK can reach, so this removes EVERY player prop — that is what it is for. Measured on twelve builders: priced-only builds come in at 0.924 of fair, while one carrying a prop comes in at 0.741, so the prop costs about a fifth of the ticket. Click for props."
@@ -3608,6 +3625,18 @@ function renderSlip() {
         Math.abs(v - S.maxLegs) < Math.abs(LEG_STEPS[best] - S.maxLegs) ? i : best, 0);
       const to = LEG_STEPS[at + (+step.dataset.legs)];
       if (to) { S.maxLegs = to; savePref("hawk.maxLegs", S.maxLegs); renderSlip(); }
+      return;
+    }
+    // How many builders Build offers. The options already in hand were found for a
+    // different count, so they're dropped: the next Build fetches the new number.
+    const ostep = e.target.closest("[data-opts]");
+    if (ostep) {
+      let at = BUILD_OPTS.indexOf(S.buildOpts);
+      if (at < 0) at = BUILD_OPTS.reduce((best, v, i) =>
+        Math.abs(v - S.buildOpts) < Math.abs(BUILD_OPTS[best] - S.buildOpts) ? i : best, 0);
+      const to = BUILD_OPTS[at + (+ostep.dataset.opts)];
+      if (to) { S.buildOpts = to; savePref("hawk.buildOpts", S.buildOpts);
+                S.options = { list: [], at: 0, key: null }; renderSlip(); }
       return;
     }
     const b = e.target.closest("[data-cyc]"); if (!b) return;
@@ -4103,7 +4132,12 @@ function b365Switches() {
 function tuneSummary() {
   const aim = !S.auto ? `${S.target.toFixed(2)}` : S.scan.exactLegs ? `${S.scan.exactLegs} legs exactly`
     : S.scan.minOdds ? `${S.scan.minOdds.toFixed(2)}+` : "2–4";
-  const of = { Mix: "mix", Players: "player props", Match: "match stats" }[S.focus] || "mix";
+  // Mix is the default and says nothing; the others are a narrowing you chose, and
+  // read as a description unless they say "only". A ticket of nothing but player
+  // props looks broken until this line tells you that is what you asked for.
+  const of = { Players: `<b style="color:var(--gold)">player props only</b>`,
+               Match: `<b style="color:var(--gold)">match stats only</b>`,
+               Stats: `<b style="color:var(--gold)">no result leg</b>` }[S.focus] || "mix";
   // "Bet365-priced only" was the mechanism, not the consequence. The consequence is
   // that every player prop is gone, because Bet365 publishes no prop price HAWK can
   // read — and this line is the only place a builder that quietly dropped them says so.
@@ -4126,7 +4160,7 @@ function recipeLine() {
 }
 function buildBody() {
   const locked = S.slip.filter(id => S.locked.has(id));
-  return { id: String(S.match.id), auto: S.auto, priced: S.priced, typed: typedLegIds(), target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs,
+  return { id: String(S.match.id), auto: S.auto, priced: S.priced, typed: typedLegIds(), target: +S.target.toFixed(2), style: S.style, focus: S.focus, maxLegs: S.maxLegs, options: S.buildOpts,
            minOdds: S.auto ? S.scan.minOdds : 0,   // 🎯 Auto follows the "at least" you set on Picks
            onlyWorth: S.auto ? S.scan.onlyWorth : false,
            exactLegs: S.auto ? S.scan.exactLegs : 0,

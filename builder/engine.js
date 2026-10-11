@@ -2234,14 +2234,25 @@
     const score = (t) => { const w = worthOf(t);
       return (w >= 1.02 ? 10 : 0) + w * 3 + (t.p || 0) - 0.08 * (t.guessed || 0) - 0.15 * Math.abs(Math.log(at(t) / target)); };
     pool.sort((x, y) => score(y) - score(x));
+    // Three passes, each looser than the last. The backfill used to have no
+    // diversity rule at all, which did not show while only five were asked for —
+    // but once you can ask for twelve it filled the list with near-copies: five
+    // builders differing by a single leg, two of them offering opposite sides of
+    // the same cards line as alternatives. Loosen the rule, don't drop it, and
+    // only take a near-copy once nothing better is left.
+    const shared = (t, c) => t.legs.filter((l) => c.legs.some((x) => x.id === l.id)).length;
     const chosen = [];
-    for (const t of pool) {
-      if (chosen.length >= count) break;
-      // as different as possible from the ones already chosen
-      if (chosen.some((c) => t.legs.filter((l) => c.legs.some((x) => x.id === l.id)).length >= Math.max(2, t.legs.length - 1))) continue;
-      chosen.push(t);
-    }
-    for (const t of pool) { if (chosen.length >= count) break; if (!chosen.includes(t)) chosen.push(t); }
+    const sweep = (limit) => {
+      for (const t of pool) {
+        if (chosen.length >= count) break;
+        if (chosen.includes(t)) continue;
+        if (limit != null && chosen.some((c) => shared(t, c) >= limit)) continue;
+        chosen.push(t);
+      }
+    };
+    sweep(Math.max(2, (pool[0].legs.length || 2) - 1));   // differ by two or more legs
+    sweep(Math.max(2, (pool[0].legs.length || 2) - 1) + 1);   // differ by at least one
+    sweep(null);                                           // rather than return fewer than asked
     return chosen.map((t) => ({ ...t, worth: +worthOf(t).toFixed(3) }));
   }
   // 🎯 Auto: no target odds to pick. HAWK tries a few targets (about 2, 2.75 and
@@ -2366,10 +2377,16 @@
     return chosen.map(({ rank, ...t }) => t);
   }
   const autoBest = (e, params) => autoTop(e, params, 1)[0] || null;
+  // How many builders Build hands you. The search itself is unchanged — it already
+  // explores far more tickets than it shows — so asking for more only returns more
+  // of what it found, at no extra simulation. Capped at a dozen because past that
+  // they stop being distinguishable from one another.
+  const OPTIONS_MIN = 3, OPTIONS_MAX = 12;
   function buildOptions(body, count = 5) {
-    if (body.auto) { const e0 = entryFor(body.id); return { options: autoOptions(e0, withPriced(e0, body), count, 0) }; }
+    const n = Math.max(OPTIONS_MIN, Math.min(OPTIONS_MAX, +body.options || count));
+    if (body.auto) { const e0 = entryFor(body.id); return { options: autoOptions(e0, withPriced(e0, body), n, 0) }; }
     const e = entryFor(body.id);
-    return { options: searchOptions(e, withPriced(e, body), count, 2) };
+    return { options: searchOptions(e, withPriced(e, body), n, 2) };
   }
 
   // Head to head: the last 5 finished meetings of the two clubs (any

@@ -1879,8 +1879,16 @@
           // Filler: a leg Bet365 pays 1.10 or less for (1+ tackles, 1+ shots, 2+ saves…) barely moves the
           // price but can still lose the bet — auto-build leaves it out (you can still add it yourself).
           if (legB365(leg) <= FILLER_PRICE) continue;
-          // Team Over 0.5 / 1.5 cards: land far less often than they look (graded: HAWK said 54%, 42% landed).
-          if (/^tcards:(home|away):o/.test(leg.id)) continue;
+          // Team card Overs were banned outright here on "HAWK said 54%, 42% landed".
+          // That figure came from the user's own settled bets in September — a handful
+          // of legs they had chosen, which is the most selected sample in the app. The
+          // graded board, which marks every team-card leg on every match whether it was
+          // bet or not, says the opposite over 4,843 legs: said 51.5%, landed 50.8%, a
+          // gap of 0.7 points. Corners are the same, every line within two points.
+          // Unbanned 2026-10-11. Do not re-ban from memory of the old number — check
+          // byKey["Team Cards · Over"] in graded.json first. (It changes little in
+          // practice: 365Scores carries no Bet365 price for team cards, so these still
+          // compete for the one estimated-leg slot and usually lose it to a prop.)
           const k = playerKey(leg);
           if (k && (perPlayer[k] || 0) >= MAX_LEGS_PER_PLAYER) continue;
           let c = 0; const a = leg.arr;

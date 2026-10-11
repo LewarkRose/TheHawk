@@ -1933,6 +1933,19 @@ function savePref(key, value) {
     }
   }
 }
+// ONE-TIME: throw away the focus that was never read.
+// savePref("hawk.focus", …) ran on every change, but the state hardcoded focus to
+// "Mix", so the key was written and discarded for as long as it existed — nobody's
+// saved focus ever did anything. Making it load (2026-10-11) brought every one of
+// those dead writes to life at once, and a focus cycled to "Match stats" months ago
+// started quietly stripping every player prop out of Build, with the props toggle
+// still reading "on". Clear it once; from here it persists honestly.
+try {
+  if (localStorage.getItem("hawk.focus") !== null && localStorage.getItem("hawk.focusReset") === null) {
+    localStorage.removeItem("hawk.focus");
+    localStorage.setItem("hawk.focusReset", "1");
+  }
+} catch { /* private window: nothing saved, nothing to undo */ }
 const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked: new Set(), banned: new Set(),
             // focus was saved on every change and then never read back, so the builder
             // reset to Mix on every reload and the saved value did nothing.

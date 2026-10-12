@@ -6355,21 +6355,56 @@ const BD_FULL = 2.5;
 // on the board and earned a confident red bar off one afternoon. Rows that can't
 // clear this stay grey however wide their bar.
 const BD_MIN_MATCHES = 10;
-function boardRow(label, s, note, trusted = true) {
+function boardRow(label, s, note, trusted = true, o = {}) {
   if (!s) return "";
-  const pts = 100 * s.gap, w = Math.min(50, Math.abs(pts) * (50 / BD_FULL));
+  // `unit` and `full` because the upset radar is graded on MATCHES, not legs, and its
+  // gaps run to nine points — on the 2.5-point leg scale a 7-point miss and a 9-point
+  // one both clip at full width and read as identical.
+  const unit = o.unit || "legs", full = o.full || BD_FULL;
+  const pts = 100 * s.gap, w = Math.min(50, Math.abs(pts) * (50 / full));
   const sig = trusted && Math.abs(s.z) >= 1.96 && Math.abs(pts) >= 1;
   const bar = Math.abs(pts) < 0.05 ? ""
     : `<i class="${pts > 0 ? "p" : "m"}${sig ? " sig" : ""}" style="width:${w.toFixed(1)}%"></i>`;
-  return `<div class="bd-row" title="HAWK said ${(100 * s.said).toFixed(1)}%, it landed ${(100 * s.hit).toFixed(1)}% over ${
-    s.n.toLocaleString()} legs — ${pts >= 0 ? "+" : ""}${pts.toFixed(1)} points${
+  return `<div class="bd-row" title="HAWK said ${(100 * s.said).toFixed(1)}%, it happened ${(100 * s.hit).toFixed(1)}% of the time over ${
+    s.n.toLocaleString()} ${unit} — ${pts >= 0 ? "+" : ""}${pts.toFixed(1)} points${
     !trusted ? ", over too few separate matches to read as more than one afternoon"
-    : sig ? ", past what chance explains at this many legs" : ", within what chance explains at this many legs"}">
+    : sig ? `, past what chance explains at this many ${unit}` : `, within what chance explains at this many ${unit}`}">
     <span class="lbl">${esc(label)}${note ? ` <i>${esc(note)}</i>` : ""}</span>
     <span class="v">${(100 * s.said).toFixed(1)}</span>
     <span class="v hit">${(100 * s.hit).toFixed(1)}</span>
     <span class="bd-bar">${bar}</span>
     <span class="nn">${s.n.toLocaleString()}</span></div>`;
+}
+// ⚡ THE UPSET RADAR, MARKED.
+// Everything else on this board is graded on legs. This is graded on MATCHES — one
+// row per risk level, 809 matches between them — so the usual "legs inside one game
+// aren't independent" caveat doesn't apply here and the significance test is honest.
+//
+// It answers two different questions and they do NOT agree, which is the whole point
+// of printing both: the radar is good at spotting a favourite in trouble, and bad at
+// saying the underdog will win instead. At High and Very high the underdog won 39
+// times against the 53.4 HAWK expected over 185 matches — past chance — while the
+// favourite failing to win came in close to forecast. The difference is draws, which
+// is why the builder seeds those matches with the underdog's DOUBLE CHANCE rather
+// than the underdog, and why this block is the evidence for that decision.
+function upsetBlocks(g) {
+  const u = (g || {}).upsets || [];
+  if (!u.length || !u.some((x) => x.n)) return "";
+  const UPSET_FULL = 10;   // points; these gaps run to nine, not to two and a half
+  const rows = (said, got) => u.filter((x) => x.n)
+    .map((x) => boardRow(x.label, boardStat(x.n, x[said], x[got]), null, true,
+                         { unit: "matches", full: UPSET_FULL })).join("");
+  const hi = u.filter((x) => x.level >= 2);
+  const sum = (k) => hi.reduce((a, x) => a + (x[k] || 0), 0);
+  const n = sum("n"), sDog = sum("saidDog"), dog = sum("dogWon"), fail = sum("failed");
+  const note = n ? ` Over the ${n} matches it called High or Very high the favourite failed to win <b>${fail}</b> times, but the underdog only won <b>${dog}</b> of them against the <b>${sDog.toFixed(0)}</b> HAWK expected — the other <b>${fail - dog}</b> were draws.` : "";
+  return boardTable("Upset radar · the favourite fails to win",
+      rows("saidFail", "failed"),
+      "Graded on matches, not legs. Read the landed column down: the radar ranks trouble in the right order, and each level lands near what it said." )
+    + boardTable("Upset radar · the underdog actually wins",
+      rows("saidDog", "dogWon"),
+      `The same matches, asking a harder question — and this is where it misses.${note}`
+      + ` Bars here run to ${UPSET_FULL} points, not the 2.5 the leg blocks use.`);
 }
 function boardTable(title, rows, hint) {
   if (!rows) return "";
@@ -6429,6 +6464,7 @@ function renderBoard() {
         "200 legs minimum. A market can be perfectly calibrated and still not be worth backing — that is the price's job, not this page's.")}
       ${boardTable("By league", byRows(g.byLeague, 200),
         `Matches, not legs, decide whether a league's number means anything — the 400-odd legs in one game all turn on the same lineup and the same scoreline. Under ${BD_MIN_MATCHES} matches a row stays grey however long its bar.`)}
+      ${upsetBlocks(g)}
       <div class="bd-foot">The bar takes a colour only where the gap is at least a point AND past what chance explains for that many legs; grey means real but small, or too little to tell. Full width is 2.5 points either way.<br>
         Corrections already in force are applied before you ever see a chance, so a gap here is not money leaking.</div>`
       : `<div class="bd-foot">HAWK's graded board hasn't loaded. It's built by the site every few hours.</div>`}

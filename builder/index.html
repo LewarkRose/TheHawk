@@ -1126,7 +1126,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
    and the row would not collapse below its content on a phone. These carry the
    specificity to win, and the board's rows run continuously rather than as the
    separate rounded cards .arow draws. */
-.dbh,.dbr{display:grid;grid-template-columns:50px minmax(0,1fr) 56px 94px 32px;align-items:start}
+/* .dbh and .dbr are separate grids, so the last track has to be a fixed width in
+   both or the header's "Acca so far" stops sitting over the column it names. */
+.dbh,.dbr{display:grid;grid-template-columns:50px minmax(0,1fr) 56px 94px 106px;align-items:start}
 .arows .arow{border:0;border-radius:0;background:transparent;margin-bottom:0;overflow:visible}
 .arows .arow > summary.dbr{display:grid;gap:0;padding:11px 14px}
 .arows .arow[open] > summary.dbr{background:rgba(188,200,255,.06);border-bottom:1px solid rgba(188,200,255,.18)}
@@ -1155,15 +1157,73 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .run .b{height:4px;border-radius:2px;background:#26262e;margin-top:5px;overflow:hidden}
 .run .b i{display:block;height:100%;background:linear-gradient(90deg,var(--accent-d),var(--accent))}
 .run .d{font:700 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--red);margin-top:5px}
+.dbr .acts{display:flex;align-items:flex-start;justify-content:flex-end;gap:5px;padding-top:1px}
 .dbr .x{text-align:right;color:var(--muted);font-size:14px;padding-top:2px;background:0;border:0;cursor:pointer}
 .dbr .x:hover{color:var(--red)}
 .dbr.weak{background:rgba(255,93,115,.05)}
 .dbr.gone{opacity:.55}
+/* ---------- ⇄ REPLACE: the swap drawer (see openSwap) ----------
+   The weak link is the one row you want to change, and until now the only thing a
+   row could do was leave — which is why the board's own note could say nothing but
+   "drop this one". The drawer answers the question that actually follows: with what.
+   It is a sibling of the <details>, not a child: anything inside it would be hidden
+   while the row is folded, and anything inside the <summary> would toggle the fold. */
+.dbr .swp{display:inline-flex;align-items:center;gap:5px;line-height:1;cursor:pointer;
+  color:var(--muted);background:0;border:1px solid var(--line);border-radius:8px;
+  padding:4px 7px;font-family:inherit;font-size:13px}
+.dbr .swp b{font-size:11px;font-weight:700}
+.dbr .swp:hover{color:var(--gold);border-color:rgba(153,169,255,.5)}
+.dbr .swp.on{color:var(--gold);border-color:rgba(153,169,255,.6);background:rgba(153,169,255,.1)}
+.swd{margin:0 14px 12px;border:1px solid rgba(188,200,255,.2);border-radius:12px;
+  background:rgba(188,200,255,.035);overflow:hidden}
+.swd-h{padding:10px 13px;border-bottom:1px solid rgba(188,200,255,.14)}
+.swd-h .t{font:700 8.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--accent)}
+.swd-h small{display:block;font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5}
+.swd-pick{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.swd-pick button{max-width:100%;padding:4px 9px;border-radius:999px;border:1px solid var(--line);
+  background:transparent;color:var(--muted);font:600 11px/1.4 inherit;cursor:pointer;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.swd-pick button.on{border-color:rgba(153,169,255,.6);background:rgba(153,169,255,.12);color:var(--text)}
+.swalt{display:grid;grid-template-columns:minmax(0,1fr) 52px 84px 74px;align-items:center;gap:0 10px;
+  padding:9px 13px;border-bottom:1px solid rgba(255,255,255,.045)}
+.swalt:hover{background:rgba(188,200,255,.05)}
+.swalt .l{min-width:0}
+.swalt .l b{display:block;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.swalt .l span{display:block;font-size:10.5px;color:var(--muted);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.swalt .p{text-align:right;font:700 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-variant-numeric:tabular-nums}
+.swalt .nw{text-align:right;font:10.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;
+  color:var(--muted);font-variant-numeric:tabular-nums}
+.swalt .nw b{display:block;font-size:12.5px;color:var(--accent)}
+.swalt .nw b.dn{color:var(--red)}
+.swalt .go{text-align:right}
+.swalt .go button{background:var(--accent);color:#13131a;border:0;border-radius:8px;padding:6px 10px;
+  font:700 11.5px/1 inherit;cursor:pointer}
+.swd-note{padding:9px 13px;font-size:11px;color:var(--muted);line-height:1.55;
+  border-top:1px solid rgba(255,255,255,.05)}
+.swd-note b{color:var(--text)}
+.swd-sk{padding:13px 13px 5px}
+.swd-sk i{display:block;height:11px;border-radius:3px;margin-bottom:8px;
+  background:linear-gradient(90deg,#1e1e26,#2a2a34,#1e1e26);background-size:200% 100%;
+  animation:swshim 1.1s linear infinite}
+@keyframes swshim{to{background-position:-200% 0}}
 .dbnote{font-size:11.5px;color:var(--muted);line-height:1.6;padding:11px 14px 0}
 .dbnote b{color:var(--text)}
 .ac-pane{padding:0 14px 14px}
 @media (max-width:620px){
-  .dbh,.dbr{grid-template-columns:42px minmax(0,1fr) 46px 74px 26px}
+  .dbh,.dbr{grid-template-columns:42px minmax(0,1fr) 46px 74px 58px}
+  /* the word goes, the ⇄ stays: a label here costs the match name 70px */
+  .dbr .swp b{display:none}
+  .dbr .swp{padding:3px 5px}
+  .dbr .acts{gap:3px}
+  .swd{margin:0 10px 10px}
+  /* Take stays on the row: dropped underneath, eight alternatives ran to 1,500px
+     of drawer and the one you wanted was never on screen with the one above it. */
+  .swalt{grid-template-columns:minmax(0,1fr) 44px 66px 56px;gap:0 7px;padding:9px 10px}
+  .swalt .go button{padding:6px 8px;font-size:11px}
+  .swd-h,.swd-note{padding-left:10px;padding-right:10px}
   .dbh,.db-top,.dbnote,.arows .arow > summary.dbr{padding-left:10px;padding-right:10px}
   .ac-pane{padding:0 10px 12px}
   /* four figures side by side need about 400px of their own; below that they go two
@@ -4431,12 +4491,14 @@ function no365Note() {
 // too — Clean Sheet is cs:home and Correct Score is cs:0-0, and without that check
 // a clean sheet would step onto a scoreline.
 const LINE_ID = /^(.*?)(\d+(?:\.\d+)?)$/;
-function lineSiblings(leg) {
+// `pool` so the acca's swap drawer can read a match it has fetched in the background
+// rather than the one the builder happens to have open.
+function lineSiblings(leg, pool) {
   if (!leg) return [];
   const m = LINE_ID.exec(leg.id);
   if (!m) return [];
   const stem = m[1];
-  return Object.values(S.legs)
+  return (pool || Object.values(S.legs))
     .filter((x) => x.market === leg.market && x.id.startsWith(stem) && LINE_ID.test(x.id)
                    && LINE_ID.exec(x.id)[1] === stem)
     .sort((a, b) => parseFloat(LINE_ID.exec(a.id)[2]) - parseFloat(LINE_ID.exec(b.id)[2]));
@@ -5214,13 +5276,17 @@ function accaToast(replaced, home, away) {
   const t = accaTotals();
   toast(`${replaced ? "Updated" : "Added"} ${home} v ${away}. Acca: ${S.acca.length} match${S.acca.length === 1 ? "" : "es"}, ${t.legs} legs, fair ${odds(t.fair)}.`);
 }
+// What a leg looks like once it is on the acca: enough to draw its card and price it
+// without the match it came from still being open. The swap drawer stores legs the
+// same way, so a swapped-in leg is indistinguishable from one you added yourself.
+const accaLegShape = (l) => ({ id: l.id, label: l.label, market: l.market, kind: l.kind, p: l.p, pRaw: l.pRaw, fair: l.fair,
+  bookPrice: l.bookPrice || null, player: l.player || null, side: l.side || null,
+  photo: l.photo || null, refPrice: l.refPrice || null, b365: l.b365 || null, ep: !!l.ep, pNoEp: l.pNoEp ?? null,
+  hits: l.hits ?? null, games: l.games ?? null, basis: l.basis || null });
 function addSlipToAcca() {
   const m = S.match, r = S.result;
   if (!m || !S.slip.length || !r || !r.p) return toast("Build a ticket first.");
-  const legs = S.slip.map(id => { const l = S.legs[id]; return { id, label: l.label, market: l.market, kind: l.kind, p: l.p, pRaw: l.pRaw, fair: l.fair,
-    bookPrice: l.bookPrice || null, player: l.player || null, side: l.side || null,
-    photo: l.photo || null, refPrice: l.refPrice || null, b365: l.b365 || null, ep: !!l.ep, pNoEp: l.pNoEp ?? null,
-    hits: l.hits ?? null, games: l.games ?? null, basis: l.basis || null }; });
+  const legs = S.slip.map(id => accaLegShape(S.legs[id]));
   accaToast(putPart(makePart(m, legs, r.p)), m.home, m.away);
   renderSlip();
 }
@@ -5390,6 +5456,138 @@ function monLeagueLabel(sel) {
   if (on.length <= 2) return on.join(" + ");
   return `${on.length} leagues`;
 }
+// ---------- ⇄ REPLACE A LEG WITHOUT LEAVING THE ACCA ----------
+// The board already names the weak link and tells you what dropping it buys back.
+// What it could not tell you is what to put there instead, so the only move it
+// offered was delete — and a nine-leg acca becomes an eight-leg one you did not want.
+//
+// The drawer offers two kinds of answer, because they come from different places:
+//   · the same bet a line along (sot:u10.5 → sot:u11.5), found by the id ladder, and
+//   · other legs in the same match that land MORE often than the one you have, since
+//     a swap that lowers the acca's chance is a thing you could already do by hand.
+// Both carry the only two numbers that decide it: what the whole acca becomes, and
+// what Bet365 pays for it. A safer leg is a shorter price — the drawer must never
+// show the chance going up without the price it costs.
+const SWAP = { i: null, legId: null, cache: {}, busy: false, err: null };
+const SWAP_OTHERS = 5;        // beyond five you are browsing the match, not swapping
+const SWAP_LADDER = 2;        // lines either side; four steps out is a different bet
+// Above this a leg moves the acca's chance without moving its price — padding, and
+// an acca padded to 70% at 4.00 is just a smaller bet you did not mean to place.
+const SWAP_CEILING = 0.92;
+async function openSwap(i) {
+  const pt = S.acca[i];
+  if (!pt) return;
+  if (SWAP.i === i) return closeSwap();
+  SWAP.i = i; SWAP.err = null;
+  // Pointed at the part's own weakest leg: for a single there is nothing to choose,
+  // and in a builder it is the leg you opened the drawer for.
+  SWAP.legId = pt.legs.reduce((a, l) => (!a || (l.p || 1) < (a.p || 1) ? l : a), null).id;
+  if (!SWAP.cache[pt.id]) {
+    SWAP.busy = true; renderAccaBody();
+    try {
+      const m = await api(`/api/match?league=${encodeURIComponent(pt.league)}&id=${encodeURIComponent(pt.id)}`);
+      SWAP.cache[pt.id] = m && m.legs ? m.legs : [];
+    } catch (e) { SWAP.err = e.message || "Could not open that match."; }
+    SWAP.busy = false;
+    if (SWAP.i !== i) return;   // closed or moved on while the match was simulating
+  }
+  renderAccaBody();
+}
+function closeSwap() { SWAP.i = null; SWAP.legId = null; SWAP.err = null; renderAccaBody(); }
+// Everything the drawer could put in that leg's place, best answer first.
+function swapCandidates(pt) {
+  const pool = SWAP.cache[pt.id] || [];
+  const old = pt.legs.find((l) => l.id === SWAP.legId) || pt.legs[0];
+  if (!pool.length || !old) return [];
+  const onPart = new Set(pt.legs.map((l) => l.id));
+  const ok = (l) => l && l.p > 0 && l.p < SWAP_CEILING && !onPart.has(l.id);
+  // The ladder includes the leg you are on, which is how "two lines safer" is counted.
+  // Kept to a couple of rungs either side: the same bet a notch along is a swap, the
+  // same market four steps out is a different opinion about the match.
+  const ladder = lineSiblings(old, pool);
+  const here = ladder.findIndex((x) => x.id === old.id);
+  const sibs = ladder.map((l, j) => ({ leg: l, d: here < 0 ? 0 : j - here }))
+    .filter((x) => ok(x.leg) && Math.abs(x.d) <= SWAP_LADDER)
+    // safer rungs first, nearest first within each — the swap you reached for
+    .sort((a, b) => (b.d > 0) - (a.d > 0) || Math.abs(a.d) - Math.abs(b.d))
+    // "safer" is decided by the chance, not the direction: Over and Under ladders run
+    // opposite ways and the reader only cares which one lands more often.
+    .map(({ leg, d }) => ({ leg, why: `same market, ${Math.abs(d) === 1 ? "one line" : `${Math.abs(d)} lines`} ${leg.p > old.p ? "safer" : "bolder"}` }));
+  const seen = new Set(ladder.map((l) => l.id));
+  // Only legs likelier than the one you have: a swap that makes the acca less likely
+  // is not a replacement, it is a different bet, and the builder is where you make those.
+  // Biggest improvement first — ranking by the smallest step that helps put six legs
+  // worth a tenth of a point at the top and the ones worth having below the fold.
+  const others = pool.filter((l) => ok(l) && !seen.has(l.id) && l.p > old.p)
+    .sort((a, b) => b.p - a.p)
+    .slice(0, SWAP_OTHERS)
+    .map((l) => ({ leg: l, why: "also in this match" }));
+  return [...sibs, ...others];
+}
+// What taking one does to the whole acca. A single IS its leg, so its new chance is
+// exact. Inside a same-match builder the legs are correlated and only the simulation
+// can combine them, so the drawer shows the ratio, says it is approximate, and asks
+// for the real number when you take it.
+function swapNumbers(pt, cand) {
+  const t = accaTotals();
+  const old = pt.legs.find((l) => l.id === SWAP.legId) || pt.legs[0];
+  const single = pt.legs.length === 1;
+  const partP = single ? cand.p : (old.p > 0 ? Math.min(1, pt.p * cand.p / old.p) : pt.p);
+  const base = pt.p > 0 ? t.p / pt.p : 0;
+  const price = t.known && single && old.bookPrice && cand.bookPrice
+    ? t.known / old.bookPrice * cand.bookPrice : null;
+  return { old, single, acca: base * partP, was: t.p, price, wasPrice: t.known };
+}
+function swapDrawer(pt, i) {
+  if (SWAP.i !== i) return "";
+  const shell = (inner) => `<div class="swd">${inner}</div>`;
+  if (SWAP.busy) return shell(`<div class="swd-h"><span class="t">Reading ${esc(pt.home)} v ${esc(pt.away)}</span>
+    <small>HAWK has to open the match again to know what else is in it.</small></div>
+    <div class="swd-sk">${'<i></i>'.repeat(4)}</div>`);
+  if (SWAP.err) return shell(`<div class="swd-h"><span class="t">Could not open that match</span>
+    <small>${esc(SWAP.err)}</small></div>`);
+  const old = pt.legs.find((l) => l.id === SWAP.legId) || pt.legs[0];
+  const cands = swapCandidates(pt);
+  // A builder has more than one leg to point at, so you can move the drawer.
+  const picker = pt.legs.length > 1 ? `<div class="swd-pick">${pt.legs.map((l) =>
+    `<button data-swleg="${esc(l.id)}" class="${l.id === old.id ? "on" : ""}">${esc(l.label)}</button>`).join("")}</div>` : "";
+  const rows = cands.map(({ leg, why }) => {
+    const n = swapNumbers(pt, leg);
+    const up = n.acca >= n.was;
+    return `<div class="swalt">
+      <span class="l"><b>${esc(leg.label)}</b><span>${esc(why)} &middot; ${
+        leg.bookPrice ? `Bet365 ${odds(leg.bookPrice)}` : "no Bet365 price"}</span></span>
+      <span class="p">${pct(leg.p)}</span>
+      <span class="nw" title="What the whole acca becomes if you take this one"><b class="${up ? "" : "dn"}">${
+        n.single ? "" : "&asymp;"}${pct(n.acca, n.acca < 0.1 ? 2 : 1)}</b>${
+        n.price ? `at ${odds(n.price)}` : "acca"}</span>
+      <span class="go"><button data-swtake="${esc(leg.id)}">Take</button></span></div>`;
+  }).join("");
+  return shell(`<div class="swd-h"><span class="t">Instead of ${esc(old.label)}</span>
+      <small>Same match. The right-hand figure is what your whole acca becomes${
+        SWAP.cache[pt.id] && accaTotals().known ? ", with the price under it" : ""} — it is <b>${
+        pct(accaTotals().p, accaTotals().p < 0.1 ? 2 : 1)}</b> now.</small>${picker}</div>
+    ${rows || `<div class="swd-note">Nothing in this match lands more often than ${esc(old.label)} that is not already on your acca.</div>`}
+    <div class="swd-note">Safer is not the same as better — a shorter leg costs you price. The chance column says how often it lands; the Bet365 figure says what you are paid for it. Legs HAWK makes better than <b>${
+      Math.round(100 * SWAP_CEILING)}%</b> are left out: they move an acca's chance without moving its price.</div>`);
+}
+async function takeSwap(i, candId) {
+  const pt = S.acca[i];
+  const cand = (SWAP.cache[pt && pt.id] || []).find((l) => l.id === candId);
+  if (!pt || !cand) return;
+  const old = pt.legs.find((l) => l.id === SWAP.legId) || pt.legs[0];
+  const legs = pt.legs.map((l) => (l.id === old.id ? accaLegShape(cand) : l));
+  let p = cand.p;
+  if (legs.length > 1) {
+    // the correlated chance of the new set, from the same simulation that made it
+    try { const r = await api("/api/evaluate", { id: String(pt.id), legs: legs.map((l) => l.id) }); if (r && r.p > 0) p = r.p; }
+    catch { p = Math.min(1, pt.p * cand.p / (old.p || cand.p)); }
+  }
+  S.acca[i] = { ...pt, legs, p, fair: p > 0 ? 1 / p : null };
+  saveAcca(); closeSwap(); renderAccaBtn(); updateMonster();
+  const t = accaTotals();
+  toast(`${old.label} → ${cand.label}. Acca now ${pct(t.p, t.p < 0.1 ? 2 : 1)}${t.known ? ` at ${odds(t.known)}` : ""}.`);
+}
 // One departure on the board. `run` is the acca's chance with every match up to and
 // including this one on it, and `first` is the chance of the earliest match alone —
 // the bar's full width — so the bar is each row's share of where the acca started.
@@ -5412,10 +5610,13 @@ function accaRow(pt, i, weak, run, first) {
         <span class="n">${pct(run, run < 0.1 ? 2 : 1)}</span>
         <span class="b"><i style="width:${Math.max(1, Math.min(100, 100 * run / (first || 1))).toFixed(1)}%"></i></span>
         ${cost > 1.05 ? `<span class="d">÷ ${cost.toFixed(1)}</span>` : ""}</span>
-      <button class="x" data-arm="${i}" title="Take it out of the acca">✕</button>
+      <span class="acts">
+        ${started ? "" : `<button class="swp ${SWAP.i === i ? "on" : ""}" data-aswap="${i}"
+          title="Put a different leg from this match in its place">&#8646;<b>Replace</b></button>`}
+        <button class="x" data-arm="${i}" title="Take it out of the acca">✕</button></span>
     </summary>
     ${open ? partRow(pt, `<div><button class="linkbtn" data-aopen="${i}">edit in the builder</button></div>`) : ""}
-  </details>`;
+  </details>${swapDrawer(pt, i)}`;
 }
 // The tab carries the leg count, so it has to follow every add and remove.
 function syncAccaTabCount() {
@@ -5496,7 +5697,16 @@ function renderAccaBody() {
     // renderAccaBtn too: the count on the page menu's Acca button used to go stale
     // the moment you took a match out, and only came back on a full re-render.
     if (rm) { e.preventDefault(); e.stopPropagation(); S.acca.splice(+rm.dataset.arm, 1);
-      S.accaOpen = new Set(); saveAcca(); renderAccaBody(); renderAccaBtn(); updateMonster(); return; }
+      S.accaOpen = new Set(); SWAP.i = null; SWAP.legId = null;
+      saveAcca(); renderAccaBody(); renderAccaBtn(); updateMonster(); return; }
+    // The swap controls live inside the <summary>, so every one of them has to say
+    // so: a click that reaches the summary folds the row open underneath the drawer.
+    const sw = e.target.closest("[data-aswap]");
+    if (sw) { e.preventDefault(); e.stopPropagation(); openSwap(+sw.dataset.aswap); return; }
+    const pick = e.target.closest("[data-swleg]");
+    if (pick) { e.preventDefault(); e.stopPropagation(); SWAP.legId = pick.dataset.swleg; renderAccaBody(); return; }
+    const take = e.target.closest("[data-swtake]");
+    if (take) { e.preventDefault(); e.stopPropagation(); takeSwap(SWAP.i, take.dataset.swtake); return; }
     const op = e.target.closest("[data-aopen]");
     if (op) { const pt = S.acca[+op.dataset.aopen]; openPart(pt); }
   };

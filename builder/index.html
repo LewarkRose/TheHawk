@@ -6691,6 +6691,64 @@ function boardTable(title, rows, hint) {
   if (!rows) return "";
   return `<div class="bd-sec">${esc(title)}${hint ? `<small>${hint}</small>` : ""}</div>${rows}`;
 }
+// ---------- 🎟 WHAT HAWK SAID vs WHAT YOU GOT ----------
+// Every other block here grades HAWK on matches it had no stake in. This one
+// grades it on the bets you actually placed — a different question, and a far
+// smaller one: a few hundred bets against a few hundred thousand legs.
+//
+// It is here because the two can disagree, and the block says which to believe
+// when they do. A fifteen-point calibration error has nowhere to hide in 283,000
+// legs; sixty-nine bets produce one about one time in twenty. So a loud row here
+// over a quiet one above is a hot streak, not a discovery — and the hint says so
+// with both sample sizes printed next to each other.
+//
+// Split by price because that is where a real difference would live: HAWK prices
+// its own legs, so if it were wrong it would be wrong at one end of the book.
+const BET_BANDS = [[0, 2.5, "Under 2.50"], [2.5, 3.5, "2.50 – 3.50"], [3.5, 5, "3.50 – 5.00"],
+                   [5, 8, "5.00 – 8.00"], [8, Infinity, "8.00 and up"]];
+const BET_FULL = 20;   // points; a bet-sized sample swings ten and fifteen, not two
+const BET_MIN = 20;    // bets before the significance colour is allowed to speak
+const BET_FLOOR = 10;  // below this the block says nothing at all
+const betBack = (b) => b.status === "WON" ? (+b.potentialReturn || 0)
+  : b.status === "CASHED_OUT" ? (+b.cashOutAmount || 0) : 0;
+function yourBetsBlocks(bets, legsGraded) {
+  // Only bets HAWK put a chance on can be graded: one you typed into the Vault
+  // yourself has no number of HAWK's to be right or wrong about.
+  const done = (bets || []).filter((b) => b.status && b.status !== "PENDING" && +b.hawkP > 0 && +b.odds > 1);
+  if (done.length < BET_FLOOR) return "";
+  const sum = (r, f) => r.reduce((a, b) => a + f(b), 0);
+  const staked = sum(done, (b) => +b.stake || 0), got = sum(done, betBack);
+  // What HAWK's own chances said these were worth at the prices you paid. If this
+  // is under what you staked, HAWK was telling you they were losing bets — and any
+  // profit came from them landing more often than it said, not from it finding value.
+  const want = sum(done, (b) => (+b.stake || 0) * (+b.hawkP) * (+b.odds));
+  const money = (x) => `${x < 0 ? "−" : ""}€${Math.abs(x).toFixed(2)}`;
+  const pc = (x) => `${x >= 0 ? "+" : "−"}${Math.abs(100 * x).toFixed(1)}%`;
+  const rows = BET_BANDS.map(([lo, hi, label]) => {
+    const r = done.filter((b) => +b.odds >= lo && +b.odds < hi);
+    if (!r.length) return "";
+    const s = boardStat(r.length, sum(r, (b) => +b.hawkP), r.filter((b) => b.status === "WON").length);
+    const st = sum(r, (b) => +b.stake || 0);
+    return boardRow(label, s, st ? pc((sum(r, betBack) - st) / st) : null,
+                    r.length >= BET_MIN, { unit: "bets", full: BET_FULL });
+  }).join("");
+  if (!rows) return "";
+  // One big win can be a whole record. Printing what is left without it is the
+  // cheapest honesty on this page: a profit that survives it means something.
+  const best = Math.max(0, ...done.map((b) => betBack(b) - (+b.stake || 0)));
+  const pl = got - staked;
+  return boardTable("What HAWK said vs what you got",
+    rows,
+    `Your own settled bets, graded on the chance HAWK gave each one &mdash; bets you typed in yourself have no number to grade.
+     At the prices you paid HAWK's own figures made these worth <b>${money(want)}</b> back on <b>${money(staked)}</b> staked (<b>${
+       pc(staked ? want / staked - 1 : 0)}</b>); they returned <b>${money(got)}</b> (<b>${pc(staked ? pl / staked : 0)}</b>).
+     ${want < staked && pl > 0 ? "HAWK was calling these losing bets. The profit is them landing more often than it said, not it finding value. " : ""}
+     Bars here run to ${BET_FULL} points, not the ${BD_FULL} the leg blocks use, and a row stays grey under ${BET_MIN} bets.`)
+    + `<div class="bd-foot" style="border-top:0;padding-top:9px">Where this disagrees with the blocks above, believe the blocks: ${
+      legsGraded ? `<b>${legsGraded.toLocaleString()} legs</b>` : "those"} behind them against <b>${done.length} bets</b> here.
+      A ten-point gap is ordinary over a few dozen bets and impossible over a few hundred thousand legs.${
+      best > 0 && pl !== 0 ? ` Your best single win is <b>${money(best)}</b> of a <b>${money(pl)}</b> record &mdash; without it this is <b>${money(pl - best)}</b>.` : ""}</div>`;
+}
 // The axis, named at both ends. Printed once, above the first block — every block
 // below it uses the same rule and the same direction.
 function boardAxis() {
@@ -6762,12 +6820,13 @@ function renderBoard() {
       ${boardTable("Which leagues is it off on?", byRows(g.byLeague, 200),
         `Matches, not legs, decide whether a league's number means anything — the 400-odd legs in one game all turn on the same lineup and the same scoreline. Under ${BD_MIN_MATCHES} matches a row stays grey however long its bar.`)}
       ${upsetBlocks(g)}
+      ${yourBetsBlocks(bets, overall && overall.n)}
       <div class="bd-key">
         <span><i class="p"></i>Real — more often than HAWK said</span>
         <span><i class="m"></i>Real — less often than HAWK said</span>
         <span><i></i>Too small to call, or down to chance</span>
       </div>
-      <div class="bd-foot">A grey bar is not a pass or a fail — it means this many legs cannot tell that gap apart from luck, or the gap is under a point and you would never feel it. Full width is 2.5 points either way.<br>
+      <div class="bd-foot">A grey bar is not a pass or a fail — it means this much evidence cannot tell that gap apart from luck, or the gap is under a point and you would never feel it. Full width is ${BD_FULL} points either way in the blocks graded on legs; the upset radar and your own bets swing further than that and each says its own scale.<br>
         Corrections already in force are applied before you ever see a chance, so a gap here is not money leaking.</div>`
       : `<div class="bd-foot">HAWK's graded board hasn't loaded. It's built by the site every few hours.</div>`}
       </div>

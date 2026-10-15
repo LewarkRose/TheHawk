@@ -325,22 +325,67 @@ img{max-width:100%}
 .stub .perf span{flex:none;white-space:nowrap;font:700 8.5px var(--mono,ui-monospace);
   letter-spacing:.22em;color:var(--muted);text-transform:uppercase}
 
-/* A RUNNING TICKET, wherever you meet it — Today, Live, or the Vault — is the
-   same printed stub. Laid out for the width it gets rather than squeezed into
-   a row, so the legs and the cash-out call are readable on the pub screen. */
-.myday .myrun{margin:0 0 12px}
-.myday .myrun:last-of-type{margin-bottom:0}
-.mrh{display:flex;align-items:flex-start;gap:12px;margin-top:4px}
-.mrf{font-size:15px;font-weight:900;line-height:1.25}
+/* ---------- A RUNNING TICKET: THE TRACK ----------
+   This was the printed stub with the legs as a row of pills. It said what the bet
+   WAS and never where it STOOD: mid-match, with a leg already home, the only thing
+   that changed on the whole card was one pill turning lavender.
+   So the bet is drawn as a journey instead. A rail across the top fills as legs
+   land, which is readable from across the room before you focus on a word; each leg
+   is a row with its own match clock, struck through once it is home; and the price
+   moves to the top right, where the eye goes first on a card about money. */
+.myday .tk{margin:0 0 12px}
+.myday .tk:last-of-type{margin-bottom:0}
+.tk{position:relative;border-radius:4px;overflow:hidden;
+  background:linear-gradient(180deg,#1b1f27,#15181e);
+  box-shadow:inset 0 0 0 1px rgba(188,200,255,.1),0 20px 34px -22px rgba(0,0,0,.95)}
+.tk-h{display:flex;align-items:center;gap:12px;padding:14px 16px 12px}
+.tk-h .f{flex:1;min-width:0}
+.tk-h .f b{display:block;font-size:15px;font-weight:800;line-height:1.2;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tk-h .f span{display:block;font:10.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+  color:var(--muted);margin-top:3px;letter-spacing:.04em}
+.tk-h .pr{flex:none;text-align:right}
+.tk-h .pr b{display:block;font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
+  font-size:26px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.tk-h .pr span{display:block;font:700 8.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:5px}
+/* the rail: one segment per leg, filled as they land */
+.rail{display:flex;gap:3px;padding:0 16px}
+.rail i{flex:1;height:5px;border-radius:2px;background:#24262e}
+.rail i.won{background:var(--accent)}
+.rail i.live{background:linear-gradient(90deg,var(--accent) 50%,#24262e 50%)}
+.rail i.lost{background:var(--red)}
+.tk-legs{padding:12px 16px 4px}
+.tk-leg{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;gap:10px;
+  padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.tk-leg:last-child{border-bottom:0}
+.tk-leg .d{width:9px;height:9px;border-radius:50%;background:#2e3038;margin-left:3px}
+.tk-leg.won .d{background:var(--accent);box-shadow:0 0 0 3px rgba(188,200,255,.15)}
+.tk-leg.lost .d{background:var(--red);box-shadow:0 0 0 3px rgba(255,93,115,.15)}
+.tk-leg.live .d{background:var(--red)}
+.tk-leg .l{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tk-leg.won .l{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(188,200,255,.4)}
+.tk-leg.lost .l{color:var(--red);text-decoration:line-through;text-decoration-color:rgba(255,93,115,.5)}
+.tk-leg .c{font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
+  color:var(--muted);text-transform:uppercase;white-space:nowrap}
+.tk-leg.live .c{color:var(--red)}
+.tk-f{display:flex;align-items:stretch;margin-top:8px;border-top:1px solid rgba(188,200,255,.14)}
+.tk-f > div{flex:1;min-width:0;padding:11px 16px}
+.tk-f > div + div{border-left:1px solid rgba(188,200,255,.14)}
+.tk-f .k{font:700 8.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted)}
+.tk-f .v{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;font-size:21px;
+  font-weight:700;line-height:1;margin-top:5px;font-variant-numeric:tabular-nums}
+.tk-f .v.a{color:var(--accent)}
+.tk-f .n{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.45}
 .mrlive{flex:none;display:inline-flex;align-items:center;gap:5px;font:800 11px system-ui;
   padding:3px 9px;border-radius:999px;color:var(--red);
   border:1px solid rgba(255,93,115,.35);background:rgba(255,93,115,.09)}
-.mrlegs{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
-.mrfoot{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
-.lab2{font:900 9.5px system-ui;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
-.mrbig{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
-  font-weight:700;font-size:23px;line-height:1.05;margin-top:2px}
-@media (max-width:640px){.mrfoot{flex-direction:column;gap:8px}}
+@media (max-width:640px){
+  .tk-h,.rail,.tk-legs{padding-left:12px;padding-right:12px}
+  .tk-f > div{padding:10px 12px}
+  .tk-h .pr b{font-size:22px}
+}
 
 /* A restored scan says its own age. Deliberately not styled as a warning — it is
    not an error, it is a fact about the numbers you are looking at. */
@@ -7020,8 +7065,8 @@ function renderToday() {
       const [id, lg] = tr.dataset.dsgo.split("|");
       if (id) openPick(id, lg);
     });
-    const day0 = $("#tdDay"); if (day0) day0.innerHTML = myDayCard((S.scores && S.scores.data) || []) ||
-      `<div class="note" style="margin:0">Nothing running. Bets you log show up here as they play.</div>`;
+    paintDay();
+    refreshHold(vaultBets().filter((b) => b.status === "PENDING"), (S.scores && S.scores.data) || []);
     scorePaper();
     return;
   }
@@ -7079,9 +7124,60 @@ function renderToday() {
     const [id, lg] = b.dataset.plango.split("|");
     if (id) openPick(id, lg);   // same rule as the Picks cards: builder if it's still to come, live if not
   });
-  const day = $("#tdDay"); if (day) day.innerHTML = myDayCard((S.scores && S.scores.data) || []) ||
-    `<div class="note" style="margin:0">Nothing running. Bets you log show up here as they play.</div>`;
+  paintDay();
+  // then ask every in-play match what the ticket is worth now, and repaint if it moved
+  refreshHold(vaultBets().filter((b) => b.status === "PENDING"), (S.scores && S.scores.data) || []);
   scorePaper();
+}
+// ---------- THE LIVE HOLD ----------
+// "Holding is worth" was `hawkP × returns`, and hawkP is the chance stored the moment
+// you placed the bet. It did not move when a goal went in — a ticket with a leg already
+// home showed the figure it showed at kick-off, which is the one number on this card
+// anyone would actually act on.
+//
+// ticketlive is cheap enough to ask for every in-play match on the card: it reuses a
+// 25-second cache of the live match and runs no simulation. Matches not yet kicked off
+// keep their stored chance and the card says the figure is part estimate; a match
+// already settled drops out of the product entirely.
+const HOLD = { by: {}, busy: false };
+async function refreshHold(bets, games) {
+  if (HOLD.busy) return;
+  const inPlay = new Set((games || []).filter((g) => g.status === 3).map((g) => String(g.id)));
+  const want = (bets || []).filter((b) => (b.legs || []).some((l) => l.hawk && inPlay.has(String(l.hawk.game))));
+  if (!want.length) return;
+  HOLD.busy = true;
+  let moved = false;
+  try {
+    for (const b of want) {
+      let p = 1, got = false, approx = false;
+      for (const l of (b.legs || [])) {
+        if (!l.hawk) { approx = true; continue; }
+        const rs = (l.hawk.legs || []).map((h) => (h.result === "won" || h.userDone) ? "won" : h.result);
+        if (rs.includes("lost")) { p = 0; got = true; break; }
+        if (rs.length && rs.every((r) => r === "won")) continue;   // this match is already home
+        if (inPlay.has(String(l.hawk.game))) {
+          try {
+            const r = await api(`/api/ticketlive?id=${encodeURIComponent(l.hawk.game)}`,
+              { legs: l.hawk.legs.map((h) => ({ ...h, subOn: S.subOn && b.subOn !== false })) });
+            if (r && r.p >= 0) { p *= r.p; got = true; continue; }
+          } catch { }
+        }
+        p *= l.hawk.p || 1; approx = true;
+      }
+      if (!got) continue;
+      const was = HOLD.by[b.id];
+      HOLD.by[b.id] = { p, approx };
+      if (!was || Math.abs(was.p - p) > 1e-6) moved = true;
+    }
+  } finally { HOLD.busy = false; }
+  if (moved) paintDay();
+}
+// One place that prints the day card, so the live refresh can repaint it without
+// re-running everything else Today does.
+function paintDay() {
+  const day = $("#tdDay"); if (!day) return;
+  day.innerHTML = myDayCard((S.scores && S.scores.data) || []) ||
+    `<div class="note" style="margin:0">Nothing running. Bets you log show up here as they play.</div>`;
 }
 function myDayCard(games) {
   let bets = [];
@@ -7098,35 +7194,50 @@ function myDayCard(games) {
   const clockOf = (id) => { const g = (games || []).find((x) => String(x.id) === String(id)); return g && g.status === 3 ? (g.clock || "live") : g && g.status === 4 ? "FT" : null; };
   const rows = mine.map((b) => {
     const legs = (b.legs || []).flatMap((l) => (l.hawk && l.hawk.legs || []).map((h) => ({ ...h, game: l.hawk.game })));
-    // A leg with no readable label would just be an empty pill.
-    const chips = legs.filter((h) => String(h.label || "").trim().length > 1).map((h) => {
-      const st = h.result === "won" || h.userDone ? "won" : h.result === "lost" ? "lost" : "";
-      const clock = clockOf(h.game);
-      return `<span class="myleg ${st}">${esc(String(h.label || "").slice(0, 34))}${clock && !st ? ` · ${esc(clock)}` : ""}</span>`;
-    }).join("");
-    const left = legs.filter((h) => !(h.result === "won" || h.userDone) && h.result !== "lost").length;
-    // A running ticket is the same printed stub the builder and the Vault use,
-    // so a ticket looks the same wherever you meet it. Below the perforation is
-    // HAWK's own value for holding on — never a cash-out offer, because Bet365's
-    // offer is in no feed HAWK reads and inventing one would be the worst lie
-    // this app could tell.
+    // A leg with no readable label would just be an empty row.
+    const named = legs.filter((h) => String(h.label || "").trim().length > 1);
+    const stateOf = (h) => (h.result === "won" || h.userDone) ? "won"
+      : h.result === "lost" ? "lost" : clockOf(h.game) ? "live" : "";
+    const home = named.filter((h) => stateOf(h) === "won").length;
     const live = legs.map((h) => clockOf(h.game)).find(Boolean) || "";
-    const hold = (+b.hawkP || +b.hawkChance || 0) * (+b.potentialReturn || 0);
-    return `<div class="stub myrun">
-      <div class="mrh">
-        <div style="flex:1;min-width:0"><div class="mrf">${esc((b.legs[0] || {}).fixture || "Your bet")}${
-          b.legs.length > 1 ? ` <span class="muted" style="font-weight:600">+${b.legs.length - 1} more</span>` : ""}</div>
-          <div class="muted" style="font-size:11.5px;margin-top:2px">€${(+b.stake || 0).toFixed(2)} at <span class="q" style="font-size:13px">${odds(b.odds)}</span> · ${
-            left ? `${left} leg${left === 1 ? "" : "s"} to go` : "all legs landed"}</div></div>
+    // The rail carries the whole state of the bet in five pixels of height.
+    const rail = named.map((h) => `<i class="${stateOf(h)}"></i>`).join("");
+    const rows2 = named.map((h) => {
+      const st = stateOf(h), clock = clockOf(h.game);
+      return `<div class="tk-leg ${st}"><span class="d"></span>
+        <span class="l" title="${esc(String(h.label || ""))}">${esc(String(h.label || "").slice(0, 46))}</span>
+        <span class="c">${st === "won" ? "landed" : st === "lost" ? "gone"
+          : clock ? esc(clock) : "not started"}</span></div>`;
+    }).join("");
+    // Below the rule is HAWK's own value for holding on — never a cash-out offer,
+    // because Bet365's offer is in no feed HAWK reads and inventing one would be the
+    // worst lie this app could tell. It is live while a match is in play, and says
+    // which it is: a figure frozen at kick-off is worse than no figure, because it
+    // looks like it is telling you something about the match you are watching.
+    const hv = HOLD.by[b.id];
+    const p = hv ? hv.p : (+b.hawkP || +b.hawkChance || 0);
+    const hold = p * (+b.potentialReturn || 0);
+    const dead = named.some((h) => stateOf(h) === "lost");
+    const when = dead ? `a leg has gone`
+      : hv ? (hv.approx ? `HAWK now &mdash; part estimate, matches still to come`
+                        : `HAWK now &middot; ${esc(live || "live")}`)
+      : `HAWK at kick-off`;
+    return `<div class="tk">
+      <div class="tk-h">
+        <div class="f"><b>${esc((b.legs[0] || {}).fixture || "Your bet")}${
+          b.legs.length > 1 ? ` +${b.legs.length - 1}` : ""}</b>
+          <span>&euro;${(+b.stake || 0).toFixed(2)} STAKE &middot; ${home} OF ${named.length} HOME</span></div>
         ${live ? `<span class="mrlive">● ${esc(live)}</span>` : ""}
+        <div class="pr"><b>${odds(b.odds)}</b><span>price</span></div>
       </div>
-      <div class="mrlegs">${chips}</div>
-      <div class="perf"><i></i><span>HAWK &middot; ${(HAWK.N_SIMS || 12000).toLocaleString()} sims</span><i></i></div>
-      <div class="mrfoot">
-        <div><div class="lab2">Returns</div><div class="mrbig">€${(+b.potentialReturn || 0).toFixed(2)}</div></div>
-        ${hold > 0 ? `<div style="text-align:right"><div class="lab2">Holding is worth</div>
-          <div class="mrbig" style="color:var(--accent)">€${hold.toFixed(2)}</div>
-          <div class="muted" style="font-size:10.5px">HAWK's own figure — it cannot see Bet365's offer</div></div>` : ""}
+      <div class="rail">${rail}</div>
+      <div class="tk-legs">${rows2}</div>
+      <div class="tk-f">
+        <div><div class="k">Returns</div><div class="v">&euro;${(+b.potentialReturn || 0).toFixed(2)}</div>
+          <div class="n">on a &euro;${(+b.stake || 0).toFixed(2)} stake</div></div>
+        ${hold > 0 || dead ? `<div><div class="k">Holding is worth</div>
+          <div class="v ${dead ? "" : "a"}" ${dead ? `style="color:var(--red)"` : ""}>&euro;${hold.toFixed(2)}</div>
+          <div class="n">${when}${dead ? "" : " &mdash; it cannot see Bet365's offer"}</div></div>` : ""}
       </div>
     </div>`;
   }).join("");

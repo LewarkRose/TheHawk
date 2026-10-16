@@ -315,20 +315,53 @@
            chance explains for that many legs. Grey is "real but small, or too little to
            tell", which is most of your own bets and is the honest thing for them to look
            like: 25 legs cannot tell a bias from an afternoon however long its bar. */
-        .sc-head, .sc-row { display: grid; grid-template-columns: minmax(0,1fr) 54px 56px 112px 62px; align-items: center; }
-        .sc-head span:not(:first-child), .sc-row span:not(:first-child) { text-align: right; }
-        .sc-head { padding: 8px 2px; font: 700 8.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-            letter-spacing: .15em; color: var(--muted); text-transform: uppercase;
-            border-bottom: 1px solid rgba(188, 200, 255,.16); }
-        .sc-row { padding: 7px 2px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,.045); }
+        /* Four columns, matching the builder's Board: what it is · the gap as a bar ·
+           the gap read out in words · the count. The said and landed figures moved
+           into the label's second line — they were two of five columns and almost
+           nobody reads a pair of percentages and subtracts them, when the gap is
+           drawn right beside them. A bar cannot say WHICH SIDE of the rule means
+           HAWK over-claimed, so it is now read out in English and the axis above
+           names both directions. Keep this in step with .bd-* in builder/index.html. */
+        .sc-head, .sc-row { display: grid; grid-template-columns: minmax(0,190px) minmax(0,1fr) 104px 52px;
+            align-items: center; gap: 0 12px; }
+        .sc-head { padding: 9px 2px 7px; border-bottom: 1px solid rgba(188, 200, 255,.16); }
+        .sc-head .hn { font: 700 8.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+            letter-spacing: .15em; color: var(--muted); text-transform: uppercase; text-align: right; align-self: end; }
+        .sc-axis { position: relative; display: block; height: 34px; font-size: 10.5px;
+            color: var(--muted); line-height: 1.3; }
+        .sc-axis b { color: var(--text-2); font-weight: 600; }
+        .sc-axis em { display: block; font-style: normal; margin-top: 2px; }
+        .sc-axis .l { position: absolute; left: 0; top: 0; max-width: 40%; }
+        .sc-axis .r { position: absolute; right: 0; top: 0; max-width: 40%; text-align: right; }
+        .sc-axis .c { position: absolute; left: 50%; top: 9px; transform: translateX(-50%); white-space: nowrap;
+            font: 700 8.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+            letter-spacing: .13em; text-transform: uppercase; }
+        .sc-axis .one { display: none; }
+        .sc-row { padding: 8px 2px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,.045); }
         .sc-row:hover { background: rgba(188, 200, 255,.035); }
-        .sc-row .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
-        .sc-row .lbl i { font-style: normal; color: var(--faint); font-size: 10.5px;
+        .sc-row .lbl { min-width: 0; color: var(--text-2); }
+        .sc-row .lbl b { display: block; font-weight: 600; font-size: 13px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sc-row .lbl i { font-style: normal; font-weight: 400; color: var(--faint); font-size: 10.5px;
             font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+        .sc-row .lbl em { display: block; font-style: normal; color: var(--faint); font-size: 10.5px;
+            margin-top: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* the bar read out in words, in its own column so a wide bar can never run over it */
+        .sc-row .say { font-size: 11px; color: var(--muted); line-height: 1.3; }
+        .sc-row .say b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700;
+            color: var(--text); font-variant-numeric: tabular-nums; }
         .sc-row .v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px;
-            font-variant-numeric: tabular-nums; color: var(--muted); }
+            font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
         .sc-row .v.hit { color: var(--text); }
-        .sc-row .nn { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: var(--muted); }
+        .sc-row .nn { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px;
+            color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+        .sc-key { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; padding: 11px 2px 0;
+            font-size: 10.5px; color: var(--muted); border-top: 1px solid rgba(188, 200, 255,.16); margin-top: 2px; }
+        .sc-key i { display: inline-block; width: 18px; height: 7px; border-radius: 1px; background: #4e4e58;
+            vertical-align: 1px; margin-right: 6px; }
+        .sc-key i.p { background: var(--accent); }
+        .sc-key i.m { background: var(--down); }
         .sc-bar { position: relative; height: 13px; }
         .sc-bar::before { content: ""; position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px;
             background: rgba(188, 200, 255,.3); }
@@ -338,14 +371,41 @@
         .sc-bar i.p.sig { background: var(--accent); }
         .sc-bar i.m.sig { background: var(--down); }
         /* raw → quoted → landed → shifted: five figures, no bar, so its own track sizes */
-        .sc-head.sc-fix, .sc-row.sc-fix { grid-template-columns: minmax(0,1fr) 52px 56px 56px 68px; }
+        .sc-head.sc-fix, .sc-row.sc-fix { grid-template-columns: minmax(0,1fr) 52px 56px 56px 68px; gap: 0; }
+        .sc-head.sc-fix span { font: 700 8.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+            letter-spacing: .15em; color: var(--muted); text-transform: uppercase; text-align: right; }
+        .sc-head.sc-fix span:first-child { text-align: left; }
+        .sc-row.sc-fix .lbl b { display: inline; }
         .sc-row .v.raw { text-decoration: line-through; }
         .sc-row .v.by { color: var(--up); font-weight: 700; }
         .sc-row .v.by i { font-style: normal; color: var(--accent); font-weight: 400; }
+        /* The axis lives over the bar column, and that column is what shrinks. Below
+           ~980px there is no room for two lines a side; below ~760px none for three
+           labels at all, so it becomes one sentence — a misaligned axis is worse
+           than a plain line of words. */
+        @media (max-width: 980px) {
+            .sc-axis { height: 19px; }
+            .sc-axis em { display: none; }
+            .sc-axis .c { top: 1px; }
+            .sc-axis .l, .sc-axis .r { max-width: 46%; }
+        }
+        @media (max-width: 760px) {
+            .sc-head { display: block; }
+            .sc-head .hn, .sc-head > span:nth-child(1), .sc-head > span:nth-child(3) { display: none; }
+            .sc-axis { height: auto; }
+            .sc-axis .l, .sc-axis .c, .sc-axis .r { display: none; }
+            .sc-axis .one { display: block; position: static; max-width: none; text-align: center; line-height: 1.45; }
+        }
         @media (max-width: 620px) {
-            .sc-head, .sc-row { grid-template-columns: minmax(0,1fr) 44px 46px 70px 52px; }
+            /* two columns, two rows: name + count above, bar and its words below */
+            .sc-row { grid-template-columns: minmax(0,1fr) 88px; gap: 0 10px; font-size: 12.5px; }
+            .sc-row .lbl { grid-area: 1 / 1; }
+            .sc-row .nn { grid-area: 1 / 2; align-self: start; }
+            .sc-row .sc-bar { grid-area: 2 / 1; margin-top: 5px; }
+            .sc-row .say { grid-area: 2 / 2; margin-top: 5px; text-align: right; font-size: 10px; }
             .sc-head.sc-fix, .sc-row.sc-fix { grid-template-columns: minmax(0,1fr) 42px 44px 44px 56px; }
-            .sc-row { font-size: 12.5px; }
+            .sc-row.sc-fix .lbl, .sc-row.sc-fix .v { grid-area: auto; }
+            .sc-axis { font-size: 10px; }
         }
     </style>
     <!-- Icons: new names / ?v= so browsers drop the old cached logo.
@@ -1327,7 +1387,7 @@
         // at. The bar now draws the gap itself against a centre rule, full width at 2.5
         // points, which is where the differences actually are.
         const SC_BAR_FULL = 2.5;
-        function scRow(label, n, said, got, thin) {
+        function scRow(label, n, said, got, thin, note) {
             const pts = 100 * (got - said);
             const w = Math.min(50, Math.abs(pts) * (50 / SC_BAR_FULL));
             // Same test the Board uses: a point or more, and past chance for this many
@@ -1338,18 +1398,42 @@
             const sig = !thin && Math.abs(z) >= 1.96 && Math.abs(pts) >= 1;
             const bar = Math.abs(pts) < 0.05 ? ''
                 : `<i class="${pts > 0 ? 'p' : 'm'}${sig ? ' sig' : ''}" style="width:${w.toFixed(1)}%"></i>`;
+            // The words are worked out from the two figures printed beside them, not from
+            // the raw gap: 42.1 → 42.7 reading "0.5 more often" is the kind of thing that
+            // makes a reader distrust the whole page. The bar, the colour test and the
+            // tooltip all stay on the exact value; only the sentence is rounded to agree
+            // with what you can see.
+            const shown = +((100 * got).toFixed(1) - (100 * said).toFixed(1)).toFixed(1);
+            const say = Math.abs(shown) < 0.05 ? 'spot on'
+                : `<b>${Math.abs(shown).toFixed(1)}</b> ${shown > 0 ? 'more' : 'less'} often`;
             return `<div class="sc-row" title="HAWK said ${scPct(said)}, it landed ${scPct(got)} over ${n.toLocaleString()} legs — ${
                 pts >= 0 ? '+' : ''}${pts.toFixed(1)} points${
                 thin ? ', over too few legs to read as more than noise'
                      : sig ? ', past what chance explains at this many legs'
                            : ', within what chance explains at this many legs'}">
-                <span class="lbl">${label}</span>
-                <span class="v">${(100 * said).toFixed(1)}</span>
-                <span class="v hit">${(100 * got).toFixed(1)}</span>
+                <span class="lbl"><b>${label}${note ? ` <i>${note}</i>` : ''}</b>
+                    <em>said ${(100 * said).toFixed(1)} &middot; landed ${(100 * got).toFixed(1)}</em></span>
                 <span class="sc-bar">${bar}</span>
+                <span class="say">${say}</span>
                 <span class="nn">${n.toLocaleString()}</span></div>`;
         }
-        const scTable = (head, rows) => `<div class="sc-head"><span>${head}</span><span>Said</span><span>Landed</span><span>Gap</span><span>Legs</span></div>${rows}`;
+        // The bands are stored as 0–20%, 20–35% and so on. Nobody thinks in ranges; they
+        // think "long shots" and "near certainties". Keyed off the midpoint so it survives
+        // the bands being re-cut. Same names the builder's Board uses.
+        const scBandName = (lo, hi) => { const m = 50 * (lo + Math.min(1, hi));
+            return m < 20 ? 'Long shots' : m < 35 ? 'Outsiders' : m < 50 ? 'Against the odds'
+                : m < 65 ? 'Coin flips' : m < 80 ? 'Likely' : m < 90 ? 'Very likely' : 'Near certainties'; };
+        // The axis, named at both ends, printed once above a block.
+        const scAxis = () => `<span class="sc-axis">
+            <span class="l"><b>&larr; HAWK claimed too much</b><em>it happened less often than it said</em></span>
+            <span class="c">bang on</span>
+            <span class="r"><b>HAWK was too shy &rarr;</b><em>it happened more often than it said</em></span>
+            <span class="one">&larr; left of the line it happened <b>less</b> often than HAWK said &nbsp;&middot;&nbsp; right of it, <b>more</b> often &rarr;</span></span>`;
+        const scTable = (rows) => `<div class="sc-head"><span></span>${scAxis()}<span></span><span class="hn">Legs</span></div>${rows}`;
+        const scKey = () => `<div class="sc-key">
+            <span><i class="p"></i>Real &mdash; more often than HAWK said</span>
+            <span><i class="m"></i>Real &mdash; less often than HAWK said</span>
+            <span><i></i>Too small to call, or down to chance</span></div>`;
 
         function renderScorecard() {
             const legs = scLegs();
@@ -1382,11 +1466,12 @@
 
             // ---- 1. calibration, on every match ----
             const label = (b) => b.lo === 0 ? `under ${Math.round(100 * b.hi)}%` : b.hi > 1 ? `${Math.round(100 * b.lo)}%+` : `${Math.round(100 * b.lo)}–${Math.round(100 * b.hi)}%`;
-            const bigRows = G ? G.bands.filter(b => b.n).map(b => scRow(label(b), b.n, b.p / b.n, b.won / b.n, b.n < 500)).join('') : '';
+            const bigRows = G ? G.bands.filter(b => b.n).map(b =>
+                scRow(scBandName(b.lo, b.hi), b.n, b.p / b.n, b.won / b.n, b.n < 500, label(b))).join('') : '';
             document.getElementById('sc-calibration').innerHTML = scCard(
-                scH('📏', 'Does 60% mean 60%?',
-                    'HAWK saves its chances for every match before kick-off and marks them afterwards — so this fills up whether you bet or not. The bar is the gap between the two, drawn either side of a centre rule: nothing on the rule is a band that told the truth.') +
-                (bigRows ? scTable('HAWK says', bigRows) : '<p class="text-xs text-zinc-500">No graded matches yet — the first appear within a day of kick-off.</p>'));
+                scH('📏', 'Does 60% really mean 60%?',
+                    'Each row takes every leg HAWK gave roughly the same chance, then checks how often they actually came in. It saves those chances before kick-off and marks them afterwards, so this fills up whether you bet or not.') +
+                (bigRows ? scTable(bigRows) + scKey() : '<p class="text-xs text-zinc-500">No graded matches yet — the first appear within a day of kick-off.</p>'));
 
             // ---- 2. where it is off: markets with a real gap ----
             //
@@ -1434,14 +1519,14 @@
                       x.fix.capped ? '<i title="The correction is capped at 0.6 in log-odds"> capped</i>' : ''}</span></div>`;
                 marketHtml = (off.length
                         ? `<p class="text-[11px] text-zinc-400">${off.length} market${off.length > 1 ? 's are' : ' is'} still more than 3 points out <b class="text-zinc-200">after</b> the builder's correction. These are the ones worth care.</p>`
-                            + scTable('Market', off.map(x => scRow(escHtml(x.m) + ver(x), x.n, x.said, x.got, false)).join(''))
+                            + scTable(off.map(x => scRow(escHtml(x.m) + ver(x), x.n, x.said, x.got, false)).join('')) + scKey()
                         : '<p class="text-[11px] text-emerald-400">No market with 200+ legs is more than 3 points out once the builder\'s correction is applied.</p>')
                     + (fixed.length ? `<details class="pt-1" open><summary class="text-[11px] text-[#bcc8ff] cursor-pointer">${fixed.length} market${fixed.length > 1 ? 's are' : ' is'} corrected before you see a price ▾</summary>
                         <p class="text-[11px] text-zinc-500 py-1">The model's raw number, what HAWK actually quotes you, and what landed.</p>
                         <div class="sc-head sc-fix"><span>Market</span><span>Raw</span><span>Quoted</span><span>Landed</span><span>Shifted</span></div>
                         ${fixed.map(fixRow).join('')}</details>` : '')
                     + (ok.length ? `<details class="pt-1"><summary class="text-[11px] text-[#bcc8ff] cursor-pointer">The ${ok.length} markets that need no correction ▸</summary>${
-                        scTable('Market', ok.map(x => scRow(escHtml(x.m) + ver(x), x.n, x.said, x.got, false)).join(''))}</details>` : '');
+                        scTable(ok.map(x => scRow(escHtml(x.m) + ver(x), x.n, x.said, x.got, false)).join(''))}</details>` : '');
             }
             document.getElementById('sc-market').innerHTML = scCard(scH('🔍', 'Where HAWK is off',
                 'This file grades HAWK\'s <b>raw</b> chances — the grader runs with learning switched off on purpose, so the record is of the model itself. The builder then shifts a market by what its record shows before quoting you, so a raw gap is not a gap in what you actually bet. '
@@ -1494,7 +1579,7 @@
                 const g = legs.filter(x => x.p >= lo && x.p < hi);
                 if (!g.length) return '';
                 const s = scStat(g);
-                return scRow(lab, s.n, s.e / s.n, s.a / s.n, s.n < SC_MIN_BAND);
+                return scRow(scBandName(lo, hi), s.n, s.e / s.n, s.a / s.n, s.n < SC_MIN_BAND, lab);
             }).join('');
             document.getElementById('sc-mine').innerHTML =
                 `<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1503,7 +1588,7 @@
                 </div>
                 <div class="h-6"></div>
                 ${scCard(scH('🎟', 'Your own bets', `Just the ${all.n} legs you actually had money on, ${mine} from the Vault and ${all.n - mine} from HAWK's board. Far too few to judge HAWK by — the table above is the one for that — but it is your record.`)
-                    + (mineRows ? scTable('HAWK says', mineRows) : '<p class="text-xs text-zinc-500">Nothing settled yet.</p>')
+                    + (mineRows ? scTable(mineRows) : '<p class="text-xs text-zinc-500">Nothing settled yet.</p>')
                     + `<p class="text-[11px] text-zinc-500">Across all ${all.n}: HAWK said <b class="text-zinc-300">${all.e.toFixed(1)}</b> would land and <b class="text-zinc-300">${all.a}</b> did. Could still be hiding a bias of up to <b class="text-zinc-300">${scPct(all.band)}</b> per leg.</p>`)}`;
 
             // By league, from every match — no betting needed. Gated on MATCHES, not
@@ -1533,7 +1618,7 @@
                 const ready = rows.filter(x => (x.matches || 0) >= SC_MIN_MATCHES);
                 const waiting = rows.filter(x => (x.matches || 0) < SC_MIN_MATCHES);
                 leagueHtml = (ready.length
-                        ? scTable('League', ready.map(x => scRow(`${escHtml(x.k)} <span class="text-zinc-600">· ${x.matches} matches</span>`, x.n, x.p / x.n, x.won / x.n, false)).join(''))
+                        ? scTable(ready.map(x => scRow(escHtml(x.k), x.n, x.p / x.n, x.won / x.n, false, `${x.matches} m`)).join(''))
                         : '')
                     + (waiting.length ? `<div class="space-y-1.5 pt-1">${ready.length ? '<p class="text-[10px] text-zinc-600 uppercase tracking-wider">Still collecting</p>' : ''}${
                         waiting.slice(0, 14).map(x => `<div class="flex items-center gap-2">

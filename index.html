@@ -244,6 +244,12 @@
             .vault-bank { height: 50px; }
             .vault-actions { order: 3; width: 100%; justify-content: space-between; }
             .vault-wordmark b { font-size: 22px; }
+            /* Sync · Export · Import · Archive · ⚙ is 405px of buttons in a 358px row and
+               the group did not wrap, so on a 390px phone the settings cog sat at x=418 —
+               off the screen, and dragging the whole page sideways to reach it. The page
+               scrolled 422px wide because of this row, and the fixed background layers
+               were then sized to that, which is why they looked like the cause. */
+            .vgroup { flex-wrap: wrap; justify-content: center; }
         }
         html body header h1 {
             background: linear-gradient(180deg, #f0f3ff, #bcc8ff 60%, #5c67ad);

@@ -904,7 +904,18 @@ def sh_players(team_id, limit=20):
                 matches.append({**info, "minutes": minutes, "shots": s.get("shots") or 0,
                                 "sot": s.get("onTargetScoringAttempt") or 0, "goals": s.get("goals") or 0, "xg": xg,
                                 "yellow": 1 if s.get("yellowCard") else 0, "red": 1 if s.get("redCard") else 0,
-                                "sub_in": bool(s.get("substitutedIn")),
+                                # StatsHub names these from the substitution's point of
+                                # view, not the player's, and they read backwards:
+                                #   substitutedIn  = a sub came IN for him -> he came OFF
+                                #   substitutedOut = he was the one who came ON
+                                # Measured on 309 player-matches with minutes (Liverpool,
+                                # last 20): substitutedIn=true is median 72 minutes and
+                                # never a full 90, substitutedOut=true is median 18 with
+                                # 60% under 20 minutes. The second one is a substitute
+                                # appearance; the first is a starter being taken off.
+                                # Reading substitutedIn here threw away every start that
+                                # ended in a substitution and counted every cameo as one.
+                                "sub_in": bool(s.get("substitutedOut")),
                                 "assists": s.get("goalAssist") or 0, "xa": xa, "fouls": s.get("fouls") or 0,
                                 "fouled": s.get("wasFouled") or 0, "tackles": s.get("totalTackle") or 0,
                                 "offsides": s.get("totalOffside") or 0, "saves": s.get("saves") or 0})

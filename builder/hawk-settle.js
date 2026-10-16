@@ -82,19 +82,32 @@
       }
       return [...per.values()].filter((v) => v.r > 0 && v.y >= 2).length;
     });
-    const cards = yellow
-      ? [0, 1].map((k) => yellow[k] + 2 * red[k] - secondYellow[k])
-      : [homeId, awayId].map((id, k) => {
-          const per = new Map();
-          for (const e of cardEvents) {
-            if (e.competitorId !== id) continue;
-            const key = e.playerId == null ? `x${per.size}` : e.playerId;
-            const v = per.get(key) || { y: 0, r: 0 };
-            /red/i.test(e.eventType.name || "") ? v.r++ : v.y++;
-            per.set(key, v);
-          }
-          return [...per.values()].reduce((a, v) => a + Math.min(3, v.y + 2 * v.r), 0);
-        });
+    // Booking points from the ITEMISED card events, per player, capped at 3.
+    const fromEvents = [homeId, awayId].map((id) => {
+      const per = new Map();
+      for (const e of cardEvents) {
+        if (e.competitorId !== id) continue;
+        const key = e.playerId == null ? `x${per.size}` : e.playerId;
+        const v = per.get(key) || { y: 0, r: 0 };
+        /red/i.test(e.eventType.name || "") ? v.r++ : v.y++;
+        per.set(key, v);
+      }
+      return [...per.values()].reduce((a, v) => a + Math.min(3, v.y + 2 * v.r), 0);
+    });
+    const fromStats = yellow ? [0, 1].map((k) => yellow[k] + 2 * red[k] - secondYellow[k]) : null;
+    // The team-stats line and the event list DISAGREE, and the stats under-count.
+    // Measured over 106 finished matches (16 Oct 2026): 17 disagreed — 16 of them
+    // with MORE cards in the events, 1 the other way. Deportivo 1-1 Levante showed
+    // 2-2 in the stats against five itemised bookings including two at 90'; Lech
+    // Poznan v Leverkusen showed ONE yellow against four card events. The stats
+    // read like a snapshot that misses late cards. Settling on them lost "Over"
+    // legs that had won — and won "Under" legs that had lost.
+    //
+    // Neither feed is authoritative, but both fail the same way: by OMITTING a
+    // card, never by inventing one. So take the higher per side. In those 106
+    // matches there was not one where the two disagreed in opposite directions
+    // across the two sides, so this never counts a card twice.
+    const cards = fromStats ? [0, 1].map((k) => Math.max(fromStats[k], fromEvents[k])) : fromEvents;
     const names = Object.fromEntries((game.members || []).map((m) => [m.id, m.name]));
     const bookedIds = new Set(cardEvents.map((e) => e.playerId));
     const players = {};

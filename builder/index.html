@@ -529,6 +529,8 @@ img{max-width:100%}
 .sc-tri .d{background:var(--draw)}
 .sc-tri .a{background:#8f5f73}
 .sc-tri.fat .d{box-shadow:0 0 6px rgba(127,212,193,.6)}
+/* the radar's call, in the one form its record supports */
+.sc-upset{font:800 9.5px/1.3 system-ui;color:var(--red);letter-spacing:.01em;white-space:nowrap;margin-top:2px}
 .sc-row{display:grid;grid-template-columns:58px 1fr 92px 1fr 64px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;
   border:1px solid transparent;transition:.12s}
 .sc-row:hover{background:var(--panel2);border-color:var(--line)}
@@ -6217,11 +6219,26 @@ function predLine(g) {
     const cell = `<u>${tag[i]}</u>${fig}`;
     return i === 1 ? `<span class="d${hot ? " hot" : ""}">${cell}</span>` : cell;
   }).join("·");
+  // ⚡ used to be a bare bolt that said nothing. The radar's two halves are not
+  // equally good: over 207 matches at High and Very high, "the favourite fails to
+  // win" landed 53.1% against 55.8% said (z = −0.77, sound), while "the underdog
+  // wins" landed 22.7% against 28.9% (z = −1.95, overstated). So the bolt states
+  // the half that holds — which is also the only one the builder ever backs.
+  // Derived from `probs`, not stored: the favourite failing to win IS the other
+  // side's double chance, so it is draw + the underdog.
+  // Added from the figures ON SCREEN, not the raw ones: a row printing D28·A33 and
+  // then claiming 62% is the kind of thing that makes a reader stop trusting a page.
+  const favHome = raw[0] >= raw[2];
+  const notLose = v[1] + (favHome ? v[2] : v[0]);
+  const dogName = favHome ? g.away : g.home;
+  const call = p.level >= 2
+    ? `<div class="sc-upset" title="${esc(dogName)} not to lose — the radar's calibrated half. Over 207 graded matches at this risk it said 55.8% and 53.1% landed. It is much worse at saying the underdog will WIN (22.7% against 28.9% said), so it does not claim that.">⚡ ${notLose}% not to lose</div>`
+    : "";
   return `<span class="sc-tri${hot ? " fat" : ""}" aria-hidden="true">${
     ["h", "d", "a"].map((k, i) => `<i class="${k}" style="width:${v[i]}%"></i>`).join("")}</span>
     <div class="sc-hawk" title="HAWK before kick-off: ${esc(names.map((n, i) => `${n} ${v[i]}%`).join(" · "))}${
     tight ? " — close between the top two" : ""}${hot ? " — the draw is unusually live here" : ""}${
-    p.level >= 2 ? " — ⚡ High upset risk" : ""}">🦅 ${nums}${p.level >= 2 ? " ⚡" : ""}${mark}</div>`;
+    p.level >= 2 ? ` — ⚡ ${esc(dogName)} ${notLose}% not to lose` : ""}">🦅 ${nums}${mark}</div>${call}`;
 }
 async function openScore(id) {
   const g = (S.scores.data || []).find(x => x.id === String(id));
@@ -6758,13 +6775,13 @@ function upsetBlocks(g) {
   const sum = (k) => hi.reduce((a, x) => a + (x[k] || 0), 0);
   const n = sum("n"), sDog = sum("saidDog"), dog = sum("dogWon"), fail = sum("failed");
   const note = n ? ` Over the ${n} matches it called High or Very high the favourite failed to win <b>${fail}</b> times, but the underdog only won <b>${dog}</b> of them against the <b>${sDog.toFixed(0)}</b> HAWK expected — the other <b>${fail - dog}</b> were draws.` : "";
-  return boardTable("Upset radar · the favourite fails to win",
+  return boardTable("Does the underdog's double chance land?",
       rows("saidFail", "failed"),
-      "Graded on matches, not legs. The radar ranks trouble in the right order and each level lands near what it said — the bars stay short." )
-    + boardTable("Upset radar · the underdog actually wins",
+      `The favourite failing to win and the underdog's double chance landing are the same event, named from opposite sides — and this is the one HAWK actually backs: when the builder opens with an underdog, it opens with this, never with them to win. Graded on matches, not legs; the radar ranks trouble in the right order and each level lands near what it said.` )
+    + boardTable("And does the underdog actually win?",
       rows("saidDog", "dogWon"),
-      `The same matches, asking a harder question — and this is where it misses.${note}`
-      + ` Bars here run to ${UPSET_FULL} points, not the 2.5 the leg blocks use.`);
+      `The same matches, asking the harder question — and this is where it misses, which is exactly why the builder will not sell you it.${note}`
+      + ` Bars here run to ${UPSET_FULL} points, not the ${BD_FULL} the leg blocks use.`);
 }
 // ---------- 🤝 HOME, DRAW OR AWAY ----------
 // Graded every run since the record began and shown nowhere until now. It belongs

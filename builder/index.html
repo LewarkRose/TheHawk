@@ -529,8 +529,12 @@ img{max-width:100%}
 .sc-tri .d{background:var(--draw)}
 .sc-tri .a{background:#8f5f73}
 .sc-tri.fat .d{box-shadow:0 0 6px rgba(127,212,193,.6)}
-/* the radar's call, in the one form its record supports */
+/* the radar's call, in the one form its record supports. Red while it is a warning;
+   after the whistle it is a verdict, so it takes HAWK's own colour when it lands and
+   steps back out of the way when it does not. */
 .sc-upset{font:800 9.5px/1.3 system-ui;color:var(--red);letter-spacing:.01em;white-space:nowrap;margin-top:2px}
+.sc-upset.hit{color:var(--accent)}
+.sc-upset.miss{color:var(--faint);font-weight:600}
 .sc-row{display:grid;grid-template-columns:58px 1fr 92px 1fr 64px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;
   border:1px solid transparent;transition:.12s}
 .sc-row:hover{background:var(--panel2);border-color:var(--line)}
@@ -6230,10 +6234,29 @@ function predLine(g) {
   // then claiming 62% is the kind of thing that makes a reader stop trusting a page.
   const favHome = raw[0] >= raw[2];
   const notLose = v[1] + (favHome ? v[2] : v[0]);
-  const dogName = favHome ? g.away : g.home;
-  const call = p.level >= 2
-    ? `<div class="sc-upset" title="${esc(dogName)} not to lose — the radar's calibrated half. Over 207 graded matches at this risk it said 55.8% and 53.1% landed. It is much worse at saying the underdog will WIN (22.7% against 28.9% said), so it does not claim that.">⚡ ${notLose}% not to lose</div>`
-    : "";
+  const dogName = favHome ? g.away : g.home, favName = favHome ? g.home : g.away;
+  // After the whistle, the bolt marks ITS OWN call. It has to, because the ✓/✗ beside
+  // the numbers grades the 1X2 top pick — and in an upset match the top pick IS the
+  // favourite. So every time the radar was right, the row marked HAWK wrong: Leganés
+  // 0-1 Cordoba showed ✗ on a match where HAWK had called the upset at 62%.
+  // Graded on the half the record supports — the favourite failing to win, which is
+  // the underdog's double chance — never on the underdog winning outright.
+  let call = "";
+  if (p.level >= 2) {
+    const why = `${esc(dogName)} not to lose — the radar's calibrated half. Over 207 graded matches at this risk it said 55.8% and 53.1% landed. It is much worse at saying the underdog will WIN (22.7% against 28.9% said), so it does not claim that.`;
+    const done = g.status === 4 && g.score[0] != null;
+    if (!done) {
+      call = `<div class="sc-upset" title="${why}">⚡ ${notLose}% not to lose</div>`;
+    } else {
+      const fg = favHome ? g.score[0] : g.score[1], dg = favHome ? g.score[1] : g.score[0];
+      const landed = fg <= dg;   // the favourite did not win
+      call = `<div class="sc-upset ${landed ? "hit" : "miss"}" title="HAWK called it before kick-off: ${
+        esc(dogName)} ${notLose}% not to lose. ${landed
+          ? `${esc(dogName)} ${dg > fg ? "won" : "drew"} — the call landed.`
+          : `${esc(favName)} won — the call missed.`} ${why}">⚡ ${
+        landed ? `called it &middot; ${notLose}%` : "missed"}</div>`;
+    }
+  }
   return `<span class="sc-tri${hot ? " fat" : ""}" aria-hidden="true">${
     ["h", "d", "a"].map((k, i) => `<i class="${k}" style="width:${v[i]}%"></i>`).join("")}</span>
     <div class="sc-hawk" title="HAWK before kick-off: ${esc(names.map((n, i) => `${n} ${v[i]}%`).join(" · "))}${

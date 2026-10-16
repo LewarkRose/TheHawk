@@ -47,6 +47,8 @@
   /* the ticket's own stock: the only warm surface in the app, and the only
      one with a tooth. it is the thing you take away with you. */
   --ticket-stock:#232130;
+  /* the draw: it belongs to neither club, so it gets a colour neither club wears */
+  --draw:#7fd4c1;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -510,6 +512,23 @@ img{max-width:100%}
 .sc-hawk{font-size:10.5px;font-weight:600;color:var(--muted);letter-spacing:0;white-space:nowrap;margin-top:1px}
 .sc-hawk b{color:var(--accent);font-weight:900}
 .sc-hawk .ok{color:var(--accent)}.sc-hawk .bad{color:var(--red)}
+/* THE DRAW, MADE VISIBLE. It was always the middle number, but the three were
+   unlabelled and only the top pick was ever bolded — and the draw is almost never
+   the top pick, so the eye never landed on it and the draw read as missing.
+   Now: a bar for the shape, letters so you know which figure is which, and the
+   draw lit only when HAWK rates it DRAW_HOT or more. Teal because it belongs to
+   neither club, which is the one thing about the draw that is always true. */
+.sc-hawk u{text-decoration:none;color:#5c5c66;font-size:8.5px;font-weight:800;margin-right:1px}
+.sc-hawk .d{color:#a9a9b4}
+.sc-hawk .d u{color:var(--draw);opacity:.75}
+.sc-hawk .d.hot{color:var(--draw);font-weight:900}
+.sc-hawk .d.hot u{opacity:1}
+.sc-tri{display:flex;height:4px;border-radius:2px;overflow:hidden;margin-top:4px;background:#23232b}
+.sc-tri i{display:block;height:100%}
+.sc-tri .h{background:#5b6291}
+.sc-tri .d{background:var(--draw)}
+.sc-tri .a{background:#8f5f73}
+.sc-tri.fat .d{box-shadow:0 0 6px rgba(127,212,193,.6)}
 .sc-row{display:grid;grid-template-columns:58px 1fr 92px 1fr 64px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;
   border:1px solid transparent;transition:.12s}
 .sc-row:hover{background:var(--panel2);border-color:var(--line)}
@@ -6174,6 +6193,7 @@ function predLine(g) {
   // wrong. Anything within CLOSE of the top was a toss-up when it was made, and
   // is shown as one both before the game and after it.
   const CLOSE = 4;
+  const DRAW_HOT = 0.28;   // the band where the graded record starts running hot
   let mark = "";
   if (g.status === 4 && g.score[0] != null) {
     const res = g.score[0] > g.score[1] ? 0 : g.score[0] === g.score[1] ? 1 : 2;
@@ -6185,9 +6205,23 @@ function predLine(g) {
   // One outcome highlighted, because that is what a prediction is. How close the
   // call was is already in the three numbers, and in the tooltip when it was tight.
   const tight = best - Math.max(...v.filter((_, i) => i !== top)) <= CLOSE;   // the RUNNER-UP, not the outsider
-  return `<div class="sc-hawk" title="HAWK before kick-off: ${esc(names.map((n, i) => `${n} ${v[i]}%`).join(" · "))}${
-    tight ? " — close between the top two" : ""}${p.level >= 2 ? " — ⚡ High upset risk" : ""}">🦅 ${
-    v.map((x, i) => i === top ? `<b>${x}</b>` : x).join("·")}${p.level >= 2 ? " ⚡" : ""}${mark}</div>`;
+  // A draw this likely is worth pointing at. HAWK's draw call is its best — over 395
+  // graded matches it said 24.6% and 24.6% drew, better than home (+2.3) or away
+  // (−2.3) — but split by confidence its top band runs hot: said 29.4%, drew 33.3%
+  // over 81 matches. That is NOT significant yet (z = 1.16 pooled), which is why this
+  // marks the number rather than changing it. The Board carries the record.
+  const hot = raw[1] >= DRAW_HOT;
+  const tag = ["H", "D", "A"];
+  const nums = v.map((x, i) => {
+    const fig = i === top ? `<b>${x}</b>` : `${x}`;
+    const cell = `<u>${tag[i]}</u>${fig}`;
+    return i === 1 ? `<span class="d${hot ? " hot" : ""}">${cell}</span>` : cell;
+  }).join("·");
+  return `<span class="sc-tri${hot ? " fat" : ""}" aria-hidden="true">${
+    ["h", "d", "a"].map((k, i) => `<i class="${k}" style="width:${v[i]}%"></i>`).join("")}</span>
+    <div class="sc-hawk" title="HAWK before kick-off: ${esc(names.map((n, i) => `${n} ${v[i]}%`).join(" · "))}${
+    tight ? " — close between the top two" : ""}${hot ? " — the draw is unusually live here" : ""}${
+    p.level >= 2 ? " — ⚡ High upset risk" : ""}">🦅 ${nums}${p.level >= 2 ? " ⚡" : ""}${mark}</div>`;
 }
 async function openScore(id) {
   const g = (S.scores.data || []).find(x => x.id === String(id));
@@ -6732,6 +6766,40 @@ function upsetBlocks(g) {
       `The same matches, asking a harder question — and this is where it misses.${note}`
       + ` Bars here run to ${UPSET_FULL} points, not the 2.5 the leg blocks use.`);
 }
+// ---------- 🤝 HOME, DRAW OR AWAY ----------
+// Graded every run since the record began and shown nowhere until now. It belongs
+// here because of what it says: the DRAW is the best call HAWK makes. Over the
+// graded matches it lands within a tenth of a point of what it said, while home
+// runs high and away runs low by the same ~2 points.
+//
+// That matters more than a curiosity, because the builder can never offer you one:
+// a result leg has to clear 50% to seed a ticket and a draw is about 25%, so the
+// one outcome HAWK reads best is the one it structurally cannot sell you. The
+// second block is what would have to change to justify revisiting that — if the
+// 28%+ band keeps landing above its own number once it has the matches behind it.
+const RES_FULL = 5;     // points; 1X2 gaps run to two and a half, not to ten
+const DRAW_FULL = 15;   // the confidence bands swing much further
+function resultBlocks(g) {
+  const R = (g || {}).result, DB = (g || {}).drawBands || [];
+  if (!R || !R.draw || !R.draw.n) return "";
+  const side = (k, label) => R[k] && R[k].n
+    ? boardRow(label, boardStat(R[k].n, R[k].p, R[k].hit), null, true, { unit: "matches", full: RES_FULL }) : "";
+  const rows = side("home", "Home win") + side("draw", "The draw") + side("away", "Away win");
+  const band = (b) => {
+    const lab = b.lo === 0 ? `Under ${Math.round(100 * b.hi)}%`
+      : b.hi > 1 ? `${Math.round(100 * b.lo)}% and up`
+      : `${Math.round(100 * b.lo)}–${Math.round(100 * b.hi)}%`;
+    return boardRow(lab, boardStat(b.n, b.p, b.drew), null, true, { unit: "matches", full: DRAW_FULL });
+  };
+  const ladder = DB.filter((b) => b.n).map(band).join("");
+  const hot = DB.filter((b) => b.lo >= 0.28 && b.n).reduce((a, b) => ({ n: a.n + b.n, p: a.p + b.p, drew: a.drew + b.drew }), { n: 0, p: 0, drew: 0 });
+  return boardTable("Home, draw or away", rows,
+      `One row per outcome, graded on whole matches rather than legs. Bars run to ${RES_FULL} points here, not the ${BD_FULL} the leg blocks use.`)
+    + (ladder ? boardTable("When HAWK says the draw is likely, is it?", ladder,
+      `The same matches, cut by how likely HAWK said the draw was. Bars run to ${DRAW_FULL} points.${
+        hot.n ? ` Above 28% it has said <b>${(100 * hot.p / hot.n).toFixed(1)}%</b> and <b>${(100 * hot.drew / hot.n).toFixed(1)}%</b> drew over <b>${hot.n}</b> matches — a lead worth watching, not yet a finding.` : ""}`) : "")
+    + `<div class="bd-foot" style="border-top:0;padding-top:9px">The builder cannot offer you a draw: a result leg must reach 50% to open a ticket and a draw is around 25%, so the outcome HAWK reads best is the one it never sells. That stays until this block says otherwise.</div>`;
+}
 function boardTable(title, rows, hint) {
   if (!rows) return "";
   return `<div class="bd-sec">${esc(title)}${hint ? `<small>${hint}</small>` : ""}</div>${rows}`;
@@ -6864,6 +6932,7 @@ function renderBoard() {
         "Only markets with 200+ graded legs. Being accurate is not the same as being worth backing — that depends on the price Bet365 gives you.")}
       ${boardTable("Which leagues is it off on?", byRows(g.byLeague, 200),
         `Matches, not legs, decide whether a league's number means anything — the 400-odd legs in one game all turn on the same lineup and the same scoreline. Under ${BD_MIN_MATCHES} matches a row stays grey however long its bar.`)}
+      ${resultBlocks(g)}
       ${upsetBlocks(g)}
       ${yourBetsBlocks(bets, overall && overall.n)}
       <div class="bd-key">

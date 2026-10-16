@@ -43,6 +43,56 @@ for (const f of ["builder/engine.js", "builder/hawk-settle.js"])
 const { HAWK, HawkSettle } = globalThis;
 HAWK.setLearning({});   // grade HAWK's own chances, not adjusted ones
 
+// ---------- 🎟 THE TICKETS HAWK OFFERS, RECORDED FOR GRADING LATER ----------
+// Every block on this board grades LEGS. Nothing grades a TICKET — which is the
+// only number anyone actually bets. A builder's chance is the JOINT chance of its
+// legs, which the engine reaches through the simulation rather than by multiplying
+// them; `evaluate` reports the difference as `agree`, the joint chance over the
+// legs multiplied as if independent. Whether that factor is right has never been
+// measured, and the leg blocks cannot measure it: HAWK can be perfect on every
+// single leg and still be wrong about how often they land together.
+//
+// The tickets are captured here because this is the one place the simulation is
+// still in memory. A build costs 3-11ms against the 1,319ms the match itself cost,
+// so eight of them are free. Grading needs nothing new either: part 1 already
+// settles every leg, and a ticket is won when all of its legs are.
+//
+// RECORDING ONLY. Nothing reads these yet — that is deliberate, so a run can be
+// watched before anything depends on it.
+// Both focuses, deliberately. Measured on one match: every "Mix" ticket contains a
+// player leg, so every one of them carries an ESTIMATED Bet365 price (guessed: 1)
+// and dies ungradeable if that player doesn't start. "Match" tickets have no player
+// legs at all, a real price on every leg, and still span the same `agree` range
+// (0.973-1.272 against Mix's 0.973-1.529). Recording only Mix would have built a
+// record that silently skipped thin-lineup matches and could never separate a
+// correlation error from a prop-price estimate.
+const BUILDER_TARGETS = [2.0, 3.0, 4.5, 7.0], BUILDER_LEGS = [3, 5];
+const BUILDER_FOCUS = ["Mix", "Match"], BUILDER_MAX = 12;
+function sampleBuilders(id) {
+  const out = [], seen = new Set();
+  for (const focus of BUILDER_FOCUS) {
+    for (const maxLegs of BUILDER_LEGS) {
+      for (const target of BUILDER_TARGETS) {
+        let t = null;
+        // One bad build must not cost the others, nor the prediction itself.
+        try { t = HAWK.build({ id: String(id), target, style: "Balanced", maxLegs, focus, picks: "likely" }); }
+        catch { continue; }
+        if (!t || !(t.p > 0) || !Array.isArray(t.legs) || t.legs.length < 2) continue;
+        const ids = t.legs.map((l) => l.id).sort();
+        const key = ids.join("|");
+        if (seen.has(key)) continue;   // different targets often land on the same ticket
+        seen.add(key);
+        out.push({ ids, n: ids.length, target, focus, p: +t.p.toFixed(4),
+                   agree: t.agree != null ? +t.agree.toFixed(3) : null,
+                   b365: t.b365 > 1 ? +t.b365.toFixed(2) : null,
+                   check: t.check != null ? +t.check.toFixed(3) : null,
+                   guessed: t.guessed || 0 });
+        if (out.length >= BUILDER_MAX) return out;
+      }
+    }
+  }
+  return out;
+}
 const newBands = () => BANDS.map(([lo, hi]) => ({ lo, hi, n: 0, p: 0, won: 0 }));
 const newTotals = () => ({ matches: 0, legs: 0, byMarket: {}, byKey: {}, byLeague: {}, keyBands: {},
                            recent: [], bands: newBands() });
@@ -186,7 +236,7 @@ if (!state.resultSeeded) {
   console.log(`[grade] result tally seeded from ${seeded} already-graded match(es)`);
 }
 const now = Date.now();
-let graded = 0, predicted = 0;
+let graded = 0, predicted = 0, builtTickets = 0;
 
 // 1. Grade finished matches.
 for (const [id, pr] of Object.entries(state.pending)) {
@@ -342,6 +392,12 @@ for (const league of HAWK.LEAGUES) {
     if (!(ko > now && ko - now <= PREDICT_AHEAD_H * 3600e3)) continue;
     try {
       const m = await HAWK.match(league, f.id, true);
+      // Belt and braces: the leg record has worked for 909 matches and a bug in
+      // something recording-only must not be able to touch it.
+      let builders = [];
+      try { builders = sampleBuilders(f.id); }
+      catch (e) { console.warn(`[grade] builders skipped for ${f.home} v ${f.away}: ${e.message}`); }
+      builtTickets += builders.length;
       state.pending[String(f.id)] = {
         league, home: f.home, away: f.away, kickoff: f.kickoff, at: new Date().toISOString(),
         legs: m.legs.filter((l) => !l.low_data).map((l) => ({ id: l.id, market: l.market, p: +(l.pRaw ?? l.p).toFixed(4),
@@ -358,6 +414,7 @@ for (const league of HAWK.LEAGUES) {
           ((m.players || {})[side] || []).filter((p) => p.name && p.has_data && p.x && p.x.tackles > 0)
             .map((p) => ({ name: p.name, rate: +p.x.tackles.toFixed(3) }))])),
         probs: { home: +m.probs.home.toFixed(3), draw: +m.probs.draw.toFixed(3), away: +m.probs.away.toFixed(3) },
+        ...(builders.length ? { builders } : {}),
       };
       predicted++;
     } catch (e) { console.warn(`skipped ${f.home} v ${f.away}: ${e.message}`); }
@@ -386,4 +443,6 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   byLine: publishedLines(), weeks: T.weeks || {},
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
+// Recording-only for now: this line is how the first run is checked.
+console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predicted} prediction(s) — not graded yet`);
 process.exit(0);   // the engine's timers shouldn't keep the job alive

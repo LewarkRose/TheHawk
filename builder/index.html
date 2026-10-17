@@ -1600,6 +1600,24 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   letter-spacing:.2em;color:var(--accent);text-transform:uppercase}
 .bd-sec small{display:block;font-family:system-ui,sans-serif;font-weight:400;letter-spacing:0;
   text-transform:none;color:var(--muted);font-size:11px;margin-top:5px;line-height:1.5}
+/* Every block of the board folds — see boardTable(). The summary carries the only
+   thing you need to decide whether to open it: how many of its rows say anything. */
+.bd-blk{border-bottom:1px solid rgba(255,255,255,.05)}
+.bd-blk > summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;
+  padding-bottom:15px}
+.bd-blk > summary::-webkit-details-marker{display:none}
+.bd-blk > summary::before{content:"▸";font-size:10px;letter-spacing:0;color:var(--faint);
+  transition:transform .12s}
+.bd-blk[open] > summary::before{transform:rotate(90deg)}
+.bd-blk > summary:hover{background:rgba(255,255,255,.03)}
+.bd-n{margin-left:auto;font-weight:500;letter-spacing:.04em;color:var(--muted);text-transform:none}
+.bd-hint{padding:0 16px 10px}
+.bd-hint small{display:block;color:var(--muted);font-size:11px;line-height:1.5}
+/* The legend and the scale note explain the bars. With every block shut there are no
+   bars, and four lines about them was the largest thing left on a page that is now
+   two thirds of a screen. They come back the moment a block is opened. */
+.bd-sheet:not(:has(.bd-blk[open])) > .bd-key,
+.bd-sheet:not(:has(.bd-blk[open])) > .bd-foot{display:none}
 .bd-row{padding:9px 16px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.045)}
 .bd-row:hover{background:rgba(232, 224, 207,.035)}
 .bd-row .lbl{min-width:0}
@@ -7235,16 +7253,38 @@ function resultBlocks(g) {
   };
   const ladder = DB.filter((b) => b.n).map(band).join("");
   const hot = DB.filter((b) => b.lo >= 0.28 && b.n).reduce((a, b) => ({ n: a.n + b.n, p: a.p + b.p, drew: a.drew + b.drew }), { n: 0, p: 0, drew: 0 });
+  // This used to be a loose <div class="bd-foot"> after both tables. With the blocks
+  // folded it became a paragraph hanging between two shut headers, so it now rides
+  // inside the block it is actually about — the draw ladder, or the 1X2 rows when
+  // there is no ladder yet.
+  const sells = `The builder cannot offer you a draw: a result leg must reach 50% to open a ticket and a draw is around 25%, so the outcome HAWK reads best is the one it never sells. That stays until this block says otherwise.`;
   return boardTable("Home, draw or away", rows,
-      `One row per outcome, graded on whole matches rather than legs. Bars run to ${RES_FULL} points here, not the ${BD_FULL} the leg blocks use.`)
+      `One row per outcome, graded on whole matches rather than legs. Bars run to ${RES_FULL} points here, not the ${BD_FULL} the leg blocks use.${ladder ? "" : ` ${sells}`}`)
     + (ladder ? boardTable("When HAWK says the draw is likely, is it?", ladder,
       `The same matches, cut by how likely HAWK said the draw was. Bars run to ${DRAW_FULL} points.${
-        hot.n ? ` Above 28% it has said <b>${(100 * hot.p / hot.n).toFixed(1)}%</b> and <b>${(100 * hot.drew / hot.n).toFixed(1)}%</b> drew over <b>${hot.n}</b> matches — a lead worth watching, not yet a finding.` : ""}`) : "")
-    + `<div class="bd-foot" style="border-top:0;padding-top:9px">The builder cannot offer you a draw: a result leg must reach 50% to open a ticket and a draw is around 25%, so the outcome HAWK reads best is the one it never sells. That stays until this block says otherwise.</div>`;
+        hot.n ? ` Above 28% it has said <b>${(100 * hot.p / hot.n).toFixed(1)}%</b> and <b>${(100 * hot.drew / hot.n).toFixed(1)}%</b> drew over <b>${hot.n}</b> matches — a lead worth watching, not yet a finding.` : ""} ${sells}`) : "");
 }
+// Every block folds. The Board was 93 rows over about seven screens and only 15 of
+// those rows clear significance — the other 84% say "cannot tell", at length, and
+// four whole blocks say it without a single finding between them. Folded, the page
+// opens as a contents list: one line per block carrying how much is inside and how
+// much of it speaks, so a block with nothing to say still tells you that, and you
+// spend a screen instead of seven to find out.
+//
+// The count is read back out of the rows HTML rather than threaded through every
+// caller — boardRow is the only thing that writes `class="bd-row"` and the only
+// thing that writes a `sig` bar, so the two counts cannot drift from what is drawn.
+//
+// The axis moved in here too. It used to be one header above the first table, which
+// with every block shut was a column heading floating over nothing.
 function boardTable(title, rows, hint) {
   if (!rows) return "";
-  return `<div class="bd-sec">${esc(title)}${hint ? `<small>${hint}</small>` : ""}</div>${rows}`;
+  const n = (rows.match(/class="bd-row/g) || []).length;
+  const sig = (rows.match(/class="[pm] sig"/g) || []).length;
+  return `<details class="bd-blk"><summary class="bd-sec">${esc(title)}<span class="bd-n">${
+    n ? (sig ? `${sig} of ${n}` : `nothing in ${n}`) : ""}</span></summary>${
+    hint ? `<div class="bd-hint"><small>${hint}</small></div>` : ""
+    }<div class="bd-head"><span></span>${boardAxis()}<span></span><span class="hn">Legs</span></div>${rows}</details>`;
 }
 // ---------- 🎟 WHAT HAWK SAID vs WHAT YOU GOT ----------
 // Every other block here grades HAWK on matches it had no stake in. This one
@@ -7363,7 +7403,6 @@ function renderBoard() {
           "Did you make money? The smallest sample here — read it last.", pl >= 0 ? "var(--accent)" : "var(--red)")}
       </div>
       ${g ? `
-      <div class="bd-head"><span></span>${boardAxis()}<span></span><span class="hn">Legs</span></div>
       ${boardTable("Does 60% really mean 60%?",
         (g.bands || []).map((b) => boardRow(bandName(b.lo, b.hi), boardStat(b.n, b.p, b.won),
           `${Math.round(100 * b.lo)}–${Math.round(100 * Math.min(1, b.hi))}%`)).join(""),
@@ -7393,7 +7432,9 @@ function renderBoard() {
         `<span class="bchip ${c.pts >= 0 ? "up" : "dn"}">${esc(c.market)} <b>${c.pts >= 0 ? "+" : ""}${c.pts.toFixed(1)}</b></span>`).join("")}</div>
     </div></div>` : ""}
     ${g && (g.recent || []).length ? `<div class="section" style="padding:0"><div class="bd-sheet">
-      <div class="bd-sec" style="padding-top:16px">Recently graded<small>The last matches to settle, each one a whole card of legs rather than a bet.</small></div>
+      <details class="bd-blk">
+      <summary class="bd-sec" style="padding-top:16px">Recently graded<span class="bd-n">${g.recent.slice(0, 20).length} matches</span></summary>
+      <div class="bd-hint"><small>The last matches to settle, each one a whole card of legs rather than a bet.</small></div>
       <div class="bd-head"><span></span>${boardAxis()}<span></span><span class="hn">Legs</span></div>
       ${g.recent.slice(0, 20).map((r) => {
         const pts = 100 * (r.got - r.said), w = Math.min(50, Math.abs(pts) * (50 / 12));
@@ -7407,6 +7448,7 @@ function renderBoard() {
           <span class="nn">${r.n}</span></div>`;
       }).join("")}
       <div class="bd-foot">One match is far too small to judge HAWK by — these are here to show the board filling up, not to be read as a verdict, so no bar here is coloured for significance. Full width is 12 points either way.</div>
+      </details>
     </div></div>` : ""}`;
 }
 function showBoard() {

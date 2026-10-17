@@ -1484,7 +1484,21 @@
     for (const [kind, type, market, label] of [["redcard", 142, "Red Card", "A Red Card in the Match"], ["pen", 143, "Penalty", "A Penalty in the Match"]]) {
       const c = cons[`${type}|`];
       if (!c || !(c.probs.Yes > 0.01) || c.books < 2) continue;
-      for (const [opt, id, text] of [["Yes", `${kind}:yes`, label], ["No", `${kind}:no`, `No ${label.replace(/^A /, "")}`]]) {
+      // Only the Yes side is offered. "No Red Card in the Match" and "No Penalty in
+      // the Match" land around nineteen times in twenty, so they added a leg to the
+      // ticket and almost nothing to its price — length that reads like conviction
+      // and is not. Removed on request, 2026-10-17.
+      //
+      // `bookLine` below still maps `redcard:no` / `pen:no`, because tickets already
+      // placed carry those legs and still need their closing price looked up.
+      //
+      // Note hawk-settle.js has never been able to SETTLE either side of these: there
+      // is no redcard:/pen: branch in legResult, so they return "unknown" and the leg
+      // is never graded. Three tickets in the bet history carry a "No Red Card in the
+      // Match" leg and all three show result "unknown". Red cards would be easy to add
+      // (facts() already reads pair("Red Cards")); penalties are not in the team-stats
+      // block at all, so `pen:yes` is a leg HAWK offers and cannot grade.
+      for (const [opt, id, text] of [["Yes", `${kind}:yes`, label]]) {
         const q = c.probs[opt];
         if (!(q > 0.01 && q < 0.99)) continue;
         // an independent draw per simulation, so it mixes with the other legs sensibly

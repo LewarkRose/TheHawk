@@ -1987,7 +1987,27 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .nav.betsnav .jn{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:5px;border-radius:999px;background:var(--gold);color:#201d15;font-size:11px}
 /* 🎟 My bets */
 .mb-h{margin:16px 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-.mb-card{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:var(--panel2)}
+.mb-card{position:relative;border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:var(--panel2)}
+/* The running card gets the same recessed channel as the Picks ticket, so the
+   clubs read the same way wherever a bet appears. The settled rows below are
+   single lines with no edge to carry a channel, so they take crests instead —
+   the point is that every row says who is playing, not that both do it the
+   same way. */
+.mb-card.kitted{padding-left:19px}
+.mb-card.kitted::before{content:"";position:absolute;left:0;top:0;bottom:0;width:11px;z-index:1;
+  border-radius:13px 0 0 13px;background:var(--channel);box-shadow:inset -1px 0 0 rgba(0,0,0,.6)}
+.mb-card.kitted::after{content:"";position:absolute;left:3px;top:6px;bottom:6px;width:5px;z-index:2;
+  border-radius:3px;
+  background:linear-gradient(180deg,var(--home,var(--accent)) 0 50%,var(--away,var(--blue)) 50% 100%);
+  box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.mb-card.kit-clash::after{
+  background:linear-gradient(180deg,
+    var(--home) 0 calc(50% - 2px), var(--channel) calc(50% - 2px) calc(50% + 2px),
+    color-mix(in srgb, var(--away) 58%, #000) calc(50% + 2px) 100%)}
+/* the crest pair on a settled row */
+.mb-cr{display:inline-flex;flex:none;vertical-align:-4px;margin-right:5px}
+.mb-cr img{width:16px;height:16px;object-fit:contain}
+.mb-cr img+img{margin-left:-5px}
 /* running tickets sit level with each other whether they carry two legs or five */
 .bdrawer .mb-card, .modal-bg[data-mybets] .mb-card{min-height:140px;display:flex;flex-direction:column}
 .bdrawer .mb-card .mb-part:last-child, .modal-bg[data-mybets] .mb-card .mb-part:last-child{margin-top:auto}
@@ -9247,12 +9267,26 @@ function myBetsHTML(drawer = false) {
     <div style="margin-top:14px">${slipBtn}
     ${betsSummary(bets)}
     <h3 class="mb-h">Still running (${pend.length})</h3>
-    ${pend.length ? pend.map((b, i) => `<div class="mb-card tilt3d" style="--i:${i}">
+    ${pend.length ? pend.map((b, i) => {
+        // The first match's crests, so paintKits can read the clubs' colours
+        // off them. A bet logged before crests were stored simply is not
+        // .kitted and keeps the plain card it has always had.
+        const k0 = (b.legs[0] || {}).hawk || {};
+        const kit = k0.homeCrest && k0.awayCrest
+          ? ` kitted" data-hc="${esc(k0.homeCrest)}" data-ac="${esc(k0.awayCrest)}` : "";
+        return `<div class="mb-card tilt3d${kit}" style="--i:${i}">
         <div class="mb-top"><span><b>€${b.stake.toFixed(2)}</b> @ <b>${odds(b.odds)}</b></span><span class="muted">returns <b style="color:var(--gold)">€${b.potentialReturn.toFixed(2)}</b></span></div>
-        ${(b.legs || []).map(part).join("")}</div>`).join("")
+        ${(b.legs || []).map(part).join("")}</div>`; }).join("")
       : `<div class="note">Nothing running. Tickets you send to the Vault show here.</div>`}
     ${done.length ? `<h3 class="mb-h">Last settled</h3>${done.map(b => { const [cls, ic, pl] = result(b);
-        return `<div class="mb-done ${cls}"><span>${ic}</span><span class="mb-dfx">${esc((b.legs || []).map(l => l.fixture).join(" · "))}</span><span class="muted">@ ${odds(b.odds)}</span><b>${pl}</b></div>`; }).join("")}` : ""}
+        // A settled row is one line, so there is no edge for a channel — it
+        // gets the crest pair instead. Both carry club identity; neither
+        // pretends to be the other.
+        const s0 = (b.legs[0] || {}).hawk || {};
+        const cr = (src) => src ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()">` : "";
+        const crests = (s0.homeCrest || s0.awayCrest)
+          ? `<span class="mb-cr">${cr(s0.homeCrest)}${cr(s0.awayCrest)}</span>` : "";
+        return `<div class="mb-done ${cls}"><span>${ic}</span><span class="mb-dfx">${crests}${esc((b.legs || []).map(l => l.fixture).join(" · "))}</span><span class="muted">@ ${odds(b.odds)}</span><b>${pl}</b></div>`; }).join("")}` : ""}
     <a class="ghost mb-vault" href="../">All bets in the Vault →</a></div>`;
 }
 // Clicks inside the popup or the drawer: open a match, back to the slip.
@@ -9270,6 +9304,7 @@ function openMyBets() {
   const bg = document.querySelector(".modal-bg");
   bg.dataset.mybets = "1";
   bg.addEventListener("click", (e) => myBetsClick(e, closeModal));
+  paintKits(bg);   // the narrow path renders separately from the drawer
 }
 // My bets is a drawer on a wide screen and a modal on a narrow one. Resizing the
 // window across that line used to strand whichever one you had open — a modal
@@ -9303,6 +9338,7 @@ function renderDrawer() {
   if (!dr || !document.body.classList.contains("drawer-open")) return;
   if (!WIDE()) return toggleDrawer(false);
   dr.innerHTML = myBetsHTML(true);
+  paintKits(dr);
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); $("#watchPop").hidden = true; } });
 

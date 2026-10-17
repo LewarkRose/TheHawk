@@ -431,6 +431,15 @@ for (const [id, d] of Object.entries(state.done || {})) predictions[id] = d;
 await writeFile(path.join(ROOT, "data", "predictions.json"), JSON.stringify({ updated: new Date().toISOString(), matches: predictions }));
 // Keep the last 12 weeks.
 if (T.weeks) for (const k of Object.keys(T.weeks).sort().slice(0, -12)) delete T.weeks[k];
+// Phase 1a records builder tickets but nothing reads them yet, so until 1b grades
+// them the only evidence it is working at all is a console line in a run log — and
+// the grading step is continue-on-error, so a sampleBuilders() that quietly returned
+// nothing would leave every run green and the week of data this needs simply absent.
+// The inventory goes into graded.json instead, where one fetch answers it.
+const pendingBuilders = Object.values(state.pending || {}).filter((p) => (p.builders || []).length);
+const storedTickets = pendingBuilders.reduce((a, p) => a + p.builders.length, 0);
+state.builderSeen = (state.builderSeen || 0) + builtTickets;
+if (!state.builderSince && builtTickets) state.builderSince = new Date().toISOString();
 await mkdir(path.dirname(STATE_FILE), { recursive: true });
 await writeFile(STATE_FILE, JSON.stringify(state));
 await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
@@ -441,6 +450,10 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   statFit: T.statFit || {}, byLeagueKey: publishedLeagueKeys(),
   result: T.result || newResult(), drawBands: T.drawBands || newDrawBands(),
   byLine: publishedLines(), weeks: T.weeks || {},
+  // Recording-only until 1b. `stored` is the inventory waiting to be graded —
+  // that is the number 1b's sample size is made of, not `seen`.
+  builders: { recorded: builtTickets, stored: storedTickets, matches: pendingBuilders.length,
+    seen: state.builderSeen || 0, since: state.builderSince || null },
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
 // Recording-only for now: this line is how the first run is checked.

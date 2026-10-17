@@ -66,6 +66,10 @@ PROPS_PER_RUN = 55
 # Kept beside it so the sum above can be checked rather than remembered. If the
 # cron in .github/workflows/hawk.yml changes, change RUNS_PER_DAY to match and the
 # run will say whether the budget still works.
+#
+# RUNS_PER_DAY is the SCHEDULED runs only, which is why push-triggered runs skip
+# props entirely (see push_run below) — otherwise a day of editing silently spends
+# the whole quota and the sum here stops meaning anything.
 PL_DAILY_LIMIT = 1000
 RUNS_PER_DAY = 12          # cron: "9 */2 * * *"
 # 365Scores backup ratings: how far back to keep matches, how many match-stat
@@ -269,7 +273,19 @@ def main(out_dir):
     # Bet365 (within ~2-3% on the markets both show). Bet365 itself has no feed.
     props = {"fresh": 0, "reused": 0, "missing": 0, "legs": 0}
     pl_key = os.environ.get("PROPLINE_KEY", "").strip()
-    if pl_key:
+    # The budget below is sized for the cron and nothing else: RUNS_PER_DAY counts
+    # scheduled runs, but the workflow also runs on every push to main, and those
+    # are not in the sum. Measured 17 Oct 2026 — 19 runs, 16 of them pushes, ~1,197
+    # PropLine calls against a free key's 1,000 — so fresh prices stopped by
+    # lunchtime on the one day the app was being worked on, and that run's health
+    # line read "0 matches (0 legs)". 10 Oct was worse: 32 runs, ~2,016 calls.
+    #
+    # Props are the only source here on a metered quota, and `soon` has a 60-hour
+    # window sorted by kick-off, so skipping them on a push costs nothing — the next
+    # scheduled run picks the same matches up with dozens of chances to spare. Every
+    # other part of a push run (fixtures, ratings, squads, the site) is unaffected.
+    push_run = os.environ.get("GITHUB_EVENT_NAME", "") == "push"
+    if pl_key and not push_run:
         soon = sorted(((f, fid) for fid, f in fixtures.items()
                        if f["league"] in sources.PL_SPORTS and (parse_time(f["kickoff"]) or now) <= now + dt.timedelta(hours=PROPS_HOURS)),
                       key=lambda x: x[0]["kickoff"])[:PROPS_PER_RUN]
@@ -299,6 +315,12 @@ def main(out_dir):
         projected = calls * RUNS_PER_DAY
         note = "OVER THE CAP — lower PROPS_PER_RUN or slow the cron" if projected > PL_DAILY_LIMIT else "within the free key"
         print(f"player prices: {calls} PropLine requests this run -> ~{projected}/day at {RUNS_PER_DAY} runs ({note}, limit {PL_DAILY_LIMIT})")
+    elif pl_key:
+        # Say WHY it is zero. Without this a deliberate skip and a broken fetch are
+        # the same four zeros, which is the ambiguity this whole change is about.
+        props["skipped"] = "push run"
+        print(f"player prices: skipped — this is a push run, and the {PL_DAILY_LIMIT}/day budget "
+              f"is sized for {RUNS_PER_DAY} scheduled runs only. Files from earlier runs are kept.")
     else:
         print("player prices: no PROPLINE_KEY — skipping (HAWK falls back to Unibet's prices)")
 

@@ -124,6 +124,22 @@ jobs:
               p, r = h.get("players", {}), h.get("ratings", {})
               lines.append(f"- Player stats: {p.get('fresh', 0)} fresh, {p.get('reused', 0)} from the last run, {p.get('missing', 0)} missing")
               lines.append(f"- Team ratings: {r.get('fresh', 0)} fresh, {r.get('reused', 0)} from the last run, {r.get('missing', 0)} missing")
+              # Props and builder tickets were only visible by fetching meta.json or
+              # graded.json by hand, so both degraded unnoticed: prop fetching had been
+              # spending its whole daily quota on push runs, and phase 1a records
+              # tickets that nothing reads yet. A number here is the only thing that
+              # makes either one falling to zero obvious.
+              pr = h.get("props", {})
+              lines.append(f"- Player props: skipped ({pr['skipped']}) — the files from earlier runs are still served"
+                           if pr.get("skipped") else
+                           f"- Player props: {pr.get('fresh', 0)} matches ({pr.get('legs', 0)} legs), {pr.get('reused', 0)} kept, {pr.get('missing', 0)} without")
+          try:
+              b = (json.load(open("data/graded.json", encoding="utf-8")).get("builders") or {})
+              lines.append(f"- Builder tickets (1a, recording only): {b.get('recorded', 0)} this run, "
+                           f"{b.get('stored', 0)} waiting across {b.get('matches', 0)} matches, "
+                           f"{b.get('seen', 0)} recorded since {b.get('since') or 'n/a'}")
+          except Exception as e:
+              lines.append(f"- Builder tickets (1a): no reading ({e})")
           lines += ["", *[f"- {x}" for x in m.get("problems", [])[:30]]]
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
               f.write("\n".join(lines) + "\n")

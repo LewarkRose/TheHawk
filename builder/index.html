@@ -2113,7 +2113,7 @@ a.nav{text-decoration:none}
      evening of tests that were checking stale code. -->
 <!-- Bump this whenever engine.js changes, or browsers keep the old one: the
      query string is the only thing telling them the file is not the same. -->
-<script src="engine.js?v=20261011d"></script>
+<script src="engine.js?v=20261017a"></script>
 <script src="hawk-settle.js?v=20260923a"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
@@ -2167,6 +2167,7 @@ const S = { league: null, fixtures: [], match: null, legs: {}, slip: [], locked:
             // the card, not to take the legs away. Tick the box for a clean
             // match-market build.
             priced: loadPref("hawk.priced", false), favourite: true, result: null, tab: "players", q: "",
+  noOffs: loadPref("hawk.noOffs", false),   // keep offsides out of every builder
             // Matches simulated since the page loaded. Opening one costs a full 12,000-run
   // call behind a skeleton, so a row that says you have already paid that is worth
   // the three pixels. It is deliberately not persisted: the point is "this is
@@ -4593,10 +4594,17 @@ const knownLegIds = () => { const on = onBet365(); return S.match && on.size ? O
 // the pick card, which is a single bet and can take them perfectly well — this only
 // keeps them out of tickets that would be impossible to place.
 const AH_LEG = /^ah:/;
+// Offsides, when you've asked for them gone. A taste, not a verdict — so it lives
+// here with the other things HAWK is told not to offer, rather than as a ban baked
+// into the engine. Covers both markets: the match total (offs:o2.5) and the player
+// one (p:…:offsides). The grader never passes `banned`, so this changes what YOU
+// build and not what the board records.
+const OFFSIDE_LEG = /^offs:|:offsides?\d/;
 function unofferedLegIds() {
   const set = notOn365();
   const ids = Object.values(S.legs)
-    .filter(l => AH_LEG.test(l.id) || (set.size && set.has(no365Key(l))))
+    .filter(l => AH_LEG.test(l.id) || (S.noOffs && OFFSIDE_LEG.test(l.id))
+                 || (set.size && set.has(no365Key(l))))
     .map(l => l.id);
   return S.match ? ids : [];
 }
@@ -4755,6 +4763,8 @@ function renderScan() {
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Only show a match when HAWK would actually back the builder \u2014 the price it expects from Bet365 beats what the ticket is worth. Most matches won't have one.">
           <input type="checkbox" id="scanWorthOnly" ${sc.onlyWorth ? "checked" : ""}> Only ones worth backing</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="scanConf" ${sc.confirmed ? "checked" : ""}> Lineups confirmed only</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Keep offsides out of every builder — the match total and the player market both. A preference, not a judgement: Player Offsides is one of HAWK's better-behaved markets (4,403 graded legs, 0.8 points out), and the match total is not graded at all.">
+          <input type="checkbox" id="noOffs" ${S.noOffs ? "checked" : ""}> No offsides</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Only legs Bet365 publishes a price for: result, double chance, goals, cards, corners, shots on target. Measured blind on twelve builders — these come in at 0.924 of fair, while a build containing a player prop comes in at 0.741. The prop costs about a fifth of the ticket, every time.">
           <input type="checkbox" id="scanPriced" ${sc.priced ? "checked" : ""}> Bet365-priced legs only${
             sc.priced ? "" : ` <b style="color:var(--gold)">· props cost ~20%</b>`}</label>
@@ -4781,6 +4791,9 @@ function renderScan() {
   $("#scanFocus").onchange = async (e) => { sc.focus = ["Mix","Match","Stats","Players"].includes(e.target.value) ? e.target.value : "Mix";
     savePref("hawk.scanFocus", sc.focus); renderScan(); await rescan(); };
   $("#scanFav").onchange = async (e) => { S.favourite = e.target.checked; savePref("hawk.fav", S.favourite);
+    renderScan(); await rescan(); };
+  $("#noOffs").onchange = async (e) => { S.noOffs = e.target.checked; savePref("hawk.noOffs", S.noOffs);
+    toast(S.noOffs ? "Offsides are out of every builder." : "Offsides are back in.");
     renderScan(); await rescan(); };
   $("#exactLegs").onchange = async (e) => { sc.exactLegs = +e.target.value; savePref("hawk.exactLegs", sc.exactLegs);
     renderScan(); await rescan(); };
@@ -6345,9 +6358,29 @@ async function goToLive(league, id) {
 // against what happened. A "Low" call is right when the favourite won; a
 // High / Very high call is right when the favourite failed to win.
 function radarVerdict(id, r) {
+  if (r.status !== 4) return "";
   const g = ((S.graded && S.graded.recent) || []).find(x => String(x.id) === String(id));
-  const u = g && g.upset;
-  if (!u || r.status !== 4) return "";
+  let u = g && g.upset;
+  // The graded record only keeps the last KEEP_RECENT (40) matches and only fills
+  // 2.5 hours after kick-off, so most finished matches had no verdict at all —
+  // measured on one day's board, 3 of 6 flagged matches could not show whether the
+  // call landed. predictions.json carries the same two facts (the radar's level and
+  // HAWK's 1X2) for every match it predicted and keeps them four days, so when the
+  // graded row is missing the verdict is rebuilt from that and the final score.
+  // The favourite failing to win IS the underdog's double chance, so it comes
+  // straight out of the probabilities — nothing is inferred that was not stored.
+  if (!u && r.score && r.score[0] != null) {
+    const p = S.preds && S.preds.m && S.preds.m[String(id)];
+    if (p && p.probs && p.level != null) {
+      const favHome = p.probs.home >= p.probs.away;
+      const fg = favHome ? r.score[0] : r.score[1], dg = favHome ? r.score[1] : r.score[0];
+      u = { level: p.level, fav: favHome ? "home" : "away",
+            favFail: p.probs.draw + (favHome ? p.probs.away : p.probs.home),
+            dogWin: favHome ? p.probs.away : p.probs.home,
+            failed: fg <= dg, dogWon: dg > fg };
+    }
+  }
+  if (!u) return "";
   const labels = ["Low", "Medium", "High", "Very high"], fav = u.fav === "home" ? r.home : r.away, dog = u.fav === "home" ? r.away : r.home;
   const outcome = u.dogWon ? `${dog} won — an upset` : u.failed ? `a draw — ${fav} failed to win` : `${fav} won — no upset`;
   const right = u.level >= 2 ? u.failed : u.level === 0 ? !u.failed : null;

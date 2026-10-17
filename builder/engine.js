@@ -148,7 +148,21 @@
   //       The old record (5,447 legs at -1.8, z=-3.6) was measuring a model that gave
   //       a forward's offside prior to midfielders; roughly 14% of those legs were
   //       repriced, so the correction standing on them no longer describes anything.
-  const MODEL_VERSION = { "Player Tackles": 3, "Player Offsides": 2 };
+  //   2 — the four card TOTALS markets, 2026-10-17. Not a model change but a
+  //       GRADING one, which costs their record the same way: hawk-settle counted
+  //       cards from 365Scores' team-stats line, and that line under-counts.
+  //       Measured over 106 finished matches: 17 disagreed with the itemised card
+  //       events, 16 of them with MORE cards in the events (Deportivo 1-1 Levante
+  //       read 2-2 against five bookings; Lech Poznan v Leverkusen read ONE yellow
+  //       against four). So ~16% of matches were graded a card or more short —
+  //       "Over" legs marked lost that had won, "Under" legs marked won that had
+  //       lost. The records below were built on those totals and describe a
+  //       counter that no longer exists.
+  //       Player to be Booked is deliberately NOT here: it settles from the card
+  //       events per player, never from the team totals, so it was never wrong.
+  const MODEL_VERSION = { "Player Tackles": 3, "Player Offsides": 2,
+                          "Total Cards · Over": 2, "Total Cards · Under": 2,
+                          "Team Cards · Over": 2, "Team Cards · Under": 2 };
   // Simulated matches kept in memory: each holds ~12 MB of legs, so a phone keeps
   // fewer — eight of them was enough to crash the tab on a phone browser.
   const MATCHES_KEPT = typeof matchMedia === "function" && matchMedia("(max-width:820px)").matches ? 3 : 6;

@@ -425,20 +425,26 @@ img{max-width:100%}
   letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:5px}
 /* the rail: one segment per leg, filled as they land */
 .rail{display:flex;gap:3px;padding:0 16px}
-.rail i{flex:1;height:5px;border-radius:2px;background:#24262e}
-.rail i.won{background:var(--accent)}
-.rail i.live{background:linear-gradient(90deg,var(--accent) 50%,#24262e 50%)}
+/* The rail is the one thing here that reads as a VERDICT, so it borrows the
+   verdict colours rather than HAWK's accent. --accent means "an action" —
+   the active tab, a price, a button — and using it for a result was a
+   leftover from when the accent was bone and bone meant HAWK generally.
+   Green landed, amber in play, red gone, dark still waiting: the rail answers
+   "am I still alive?" without you having to know the palette. */
+.rail i{flex:1;height:5px;border-radius:2px;background:#1b2230}
+.rail i.won{background:var(--green)}
+.rail i.live{background:linear-gradient(90deg,var(--gold) 50%,#1b2230 50%)}
 .rail i.lost{background:var(--red)}
 .tk-legs{padding:12px 16px 4px}
 .tk-leg{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;gap:10px;
   padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
 .tk-leg:last-child{border-bottom:0}
 .tk-leg .d{width:9px;height:9px;border-radius:50%;background:#2e3038;margin-left:3px}
-.tk-leg.won .d{background:var(--accent);box-shadow:0 0 0 3px rgba(232, 224, 207,.15)}
+.tk-leg.won .d{background:var(--green);box-shadow:0 0 0 3px rgba(79,212,134,.16)}
 .tk-leg.lost .d{background:var(--red);box-shadow:0 0 0 3px rgba(255,93,115,.15)}
 .tk-leg.live .d{background:var(--red)}
 .tk-leg .l{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tk-leg.won .l{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(232, 224, 207,.4)}
+.tk-leg.won .l{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(79,212,134,.45)}
 .tk-leg.lost .l{color:var(--red);text-decoration:line-through;text-decoration-color:rgba(255,93,115,.5)}
 .tk-leg .c{font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
   color:var(--muted);text-transform:uppercase;white-space:nowrap}
@@ -2036,10 +2042,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .mb-fx b{margin-right:auto}
 .mb-go{padding:3px 10px;border-radius:8px;border:1px solid rgba(232, 224, 207,.4);background:rgba(232, 224, 207,.08);color:var(--accent);font:700 12px inherit;cursor:pointer}
 .mb-leg{display:flex;gap:7px;font-size:13px;padding:1px 0}
-.mb-m{width:12px;flex-shrink:0;color:var(--muted);font-weight:900}.mb-m.won{color:var(--accent)}.mb-m.lost{color:var(--red)}
+.mb-m{width:12px;flex-shrink:0;color:var(--muted);font-weight:900}.mb-m.won{color:var(--green)}.mb-m.lost{color:var(--red)}
 .mb-done{display:grid;grid-template-columns:22px minmax(0,1fr) auto auto;gap:8px;align-items:center;font-size:13px;padding:7px 2px;border-bottom:1px solid var(--line)}
 .mb-dfx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mb-done.won b{color:var(--accent)}.mb-done.lost b{color:#ff8a8a}.mb-done.co b{color:var(--gold)}
+/* a win is green and a loss is red, the same two colours the rail uses, so a
+   settled row and a running one say the same thing the same way */
+.mb-done.won b{color:var(--green)}.mb-done.lost b{color:var(--red)}.mb-done.co b{color:var(--gold)}
 .mb-vault{display:block;text-align:center;margin-top:14px;text-decoration:none}
 /* The builder column on other pages (Scores, Live…) on a PC: ✕ hides it there, 🧩 Builder brings it back. Always shown on the Builder page. */
 .slip-bar,.slip-back{display:none}

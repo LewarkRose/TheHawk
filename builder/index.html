@@ -1128,9 +1128,35 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* best builders scan */
 .prog{height:8px;border-radius:5px;background:#2f2f2f;overflow:hidden;margin-top:12px}
 .prog span{display:block;height:100%;background:linear-gradient(90deg,var(--accent-d),var(--accent));transition:width .4s}
-.scard{display:flex;gap:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;
-  background:var(--panel2);margin-bottom:10px;cursor:pointer;transition:.15s;animation:in .3s both}
+/* ── A PICK IS A TICKET ───────────────────────────────────────────────────
+   Ticket stock with a tooth, and BOTH edges carry meaning:
+     left  — the verdict rail that was always here (worth it / fair / under)
+     right — a channel holding the two clubs' colours
+   The channel is cut in --channel, the desk colour, never a tint of the card.
+   Measured on a normal day's 22 fixtures, five clubs (Everton #274488,
+   Atlético #27296f, Man City #01255c, Ipswich #123d88, Hamburg #1e5cb3) are
+   blue enough to vanish into --panel. Against near-black they all read, so
+   the rule needs no per-club exception. */
+.scard{position:relative;display:flex;gap:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  background:
+    repeating-linear-gradient(135deg,rgba(255,255,255,.015) 0 2px,transparent 2px 5px),
+    linear-gradient(180deg,var(--panel2) 0%,var(--ticket-stock) 100%);
+  margin-bottom:10px;cursor:pointer;transition:.15s;animation:in .3s both}
 .scard:hover{border-color:var(--accent)}
+/* the club channel, and the flash recessed into it */
+.scard.kitted{padding-right:13px}
+.scard.kitted::before{content:"";position:absolute;right:0;top:0;bottom:0;width:13px;z-index:2;
+  background:var(--channel);box-shadow:inset 1px 0 0 rgba(0,0,0,.65)}
+.scard.kitted::after{content:"";position:absolute;right:4px;top:6px;bottom:6px;width:5px;z-index:3;
+  border-radius:3px;
+  background:linear-gradient(180deg,var(--home,var(--accent)) 0 50%,var(--away,var(--blue)) 50% 100%);
+  box-shadow:0 0 0 1px rgba(0,0,0,.55)}
+/* the rare genuine clash — a bite of the channel splits the flash and the away
+   half steps darker, so two clubs in the same colour still read as two */
+.scard.kit-clash::after{
+  background:linear-gradient(180deg,
+    var(--home) 0 calc(50% - 2px), var(--channel) calc(50% - 2px) calc(50% + 2px),
+    color-mix(in srgb, var(--away) 58%, #000) calc(50% + 2px) 100%)}
     /* the rail down the left is the verdict at a glance: green worth it, gold fair, grey under */
     .scard .rail{flex:none;width:6px;background:var(--muted);opacity:.55}
     .scard .rail.ok{background:linear-gradient(180deg,var(--accent),var(--accent-d));opacity:1}
@@ -5053,7 +5079,10 @@ function renderScan() {
         S.scan.openRows.add(k);
         if (!e.target.querySelector(".scard")) {
           const r = ((S.scan.data || {}).results || []).find((x) => scanKey(x) === k);
-          if (r) e.target.insertAdjacentHTML("beforeend", scanCard(r, (S.scan.data || {}).params));
+          if (r) {
+            e.target.insertAdjacentHTML("beforeend", scanCard(r, (S.scan.data || {}).params));
+            paintKits(e.target);   // this card was not in the DOM at the last render
+          }
         }
       } else S.scan.openRows.delete(k);
     } }, true);
@@ -5143,6 +5172,9 @@ function updateScan() {
     : d.total === 0 && d.params ? "No fixtures kick off in that window — try a longer one."
     : betOn.size && !open.length ? "Nothing new — you've already bet on every match scanned."
     : "Pick leagues and a time window, then hit Scan. It takes a few seconds per match."}</div>`);
+  // Clubs' colours, read off the crests already on these cards. Cached, so a
+  // second scan of the same leagues costs nothing.
+  paintKits($("#scanRes"));
 }
 // Scanned matches that already have a bet in the Vault: sent from HAWK (or linked) by match id,
 // typed ones by team names ("Coventry vs Aston Villa").
@@ -5482,7 +5514,13 @@ function scanRow(r, params) {
 function scanCard(r, params) {
   const alts = (r.alts || []).map((a, i) => ({ ...a, id: r.id, league: r.league, home: r.home, away: r.away,
     homeCrest: r.homeCrest, awayCrest: r.awayCrest, kickoff: r.kickoff, confirmed: r.confirmed }));
-  return `<div class="scard" data-open="${esc(r.id)}">
+  // The crest URLs ride along so paintKits() can read the clubs' colours off
+  // them after this renders — decoding an image is async and this is not.
+  // Without them the card is simply not .kitted and has no channel, which is
+  // what every card looked like before club colours existed.
+  const kit = r.homeCrest && r.awayCrest
+    ? ` kitted" data-hc="${esc(r.homeCrest)}" data-ac="${esc(r.awayCrest)}` : "";
+  return `<div class="scard${kit}" data-open="${esc(r.id)}">
     <i class="rail ${optTone(r)}"></i>
     <div class="sbody">
       <div class="stop">

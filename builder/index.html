@@ -92,8 +92,10 @@
 .bg-mow{position:absolute;inset:0;background:repeating-linear-gradient(90deg,
   rgba(232, 224, 207,.038) 0 5%, transparent 5% 10%)}
 .bg-pitch{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:.20}
-.bg-pitch svg{width:112%;max-width:none;fill:none;stroke:#e8e0cf;stroke-width:.30}
-.bg-pitch .spot{fill:#e8e0cf;stroke:none}
+/* the pitch watermark was drawn in bone; on a black-and-navy app it reads as a
+   third colour, so it takes the accent's hue at low opacity instead */
+.bg-pitch svg{width:112%;max-width:none;fill:none;stroke:#6b8fe0;stroke-width:.30}
+.bg-pitch .spot{fill:#6b8fe0;stroke:none}
 .bg-vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 22%,rgba(11,15,18,.88) 78%)}
 @media (max-width:700px){.bg-pitch svg{width:200%}.bg-mow{background-size:200% 100%}}
 main.grid{position:relative;z-index:1}
@@ -121,13 +123,15 @@ img{max-width:100%}
 .nav{border:0;background:transparent;color:var(--muted);padding:7px 14px;border-radius:10px;cursor:pointer;font-weight:700;white-space:nowrap;
   display:flex;align-items:center;gap:6px;transition:.15s}
 .nav:hover{color:var(--text);background:var(--panel2)}
-.nav.on{color:var(--on-fill);background:linear-gradient(180deg,#f2ecde,var(--accent));box-shadow:0 4px 14px -4px rgba(232, 224, 207,.6)}
+/* the top stop was a bone-era cream, which made the active tab fade from
+   cream into blue. Lit navy to the accent instead. */
+.nav.on{color:var(--on-fill);background:linear-gradient(180deg,#8aa8ea,var(--accent));box-shadow:0 4px 14px -4px rgba(107,143,224,.55)}
 .nav .count,.tool .count{font-style:normal;font-size:11px;font-weight:900;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
   display:inline-grid;place-items:center;background:var(--gold);color:#201d15}
 .nav.on .count{background:var(--on-fill);color:var(--accent)}
 .topright{display:flex;align-items:center;gap:8px;position:relative;flex-shrink:0}
 .empty .bigmark{width:72px;height:72px;filter:drop-shadow(0 0 18px rgba(232, 224, 207,.35))}
-.ghost.vault{color:#e8e0cf;border-color:#7a7158}
+.ghost.vault{color:var(--accent);border-color:#3a4f7d}
 .ghost.vault:hover{background:rgba(221, 210, 187,.08)}
 .leagues{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:0 22px 10px}
 .leagues::-webkit-scrollbar{display:none}
@@ -768,6 +772,11 @@ img{max-width:100%}
 .star{cursor:pointer;color:#3a3a3a;margin-left:6px;font-size:13px}
 .star:hover{color:var(--gold)}
 .star.on{color:var(--gold)}
+/* the crest pair on an acca row — small, inline with the name, so it sits in
+   the text rather than adding a column to an already dense grid */
+.acr{display:inline-flex;flex:none;vertical-align:-4px;margin-right:6px}
+.acr img{width:17px;height:17px;object-fit:contain}
+.acr img+img{margin-left:-5px}
 .apart{display:grid;grid-template-columns:1fr auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
 .apart.gone{opacity:.55}
 .apart .teams{font-weight:700}
@@ -801,8 +810,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .opts{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
 .opts select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px 6px}
 .build{width:100%;margin-top:12px;padding:13px;border:0;border-radius:12px;cursor:pointer;font-weight:900;letter-spacing:.06em;
-  color:#03261b;background:linear-gradient(90deg,#d9cfb6,#f2ecde,#d9cfb6);background-size:200% 100%;animation:shine 3s linear infinite;
-  box-shadow:0 8px 24px rgba(232, 224, 207,.3)}
+  color:var(--on-fill);background:linear-gradient(90deg,#4a6bb5,#8aa8ea,#4a6bb5);background-size:200% 100%;animation:shine 3s linear infinite;
+  box-shadow:0 8px 24px rgba(107,143,224,.3)}
 .build:disabled{opacity:.5;cursor:default}
 @keyframes shine{to{background-position:-200% 0}}
 /* The ticket is a physical object: a printed stub with a perforation across it,
@@ -2077,7 +2086,7 @@ a.nav{text-decoration:none}
 .mm .count{grid-row:1/3;grid-column:3}
 .mm:hover{background:var(--panel2)}
 .mm.on{color:var(--accent)}
-.mm.vaultnav{color:#e8e0cf}
+.mm.vaultnav{color:var(--accent)}
 /* Scan sits in the card's own header rather than on a tab of its own. Sized
    down from .tool so it reads as part of the header strip, not a page action. */
 .dsscan{padding:4px 10px;font-size:11.5px;font-weight:800;letter-spacing:.04em;flex:none}
@@ -2090,13 +2099,13 @@ a.nav{text-decoration:none}
   .mainnav .mm{display:flex;align-items:center;gap:6px;width:auto;padding:7px 14px;border-radius:10px;color:var(--muted);font-weight:700;white-space:nowrap;transition:.15s}
   .mainnav .mm small{display:none}
   .mainnav .mm:hover{color:var(--text);background:var(--panel2)}
-  .mainnav .mm.on{color:var(--on-fill);background:linear-gradient(180deg,#f2ecde,var(--accent));box-shadow:0 4px 14px -4px rgba(232, 224, 207,.6)}
-  .mainnav .mm.vaultnav{color:#e8e0cf}
+  .mainnav .mm.on{color:var(--on-fill);background:linear-gradient(180deg,#8aa8ea,var(--accent));box-shadow:0 4px 14px -4px rgba(107,143,224,.55)}
+  .mainnav .mm.vaultnav{color:var(--accent)}
 }
 @media (max-width:1180px) and (min-width:821px){.mainnav .nav span,.mainnav .mm span{display:none}.mainnav .nav.on span,.mainnav .mm.on span{display:inline}}
 .sc-ht{display:flex;flex-direction:column;gap:2px;padding:8px 0;border-top:1px solid var(--line);cursor:pointer}
 .sc-ht:first-of-type{border-top:0}
-.nav.vaultnav{color:#e8e0cf}
+.nav.vaultnav{color:var(--accent)}
 .nav.vaultnav:hover{color:#ece6d8;background:rgba(221, 210, 187,.1)}
 @media (max-width:560px){.tool.install span{display:none}}
 /* long page names get a short one on phones (6 pages across a phone screen) */
@@ -6007,6 +6016,15 @@ async function takeSwap(i, candId) {
 // One departure on the board. `run` is the acca's chance with every match up to and
 // including this one on it, and `first` is the chance of the earliest match alone —
 // the bar's full width — so the bar is each row's share of where the acca started.
+// An acca is the one place where every row is a DIFFERENT match, so saying
+// which one matters more here than anywhere else. makePart already stores both
+// crests, so this is markup only. The Monster Acca cards below already show
+// them this way; this brings the rows into line.
+function accaCrests(pt) {
+  if (!pt.homeCrest && !pt.awayCrest) return "";
+  const c = (s) => s ? `<img src="${esc(s)}" alt="" loading="lazy" onerror="this.remove()">` : "";
+  return `<span class="acr">${c(pt.homeCrest)}${c(pt.awayCrest)}</span>`;
+}
 function accaRow(pt, i, weak, run, first) {
   const many = pt.legs.length > 1;
   const started = pt.kickoff && new Date(pt.kickoff).getTime() < Date.now();
@@ -6019,7 +6037,7 @@ function accaRow(pt, i, weak, run, first) {
     <summary class="dbr ${weak ? "weak" : ""} ${started ? "gone" : ""}"
       title="${esc(pt.home)} v ${esc(pt.away)} — tap for the full card">
       <span class="ko">${pt.kickoff ? esc(fmtKick(pt.kickoff)) : ""}${started ? "<br>started" : ""}</span>
-      <span class="mt"><b>${esc(pt.home)} v ${esc(pt.away)}${weak ? ` <span class="weaktag" title="The match least likely to land — the one to drop first">weak link</span>` : ""}</b>
+      <span class="mt"><b>${accaCrests(pt)}${esc(pt.home)} v ${esc(pt.away)}${weak ? ` <span class="weaktag" title="The match least likely to land — the one to drop first">weak link</span>` : ""}</b>
         <span class="lg">${legs}</span></span>
       <span class="mp" title="How often this match's ${many ? `${pt.legs.length} legs land together` : "leg lands"}">${pct(pt.p, pt.p < 0.1 ? 1 : 0)}</span>
       <span class="run" title="The whole acca's chance with this match and everything above it on it">

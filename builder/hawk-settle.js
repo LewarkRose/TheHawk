@@ -138,6 +138,12 @@
       ht: ht ? [ht.homeCompetitorScore, ht.awayCompetitorScore] : null,
       first: goals.length ? (goals[0].competitorId === homeId ? "home" : "away") : null,
       corners: pair("Corners"), sot: pair("Shots On Target"), cards, players, closing, replacedBy,
+    // 365Scores publishes Offsides per team in the same stats block as Corners
+    // (verified on a finished match: two rows, one per competitor). Without this the
+    // builder's Over/Under Offsides legs settled "unknown" every time, so they were
+    // never graded and never reached the board — the learnKey they were given on
+    // 2026-10-17 could not have helped on its own.
+    offsides: pair("Offsides"),
       // who went through (To Qualify legs: extra time and penalties included)
       qualified: game.homeCompetitor.isQualified ? "home" : game.awayCompetitor.isQualified ? "away" : null,
     });
@@ -239,8 +245,9 @@
       const gl = /^([ou])([\d.]+)$/.exec(m[3]);
       return gl ? W(line(gl[1], +gl[2], hh + ha)) : "unknown";
     }
-    const totals = { corners: f.corners, cards: f.cards, sot: f.sot };
-    if ((m = /^(corners|cards|sot):([ou])([\d.]+)$/.exec(id))) {
+    // `offs` is the leg-id prefix, `offsides` the facts key — the map bridges the two.
+    const totals = { corners: f.corners, cards: f.cards, sot: f.sot, offs: f.offsides };
+    if ((m = /^(corners|cards|sot|offs):([ou])([\d.]+)$/.exec(id))) {
       const t = totals[m[1]];
       return t ? W(line(m[2], +m[3], t[0] + t[1])) : "unknown";
     }

@@ -21,10 +21,19 @@
 <meta name="apple-mobile-web-app-title" content="HAWK">
 <style>
 :root{
-  --bg:#0a0a0a; --panel:#141414; --panel2:#1c1c1c; --line:#2a2a2a; --text:#ededed; --muted:#8a8a8a;
-  --accent:#e8e0cf; --accent-d:#c9bfa6; --gold:#d8cdb4; --red:#ff5d73; --blue:#efece6; --shadow:0 10px 30px rgba(0,0,0,.35);
-  /* Results read as results, not as HAWK's gold: won, drew, lost. */
-  --green:#3ec46d;
+  /* ════ NAVY · one theme ═════════════════════════════════════════════════
+     #22396F is the card. The desk stays near-black so the blue is an object
+     you look at rather than a room you are in, and because 23% of clubs in
+     HAWK's leagues are themselves blue — measured, not guessed — a saturated
+     page would swallow a quarter of every crest and club flash on screen.
+
+     #22396F has luminance 0.044, which is too dark to act as a highlight
+     against anything here. So --accent (the thing HAWK FILLS to shout) is a
+     lit tint of the same hue, and #22396F itself lives in --panel. */
+  --bg:#090c13; --panel:#22396F; --panel2:#2b4785; --line:#31487c; --text:#eef1f8; --muted:#93a0bd;
+  --accent:#6b8fe0; --accent-d:#4a6bb5; --gold:#e0b063; --red:#ff6b7f; --blue:#d9a05b; --shadow:0 10px 30px rgba(0,0,0,.5);
+  /* Results read as results, not as HAWK's blue: won, drew, lost. */
+  --green:#4fd486;
 
   /* ════ PRESS · the shared vocabulary ════════════════════════════════════
      The same names the Vault declares, so both halves of HAWK speak one
@@ -35,125 +44,37 @@
   --ink-0:var(--bg);          /* the desk */
   --stock-1:var(--panel);     /* ordinary card */
   --stock-2:var(--panel2);    /* raised */
-  --stock-3:#262626;          /* raised further: chips, pressed states */
-  --sunk:#0f0f0f;             /* cut into the card: inputs, bar tracks */
+  --stock-3:#345495;          /* raised further: chips, pressed states */
+  --sunk:#16233f;             /* cut into the card: inputs, bar tracks */
   --rule:var(--line);         /* a hairline. carries no meaning */
-  --rule-strong:#3d3b48;      /* a boundary that means something */
-  --text-2:#c6c6c6;           /* reading text, below headings */
-  --faint:#6a6a6a;
+  --rule-strong:#4a67a6;      /* a boundary that means something */
+  --text-2:#c6d0e6;           /* reading text, below headings */
+  --faint:#7b88a5;
   --up:var(--green);
   --down:var(--red);
-  --on-fill:#1d1b14;          /* the one ink that sits on any bright fill */
-  /* the ticket's own stock: the only warm surface in the app, and the only
-     one with a tooth. it is the thing you take away with you. */
-  --ticket-stock:#232130;
+  --on-fill:#081020;          /* the one ink that sits on any bright fill */
+  /* the ticket's own stock: the one surface with a tooth, and the one thing
+     here you take away with you. */
+  --ticket-stock:#1b2d59;
+  /* the channel the club flash is recessed into. It is the DESK colour, not a
+     tint of the card, so a club's colour is always read against near-black —
+     never against the navy it is printed on. Measured: 5 of 22 clubs in a
+     normal day's fixtures (Everton, Atlético, Man City, Ipswich, Hamburg) are
+     blue enough to vanish into --panel without it. */
+  --channel:#070a10;
   /* the draw: it belongs to neither club, so it gets a colour neither club wears */
   /* the draw belongs to neither club, so it gets a colour neither club wears —
      a true neutral between the home warm and the away mauve. It was teal,
      which read as green and as a verdict rather than a third outcome. The lit
      version is the same hue brighter, used when HAWK rates the draw 28%+. */
-  --draw:#8a8a86; --draw-lit:#c8c8c2;
+  --draw:#8d99b4; --draw-lit:#c3cde0;
 }
 
-/* ════ BONE & INK ═══════════════════════════════════════════════════════
-   A second skin, not a replacement. Every line below overrides a token the
-   dark theme already declares, so the switch is one attribute on <html> and
-   nothing is lost if it turns out to be wrong.
-
-   Three tokens INVERT rather than lighten, and they are the ones that catch
-   you out if you treat this as "make everything paler":
-     · --accent is the loud surface, the thing HAWK fills to shout. On black
-       that is bone; on paper it has to be ink — so --on-fill flips the other
-       way, to bone, or text on a filled button disappears.
-     · --sunk means "cut into the card". A cut is darker than its surface on
-       either theme, so on paper it goes DOWN from --panel, not up.
-     · --draw-lit means "stronger" (HAWK rates the draw 28%+). On black that
-       is brighter; on paper it is darker. */
-:root[data-theme="bone"]{
-  --bg:#e4dfd2; --panel:#faf8f1; --panel2:#f2eee2; --line:#d7d0bf;
-  --text:#16150f; --muted:#6b6655;
-  --accent:#3c3930; --accent-d:#24221c; --gold:#7a5a16;
-  --red:#8c2f2a; --green:#1f6b45; --blue:#2e2b24;
-  --shadow:0 10px 24px rgba(60,52,32,.18);
-  --stock-3:#eae4d5;
-  --sunk:#ddd7c6;
-  --rule-strong:#b3aa93;
-  --text-2:#3f3b2f;
-  --faint:#8c8775;
-  --on-fill:#faf8f1;
-  --ticket-stock:#fbf7ec;
-  --draw:#9a9688; --draw-lit:#46433a;
-}
-/* The pitch behind everything is drawn in bone on black. On paper it has to
-   be drawn in ink and much fainter, or it reads as dirt on the page rather
-   than as a pitch. The vignette inverts too: it darkened the edges on black,
-   so here it has to warm them instead. */
-:root[data-theme="bone"] .bg-mow{
-  background:repeating-linear-gradient(90deg,rgba(60,52,32,.045) 0 5%,transparent 5% 10%)}
-:root[data-theme="bone"] .bg-pitch{opacity:.13}
-:root[data-theme="bone"] .bg-pitch svg{stroke:#3c3930}
-:root[data-theme="bone"] .bg-pitch .spot{fill:#3c3930}
-:root[data-theme="bone"] .bg-vig{
-  background:radial-gradient(ellipse at center,transparent 30%,rgba(188,180,161,.5) 82%)}
-:root[data-theme="bone"] .top{
-  background:linear-gradient(180deg,rgba(250,248,241,.97),rgba(236,232,220,.95))}
-/* Pockets the token flip cannot reach: places where a bone colour was written
-   as a literal, or where a near-white was used to mean "the bright one". They
-   are all the same bug — a value that meant LIGHT on black has to mean DARK
-   here, and a tint of bone over bone is no tint at all. */
-/* background-image, NOT the `background` shorthand: the shorthand resets
-   background-clip, and this element is clipped to its own letterforms. The
-   shorthand turned HAWK into a solid black rectangle. */
-:root[data-theme="bone"] .wordmark b{
-  background-image:linear-gradient(180deg,#2c2a22,#16150f 70%,#3c3930)}
-:root[data-theme="bone"] .tool{background:rgba(60,52,32,.06)}
-:root[data-theme="bone"] .tool:hover{background:rgba(60,52,32,.13)}
-:root[data-theme="bone"] .tool.bell{background:rgba(122,90,22,.1)}
-:root[data-theme="bone"] .mm.vaultnav,
-/* The ticket. Its stock was written as literals (#1b1f27 → #15181e), which is
-   also the last blue left in the app — hue 220, next to greys that carry none.
-   On paper it becomes the warm stock --ticket-stock already names, with a
-   torn bottom edge, because it is the one thing here you take away with you. */
-/* :has(.tk-h) because .tk is two different things — this ticket, and the small
-   key label inside a .leg .tile ("Chance", "Bet365", "Form"). The base rule
-   already paints stock behind those labels on the dark theme; on paper that
-   would be loud, so this override only claims elements that have a ticket
-   header in them. */
-:root[data-theme="bone"] .tk:has(.tk-h){
-  background:linear-gradient(180deg,var(--ticket-stock),#f1ebdc);
-  box-shadow:inset 0 1px 0 #fff,0 1px 0 #cfc6b1,0 3px 0 #b8ae97,
-             0 18px 26px -14px rgba(60,52,32,.55)}
-/* The other .tk — the key label inside a leg tile. It has been inheriting the
-   ticket's stock and inset rule all along; on black that is a dark plate on a
-   dark tile and nobody ever saw it, on paper it is a navy slab behind the word
-   "Chance". Reset here only: the dark theme keeps exactly what it has today. */
-/* Live's league chips: a literal #1f1f1f plate carrying --text, which on paper
-   is dark ink on a dark plate — two rows of unreadable blobs. The selected
-   state had the opposite problem: bone at 16% over bone is no tint at all. */
-:root[data-theme="bone"] .qc{background:var(--panel2);border-color:var(--line);color:var(--text-2)}
-:root[data-theme="bone"] .qc.in{background:var(--accent);border-color:var(--accent);color:var(--on-fill)}
-:root[data-theme="bone"] .qc.in:hover,
-:root[data-theme="bone"] .qc.in b{color:var(--on-fill)}
-:root[data-theme="bone"] .leg .tile .tk{background:none;box-shadow:none}
-:root[data-theme="bone"] .tk-h .cr img{filter:drop-shadow(0 2px 2px rgba(60,52,32,.3))}
-:root[data-theme="bone"] .rail i{background:#ddd6c4}
-:root[data-theme="bone"] .rail i.won{background:var(--green)}
-:root[data-theme="bone"] .rail i.live{background:linear-gradient(90deg,var(--green) 50%,#ddd6c4 50%)}
-:root[data-theme="bone"] .tk-leg{border-bottom-color:#e6dfcd}
-:root[data-theme="bone"] .tk-leg .d{background:#cdc5b1}
-:root[data-theme="bone"] .tk-leg.won .d{background:var(--green);box-shadow:0 0 0 3px rgba(31,107,69,.16)}
-:root[data-theme="bone"] .tk-leg.won .l{text-decoration-color:rgba(31,107,69,.6)}
-:root[data-theme="bone"] .mainnav .mm.vaultnav,
-:root[data-theme="bone"] .nav.vaultnav{color:var(--accent)}
-:root[data-theme="bone"] .nav.vaultnav:hover{color:var(--accent-d);background:rgba(60,52,32,.08)}
-/* The active tab fills with --accent and prints --on-fill on it. Both tokens
-   flip correctly, but the gradient's top stop is a literal pale cream, so on
-   paper the plate ran light-to-dark and the bone label vanished off its top
-   edge. Dark-to-darker instead. */
-:root[data-theme="bone"] .nav.on,
-:root[data-theme="bone"] .mainnav .mm.on{
-  background:linear-gradient(180deg,#4a473c,var(--accent));
-  box-shadow:0 4px 12px -4px rgba(60,52,32,.45)}
+/* .tk is two things: the ticket, and the small key label inside a .leg
+   .tile ("Chance", "Bet365", "Form"). The ticket rule has always painted
+   its stock behind those labels — invisible when both were near-black,
+   obvious now the ticket is navy. */
+.leg .tile .tk{background:none;box-shadow:none}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 /* Background: a mown pitch. Nothing moves — the drifting glows that used to sit
@@ -284,7 +205,10 @@ img{max-width:100%}
   font-weight:900;display:flex;align-items:center;gap:7px;margin-bottom:7px;flex-wrap:wrap}
 .hread .rk s{text-decoration:none;color:#5f5f5f;letter-spacing:.1em}
 .hread .lead{font-size:18.5px;line-height:1.3;font-weight:800;letter-spacing:-.012em;margin-bottom:9px}
-.hread p{margin:0 0 9px;font-size:13.2px;line-height:1.62;color:#c6c6c6;max-width:68ch}
+/* var(--text-2), not the literal it was: on the dark theme the token resolves
+   to exactly #c6c6c6, so nothing changes there, and on paper it stops being
+   near-invisible grey-on-cream. This is the whole body of HAWK's read. */
+.hread p{margin:0 0 9px;font-size:13.2px;line-height:1.62;color:var(--text-2);max-width:68ch}
 .hread p b{color:var(--text);font-weight:800}
 .hcalm{border:1px solid #2e2b24;background:rgba(232, 224, 207,.045);border-radius:11px;
   padding:10px 12px;margin:11px 0 0;max-width:68ch}
@@ -441,9 +365,35 @@ img{max-width:100%}
    moves to the top right, where the eye goes first on a card about money. */
 .myday .tk{margin:0 0 12px}
 .myday .tk:last-of-type{margin-bottom:0}
-.tk{position:relative;border-radius:4px;overflow:hidden;
-  background:linear-gradient(180deg,#1b1f27,#15181e);
-  box-shadow:inset 0 0 0 1px rgba(232, 224, 207,.1),0 20px 34px -22px rgba(0,0,0,.95)}
+.tk{position:relative;border-radius:4px;overflow:hidden;padding-left:14px;
+  background:
+    repeating-linear-gradient(135deg,rgba(255,255,255,.014) 0 2px,transparent 2px 5px),
+    linear-gradient(180deg,var(--panel2) 0%,var(--ticket-stock) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.07),
+             0 20px 34px -22px rgba(0,0,0,.95)}
+/* ── THE RECESSED CHANNEL ──────────────────────────────────────────────────
+   The club flash does not sit ON the ticket, it sits IN a slot cut through it.
+   The slot is --channel (the desk colour), so a club's colour is always read
+   against near-black and never against the navy stock.
+   This is not decoration. Measured on a normal day's 22 fixtures, FIVE clubs —
+   Everton #274488, Atlético #27296f, Man City #01255c, Ipswich #123d88,
+   Hamburg #1e5cb3 — are blue enough to disappear into --panel. A conditional
+   hairline would have fired on a quarter of all cards; a channel fires on
+   none, because the problem can no longer arise. */
+.tk::before{content:"";position:absolute;left:0;top:0;bottom:0;width:14px;z-index:2;
+  background:var(--channel);
+  box-shadow:inset -1px 0 0 rgba(0,0,0,.6),inset 1px 0 0 rgba(0,0,0,.6)}
+.tk::after{content:"";position:absolute;left:4px;top:5px;bottom:5px;width:6px;z-index:3;
+  border-radius:3px;
+  background:linear-gradient(180deg,var(--home,var(--accent)) 0 50%,var(--away,var(--blue)) 50% 100%);
+  box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+/* The rare genuine clash: two clubs whose colours are within the picker's own
+   "too close to tell apart" distance. A bite of the channel splits the flash
+   and the away half steps darker — no second-colour dataset needed. */
+.tk.kit-clash::after{
+  background:linear-gradient(180deg,
+    var(--home) 0 calc(50% - 2px), var(--channel) calc(50% - 2px) calc(50% + 2px),
+    color-mix(in srgb, var(--away) 58%, #000) calc(50% + 2px) 100%)}
 .tk-h{display:flex;align-items:center;gap:12px;padding:14px 16px 12px}
 /* The two clubs, overlapped — the same idiom .pcrests already uses elsewhere,
    so a ticket and a fixture row say "this match" the same way. Absent on any
@@ -521,7 +471,7 @@ img{max-width:100%}
 @media (max-width:560px){.ip-bell{top:7px;right:7px;width:30px;height:30px;padding:0;justify-content:center;font-size:14px}.ip-bell span{display:none}}
 .hero{position:relative}
 .hero{padding:22px 24px;border-radius:16px 16px 0 0;
-  background:radial-gradient(1200px 200px at 50% -60px,rgba(232, 224, 207,.18),transparent),linear-gradient(180deg,#222222,#141414)}
+  background:radial-gradient(1200px 200px at 50% -60px,rgba(107,143,224,.2),transparent),linear-gradient(180deg,var(--panel2),var(--panel))}
 .vs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px}
 .side{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
 .side img{width:64px;height:64px;filter:drop-shadow(0 6px 12px rgba(0,0,0,.4))}
@@ -572,7 +522,7 @@ img{max-width:100%}
 .qchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
 /* Wide enough to wrap without costing much; the strip below takes over on a phone. */
 .scstrip{flex-wrap:wrap;padding-left:0;padding-right:0}
-.qc{font-size:11.5px;padding:3px 8px;border-radius:999px;background:#1f1f1f;border:1px solid #3c3c3c;cursor:pointer;transition:.12s}
+.qc{font-size:11.5px;padding:3px 8px;border-radius:999px;background:var(--sunk);border:1px solid var(--line);cursor:pointer;transition:.12s}
 .qc:hover{border-color:var(--accent);color:var(--accent)}
 .qc.in{background:rgba(232, 224, 207,.16);border-color:var(--accent);color:var(--accent)}
 .qc b{font-weight:800;opacity:.7;margin-left:2px}
@@ -783,7 +733,10 @@ img{max-width:100%}
 .ip-scorers{margin-top:6px;display:flex;flex-direction:column;gap:2px;font-size:12.5px;font-weight:700;color:var(--text)}
 .ip-tabs{display:inline-flex;gap:4px;padding:3px;text-transform:none;letter-spacing:0}.ip-tabs button{padding:4px 10px;font-size:12px}
 .ip-teams{display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;color:var(--muted);margin:0 0 4px}
-.ip-teams span:first-child{color:var(--accent)}.ip-teams span:last-child{color:#efece6}
+/* home is --accent, away is --blue. The away half was the literal #efece6,
+   which is exactly what --blue resolves to on dark — so this changes nothing
+   there and stops the away team's name being near-white on parchment. */
+.ip-teams span:first-child{color:var(--accent)}.ip-teams span:last-child{color:var(--blue)}
 .lp-sec{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:14px 0 6px}
 .lp-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}.lp-row small{display:block;color:var(--muted);font-size:11px}
 .lp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
@@ -2157,12 +2110,6 @@ a.nav{text-decoration:none}
   .qc.in:hover{border-color:var(--accent);color:var(--accent)}
 }
 </style>
-<script>
-/* Theme, applied before first paint so the page never flashes dark then
-   repaints to paper. Deliberately standalone and above everything else:
-   if the rest of the app fails to boot, the theme still resolves. */
-try { if (localStorage.getItem("hawk.theme") === "bone") document.documentElement.dataset.theme = "bone"; } catch (e) {}
-</script>
 </head>
 <body>
 <!-- Background: slow floodlight glows + a big faint hawk, behind everything -->
@@ -2229,7 +2176,6 @@ try { if (localStorage.getItem("hawk.theme") === "bone") document.documentElemen
       <a class="mm vaultnav" href="../">🏦 <span>Vault</span><small>bankroll, all bets, track record</small></a>
     </div>
     <div class="topright">
-      <button class="tool" id="themeBtn" title="Switch between the dark app and bone &amp; ink">🌗</button>
       <button class="tool install" id="installBtn" hidden title="Install HAWK as an app on this device">📲 <span>Install</span></button>      <button class="tool bell" id="watchBtn" hidden></button>
       <div class="pop" id="watchPop" hidden></div>
     </div>
@@ -2360,6 +2306,110 @@ const odds = (o) => o == null ? "–" : o.toFixed(2);
 const capitalise = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const sliderToOdds = (v) => 1.5 * Math.pow(25 / 1.5, v / 100);
 const oddsToSlider = (o) => 100 * Math.log(o / 1.5) / Math.log(25 / 1.5);
+
+// ───────────────────────────────────────────────────────────────────────────
+// CLUB COLOURS, READ OFF THE CREST
+//
+// HAWK has never stored a club colour. The "team-coloured ring" on a player
+// face is var(--accent)/var(--blue) — HAWK's own home/away tokens, not the
+// club's. So rather than hand-maintaining a table of 150+ clubs across eight
+// leagues (which goes stale every promotion and every re-badge), each club's
+// colours are sampled from the crest the app is already showing you.
+//
+// That makes them right by construction: the colour on the ticket is a colour
+// that is actually in the badge beside it. 365Scores' image host sends CORS
+// headers, so the canvas is readable; if that ever stops, every call fails
+// closed and the caller falls back to the home/away tokens — which is exactly
+// today's behaviour, so nothing breaks.
+//
+// A crest URL carries its own version (…/v5/Competitors/392). Caching by URL
+// therefore self-invalidates when a club re-badges, with no cache-busting.
+const KIT = {
+  mem: new Map(),
+  KEY: "hawk.kit",
+  store: null,
+  load() {
+    if (this.store) return this.store;
+    try { this.store = JSON.parse(localStorage.getItem(this.KEY) || "{}"); } catch { this.store = {}; }
+    return this.store;
+  },
+  save() {
+    try {
+      const s = this.load(), keys = Object.keys(s);
+      // keep it bounded: a season of fixtures is a few hundred clubs
+      if (keys.length > 400) keys.slice(0, keys.length - 300).forEach(k => delete s[k]);
+      localStorage.setItem(this.KEY, JSON.stringify(s));
+    } catch { /* private window, or full */ }
+  },
+  // Returns {primary, second} or null. Never throws.
+  async of(url) {
+    if (!url) return null;
+    if (this.mem.has(url)) return this.mem.get(url);
+    const cached = this.load()[url];
+    if (cached) { this.mem.set(url, cached); return cached; }
+    let out = null;
+    try { out = await this.read(url); } catch { out = null; }
+    this.mem.set(url, out);
+    if (out) { this.load()[url] = out; this.save(); }
+    return out;
+  },
+  read(url) {
+    return new Promise((resolve, reject) => {
+      const im = new Image();
+      im.crossOrigin = "anonymous";
+      const bail = setTimeout(() => reject(new Error("timeout")), 8000);
+      im.onerror = () => { clearTimeout(bail); reject(new Error("load")); };
+      im.onload = () => {
+        clearTimeout(bail);
+        try {
+          const c = document.createElement("canvas");
+          c.width = im.naturalWidth; c.height = im.naturalHeight;
+          const x = c.getContext("2d", { willReadFrequently: true });
+          x.drawImage(im, 0, 0);
+          const d = x.getImageData(0, 0, c.width, c.height).data;
+          const bins = new Map();
+          for (let i = 0; i < d.length; i += 4) {
+            if (d[i + 3] < 160) continue;                       // transparent surround
+            const r = d[i], g = d[i + 1], b = d[i + 2];
+            const k = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+            const e = bins.get(k) || { n: 0, r: 0, g: 0, b: 0 };
+            e.n++; e.r += r; e.g += g; e.b += b; bins.set(k, e);
+          }
+          const all = [...bins.values()].map((e) => {
+            const r = Math.round(e.r / e.n), g = Math.round(e.g / e.n), b = Math.round(e.b / e.n);
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+            const s = mx === 0 ? 0 : (mx - mn) / mx, lum = (r + g + b) / 765;
+            // Most badges are mostly white fill and black outline. Weight those
+            // down so the KIT colour wins — but never to zero, because Fulham
+            // and Leipzig really do play in white.
+            const w = e.n * (s > 0.35 ? 1 : lum > 0.85 ? 0.22 : lum < 0.12 ? 0.3 : 0.5);
+            return { r, g, b, w };
+          }).sort((p, q) => q.w - p.w);
+          const far = (a, z) => Math.abs(a.r - z.r) + Math.abs(a.g - z.g) + Math.abs(a.b - z.b) > 110;
+          const pick = [];
+          for (const c2 of all) { if (pick.every(p => far(p, c2))) pick.push(c2); if (pick.length === 2) break; }
+          if (!pick.length) return reject(new Error("empty"));
+          resolve({ primary: KIT.hex(pick[0]), second: pick[1] ? KIT.hex(pick[1]) : null });
+        } catch (e) { reject(e); }   // tainted canvas, or no 2d context
+      };
+      im.src = url;
+    });
+  },
+  hex: (c) => "#" + [c.r, c.g, c.b].map(v => v.toString(16).padStart(2, "0")).join(""),
+  // Perceptual-ish distance, same metric the picker uses, so "too close to tell
+  // apart" means one thing everywhere.
+  near(a, b, limit = 110) {
+    const p = KIT.rgb(a), q = KIT.rgb(b);
+    if (!p || !q) return false;
+    return Math.abs(p.r - q.r) + Math.abs(p.g - q.g) + Math.abs(p.b - q.b) <= limit;
+  },
+  rgb(h) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(h || ""));
+    if (!m) return null;
+    const n = parseInt(m[1], 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  },
+};
 
 // "At least this much" for 🎯 Auto and for the Picks scan — one setting, shown
 // in both places. The left end of the travel is "any odds", where HAWK picks the
@@ -6560,7 +6610,7 @@ async function showReport(id) {
     ${r.stats.length ? `<h3 style="margin:16px 0 6px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Match stats</h3>
       ${r.stats.map(s => { const a = parseFloat(s.home) || 0, b = parseFloat(s.away) || 0, t = a + b || 1;
         return `<div class="ip-stat"><div class="nm">${esc(s.label)}</div><div style="text-align:right;font-weight:700">${esc(s.home)}</div>
-          <div class="bar"><i style="width:${(100 * a / t).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / t).toFixed(1)}%;background:#efece6"></i></div>
+          <div class="bar"><i style="width:${(100 * a / t).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / t).toFixed(1)}%;background:var(--blue)"></i></div>
           <div style="font-weight:700">${esc(s.away)}</div></div>`; }).join("")}` : ""}`);
 }
 
@@ -7538,6 +7588,21 @@ function paintDay() {
   const day = $("#tdDay"); if (!day) return;
   day.innerHTML = myDayCard((S.scores && S.scores.data) || []) ||
     `<div class="note" style="margin:0">Nothing running. Bets you log show up here as they play.</div>`;
+  paintKits(day);
+}
+// Fills in the club colours after a render. Every element carrying crest URLs
+// gets --home/--away set from the crests themselves; anything that fails keeps
+// the tokens it already had. Cached, so after the first sight of a club this
+// costs nothing and the colour is there on the next paint.
+async function paintKits(root) {
+  if (!root) return;
+  for (const el of root.querySelectorAll("[data-hc],[data-ac]")) {
+    const [h, a] = await Promise.all([KIT.of(el.dataset.hc), KIT.of(el.dataset.ac)]);
+    if (h) el.style.setProperty("--home", h.primary);
+    if (a) el.style.setProperty("--away", a.primary);
+    // Only when both resolved can we know whether they collide.
+    el.classList.toggle("kit-clash", !!(h && a && KIT.near(h.primary, a.primary)));
+  }
 }
 function myDayCard(games) {
   let bets = [];
@@ -7589,7 +7654,13 @@ function myDayCard(games) {
     const crest = (src) => src ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()">` : "";
     const crests = (h0.homeCrest || h0.awayCrest)
       ? `<div class="cr">${crest(h0.homeCrest)}${crest(h0.awayCrest)}</div>` : "";
-    return `<div class="tk">
+    // The crest URLs ride along on the element so the club colours can be
+    // painted in afterwards — reading them means decoding an image, which is
+    // async, and this render is not. paintKits() fills them in; until it does
+    // the flash falls back to HAWK's own home/away tokens, which is what the
+    // app showed before club colours existed.
+    return `<div class="tk"${h0.homeCrest ? ` data-hc="${esc(h0.homeCrest)}"` : ""}${
+      h0.awayCrest ? ` data-ac="${esc(h0.awayCrest)}"` : ""}>
       <div class="tk-h">
         ${crests}
         <div class="f"><b>${esc((b.legs[0] || {}).fixture || "Your bet")}${
@@ -7854,7 +7925,7 @@ function renderInPlay() {
     const v = st[name]; if (!v || (v[0] == null && v[1] == null)) return "";
     const a = v[0] || 0, b = v[1] || 0, tot = a + b || 1;
     return `<div class="ip-stat"><div class="nm">${label}</div><div style="text-align:right;font-weight:700">${fmt(a)}</div>
-      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:#efece6"></i></div>
+      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:var(--blue)"></i></div>
       <div style="font-weight:700">${fmt(b)}</div></div>`;
   };
   const p = d.probs || {};
@@ -7884,7 +7955,7 @@ function renderInPlay() {
     return `<div class="ip-stat" title="Booking points, the way Bet365 settles card markets: a yellow is 1 and a red is 2.">
       <div class="nm">Cards <span class="muted" style="font-size:10px">booking pts</span></div>
       <div style="text-align:right;font-weight:700">${a}</div>
-      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:#efece6"></i></div>
+      <div class="bar"><i style="width:${(100 * a / tot).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(100 * b / tot).toFixed(1)}%;background:var(--blue)"></i></div>
       <div style="font-weight:700">${b}</div></div>`;
   })();
   // One price table, not two. "Live value" was "All live prices" with a filter on
@@ -8054,23 +8125,6 @@ function healthLine() {
 // Chrome/Edge/Android offer the install prompt; on iPhone it's Share → Add to
 // Home Screen, so the button explains that instead. Hidden once installed.
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("../sw.js").catch(() => { /* not over https / blocked */ });
-// The theme switch. The attribute is the whole mechanism — removing it puts
-// the dark app back exactly as it was, which is why bone & ink is written as
-// an override layer rather than edited into the palette.
-(function setupTheme() {
-  const btn = document.getElementById("themeBtn");
-  if (!btn) return;
-  const paint = () => { btn.textContent = document.documentElement.dataset.theme === "bone" ? "🌙" : "🌗"; };
-  btn.onclick = () => {
-    const on = document.documentElement.dataset.theme === "bone";
-    if (on) delete document.documentElement.dataset.theme;
-    else document.documentElement.dataset.theme = "bone";
-    try { localStorage.setItem("hawk.theme", on ? "dark" : "bone"); } catch (e) { /* private window */ }
-    paint();
-  };
-  paint();
-})();
-
 (function setupInstall() {
   const btn = document.getElementById("installBtn");
   const installed = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;

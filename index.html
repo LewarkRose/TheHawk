@@ -21,67 +21,37 @@
            glow, tilt) in the Vault's gold. Layered over the Tailwind classes, so
            the page's markup is unchanged. "html body" outranks Tailwind's own
            rules, which it injects after this. ---- */
-        :root { --v-bg:#0a0a0a; --v-line:#2a2a2a; --v-gold:#e8e0cf; --accent:#e8e0cf; --v-shadow:0 18px 40px -14px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.35); }
+        :root { --v-bg:#090c13; --v-line:#31487c; --v-gold:#e0b063; --accent:#6b8fe0;
+                --v-shadow:0 18px 40px -14px rgba(0,0,0,.75), 0 2px 6px rgba(0,0,0,.45); }
 
         /* ════ PRESS · the shared vocabulary ════════════════════════════════
            The same tokens the builder declares, so both halves of HAWK speak
-           one language. Nothing here changes a layout; it only names things. */
+           one language. Nothing here changes a layout; it only names things.
+
+           Navy: #22396F is the card, the desk stays near-black. --accent is a
+           LIT tint of the same hue rather than #22396F itself, because at
+           luminance 0.044 the chosen blue is too dark to be a highlight
+           against anything in this app. Because the Vault's Tailwind BRIDGE
+           below maps every zinc utility onto these names, all 541 of them
+           turn over from this block alone. */
         :root {
-            --ink-0:#0a0a0a;        /* the desk */
-            --stock-1:#141414;      /* ordinary card */
-            --stock-2:#1c1c1c;      /* raised */
-            --stock-3:#262626;      /* raised further: chips, pressed states */
-            --sunk:#0f0f0f;         /* cut into the card: inputs, tracks */
-            --rule:#2a2a2a;         /* a hairline. carries no meaning */
-            --rule-strong:#3d3b48;  /* a boundary that means something */
-            --text:#ededed;
-            --text-2:#c6c6c6;
-            --muted:#8a8a8a;
-            --faint:#6a6a6a;
-            --accent-d:#c9bfa6;
-            --up:#3ec46d;
-            --down:#ff5d73;
-            --on-fill:#1d1b14;      /* the one ink that sits on any bright fill */
-        }
-
-        /* ════ BONE & INK ═══════════════════════════════════════════════════
-           The same second skin the builder carries, and the switch is shared:
-           both halves read "hawk.theme" from the same origin, so toggling in
-           one is toggling in the other. Without this the 🌗 in the builder was
-           a lie the moment you clicked through to the Vault.
-
-           This is cheap here because of THE BRIDGE below — every Tailwind zinc
-           utility already resolves to a token, so all 541 of them turn over
-           with these twenty lines and not one class name moves.
-
-           The three that INVERT rather than lighten, same as the builder:
-           --accent is the loud fill (ink on paper, so --on-fill becomes bone),
-           --sunk is a cut and so goes darker than --stock-1, and --v-gold has
-           to become a real ochre because bone-on-bone is nothing at all. */
-        :root[data-theme="bone"] {
-            /* Navy on parchment. --accent is #22396F, which does every job that
-               is a figure you ACT on: a price, the active tab, a filled plate.
-               Body ink is a navy-black rather than true black so the page reads
-               as one family instead of navy sprinkled over grey. Green and red
-               are reserved for money, which is why nothing else is allowed to
-               be loud. */
-            --v-bg:#d4cdba; --v-line:#c2bba6; --v-gold:#2d4a87; --accent:#22396F;
-            --v-shadow:0 18px 36px -14px rgba(27,36,54,.38), 0 2px 6px rgba(27,36,54,.18);
-            --ink-0:#d4cdba;        /* the desk */
-            --stock-1:#f0ebdd;      /* ordinary card */
-            --stock-2:#e5dfcd;      /* raised */
-            --stock-3:#dcd5c2;      /* raised further: chips, pressed states */
-            --sunk:#d2cab5;         /* a cut is darker than its surface on any theme */
-            --rule:#c2bba6;
-            --rule-strong:#a79e86;
-            --text:#1b2436;         /* navy-black, not true black */
-            --text-2:#3a4356;
-            --muted:#5d6678;
-            --faint:#797f8e;
-            --accent-d:#18294f;
-            --up:#1f6b45;
-            --down:#8c2f2a;
-            --on-fill:#f6f3ea;      /* what sits on a navy fill */
+            --ink-0:#090c13;        /* the desk */
+            --stock-1:#22396F;      /* ordinary card — the chosen blue */
+            --stock-2:#2b4785;      /* raised */
+            --stock-3:#345495;      /* raised further: chips, pressed states */
+            --sunk:#16233f;         /* cut into the card: inputs, tracks */
+            --rule:#31487c;         /* a hairline. carries no meaning */
+            --rule-strong:#4a67a6;  /* a boundary that means something */
+            --text:#eef1f8;
+            --text-2:#c6d0e6;
+            --muted:#93a0bd;
+            --faint:#7b88a5;
+            --accent-d:#4a6bb5;
+            --up:#4fd486;
+            --down:#ff6b7f;
+            --on-fill:#081020;      /* the one ink that sits on any bright fill */
+            /* the channel a club flash is recessed into — see the builder */
+            --channel:#070a10;
         }
 
         /* ════ THE BRIDGE ═══════════════════════════════════════════════════
@@ -426,27 +396,27 @@
         .vkey { display: flex; align-items: center; justify-content: space-between; gap: 8px;
             width: 100%; padding: 10px 12px; border: 0; border-radius: 9px; cursor: pointer;
             font: inherit; text-align: left; color: var(--text-2);
-            background: linear-gradient(180deg, #343434, #272727);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 2px 0 #121212,
-                        0 3px 5px -2px rgba(0,0,0,.7);
+            background: linear-gradient(180deg, var(--stock-3), var(--stock-2));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 2px 0 #14234a,
+                        0 3px 5px -2px rgba(0,0,0,.6);
             transition: background .12s, box-shadow .12s, transform .06s; }
-        .vkey:hover { background: linear-gradient(180deg, #3d3d3d, #2f2f2f); color: var(--text); }
+        .vkey:hover { background: linear-gradient(180deg, #3d5fa4, var(--stock-3)); color: var(--text); }
         .vkey:active { transform: translateY(1px);
-            box-shadow: inset 0 2px 4px rgba(0,0,0,.5), 0 1px 0 #121212; }
+            box-shadow: inset 0 2px 4px rgba(0,0,0,.45), 0 1px 0 #14234a; }
         .vkey.on { color: var(--on-fill); font-weight: 800;
             background: linear-gradient(180deg, var(--accent), var(--accent-d));
             box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.45),
-                        0 6px 14px -4px rgba(232,224,207,.45); }
+                        0 6px 14px -4px rgba(107,143,224,.5); }
         .vkey .vk-l { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; min-width: 0; }
         .vkey .vk-i { opacity: .7; flex: none; }
         .vkey.on .vk-i { opacity: .9; }
         .vkey .vk-t { font-weight: 900; flex: none; }
         /* the slip: the one object on the page you are actually filling */
         .vslip { border-radius: 16px;
-            background: linear-gradient(180deg, #262626, #1b1b1b);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.1), inset 0 0 0 1px rgba(232,224,207,.16),
-                        0 2px 0 #131313, 0 3px 0 #0f0f0f,
-                        0 12px 20px -8px rgba(0,0,0,.85), 0 36px 54px -26px rgba(0,0,0,.95); }
+            background: linear-gradient(180deg, var(--stock-2), var(--ticket-stock, #1b2d59));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 0 1px rgba(107,143,224,.22),
+                        0 2px 0 #14234a, 0 3px 0 #0f1b36,
+                        0 12px 20px -8px rgba(0,0,0,.8), 0 36px 54px -26px rgba(0,0,0,.9); }
         /* the header is a printed band across the top of the slip. Negative margins
            pull it out through the wrapper's p-5 (20px) so it runs edge to edge;
            its own top radius matches .vslip so no overflow:hidden is needed, which
@@ -454,15 +424,15 @@
         .vslip > div:first-child > h2:first-child {
             margin: -20px -20px 14px; padding: 13px 20px;
             border-radius: 16px 16px 0 0;
-            border-bottom: 1px solid rgba(232,224,207,.14);
-            background: linear-gradient(180deg, rgba(232,224,207,.08), transparent); }
+            border-bottom: 1px solid rgba(107,143,224,.2);
+            background: linear-gradient(180deg, rgba(107,143,224,.12), transparent); }
         /* the panels behind them step back rather than competing */
         #quick-chips-panel, #leg-form-panel {
             border: 0 !important;
-            background: linear-gradient(180deg, #212121, var(--stock-1) 55%, #101010) !important;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.08), inset 0 0 0 1px rgba(232,224,207,.09),
-                        0 1px 0 #141414, 0 2px 0 #111111,
-                        0 6px 10px -4px rgba(0,0,0,.7), 0 26px 40px -22px rgba(0,0,0,.9); }
+            background: linear-gradient(180deg, #27406f, var(--stock-1) 55%, #1b2d59) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.08), inset 0 0 0 1px rgba(107,143,224,.14),
+                        0 1px 0 #14234a, 0 2px 0 #0f1b36,
+                        0 6px 10px -4px rgba(0,0,0,.6), 0 26px 40px -22px rgba(0,0,0,.85); }
         /* ── Bankroll & History and How good is HAWK ───────────────────────
            Those two views are reading, not acting: 455 elements wore the same
            radius, border and flat fill, so six figures and three sections all
@@ -490,34 +460,6 @@
            literal greys when they were built, so the token flip cannot reach
            them. Same three levels, printed: a key you press, the slip you are
            filling, the panels receding behind both. */
-        :root[data-theme="bone"] .vkey {
-            color: var(--text-2);
-            background: linear-gradient(180deg, #f7f3e8, #e9e3d2);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 2px 0 #bdb5a0,
-                        0 3px 5px -2px rgba(27,36,54,.3); }
-        :root[data-theme="bone"] .vkey:hover {
-            background: linear-gradient(180deg, #fdfbf4, #efe9d9); color: var(--text); }
-        :root[data-theme="bone"] .vkey:active {
-            box-shadow: inset 0 2px 4px rgba(27,36,54,.28), 0 1px 0 #bdb5a0; }
-        :root[data-theme="bone"] .vkey.on {
-            color: var(--on-fill);
-            background: linear-gradient(180deg, #3d5a9e, var(--accent));
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 2px 0 var(--accent-d),
-                        0 6px 14px -4px rgba(34,57,111,.5); }
-        :root[data-theme="bone"] .vslip {
-            background: linear-gradient(180deg, #f4efe2, #e9e3d2);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.85), inset 0 0 0 1px rgba(34,57,111,.16),
-                        0 2px 0 #c3bba7, 0 3px 0 #ada48e,
-                        0 12px 20px -8px rgba(27,36,54,.42), 0 36px 54px -26px rgba(27,36,54,.38); }
-        :root[data-theme="bone"] .vslip > div:first-child > h2:first-child {
-            border-bottom-color: rgba(34,57,111,.18);
-            background: linear-gradient(180deg, rgba(34,57,111,.09), transparent); }
-        :root[data-theme="bone"] #quick-chips-panel,
-        :root[data-theme="bone"] #leg-form-panel {
-            background: linear-gradient(180deg, #ece6d7, var(--stock-1) 55%, #e6e0ce) !important;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.8), inset 0 0 0 1px rgba(34,57,111,.1),
-                        0 1px 0 #cdc5b1, 0 2px 0 #bdb5a0,
-                        0 6px 10px -4px rgba(27,36,54,.28), 0 26px 40px -22px rgba(27,36,54,.32); }
         /* ── Bone: the pockets the bridge cannot reach ────────────────────
            Each of these is a literal written when the only theme was dark.
            Two patterns repeat: a near-white used to mean "the bright one"
@@ -525,74 +467,28 @@
            all). The wordmark uses background-IMAGE, never the `background`
            shorthand, because the shorthand resets background-clip and turns
            the letters into a solid black box. */
-        html[data-theme="bone"] body header,
-        :root[data-theme="bone"] header {
-            background: linear-gradient(180deg, rgba(240,235,221,.94), rgba(226,220,203,.82)); }
-        :root[data-theme="bone"] .vault-wordmark b {
-            background-image: linear-gradient(180deg, #2d3f6b, #1b2436 60%, #334469); }
-        :root[data-theme="bone"] .vault-wordmark small { color: var(--muted); }
-        html[data-theme="bone"] body header .vault-logo {
-            filter: drop-shadow(0 2px 8px rgba(27,36,54,.4)); }
         /* the pitch behind the page: drawn in bone on black, so in ink here,
            and the vignette has to warm the edges rather than darken them */
         /* The pitch is drawn in bone at 20% to read on black. In navy on
            parchment that is far too present — the markings came through the
            panels. Ink, and much fainter, so it stays a watermark. The mown
            stripes were bone too, which on parchment is nothing at all. */
-        :root[data-theme="bone"] .bg-pitch { opacity: .11; }
-        :root[data-theme="bone"] .bg-pitch svg { stroke: #22396F; }
-        :root[data-theme="bone"] .bg-pitch .spot { fill: #22396F; }
-        :root[data-theme="bone"] .bg-mow {
-            background: repeating-linear-gradient(90deg, rgba(34,57,111,.04) 0 5%, transparent 5% 10%); }
-        :root[data-theme="bone"] .bg-vig {
-            background: radial-gradient(ellipse at center, transparent 30%, rgba(176,168,148,.5) 78%); }
         /* the site menu: a pale plate on a pale page is not a plate */
-        html[data-theme="bone"] body .snav { color: var(--muted); }
-        html[data-theme="bone"] body .snav:hover {
-            color: var(--text); background: rgba(34,57,111,.09); }
-        html[data-theme="bone"] body .snav.on {
-            color: var(--on-fill);
-            background: linear-gradient(180deg, #3d5a9e, var(--accent));
-            box-shadow: 0 5px 14px -6px rgba(34,57,111,.55), inset 0 1px 0 rgba(255,255,255,.28); }
         /* The primary plates were a bone gradient carrying Tailwind's text-black.
            On parchment a bone plate is nearly the page, so they become navy —
            and the text has to flip with them or it is black on navy. */
-        html[data-theme="bone"] body .bg-\[\#e8e0cf\] {
-            background: linear-gradient(180deg, #3d5a9e 0%, var(--accent) 55%, var(--accent-d) 100%) !important;
-            color: var(--on-fill) !important;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 2px 0 var(--accent-d),
-                        0 8px 18px -8px rgba(34,57,111,.5) !important; }
         /* Only INSIDE a navy plate. A blanket .text-black override turned every
            dark label on a pale panel near-white — text-black is used all over
            the Vault, not just on these buttons. The plate sets its own colour
            above, which covers the class sitting on the plate itself. */
-        html[data-theme="bone"] body .bg-\[\#e8e0cf\] .text-black { color: var(--on-fill); }
-        html[data-theme="bone"] body .vbtn-gold {
-            color: var(--on-fill);
-            background: linear-gradient(180deg, #3d5a9e 0%, var(--accent) 55%, var(--accent-d) 100%);
-            box-shadow: 0 8px 18px -8px rgba(34,57,111,.55), inset 0 1px 0 rgba(255,255,255,.3),
-                        inset 0 -2px 0 rgba(0,0,0,.2); }
-        :root[data-theme="bone"] .vbtn-gold img { filter: brightness(3) saturate(0); }
         /* The bankroll: a near-white figure and a grey label, both literals, on
            a parchment plate. It is the most-read number here, so it goes to
            full ink rather than being nudged. */
-        html[data-theme="bone"] .vault-bank .amt { color: var(--text); }
-        html[data-theme="bone"] .vault-bank .lbl { color: var(--muted); }
         /* The storage warning is Tailwind amber/orange — pale tints chosen to
            glow on black, invisible on parchment. Ink goes dark, tint goes up
            enough that it still reads as a caution rather than a note. */
-        html[data-theme="bone"] body .text-orange-300,
-        html[data-theme="bone"] body .text-amber-300 { color: #7a4a07; }
-        html[data-theme="bone"] body .text-orange-200,
-        html[data-theme="bone"] body .text-amber-200 { color: #5c3604; }
-        html[data-theme="bone"] body .bg-amber-500\/5 { background-color: rgba(168,116,18,.12); }
-        html[data-theme="bone"] body .border-amber-500\/25 { border-color: rgba(168,116,18,.42); }
         /* headings and marks written as the literal bone hex */
-        :root[data-theme="bone"] .text-\[\#e8e0cf\] { color: var(--accent) !important; }
-        :root[data-theme="bone"] .vday > summary::before,
-        :root[data-theme="bone"] .vbet > summary::before { color: var(--accent); }
         /* text-white was never bridged — it is on the feed selects */
-        html[data-theme="bone"] body .text-white { color: var(--text); }
         .sc-bar { position: relative; height: 13px; }
         .sc-bar::before { content: ""; position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px;
             background: rgba(232, 224, 207,.3); }
@@ -655,23 +551,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="HAWK">
 <script>
-/* Theme, before first paint so the page never flashes dark then repaints to
-   paper. The key is shared with the builder (same origin), so the 🌗 in either
-   half switches both — otherwise clicking through to the Vault dropped you
-   back into the dark app mid-journey. */
-try { if (localStorage.getItem("hawk.theme") === "bone") document.documentElement.dataset.theme = "bone"; } catch (e) {}
-function toggleTheme() {
-  const on = document.documentElement.dataset.theme === "bone";
-  if (on) delete document.documentElement.dataset.theme;
-  else document.documentElement.dataset.theme = "bone";
-  try { localStorage.setItem("hawk.theme", on ? "dark" : "bone"); } catch (e) { /* private window */ }
-  const b = document.getElementById("themeBtn");
-  if (b) b.firstElementChild.textContent = on ? "🌗" : "🌙";
-}
-document.addEventListener("DOMContentLoaded", () => {
-  const b = document.getElementById("themeBtn");
-  if (b) b.firstElementChild.textContent = document.documentElement.dataset.theme === "bone" ? "🌙" : "🌗";
-});
+/* One theme now, so there is nothing to switch. This clears the key the old
+   toggle wrote: without it, anyone who tried bone & ink keeps a stale
+   "hawk.theme" in storage forever, which is litter rather than a bug. */
+try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ }
 </script>
 </head>
 <body class="bg-black text-zinc-100 min-h-screen font-sans p-4 md:p-8">
@@ -718,7 +601,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     <button onclick="exportData()" class="vbtn" title="Download a backup of your Vault"><span class="icon-gold">💾</span> Export</button>
                     <label class="vbtn" title="Load a backup (replaces your current data)"><span class="icon-gold">📂</span> Import<input type="file" id="import-file" onchange="importData(event)" class="hidden" accept=".json"></label>
                     <button onclick="archiveOld()" class="vbtn" title="Back up the Vault, then clear settled tickets older than six months to free up storage"><span class="icon-gold">🗄️</span> Archive</button>
-                    <button onclick="toggleTheme()" class="vbtn vicon" id="themeBtn" title="Switch between the dark app and bone &amp; ink"><span class="icon-gold">🌗</span></button>
                     <button onclick="resetVault()" class="vbtn vicon" title="Reset the Vault (downloads a backup first)"><span class="icon-gold">⚙️</span></button>
                 </div>
             </div>

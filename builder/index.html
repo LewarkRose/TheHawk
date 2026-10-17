@@ -127,6 +127,13 @@
    ticket's stock and inset rule all along; on black that is a dark plate on a
    dark tile and nobody ever saw it, on paper it is a navy slab behind the word
    "Chance". Reset here only: the dark theme keeps exactly what it has today. */
+/* Live's league chips: a literal #1f1f1f plate carrying --text, which on paper
+   is dark ink on a dark plate — two rows of unreadable blobs. The selected
+   state had the opposite problem: bone at 16% over bone is no tint at all. */
+:root[data-theme="bone"] .qc{background:var(--panel2);border-color:var(--line);color:var(--text-2)}
+:root[data-theme="bone"] .qc.in{background:var(--accent);border-color:var(--accent);color:var(--on-fill)}
+:root[data-theme="bone"] .qc.in:hover,
+:root[data-theme="bone"] .qc.in b{color:var(--on-fill)}
 :root[data-theme="bone"] .leg .tile .tk{background:none;box-shadow:none}
 :root[data-theme="bone"] .tk-h .cr img{filter:drop-shadow(0 2px 2px rgba(60,52,32,.3))}
 :root[data-theme="bone"] .rail i{background:#ddd6c4}

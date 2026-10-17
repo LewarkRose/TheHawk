@@ -44,6 +44,46 @@
             --on-fill:#1d1b14;      /* the one ink that sits on any bright fill */
         }
 
+        /* ════ BONE & INK ═══════════════════════════════════════════════════
+           The same second skin the builder carries, and the switch is shared:
+           both halves read "hawk.theme" from the same origin, so toggling in
+           one is toggling in the other. Without this the 🌗 in the builder was
+           a lie the moment you clicked through to the Vault.
+
+           This is cheap here because of THE BRIDGE below — every Tailwind zinc
+           utility already resolves to a token, so all 541 of them turn over
+           with these twenty lines and not one class name moves.
+
+           The three that INVERT rather than lighten, same as the builder:
+           --accent is the loud fill (ink on paper, so --on-fill becomes bone),
+           --sunk is a cut and so goes darker than --stock-1, and --v-gold has
+           to become a real ochre because bone-on-bone is nothing at all. */
+        :root[data-theme="bone"] {
+            /* Navy on parchment. --accent is #22396F, which does every job that
+               is a figure you ACT on: a price, the active tab, a filled plate.
+               Body ink is a navy-black rather than true black so the page reads
+               as one family instead of navy sprinkled over grey. Green and red
+               are reserved for money, which is why nothing else is allowed to
+               be loud. */
+            --v-bg:#d4cdba; --v-line:#c2bba6; --v-gold:#2d4a87; --accent:#22396F;
+            --v-shadow:0 18px 36px -14px rgba(27,36,54,.38), 0 2px 6px rgba(27,36,54,.18);
+            --ink-0:#d4cdba;        /* the desk */
+            --stock-1:#f0ebdd;      /* ordinary card */
+            --stock-2:#e5dfcd;      /* raised */
+            --stock-3:#dcd5c2;      /* raised further: chips, pressed states */
+            --sunk:#d2cab5;         /* a cut is darker than its surface on any theme */
+            --rule:#c2bba6;
+            --rule-strong:#a79e86;
+            --text:#1b2436;         /* navy-black, not true black */
+            --text-2:#3a4356;
+            --muted:#5d6678;
+            --faint:#797f8e;
+            --accent-d:#18294f;
+            --up:#1f6b45;
+            --down:#8c2f2a;
+            --on-fill:#f6f3ea;      /* what sits on a navy fill */
+        }
+
         /* ════ THE BRIDGE ═══════════════════════════════════════════════════
            The Vault is built from Tailwind utilities — 541 uses of the zinc
            scale across 20 distinct classes. Rewriting that markup would be
@@ -55,6 +95,10 @@
            The translucent variants keep their translucency via color-mix
            rather than being flattened to a solid, or every /60 panel in the
            Vault would quietly become opaque. */
+        /* bg-black was outside the bridge — it is on <body> itself, so on paper
+           the page stayed black behind every panel that had turned cream. It is
+           the desk, same as bg-zinc-950. */
+        html body.bg-black, html body .bg-black { background-color: var(--ink-0) }
         html body .bg-zinc-950 { background-color: var(--ink-0) }
         html body .bg-zinc-900 { background-color: var(--stock-1) }
         html body .bg-zinc-800 { background-color: var(--stock-2) }
@@ -72,7 +116,11 @@
         html body .divide-zinc-800\/70 > :not([hidden]) ~ :not([hidden]) {
             border-color: color-mix(in srgb, var(--rule) 70%, transparent) }
 
-        html body .text-zinc-100 { color: var(--text) }
+        /* body carries its own utilities (bg-black text-zinc-100), and every
+           bridge rule below is a DESCENDANT selector, so neither matched the
+           element they are written on — the page kept near-white type on a
+           cream desk. Both forms, here and for bg-black above. */
+        html body.text-zinc-100, html body .text-zinc-100 { color: var(--text) }
         html body .text-zinc-200 { color: var(--text-2) }
         html body .text-zinc-300 { color: var(--text-2) }
         html body .text-zinc-400 { color: var(--muted) }
@@ -437,6 +485,114 @@
             background: var(--sunk);
             box-shadow: inset 0 2px 4px rgba(0,0,0,.8), inset 0 -1px 0 rgba(255,255,255,.05),
                         0 1px 0 rgba(255,255,255,.045); }
+        /* ── Bone: the Vault's own furniture ──────────────────────────────
+           The keys, the slip and the panels behind them were written as
+           literal greys when they were built, so the token flip cannot reach
+           them. Same three levels, printed: a key you press, the slip you are
+           filling, the panels receding behind both. */
+        :root[data-theme="bone"] .vkey {
+            color: var(--text-2);
+            background: linear-gradient(180deg, #f7f3e8, #e9e3d2);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 2px 0 #bdb5a0,
+                        0 3px 5px -2px rgba(27,36,54,.3); }
+        :root[data-theme="bone"] .vkey:hover {
+            background: linear-gradient(180deg, #fdfbf4, #efe9d9); color: var(--text); }
+        :root[data-theme="bone"] .vkey:active {
+            box-shadow: inset 0 2px 4px rgba(27,36,54,.28), 0 1px 0 #bdb5a0; }
+        :root[data-theme="bone"] .vkey.on {
+            color: var(--on-fill);
+            background: linear-gradient(180deg, #3d5a9e, var(--accent));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 2px 0 var(--accent-d),
+                        0 6px 14px -4px rgba(34,57,111,.5); }
+        :root[data-theme="bone"] .vslip {
+            background: linear-gradient(180deg, #f4efe2, #e9e3d2);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.85), inset 0 0 0 1px rgba(34,57,111,.16),
+                        0 2px 0 #c3bba7, 0 3px 0 #ada48e,
+                        0 12px 20px -8px rgba(27,36,54,.42), 0 36px 54px -26px rgba(27,36,54,.38); }
+        :root[data-theme="bone"] .vslip > div:first-child > h2:first-child {
+            border-bottom-color: rgba(34,57,111,.18);
+            background: linear-gradient(180deg, rgba(34,57,111,.09), transparent); }
+        :root[data-theme="bone"] #quick-chips-panel,
+        :root[data-theme="bone"] #leg-form-panel {
+            background: linear-gradient(180deg, #ece6d7, var(--stock-1) 55%, #e6e0ce) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.8), inset 0 0 0 1px rgba(34,57,111,.1),
+                        0 1px 0 #cdc5b1, 0 2px 0 #bdb5a0,
+                        0 6px 10px -4px rgba(27,36,54,.28), 0 26px 40px -22px rgba(27,36,54,.32); }
+        /* ── Bone: the pockets the bridge cannot reach ────────────────────
+           Each of these is a literal written when the only theme was dark.
+           Two patterns repeat: a near-white used to mean "the bright one"
+           (inverts on paper), and a bone tint laid over bone (no tint at
+           all). The wordmark uses background-IMAGE, never the `background`
+           shorthand, because the shorthand resets background-clip and turns
+           the letters into a solid black box. */
+        html[data-theme="bone"] body header,
+        :root[data-theme="bone"] header {
+            background: linear-gradient(180deg, rgba(240,235,221,.94), rgba(226,220,203,.82)); }
+        :root[data-theme="bone"] .vault-wordmark b {
+            background-image: linear-gradient(180deg, #2d3f6b, #1b2436 60%, #334469); }
+        :root[data-theme="bone"] .vault-wordmark small { color: var(--muted); }
+        html[data-theme="bone"] body header .vault-logo {
+            filter: drop-shadow(0 2px 8px rgba(27,36,54,.4)); }
+        /* the pitch behind the page: drawn in bone on black, so in ink here,
+           and the vignette has to warm the edges rather than darken them */
+        /* The pitch is drawn in bone at 20% to read on black. In navy on
+           parchment that is far too present — the markings came through the
+           panels. Ink, and much fainter, so it stays a watermark. The mown
+           stripes were bone too, which on parchment is nothing at all. */
+        :root[data-theme="bone"] .bg-pitch { opacity: .11; }
+        :root[data-theme="bone"] .bg-pitch svg { stroke: #22396F; }
+        :root[data-theme="bone"] .bg-pitch .spot { fill: #22396F; }
+        :root[data-theme="bone"] .bg-mow {
+            background: repeating-linear-gradient(90deg, rgba(34,57,111,.04) 0 5%, transparent 5% 10%); }
+        :root[data-theme="bone"] .bg-vig {
+            background: radial-gradient(ellipse at center, transparent 30%, rgba(176,168,148,.5) 78%); }
+        /* the site menu: a pale plate on a pale page is not a plate */
+        html[data-theme="bone"] body .snav { color: var(--muted); }
+        html[data-theme="bone"] body .snav:hover {
+            color: var(--text); background: rgba(34,57,111,.09); }
+        html[data-theme="bone"] body .snav.on {
+            color: var(--on-fill);
+            background: linear-gradient(180deg, #3d5a9e, var(--accent));
+            box-shadow: 0 5px 14px -6px rgba(34,57,111,.55), inset 0 1px 0 rgba(255,255,255,.28); }
+        /* The primary plates were a bone gradient carrying Tailwind's text-black.
+           On parchment a bone plate is nearly the page, so they become navy —
+           and the text has to flip with them or it is black on navy. */
+        html[data-theme="bone"] body .bg-\[\#e8e0cf\] {
+            background: linear-gradient(180deg, #3d5a9e 0%, var(--accent) 55%, var(--accent-d) 100%) !important;
+            color: var(--on-fill) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 2px 0 var(--accent-d),
+                        0 8px 18px -8px rgba(34,57,111,.5) !important; }
+        /* Only INSIDE a navy plate. A blanket .text-black override turned every
+           dark label on a pale panel near-white — text-black is used all over
+           the Vault, not just on these buttons. The plate sets its own colour
+           above, which covers the class sitting on the plate itself. */
+        html[data-theme="bone"] body .bg-\[\#e8e0cf\] .text-black { color: var(--on-fill); }
+        html[data-theme="bone"] body .vbtn-gold {
+            color: var(--on-fill);
+            background: linear-gradient(180deg, #3d5a9e 0%, var(--accent) 55%, var(--accent-d) 100%);
+            box-shadow: 0 8px 18px -8px rgba(34,57,111,.55), inset 0 1px 0 rgba(255,255,255,.3),
+                        inset 0 -2px 0 rgba(0,0,0,.2); }
+        :root[data-theme="bone"] .vbtn-gold img { filter: brightness(3) saturate(0); }
+        /* The bankroll: a near-white figure and a grey label, both literals, on
+           a parchment plate. It is the most-read number here, so it goes to
+           full ink rather than being nudged. */
+        html[data-theme="bone"] .vault-bank .amt { color: var(--text); }
+        html[data-theme="bone"] .vault-bank .lbl { color: var(--muted); }
+        /* The storage warning is Tailwind amber/orange — pale tints chosen to
+           glow on black, invisible on parchment. Ink goes dark, tint goes up
+           enough that it still reads as a caution rather than a note. */
+        html[data-theme="bone"] body .text-orange-300,
+        html[data-theme="bone"] body .text-amber-300 { color: #7a4a07; }
+        html[data-theme="bone"] body .text-orange-200,
+        html[data-theme="bone"] body .text-amber-200 { color: #5c3604; }
+        html[data-theme="bone"] body .bg-amber-500\/5 { background-color: rgba(168,116,18,.12); }
+        html[data-theme="bone"] body .border-amber-500\/25 { border-color: rgba(168,116,18,.42); }
+        /* headings and marks written as the literal bone hex */
+        :root[data-theme="bone"] .text-\[\#e8e0cf\] { color: var(--accent) !important; }
+        :root[data-theme="bone"] .vday > summary::before,
+        :root[data-theme="bone"] .vbet > summary::before { color: var(--accent); }
+        /* text-white was never bridged — it is on the feed selects */
+        html[data-theme="bone"] body .text-white { color: var(--text); }
         .sc-bar { position: relative; height: 13px; }
         .sc-bar::before { content: ""; position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px;
             background: rgba(232, 224, 207,.3); }
@@ -498,6 +654,25 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="HAWK">
+<script>
+/* Theme, before first paint so the page never flashes dark then repaints to
+   paper. The key is shared with the builder (same origin), so the 🌗 in either
+   half switches both — otherwise clicking through to the Vault dropped you
+   back into the dark app mid-journey. */
+try { if (localStorage.getItem("hawk.theme") === "bone") document.documentElement.dataset.theme = "bone"; } catch (e) {}
+function toggleTheme() {
+  const on = document.documentElement.dataset.theme === "bone";
+  if (on) delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = "bone";
+  try { localStorage.setItem("hawk.theme", on ? "dark" : "bone"); } catch (e) { /* private window */ }
+  const b = document.getElementById("themeBtn");
+  if (b) b.firstElementChild.textContent = on ? "🌗" : "🌙";
+}
+document.addEventListener("DOMContentLoaded", () => {
+  const b = document.getElementById("themeBtn");
+  if (b) b.firstElementChild.textContent = document.documentElement.dataset.theme === "bone" ? "🌙" : "🌗";
+});
+</script>
 </head>
 <body class="bg-black text-zinc-100 min-h-screen font-sans p-4 md:p-8">
     <!-- Background: a mown pitch. Stripes, then the markings to FIFA proportions
@@ -543,6 +718,7 @@
                     <button onclick="exportData()" class="vbtn" title="Download a backup of your Vault"><span class="icon-gold">💾</span> Export</button>
                     <label class="vbtn" title="Load a backup (replaces your current data)"><span class="icon-gold">📂</span> Import<input type="file" id="import-file" onchange="importData(event)" class="hidden" accept=".json"></label>
                     <button onclick="archiveOld()" class="vbtn" title="Back up the Vault, then clear settled tickets older than six months to free up storage"><span class="icon-gold">🗄️</span> Archive</button>
+                    <button onclick="toggleTheme()" class="vbtn vicon" id="themeBtn" title="Switch between the dark app and bone &amp; ink"><span class="icon-gold">🌗</span></button>
                     <button onclick="resetVault()" class="vbtn vicon" title="Reset the Vault (downloads a backup first)"><span class="icon-gold">⚙️</span></button>
                 </div>
             </div>

@@ -1568,12 +1568,20 @@
   let earlyPayout = false;
   function setEarlyPayout(on) { if (!!on !== earlyPayout) { earlyPayout = !!on; matches.clear(); } }
   // Which group a leg learns with, or null. Only HAWK's own estimates learn:
-  // player props, and corners/cards/shots-on-target lines split by Over and
-  // Under (shifting both the same way would be contradictory). Results and
+  // player props, and corners/cards/shots-on-target/offsides lines split by Over
+  // and Under (shifting both the same way would be contradictory). Results and
   // goals come from the bookmakers' prices, so they're left alone.
+  //
+  // `offs` was missing until 2026-10-17, so match offsides returned null here and
+  // was the ONE match total that never learned and never reached the graded
+  // board's byKey — while corners, cards and shots on target all did. Its legs
+  // are built the same way (every player's own offsides added up), so there was
+  // no reason for it to be the exception; it just was not in the list.
+  // Safe to add: a shift needs 30 settled legs before it applies at all, and is
+  // shrunk and capped above that (SC_LEARN_MIN / SHRINK / CAP in index.html).
   function learnKey(id, market) {
     if (String(id).startsWith("p:")) return market;
-    const m = /^(?:corners|cards|sot|tcorners:\w+|tcards:\w+):([ou])/.exec(id || "");
+    const m = /^(?:corners|cards|sot|offs|tcorners:\w+|tcards:\w+):([ou])/.exec(id || "");
     return m ? `${market} · ${m[1] === "o" ? "Over" : "Under"}` : null;
   }
   const adjOf = (legs, ids) => ids.reduce((s, id) => s * ((legs[id] && legs[id].adj) || 1), 1);

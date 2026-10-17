@@ -2983,11 +2983,42 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
                     g && g.waiting ? ` (${g.waiting} match${g.waiting === 1 ? '' : 'es'} waiting to be graded)` : ''}.</div>`;
             const bandLabel = (b) => b.lo === 0 ? `Under ${Math.round(100 * b.hi)}%` : b.hi > 1 ? `${Math.round(100 * b.lo)}%+` : `${Math.round(100 * b.lo)}–${Math.round(100 * b.hi)}%`;
             const bands = g.bands.filter(b => b.n).map(b => calRow(bandLabel(b), b.n, b.p / b.n, b.won / b.n)).join('');
-            const markets = Object.entries(g.byMarket).sort((a, b) => b[1].n - a[1].n).slice(0, 8)
+            // byKey, not byMarket — the same rule the Scorecard follows above, and for
+            // the same two reasons. Measured 2026-10-17 on the live board:
+            //
+            // 1. byMarket spans every model version ever run. It showed Player Tackles
+            //    as said 53.0 / landed 59.8, i.e. 6.8 points LOW, while the current
+            //    model's own record is said 60.4 / landed 58.1 — 2.2 points HIGH. The
+            //    wrong direction, from a model two versions dead.
+            // 2. A two-sided market's Over and Under are exact mirrors, so its byMarket
+            //    total is 0.500 BY CONSTRUCTION and says nothing. Team Corners and Match
+            //    Shots on Target both rendered as flawless 50.1/50.1 — and Match Shots on
+            //    Target is in fact the most miscalibrated market on the board, Over +2.6
+            //    and Under −2.7. Splitting the sides is what makes that visible.
+            const ranked = Object.entries(g.byKey || g.byMarket).sort((a, b) => b[1].n - a[1].n);
+            const markets = ranked.slice(0, 8)
                 .map(([m, b]) => calRow(escHtml(m), b.n, b.p / b.n, b.won / b.n)).join('');
+            // Ranking by volume alone hands the slots to the highest-traffic, best-behaved
+            // markets every time, so the board's biggest actual error never showed: Match
+            // Shots on Target (~6,500 legs a side, Over +2.6 / Under −2.7) falls outside
+            // the top 8 by n. This second list ranks by the gap instead, and prints it,
+            // because calRow rounds to whole percent and greys anything under 5 points —
+            // which is every gap this board produces.
+            //
+            // 300 legs minimum: a market that has just reset its MODEL_VERSION can sit on
+            // 56, and a gap measured on 56 legs is noise wearing a big number.
+            const GAP_MIN_N = 300, shown = new Set(ranked.slice(0, 8).map(([m]) => m));
+            const gaps = ranked
+                .filter(([m, b]) => b.n >= GAP_MIN_N && !shown.has(m))
+                .map(([m, b]) => ({ m, b, gap: b.won / b.n - b.p / b.n }))
+                .sort((x, y) => Math.abs(y.gap) - Math.abs(x.gap)).slice(0, 4)
+                .map(({ m, b, gap }) => calRow(
+                    `${escHtml(m)} <span class="font-normal ${gap > 0 ? 'text-emerald-400' : 'text-red-400'}">${gap > 0 ? '+' : '−'}${Math.abs(100 * gap).toFixed(1)}</span>`,
+                    b.n, b.p / b.n, b.won / b.n)).join('');
             return `<div class="text-xs font-bold text-white">🌍 HAWK on every match <span class="text-zinc-500 font-normal">— ${g.matches} matches, ${g.legs.toLocaleString()} legs graded</span></div>
                 <div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-1">By HAWK's chance</div>${bands}
-                <div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-2">By market</div>${markets}
+                <div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-2">By market <span class="normal-case tracking-normal">— most graded</span></div>${markets}
+                ${gaps ? `<div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-2">Furthest out <span class="normal-case tracking-normal">— ${GAP_MIN_N}+ legs, not already above</span></div>${gaps}` : ''}
                 ${radarBlock(g)}
                 ${(g.recent || []).length ? `<div class="text-[10px] text-zinc-500 uppercase tracking-wider pt-2">Latest matches graded</div>
                 <div class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-1 text-xs divide-y divide-zinc-800/70">${g.recent.slice(0, 6).map(r =>

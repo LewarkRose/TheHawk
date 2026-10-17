@@ -21,37 +21,37 @@
            glow, tilt) in the Vault's gold. Layered over the Tailwind classes, so
            the page's markup is unchanged. "html body" outranks Tailwind's own
            rules, which it injects after this. ---- */
-        :root { --v-bg:#090c13; --v-line:#31487c; --v-gold:#e0b063; --accent:#6b8fe0;
-                --v-shadow:0 18px 40px -14px rgba(0,0,0,.75), 0 2px 6px rgba(0,0,0,.45); }
+        :root { --v-bg:#070910; --v-line:#222b3c; --v-gold:#e0b063; --accent:#6b8fe0;
+                --v-shadow:0 18px 40px -14px rgba(0,0,0,.8), 0 2px 6px rgba(0,0,0,.5); }
 
         /* ════ PRESS · the shared vocabulary ════════════════════════════════
            The same tokens the builder declares, so both halves of HAWK speak
            one language. Nothing here changes a layout; it only names things.
 
-           Navy: #22396F is the card, the desk stays near-black. --accent is a
-           LIT tint of the same hue rather than #22396F itself, because at
-           luminance 0.044 the chosen blue is too dark to be a highlight
-           against anything in this app. Because the Vault's Tailwind BRIDGE
-           below maps every zinc utility onto these names, all 541 of them
-           turn over from this block alone. */
+           The surfaces are BLACK, not navy. Painting them #22396F made the
+           shell, the rows inside it and the drawer all one colour — blue on
+           blue on blue, a wash rather than a colour. Navy now appears only as
+           LIGHT: --accent on an active tab, a price, a filled plate.
+           Because the Vault's Tailwind BRIDGE below maps every zinc utility
+           onto these names, all 541 of them turn over from this block alone. */
         :root {
-            --ink-0:#090c13;        /* the desk */
-            --stock-1:#22396F;      /* ordinary card — the chosen blue */
-            --stock-2:#2b4785;      /* raised */
-            --stock-3:#345495;      /* raised further: chips, pressed states */
-            --sunk:#16233f;         /* cut into the card: inputs, tracks */
-            --rule:#31487c;         /* a hairline. carries no meaning */
-            --rule-strong:#4a67a6;  /* a boundary that means something */
+            --ink-0:#070910;        /* the desk */
+            --stock-1:#0d111a;      /* ordinary card */
+            --stock-2:#121722;      /* raised */
+            --stock-3:#1b2334;      /* raised further: chips, pressed states */
+            --sunk:#0a0e16;         /* cut into the card: inputs, tracks */
+            --rule:#222b3c;         /* a hairline. carries no meaning */
+            --rule-strong:#33405a;  /* a boundary that means something */
             --text:#eef1f8;
             --text-2:#c6d0e6;
-            --muted:#93a0bd;
-            --faint:#7b88a5;
+            --muted:#8d97ab;
+            --faint:#6b7489;
             --accent-d:#4a6bb5;
             --up:#4fd486;
             --down:#ff6b7f;
-            --on-fill:#081020;      /* the one ink that sits on any bright fill */
+            --on-fill:#070910;      /* the one ink that sits on any bright fill */
             /* the channel a club flash is recessed into — see the builder */
-            --channel:#070a10;
+            --channel:#05070b;
         }
 
         /* ════ THE BRIDGE ═══════════════════════════════════════════════════
@@ -185,9 +185,9 @@
         html body input:focus, html body select:focus { border-color: var(--v-gold) !important; box-shadow: inset 0 2px 6px rgba(0,0,0,.5), 0 0 0 3px rgba(232, 224, 207,.15) !important; }
         /* gold buttons: lit from above, press in when clicked */
         html body .bg-\[\#e8e0cf\] {
-            background: linear-gradient(180deg, #f5f0e5 0%, #e8e0cf 55%, #a89c82 100%) !important;
-            color: #17150f !important;
-            box-shadow: 0 10px 22px -8px rgba(232, 224, 207,.6), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(0,0,0,.2) !important;
+            background: linear-gradient(180deg, #8aa8ea 0%, #6b8fe0 55%, #4a6bb5 100%) !important;
+            color: #070910 !important;
+            box-shadow: 0 10px 22px -8px rgba(107,143,224,.55), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(0,0,0,.2) !important;
         }
         /* dark buttons */
         html body button.bg-zinc-900, html body label.bg-zinc-900, html body button.bg-zinc-800, html body .bg-zinc-800.rounded-lg {
@@ -225,8 +225,8 @@
         html body .snav { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px; color: #a1a1aa; font-weight: 700;
             font-size: 12.5px; text-decoration: none; white-space: nowrap; transition: .15s; }
         html body .snav:hover { color: #fff; background: rgba(255,255,255,.06); }
-        html body .snav.on { color: #17150f; background: linear-gradient(180deg, #f5f0e5 0%, #e8e0cf 55%, #a89c82 100%);
-            box-shadow: 0 6px 16px -6px rgba(232, 224, 207,.6), inset 0 1px 0 rgba(255,255,255,.5); }
+        html body .snav.on { color: #070910; background: linear-gradient(180deg, #8aa8ea 0%, #6b8fe0 55%, #4a6bb5 100%);
+            box-shadow: 0 6px 16px -6px rgba(107,143,224,.55), inset 0 1px 0 rgba(255,255,255,.5); }
         .snav .ns { display: none; }
         /* narrower screens: the menu gets its own row; phones: icon over a short label */
         @media (max-width: 640px) {
@@ -238,9 +238,9 @@
         html body .vbtn { height: 38px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px; border-radius: 10px; font-size: 12.5px; font-weight: 700;
             color: #d4d4d8; background: transparent; border: 0; cursor: pointer; text-decoration: none; white-space: nowrap; }
         html body .vgroup .vbtn:hover { background: rgba(255,255,255,.06); color: #fff; }
-        html body .vbtn-gold { height: 44px; padding: 0 18px; border-radius: 12px; color: #17150f;
-            background: linear-gradient(180deg, #f5f0e5 0%, #e8e0cf 55%, #a89c82 100%);
-            box-shadow: 0 10px 22px -8px rgba(232, 224, 207,.6), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(0,0,0,.2); }
+        html body .vbtn-gold { height: 44px; padding: 0 18px; border-radius: 12px; color: #070910;
+            background: linear-gradient(180deg, #8aa8ea 0%, #6b8fe0 55%, #4a6bb5 100%);
+            box-shadow: 0 10px 22px -8px rgba(107,143,224,.55), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(0,0,0,.2); }
         .vbtn-gold img { width: 18px; height: 18px; filter: brightness(.25) saturate(0); }
         html body .vicon { width: 38px; padding: 0; justify-content: center; }
         .vault-bank { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 8px 0 16px; border-radius: 14px;
@@ -397,12 +397,12 @@
             width: 100%; padding: 10px 12px; border: 0; border-radius: 9px; cursor: pointer;
             font: inherit; text-align: left; color: var(--text-2);
             background: linear-gradient(180deg, var(--stock-3), var(--stock-2));
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 2px 0 #14234a,
-                        0 3px 5px -2px rgba(0,0,0,.6);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 2px 0 #090d15,
+                        0 3px 5px -2px rgba(0,0,0,.7);
             transition: background .12s, box-shadow .12s, transform .06s; }
-        .vkey:hover { background: linear-gradient(180deg, #3d5fa4, var(--stock-3)); color: var(--text); }
+        .vkey:hover { background: linear-gradient(180deg, #27314a, var(--stock-3)); color: var(--text); }
         .vkey:active { transform: translateY(1px);
-            box-shadow: inset 0 2px 4px rgba(0,0,0,.45), 0 1px 0 #14234a; }
+            box-shadow: inset 0 2px 4px rgba(0,0,0,.6), 0 1px 0 #090d15; }
         .vkey.on { color: var(--on-fill); font-weight: 800;
             background: linear-gradient(180deg, var(--accent), var(--accent-d));
             box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.45),
@@ -413,10 +413,10 @@
         .vkey .vk-t { font-weight: 900; flex: none; }
         /* the slip: the one object on the page you are actually filling */
         .vslip { border-radius: 16px;
-            background: linear-gradient(180deg, var(--stock-2), var(--ticket-stock, #1b2d59));
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 0 1px rgba(107,143,224,.22),
-                        0 2px 0 #14234a, 0 3px 0 #0f1b36,
-                        0 12px 20px -8px rgba(0,0,0,.8), 0 36px 54px -26px rgba(0,0,0,.9); }
+            background: linear-gradient(180deg, var(--stock-2), #161d2b);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.1), inset 0 0 0 1px rgba(107,143,224,.2),
+                        0 2px 0 #090d15, 0 3px 0 #05070b,
+                        0 12px 20px -8px rgba(0,0,0,.85), 0 36px 54px -26px rgba(0,0,0,.95); }
         /* the header is a printed band across the top of the slip. Negative margins
            pull it out through the wrapper's p-5 (20px) so it runs edge to edge;
            its own top radius matches .vslip so no overflow:hidden is needed, which
@@ -429,10 +429,10 @@
         /* the panels behind them step back rather than competing */
         #quick-chips-panel, #leg-form-panel {
             border: 0 !important;
-            background: linear-gradient(180deg, #27406f, var(--stock-1) 55%, #1b2d59) !important;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.08), inset 0 0 0 1px rgba(107,143,224,.14),
-                        0 1px 0 #14234a, 0 2px 0 #0f1b36,
-                        0 6px 10px -4px rgba(0,0,0,.6), 0 26px 40px -22px rgba(0,0,0,.85); }
+            background: linear-gradient(180deg, #141a28, var(--stock-1) 55%, #0a0e16) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset 0 0 0 1px rgba(107,143,224,.1),
+                        0 1px 0 #090d15, 0 2px 0 #05070b,
+                        0 6px 10px -4px rgba(0,0,0,.7), 0 26px 40px -22px rgba(0,0,0,.9); }
         /* ── Bankroll & History and How good is HAWK ───────────────────────
            Those two views are reading, not acting: 455 elements wore the same
            radius, border and flat fill, so six figures and three sections all

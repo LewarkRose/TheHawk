@@ -29,9 +29,15 @@
 
      #22396F has luminance 0.044, which is too dark to act as a highlight
      against anything here. So --accent (the thing HAWK FILLS to shout) is a
-     lit tint of the same hue, and #22396F itself lives in --panel. */
-  --bg:#090c13; --panel:#22396F; --panel2:#2b4785; --line:#31487c; --text:#eef1f8; --muted:#93a0bd;
-  --accent:#6b8fe0; --accent-d:#4a6bb5; --gold:#e0b063; --red:#ff6b7f; --blue:#d9a05b; --shadow:0 10px 30px rgba(0,0,0,.5);
+     lit tint of the same hue.
+
+     The surfaces are BLACK, not navy. Painting --panel navy made the shell,
+     every row inside it and the drawer all the same colour — blue on blue on
+     blue, one wash rather than a colour. Navy now appears only as LIGHT: the
+     active tab, a selected chip, a price, the probability bar. It is a signal,
+     not a wallpaper. */
+  --bg:#070910; --panel:#0d111a; --panel2:#121722; --line:#222b3c; --text:#eef1f8; --muted:#8d97ab;
+  --accent:#6b8fe0; --accent-d:#4a6bb5; --gold:#e0b063; --red:#ff6b7f; --blue:#d9a05b; --shadow:0 10px 30px rgba(0,0,0,.6);
   /* Results read as results, not as HAWK's blue: won, drew, lost. */
   --green:#4fd486;
 
@@ -44,24 +50,26 @@
   --ink-0:var(--bg);          /* the desk */
   --stock-1:var(--panel);     /* ordinary card */
   --stock-2:var(--panel2);    /* raised */
-  --stock-3:#345495;          /* raised further: chips, pressed states */
-  --sunk:#16233f;             /* cut into the card: inputs, bar tracks */
+  --stock-3:#1b2334;          /* raised further: chips, pressed states */
+  --sunk:#0a0e16;             /* cut into the card: inputs, bar tracks */
   --rule:var(--line);         /* a hairline. carries no meaning */
-  --rule-strong:#4a67a6;      /* a boundary that means something */
+  --rule-strong:#33405a;      /* a boundary that means something */
   --text-2:#c6d0e6;           /* reading text, below headings */
-  --faint:#7b88a5;
+  --faint:#6b7489;
   --up:var(--green);
   --down:var(--red);
-  --on-fill:#081020;          /* the one ink that sits on any bright fill */
+  --on-fill:#070910;          /* the one ink that sits on any bright fill */
   /* the ticket's own stock: the one surface with a tooth, and the one thing
      here you take away with you. */
-  --ticket-stock:#1b2d59;
-  /* the channel the club flash is recessed into. It is the DESK colour, not a
-     tint of the card, so a club's colour is always read against near-black —
-     never against the navy it is printed on. Measured: 5 of 22 clubs in a
-     normal day's fixtures (Everton, Atlético, Man City, Ipswich, Hamburg) are
-     blue enough to vanish into --panel without it. */
-  --channel:#070a10;
+  --ticket-stock:#161d2b;
+  /* The channel the club flash is recessed into — darker than any surface, so
+     a club is read against one known ground everywhere.
+     Measured on 24 clubs from a normal day: five (Chelsea, Atlético, Venezia,
+     Fulham, Man City) are dark enough to vanish into the card; against the
+     channel only two still are — Venezia #010102 and Fulham #000000, who
+     genuinely play in black. Those two are caught by the rim on the flash
+     itself rather than by a per-club exception. */
+  --channel:#05070b;
   /* the draw: it belongs to neither club, so it gets a colour neither club wears */
   /* the draw belongs to neither club, so it gets a colour neither club wears —
      a true neutral between the home warm and the away mauve. It was teal,
@@ -386,7 +394,7 @@ img{max-width:100%}
 .tk::after{content:"";position:absolute;left:4px;top:5px;bottom:5px;width:6px;z-index:3;
   border-radius:3px;
   background:linear-gradient(180deg,var(--home,var(--accent)) 0 50%,var(--away,var(--blue)) 50% 100%);
-  box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+  box-shadow:0 0 0 1px rgba(255,255,255,.32)}
 /* The rare genuine clash: two clubs whose colours are within the picker's own
    "too close to tell apart" distance. A bite of the channel splits the flash
    and the away half steps darker — no second-colour dataset needed. */
@@ -1150,7 +1158,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .scard.kitted::after{content:"";position:absolute;right:4px;top:6px;bottom:6px;width:5px;z-index:3;
   border-radius:3px;
   background:linear-gradient(180deg,var(--home,var(--accent)) 0 50%,var(--away,var(--blue)) 50% 100%);
-  box-shadow:0 0 0 1px rgba(0,0,0,.55)}
+  box-shadow:0 0 0 1px rgba(255,255,255,.32)}
 /* the rare genuine clash — a bite of the channel splits the flash and the away
    half steps darker, so two clubs in the same colour still read as two */
 .scard.kit-clash::after{
@@ -1999,7 +2007,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .mb-card.kitted::after{content:"";position:absolute;left:3px;top:6px;bottom:6px;width:5px;z-index:2;
   border-radius:3px;
   background:linear-gradient(180deg,var(--home,var(--accent)) 0 50%,var(--away,var(--blue)) 50% 100%);
-  box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+  box-shadow:0 0 0 1px rgba(255,255,255,.32)}
 .mb-card.kit-clash::after{
   background:linear-gradient(180deg,
     var(--home) 0 calc(50% - 2px), var(--channel) calc(50% - 2px) calc(50% + 2px),

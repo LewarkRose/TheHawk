@@ -368,6 +368,75 @@
             vertical-align: 1px; margin-right: 6px; }
         .sc-key i.p { background: var(--accent); }
         .sc-key i.m { background: var(--down); }
+        /* ---------- THE VAULT'S BUILDER: KEYS, THEN A SLIP ----------
+           The page had 455 elements wearing the same radius, the same border and the
+           same flat fill, so the chips, the slip and the leg form all shouted at the
+           same volume and nothing told the eye where to start. Three levels now:
+           keys you press, the slip you are filling, the form receding behind both.
+           Static depth only — a highlight on top, a shelf beneath, a pressed state —
+           because a lift moves every figure in the row and these rows carry money. */
+        .vkey { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            width: 100%; padding: 10px 12px; border: 0; border-radius: 9px; cursor: pointer;
+            font: inherit; text-align: left; color: var(--text-2);
+            background: linear-gradient(180deg, #343434, #272727);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 2px 0 #121212,
+                        0 3px 5px -2px rgba(0,0,0,.7);
+            transition: background .12s, box-shadow .12s, transform .06s; }
+        .vkey:hover { background: linear-gradient(180deg, #3d3d3d, #2f2f2f); color: var(--text); }
+        .vkey:active { transform: translateY(1px);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,.5), 0 1px 0 #121212; }
+        .vkey.on { color: var(--on-fill); font-weight: 800;
+            background: linear-gradient(180deg, var(--accent), var(--accent-d));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.45),
+                        0 6px 14px -4px rgba(232,224,207,.45); }
+        .vkey .vk-l { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; min-width: 0; }
+        .vkey .vk-i { opacity: .7; flex: none; }
+        .vkey.on .vk-i { opacity: .9; }
+        .vkey .vk-t { font-weight: 900; flex: none; }
+        /* the slip: the one object on the page you are actually filling */
+        .vslip { border-radius: 16px;
+            background: linear-gradient(180deg, #262626, #1b1b1b);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.1), inset 0 0 0 1px rgba(232,224,207,.16),
+                        0 2px 0 #131313, 0 3px 0 #0f0f0f,
+                        0 12px 20px -8px rgba(0,0,0,.85), 0 36px 54px -26px rgba(0,0,0,.95); }
+        /* the header is a printed band across the top of the slip. Negative margins
+           pull it out through the wrapper's p-5 (20px) so it runs edge to edge;
+           its own top radius matches .vslip so no overflow:hidden is needed, which
+           would clip the staking dropdowns underneath. */
+        .vslip > div:first-child > h2:first-child {
+            margin: -20px -20px 14px; padding: 13px 20px;
+            border-radius: 16px 16px 0 0;
+            border-bottom: 1px solid rgba(232,224,207,.14);
+            background: linear-gradient(180deg, rgba(232,224,207,.08), transparent); }
+        /* the panels behind them step back rather than competing */
+        #quick-chips-panel, #leg-form-panel {
+            border: 0 !important;
+            background: linear-gradient(180deg, #212121, var(--stock-1) 55%, #101010) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.08), inset 0 0 0 1px rgba(232,224,207,.09),
+                        0 1px 0 #141414, 0 2px 0 #111111,
+                        0 6px 10px -4px rgba(0,0,0,.7), 0 26px 40px -22px rgba(0,0,0,.9); }
+        /* ── Bankroll & History and How good is HAWK ───────────────────────
+           Those two views are reading, not acting: 455 elements wore the same
+           radius, border and flat fill, so six figures and three sections all
+           shouted at one volume. Nothing here is pressed, so nothing is raised.
+           Two levels only — a sheet the section sits on, and wells cut into it
+           for the figures. A well is ink on paper, not a button, which is why
+           it has no hover and no lift: the digits inside it must not move. */
+        #view-history [class*="bg-zinc-900/"],
+        #view-scorecard [class*="bg-zinc-900/"] {
+            border-color: transparent;
+            background: linear-gradient(180deg, #212121, var(--stock-1) 55%, #101010);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.08), inset 0 0 0 1px rgba(232,224,207,.09),
+                        0 1px 0 #141414, 0 2px 0 #111111,
+                        0 6px 10px -4px rgba(0,0,0,.7), 0 26px 40px -22px rgba(0,0,0,.9); }
+        #view-history .vwells > div,
+        #view-scorecard .vwells > div,
+        #view-history div[class*="bg-zinc-950"][class*="rounded"],
+        #view-scorecard div[class*="bg-zinc-950"][class*="rounded"] {
+            border-color: transparent;
+            background: var(--sunk);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,.8), inset 0 -1px 0 rgba(255,255,255,.05),
+                        0 1px 0 rgba(255,255,255,.045); }
         .sc-bar { position: relative; height: 13px; }
         .sc-bar::before { content: ""; position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px;
             background: rgba(232, 224, 207,.3); }
@@ -531,7 +600,7 @@
                 </div>
 
                 <!-- Add Leg Form -->
-                <div class="bg-zinc-900/60 p-5 rounded-2xl border border-zinc-800/80 space-y-4 overflow-visible">
+                <div id="leg-form-panel" class="bg-zinc-900/60 p-5 rounded-2xl border border-zinc-800/80 space-y-4 overflow-visible">
                     <div class="flex justify-between items-center">
                         <h2 id="leg-form-title" class="font-bold text-sm text-white uppercase tracking-wider flex items-center gap-2">
                             <span class="icon-gold">📝</span> Add Bet Builder Leg
@@ -621,7 +690,7 @@
             </div>
 
             <!-- Right Col: Active Ticket Slip & Staking -->
-            <div class="bg-zinc-900/60 p-5 rounded-2xl border border-zinc-800/80 flex flex-col justify-between">
+            <div class="vslip p-5 flex flex-col justify-between">
                 <div>
                     <h2 class="font-bold text-lg text-white mb-3 flex items-center gap-2 justify-between">
                         <span class="flex items-center gap-2"><span class="icon-gold">🎟️</span> Bet Slip Vault</span>
@@ -680,7 +749,7 @@
                 <div id="weekly-container"></div>
             </div>
             <div class="vband"><span>Your numbers</span><i></i></div>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div class="vwells grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80">
                     <span class="text-[10px] text-zinc-400 uppercase tracking-wider flex items-center gap-1"><span class="icon-gold">💰</span> Total Profit / Loss</span>
                     <span id="stat-net" class="text-lg font-bold text-zinc-200">€0.00</span>
@@ -1856,10 +1925,11 @@
                 const selected = !item.customizable && isChipSelected(item);
                 const btn = document.createElement('button');
                 btn.type = "button";
-                btn.className = selected
-                    ? "bg-[#c9bfa6]/15 hover:bg-[#c9bfa6]/20 border border-[#e8e0cf] p-2.5 rounded-xl text-left transition flex justify-between items-center gap-2 group"
-                    : "bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-[#e8e0cf]/50 p-2.5 rounded-xl text-left transition flex justify-between items-center gap-2 group";
-                btn.innerHTML = `<span class="flex items-center gap-2 text-xs ${selected ? 'text-[#e8e0cf]' : 'text-zinc-300 group-hover:text-[#e8e0cf]'} font-medium">${selected ? '<span class="icon-gold">✓</span>' : ''}<span class="opacity-70">${item.icon || '⚡'}</span>${item.label}</span>`;
+                // A key you press, not a box you tick — see .vkey. The Tailwind strings
+                // went because a raised cap needs a highlight, a shelf beneath and a
+                // pressed state, and utilities cannot express a shadow stack.
+                btn.className = selected ? "vkey on" : "vkey";
+                btn.innerHTML = `<span class="vk-l">${selected ? '<span class="vk-t">✓</span>' : ''}<span class="vk-i">${item.icon || '⚡'}</span>${item.label}</span>`;
                 btn.onclick = () => toggleChip(item);
                 container.appendChild(btn);
             });

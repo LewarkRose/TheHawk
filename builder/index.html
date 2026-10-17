@@ -442,13 +442,15 @@ img{max-width:100%}
 .tk-leg .d{width:9px;height:9px;border-radius:50%;background:#2e3038;margin-left:3px}
 .tk-leg.won .d{background:var(--green);box-shadow:0 0 0 3px rgba(79,212,134,.16)}
 .tk-leg.lost .d{background:var(--red);box-shadow:0 0 0 3px rgba(255,93,115,.15)}
-.tk-leg.live .d{background:var(--red)}
+/* In play is amber, not red — same traffic light as the rail. Red here read as
+   "gone" on a leg that was still perfectly alive. */
+.tk-leg.live .d{background:var(--gold);box-shadow:0 0 0 3px rgba(224,176,99,.14)}
 .tk-leg .l{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tk-leg.won .l{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(79,212,134,.45)}
 .tk-leg.lost .l{color:var(--red);text-decoration:line-through;text-decoration-color:rgba(255,93,115,.5)}
 .tk-leg .c{font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
   color:var(--muted);text-transform:uppercase;white-space:nowrap}
-.tk-leg.live .c{color:var(--red)}
+.tk-leg.live .c{color:var(--gold)}
 .tk-f{display:flex;align-items:stretch;margin-top:8px;border-top:1px solid rgba(232, 224, 207,.14)}
 .tk-f > div{flex:1;min-width:0;padding:11px 16px}
 .tk-f > div + div{border-left:1px solid rgba(232, 224, 207,.14)}
@@ -2622,7 +2624,7 @@ async function init() {
   // Worker: browsers slow a background tab's own timers to once a minute, but not
   // a worker's, so alerts stay quick while HAWK sits in another tab.
   let beat = 0;
-  const tick = () => { fastGoals(); if (++beat % 2 === 0) { checkGoals(); renderDrawer(); } if (beat % 12 === 0) checkLineups(); if (beat % 6 === 3) htScan(); if (beat % 60 === 0) linkVaultBets(); };
+  const tick = () => { fastGoals(); if (++beat % 2 === 0) { checkGoals(); renderDrawer(); refreshToday(); } if (beat % 12 === 0) checkLineups(); if (beat % 6 === 3) htScan(); if (beat % 60 === 0) linkVaultBets(); };
   if (loadPref("hawk.drawer", false) && WIDE()) toggleDrawer(true);
   linkVaultBets();
   try { new Worker(URL.createObjectURL(new Blob([`setInterval(() => postMessage(0), ${FAST_MS})`], { type: "text/javascript" }))).onmessage = tick; }
@@ -7568,7 +7570,8 @@ function renderToday() {
       if (id) openPick(id, lg);
     });
     paintDay();
-    refreshHold(vaultBets().filter((b) => b.status === "PENDING"), (S.scores && S.scores.data) || []);
+    refreshHold(vaultBets().filter((b) => b.status === "PENDING"), todayGames());
+    refreshToday();   // and pull today's clocks straight away rather than waiting for the next beat
     scorePaper();
     return;
   }
@@ -7628,7 +7631,8 @@ function renderToday() {
   });
   paintDay();
   // then ask every in-play match what the ticket is worth now, and repaint if it moved
-  refreshHold(vaultBets().filter((b) => b.status === "PENDING"), (S.scores && S.scores.data) || []);
+  refreshHold(vaultBets().filter((b) => b.status === "PENDING"), todayGames());
+  refreshToday();   // and pull today's clocks straight away rather than waiting for the next beat
   scorePaper();
 }
 // ---------- THE LIVE HOLD ----------
@@ -7678,10 +7682,43 @@ async function refreshHold(bets, games) {
 // re-running everything else Today does.
 function paintDay() {
   const day = $("#tdDay"); if (!day) return;
-  day.innerHTML = myDayCard((S.scores && S.scores.data) || []) ||
+  day.innerHTML = myDayCard(todayGames()) ||
     `<div class="note" style="margin:0">Nothing running. Bets you log show up here as they play.</div>`;
   paintKits(day);
 }
+// The day card used to read S.scores.data, which is whatever day the Scores page
+// is showing — flip that picker to Yesterday and the card quietly took yesterday's
+// clocks. Worse, nothing refreshed it: the minute and "Holding is worth" were
+// frozen at whatever they were when you landed on Today, which is the one figure
+// on this card anyone would act on. It keeps its own copy of today now, topped up
+// on the heartbeat while you are actually looking at it.
+//
+// Cost is nil: HAWK.scores caches for 10 s and the heartbeat asks every 10 s, so
+// this is one request per tick — the same cadence the Scores page already runs at,
+// and only while Today is the open view and the tab is in front.
+const TODAY = { day: null, games: null, busy: false };
+function todayGames() {
+  const d = localDay(new Date());
+  if (TODAY.day === d && TODAY.games) return TODAY.games;
+  const sc = S.scores || {};
+  return sc.dataDay === d && sc.data ? sc.data : [];   // fall back only if Scores happens to hold today
+}
+async function refreshToday() {
+  if (S.view !== "today" || document.hidden || TODAY.busy) return;
+  const d = localDay(new Date());
+  TODAY.busy = true;
+  try {
+    const games = await api(`/api/scores?day=${d}`);
+    // An empty answer is a 365Scores hiccup, not a day without games: keep what's up.
+    if (games && games.length) { TODAY.day = d; TODAY.games = games; }
+  } catch (e) { console.warn("[hawk] today refresh:", e.message); }
+  finally { TODAY.busy = false; }
+  if (S.view !== "today") return;
+  paintDay();
+  refreshHold(vaultBets().filter((b) => b.status === "PENDING"), todayGames());
+}
+// Back on the tab after it was hidden: catch up at once rather than on the next beat.
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshToday(); });
 // Fills in the club colours after a render. Every element carrying crest URLs
 // gets --home/--away set from the crests themselves; anything that fails keeps
 // the tokens it already had. Cached, so after the first sight of a club this
@@ -7709,12 +7746,23 @@ function myDayCard(games) {
     : b.status === "CASHED_OUT" ? (+b.cashOut || 0) - (+b.stake || 0) : -(+b.stake || 0)), 0);
   const won = done.filter((b) => b.status === "WON").length, lost = done.filter((b) => b.status === "LOST").length;
   const clockOf = (id) => { const g = (games || []).find((x) => String(x.id) === String(id)); return g && g.status === 3 ? (g.clock || "live") : g && g.status === 4 ? "FT" : null; };
+  // A leg that lands mid-match stayed amber until the whole match finished, because
+  // h.result is only written when a bet settles — nothing marks one leg home while
+  // the game is still on. HAWK already knew: ticketlive returns each leg's state and
+  // matchAlerts has been storing it in hawk.betStates to fire the "leg landed" alert.
+  // It was computing the answer, telling you about it, and then not colouring it in.
+  // (It rides on goal alerts, which follow every pending bet's match and are on by
+  // default — with them off, a leg waits for full time as it used to.)
+  const liveLegs = loadPref("hawk.betStates", {});
   const rows = mine.map((b) => {
     const legs = (b.legs || []).flatMap((l) => (l.hawk && l.hawk.legs || []).map((h) => ({ ...h, game: l.hawk.game })));
     // A leg with no readable label would just be an empty row.
     const named = legs.filter((h) => String(h.label || "").trim().length > 1);
+    const seen = liveLegs[b.id] || {};
     const stateOf = (h) => (h.result === "won" || h.userDone) ? "won"
-      : h.result === "lost" ? "lost" : clockOf(h.game) ? "live" : "";
+      : h.result === "lost" ? "lost"
+      : seen[h.id] === "won" ? "won" : seen[h.id] === "lost" ? "lost"
+      : clockOf(h.game) ? "live" : "";
     const home = named.filter((h) => stateOf(h) === "won").length;
     const live = legs.map((h) => clockOf(h.game)).find(Boolean) || "";
     // The rail carries the whole state of the bet in five pixels of height.
@@ -7733,8 +7781,13 @@ function myDayCard(games) {
     // looks like it is telling you something about the match you are watching.
     const hv = HOLD.by[b.id];
     const p = hv ? hv.p : (+b.hawkP || +b.hawkChance || 0);
-    const hold = p * (+b.potentialReturn || 0);
     const dead = named.some((h) => stateOf(h) === "lost");
+    // A gone leg is worth nothing, whatever the last live reading said. This used to
+    // be unreachable: "lost" only came from settleLost, which marks the whole bet LOST
+    // in the same breath, so a pending bet could never show a dead leg. Reading leg
+    // state live makes it reachable — settleLost waits for a second sighting before it
+    // believes the leg — and in that gap the stale figure would have been printed.
+    const hold = dead ? 0 : p * (+b.potentialReturn || 0);
     const when = dead ? `a leg has gone`
       : hv ? (hv.approx ? `HAWK now &mdash; part estimate, matches still to come`
                         : `HAWK now &middot; ${esc(live || "live")}`)

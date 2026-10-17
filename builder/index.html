@@ -1739,6 +1739,25 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .up-level.med{background:rgba(153, 169, 255,.14);color:var(--gold)}
 .up-level.high{background:rgba(155, 171, 255,.18);color:#ff9d5c}
 .up-level.vhigh{background:rgba(255,93,115,.2);color:var(--red)}
+/* ⚖️ the two candidates for the opening leg, and which one won (see seedChoice) */
+.seed-box{margin-top:12px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+.seed-h{font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+.seed-row{display:grid;grid-template-columns:minmax(0,1fr) 58px 62px 78px;gap:8px;align-items:center;
+  padding:6px 8px;border-radius:8px;font-size:12.5px}
+.seed-row .l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seed-row .n{text-align:right;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;
+  font-variant-numeric:tabular-nums;color:var(--muted)}
+.seed-row .n.k{color:var(--text);font-weight:700}
+.seed-row.hd{padding-top:0;padding-bottom:3px}
+.seed-row.hd .n{font-size:9px;letter-spacing:.1em;text-transform:uppercase}
+.seed-row.took{background:rgba(188,200,255,.1);box-shadow:inset 0 0 0 1px rgba(188,200,255,.3)}
+.seed-row.took .l{font-weight:700;color:var(--text)}
+.seed-v{font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:8px}
+.seed-v b{color:var(--text)}
+@media (max-width:560px){
+  .seed-row{grid-template-columns:minmax(0,1fr) 48px 54px 64px;gap:5px;font-size:12px}
+}
 .up-nums{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .up-nums>div{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:9px 12px}
 .up-nums .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
@@ -3280,6 +3299,7 @@ function upsetCard(m) {
     <div class="up-signals">${ups.map(s => `<div class="sig up"><span>✅</span>${esc(s.text)}</div>`).join("")}${downs.map(s => `<div class="sig down"><span>✖</span>${esc(s.text)}</div>`).join("")}
       ${infos.map(s => `<div class="sig info"><span>⚠️</span>${esc(s.text)}</div>`).join("")}
       ${ups.length || downs.length ? "" : `<div class="note" style="margin:0">Nothing unusual: no rotation, team news, money, chances or form pointing either way.</div>`}</div>
+    ${seedChoice(m)}
     ${radarRecord(u)}
     <div class="note">✅ points to an upset, ✖ points to ${esc(u.favName)}, ⚠️ is a caution. The risk weighs the evidence the odds may not fully show — HAWK's own team ratings,
       money moving, Polymarket, missing regulars, rotation (once lineups are out), tiredness, who creates the chances and recent form — plus how live ${esc(u.dogName)} already are.
@@ -3288,6 +3308,52 @@ function upsetCard(m) {
       this is the reasoning behind them, not an extra step for you to take.</div>
     </details>
   </div>`;
+}
+// ⚖️ THE CHOICE HAWK MAKES, SHOWN.
+// Every builder opens with a result leg, and there are only ever two candidates:
+// the favourite's (to win, or their double chance) and the UNDERDOG'S DOUBLE
+// CHANCE. HAWK compares them and takes one — silently, so it has always looked
+// like it simply prefers favourites. Measured over 150 recorded tickets it takes
+// the underdog 8% of the time; this is the arithmetic behind the other 92%.
+//
+// "Keeps per €1" is price × chance, which is `valueScore` + 1 for a priced leg —
+// the same number the engine compares. The switch needs the underdog ahead by
+// DOG_DC_EDGE (0.04), wide enough that a penny of price movement cannot flip it,
+// and both legs need a REAL quoted price: an estimate is not comparable to a quote.
+const SEED_EDGE = 0.04;
+function seedChoice(m) {
+  const u = m.upset, L = S.legs || {};
+  if (!u) return "";
+  const favSide = u.fav === "home" || u.fav === "away" ? u.fav
+    : ((L["res:home"] || {}).p || 0) >= ((L["res:away"] || {}).p || 0) ? "home" : "away";
+  const dogSide = favSide === "home" ? "away" : "home";
+  const favLeg = ((L[`res:${favSide}`] || {}).p >= 0.5) ? L[`res:${favSide}`]
+    : ((L[`dc:${favSide}`] || {}).p >= 0.6) ? L[`dc:${favSide}`] : null;
+  const dogLeg = L[`dc:${dogSide}`];
+  if (!favLeg || !dogLeg) return "";
+  const keeps = (l) => (l.bookPrice > 1 ? l.bookPrice * l.p : null);
+  const kf = keeps(favLeg), kd = keeps(dogLeg);
+  const row = (l, k, taken) => `<div class="seed-row ${taken ? "took" : ""}">
+    <span class="l">${esc(l.label)}</span>
+    <span class="n">${pct(l.p)}</span>
+    <span class="n">${l.bookPrice > 1 ? odds(l.bookPrice) : "no price"}</span>
+    <span class="n k">${k ? "€" + k.toFixed(2) : "—"}</span></div>`;
+  // Why it went the way it did, in the order the engine actually asks.
+  let verdict, dogTook = false;
+  if (!(dogLeg.p >= 0.5))
+    verdict = `${esc(u.dogName)} are below the 50% floor a result leg has to clear, so there is nothing to weigh.`;
+  else if (!(dogLeg.bookPrice > 1) || !(favLeg.bookPrice > 1))
+    verdict = `One of these has no quoted Bet365 price, and HAWK will not weigh a quote against an estimate — so it opens with the favourite.`;
+  else if (kd >= kf + SEED_EDGE) { dogTook = true;
+    verdict = `<b>HAWK opens with ${esc(dogLeg.label)}</b> — ${(100 * (kd - kf)).toFixed(0)}c per €1 ahead, past the ${(100 * SEED_EDGE).toFixed(0)}c it needs before it will switch.`; }
+  else
+    verdict = `<b>HAWK opens with ${esc(favLeg.label)}.</b> The underdog needs to be ${(100 * SEED_EDGE).toFixed(0)}c per €1 ahead before it switches, and here it is ${
+      (100 * Math.abs(kd - kf)).toFixed(0)}c ${kd > kf ? "ahead — not enough" : "behind"}.`;
+  return `<div class="seed-box"><div class="seed-h">⚖️ Favourite or underdog — the leg every builder opens with</div>
+    <div class="seed-row hd"><span class="l"></span><span class="n">lands</span><span class="n">Bet365</span><span class="n">keeps per €1</span></div>
+    ${row(favLeg, kf, !dogTook)}${row(dogLeg, kd, dogTook)}
+    <div class="seed-v">${verdict}</div>
+    <div class="note" style="margin:6px 0 0">It never backs the underdog to <i>win</i> — only not to lose. Over 207 graded matches at High and Very high risk, the underdog's double chance landed 53.1% against 55.8% said; the underdog winning landed 22.7% against 28.9%.</div></div>`;
 }
 // How the radar has done at this level on finished matches (graded on
 // GitHub by engine/grade.mjs): said vs happened.

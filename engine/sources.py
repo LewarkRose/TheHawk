@@ -313,10 +313,21 @@ def parse_kickoff(start_time):
 S365_BASE = "https://webws.365scores.com/web"
 S365_PARAMS = {"appTypeId": 5, "langId": 1, "timezoneName": "Europe/London", "userCountryId": -1}
 S365_COMPETITIONS = {name: c["s365"] for name, c in COMPETITIONS.items()}
-# Odds are geo-gated by userCountryId (-1 returns none). Each of these
-# countries exposes a different bookmaker set, confirmed live:
-#   21 -> Bet365, NoviBet, Superbet, SportingBet   31 -> BWIN   37 -> STS
-S365_ODDS_COUNTRIES = (21, 31, 37)
+# Odds are geo-gated by userCountryId (-1 returns none). Each country exposes a
+# different bookmaker set, and 365Scores MOVES which one serves which book.
+#
+# Re-confirmed live 2026-10-18:
+#   1 -> Bet365      21 -> 365Scores      31 -> BWIN      37 -> STS
+#
+# 21 used to serve Bet365 (the old comment here said so) and silently stopped.
+# Nothing noticed, because a sweep that finds three other books looks healthy —
+# so every price this pipeline believed was Bet365's had quietly become
+# 365Scores', BWIN's and STS'. Country 1 is now in front, matching
+# ODDS_COUNTRIES in builder/engine.js, which was fixed for the same drift.
+# Bet365 was also live at 8, 9, 10, 13, 28 and 39 on the same check.
+#
+# If Bet365 disappears again, `bet365_missing()` below is what says so.
+S365_ODDS_COUNTRIES = (1, 21, 31, 37)
 
 
 def _s365(path, **params):
@@ -505,7 +516,33 @@ def s365_odds(game_id):
 
     with ThreadPoolExecutor(len(S365_ODDS_COUNTRIES)) as ex:
         batches = list(ex.map(fetch, S365_ODDS_COUNTRIES))
-    return dedupe_quotes(q for batch in batches for q in batch)
+    out = dedupe_quotes(q for batch in batches for q in batch)
+    _note_books(out)
+    return out
+
+
+# Which books the sweep actually reached, so a silent geo-drift can be seen rather
+# than guessed at. A sweep that loses Bet365 but still finds three other books looks
+# perfectly healthy from the outside — that is exactly how it went unnoticed.
+SEEN_BOOKS = set()
+
+
+def _note_books(quotes):
+    for q in quotes:
+        b = q.get("book")
+        if b:
+            SEEN_BOOKS.add(b)
+
+
+def bet365_missing():
+    """True once odds have been fetched and Bet365 was not among the books.
+
+    None while nothing has been fetched yet, so 'no odds at all' (a quiet night,
+    or 365Scores down) reads differently from 'odds, but not the one that matters'.
+    """
+    if not SEEN_BOOKS:
+        return None
+    return not any("bet365" in b.lower() for b in SEEN_BOOKS)
 
 
 def dedupe_quotes(quotes):

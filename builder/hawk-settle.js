@@ -122,16 +122,28 @@
     for (const e of events) if (/substitution/i.test(e.eventType.name || "")) for (const off of e.extraPlayers || []) replacedBy[off] = e.playerId;
     // Closing prices: once a match is over, 365Scores shows each Bet365 line at
     // its last price before kick-off (the opening price is kept separately).
+    // Odds are geo-gated, and 365Scores MOVES which userCountryId serves which book.
+    // This asked country 21 alone, which served Bet365 once and by 2026-10-18 served
+    // 365Scores instead — so every closing price came back empty and nothing said so.
+    // CLV was reading 131 legs out of 822 and looked like a limit of the data.
+    //
+    // Try each in turn and stop at the first that actually carries Bet365, rather
+    // than trusting any single id to keep meaning what it meant. Same list as
+    // ODDS_COUNTRIES in engine.js; Bet365 was also live at 8, 9, 10, 13, 28 and 39.
     const closing = {};
-    try {
-      const lines = await s365("bets/lines", { games: gameId, userCountryId: 21 });
-      const b365 = new Set(((lines && lines.bookmakers) || []).filter((b) => /bet365/i.test(b.name || "")).map((b) => b.id));
-      for (const l of (lines && lines.lines) || []) {
-        if (!b365.has(l.bookmakerId)) continue;
-        closing[`${l.lineTypeId}|${l.internalOptionValue ?? ""}`] = Object.fromEntries((l.options || [])
-          .map((o) => [String(o.name), o.rate && o.rate.decimal]).filter(([, v]) => v > 1));
-      }
-    } catch (e) { /* no closing prices — the result still settles */ }
+    for (const country of [1, 21, 31, 37]) {
+      try {
+        const lines = await s365("bets/lines", { games: gameId, userCountryId: country });
+        const b365 = new Set(((lines && lines.bookmakers) || []).filter((b) => /bet365/i.test(b.name || "")).map((b) => b.id));
+        if (!b365.size) continue;   // this country serves someone else — try the next
+        for (const l of (lines && lines.lines) || []) {
+          if (!b365.has(l.bookmakerId)) continue;
+          closing[`${l.lineTypeId}|${l.internalOptionValue ?? ""}`] = Object.fromEntries((l.options || [])
+            .map((o) => [String(o.name), o.rate && o.rate.decimal]).filter(([, v]) => v > 1));
+        }
+        if (Object.keys(closing).length) break;
+      } catch (e) { /* try the next country */ }
+    }
     return (facts[gameId] = {
       finished: true, homeId,
       ft: ft90, twoUp, tackles,

@@ -95,7 +95,41 @@ function sampleBuilders(id) {
 }
 const newBands = () => BANDS.map(([lo, hi]) => ({ lo, hi, n: 0, p: 0, won: 0 }));
 const newTotals = () => ({ matches: 0, legs: 0, byMarket: {}, byKey: {}, byLeague: {}, keyBands: {},
-                           recent: [], bands: newBands() });
+                           recent: [], bands: newBands(), clv: {} });
+
+// ---------- HAWK AGAINST THE CLOSING LINE ----------
+// Every other block here asks whether HAWK's chances are honest. This one asks the
+// only question that decides whether they are worth money: on the same leg, is HAWK
+// a better forecaster than Bet365's own closing price?
+//
+// Being well calibrated does not pay. HAWK is already within a point almost
+// everywhere and the bets still run at about -12% expected, because the price moves
+// with the model. Beating the CLOSE is the thing that doesn't — the closing line is
+// the best forecast anyone has of a match, so beating it consistently is an edge,
+// and it shows up in a few hundred legs instead of the thousands of BETS an ROI
+// needs. See Match Shots on Target: +2 points over 7,000 legs and holding, which is
+// either a real edge or a market that already knows. This is what tells them apart.
+//
+// Brier score, lower is better: mean (chance - outcome)^2. Scored for HAWK and for
+// the market on exactly the same legs, so the pair is comparable even though the
+// mix of legs changes over time.
+//
+// The closing price is DE-MARGINED first. A raw 1/price is inflated by the
+// bookmaker's cut, which would hand HAWK a win it hasn't earned — so every option
+// at that line is read, the implied chances are summed, and each is divided by the
+// total. Legs where only one side closed are counted separately and left out of the
+// comparison rather than scored with the margin still in.
+function closingChance(leg, f) {
+  const b = HawkSettle.bookLine(leg.id);
+  if (!b || !f.closing) return null;
+  const opts = f.closing[`${b[0]}|${b[1]}`];
+  const mine = opts && opts[b[2]];
+  if (!(mine > 1)) return null;
+  const all = Object.values(opts).filter((v) => v > 1);
+  if (all.length < 2) return { q: 1 / mine, demargined: false };
+  const book = all.reduce((a, v) => a + 1 / v, 0);
+  return book > 0 ? { q: (1 / mine) / book, demargined: true } : null;
+}
 // Upset radar record, per level (Low … Very high): how often the favourite
 // really failed to win / the underdog won, against what the radar said.
 const newUpsets = () => ["Low", "Medium", "High", "Very high"].map((label, level) =>
@@ -297,6 +331,18 @@ for (const [id, pr] of Object.entries(state.pending)) {
     const w = r === "won";
     n++; said += leg.p; if (w) won++;
     tally(T.byMarket[leg.market] ||= { n: 0, p: 0, won: 0 }, leg.p, w);
+    // HAWK vs the closing line on this exact leg (see closingChance above).
+    const cc = closingChance(leg, f);
+    if (cc) {
+      const c = (T.clv ||= {})[leg.market] ||= { n: 0, hawk: 0, market: 0, p: 0, q: 0, won: 0, oneSided: 0 };
+      if (!cc.demargined) c.oneSided++;
+      else {
+        const o = w ? 1 : 0;
+        c.n++; c.won += o; c.p += leg.p; c.q += cc.q;
+        c.hawk += (leg.p - o) ** 2;
+        c.market += (cc.q - o) ** 2;
+      }
+    }
     const key = HAWK.learnKey(leg.id, leg.market);
     if (key) {
       // A market whose model has been changed starts again: what was measured
@@ -450,6 +496,9 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   statFit: T.statFit || {}, byLeagueKey: publishedLeagueKeys(),
   result: T.result || newResult(), drawBands: T.drawBands || newDrawBands(),
   byLine: publishedLines(), weeks: T.weeks || {},
+  // HAWK's Brier against the closing line's, on the same legs. `hawk` lower than
+  // `market` means HAWK forecast that market better than the price did.
+  clv: T.clv || {},
   // Recording-only until 1b. `stored` is the inventory waiting to be graded —
   // that is the number 1b's sample size is made of, not `seen`.
   builders: { recorded: builtTickets, stored: storedTickets, matches: pendingBuilders.length,
@@ -458,4 +507,17 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
 // Recording-only for now: this line is how the first run is checked.
 console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predicted} prediction(s) — not graded yet`);
+// Closing line: the markets where HAWK forecast better than the price, worst gap
+// first. A negative `edge` means the closing line beat HAWK on those legs.
+{
+  const rows = Object.entries(T.clv || {}).filter(([, c]) => c.n >= 200)
+    .map(([m, c]) => [m, c.n, (c.market - c.hawk) / c.n]);
+  if (rows.length) {
+    console.log(`[grade] HAWK vs the closing line (Brier, 200+ legs; + means HAWK forecast it better):`);
+    for (const [m, n, edge] of rows.sort((a, b) => b[2] - a[2]))
+      console.log(`[grade]   ${m.padEnd(30)} ${String(n).padStart(6)} legs   ${edge >= 0 ? "+" : ""}${(1000 * edge).toFixed(2)} per 1000`);
+  } else {
+    console.log(`[grade] closing line: no market has 200 two-sided legs yet (${Object.keys(T.clv || {}).length} started)`);
+  }
+}
 process.exit(0);   // the engine's timers shouldn't keep the job alive

@@ -440,11 +440,23 @@ def main(out_dir):
         status[name] = {"ok": ok, "last_ok": last_ok}
     alerts = [name for name, s in status.items() if not s["ok"] and (not parse_time(s["last_ok"]) or now - parse_time(s["last_ok"]) > ALERT_AFTER)]
 
+    # 365Scores geo-gates odds and moves which country serves which bookmaker.
+    # Country 21 served Bet365 when this was written, quietly stopped, and nothing
+    # noticed for an unknown stretch — a sweep that still finds BWIN and STS looks
+    # healthy from every angle except the one that matters. Measured, not assumed.
+    books = sorted(sources.SEEN_BOOKS)
+    missing_b365 = sources.bet365_missing()
+    if missing_b365:
+        problems.append("Bet365 not among the bookmakers 365Scores returned — "
+                        f"got {', '.join(books) or 'nothing'}. Prices are another book's. "
+                        "Check S365_ODDS_COUNTRIES in sources.py.")
+
     write(out_dir / "fixtures.json", {"fixtures": fixtures})
     write(out_dir / "meta.json", {"generated": stamp, "seconds": round(time.time() - started),
                                   "fixtures": len(fixtures), "squads": squads["fresh"] + squads["reused"],
                                   "sources": status, "health": {"fixtures": {"leagues_ok": s365_ok, "leagues_failed": s365_failed},
-                                                                "ratings": rated, "players": squads, "props": props},
+                                                                "ratings": rated, "players": squads, "props": props,
+                                                                "odds": {"books": books, "bet365": missing_b365 is False}},
                                   "alerts": alerts, "problems": problems})
     print(f"done in {time.time() - started:.0f}s; squads {squads}; ratings {rated}; {len(problems)} problems")
     for p in problems:

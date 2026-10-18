@@ -18,7 +18,41 @@ const WANT = 3;   // matches to check
 globalThis.window = globalThis;
 globalThis.document = { baseURI: `${LOCAL}/builder/` };
 vm.runInThisContext(await readFile(path.join(ROOT, "builder/engine.js"), "utf8"), { filename: "builder/engine.js" });
-const { HAWK } = globalThis;
+vm.runInThisContext(await readFile(path.join(ROOT, "builder/hawk-settle.js"), "utf8"), { filename: "builder/hawk-settle.js" });
+const { HAWK, HawkSettle } = globalThis;
+
+// ---------- every market HAWK offers must be one it can grade ----------
+// The builder and the settler are separate files that never checked each other,
+// and three markets sat in that gap: Match Offsides could never be settled, a
+// Penalty has no data source at all, and A Red Card in the Match was offered for
+// months and graded exactly never. Each one looked fine from either side alone.
+//
+// A finished match with EVERY fact filled in. The point of filling it completely
+// is that "unknown" can then only mean "no branch in legResult for this id" —
+// never "the data was missing" — which is what makes a failure here real.
+const GRADED_FACTS = {
+  finished: true, homeId: 1,
+  ft: [2, 1], ht: [1, 0], twoUp: { home: false, away: false },
+  first: "home", qualified: "home",
+  corners: [6, 5], cards: [3, 2], sot: [5, 4], offsides: [2, 1], reds: [0, 1],
+  tackles: [10, 9], players: { home: [], away: [] }, closing: {}, replacedBy: null,
+};
+// Player props are left out on purpose: their branch needs the real player inside
+// facts.players, so a synthetic one would report "void" and drown this in noise.
+// All three markets that went missing were match-level, and player props are the
+// best-covered on the board anyway.
+const matchLevel = (id) => !String(id).startsWith("p:");
+function ungradeableMarkets(legs) {
+  const bad = new Map();
+  for (const l of legs) {
+    if (!matchLevel(l.id) || bad.has(l.market)) continue;
+    let r;
+    try { r = HawkSettle.legResult(l, GRADED_FACTS, {}); }
+    catch (e) { bad.set(l.market, `${l.id} threw ${e.name}: ${e.message}`); continue; }
+    if (r !== "won" && r !== "lost") bad.set(l.market, `${l.id} settles "${r}"`);
+  }
+  return bad;
+}
 
 const failures = [];
 const check = (ok, what) => { if (!ok) failures.push(what); return ok; };
@@ -58,6 +92,9 @@ for (const league of [...new Set(leagues)]) {
     const t = HAWK.build({ id: f.id, target: 3, style: "Balanced", focus: "Mix", maxLegs: 10, favourite: true });
     check(t.legs.length > 0 && t.p > 0 && t.p < 1, `${name}: the builder returned no ticket`);
   } catch (e) { failures.push(`${name}: build crashed — ${e.message}`); }
+  for (const [market, why] of ungradeableMarkets(m.legs))
+    check(false, `${name}: "${market}" is offered but cannot be graded — ${why}. `
+      + `Give it a branch in hawk-settle.js legResult, or stop offering it in engine.js.`);
   tested++;
   console.log(`ok  ${league}: ${name} — ${m.legs.length} legs, ${Math.round(100 * p.home)}/${Math.round(100 * p.draw)}/${Math.round(100 * p.away)}, radar ${m.upset.label}`);
 }

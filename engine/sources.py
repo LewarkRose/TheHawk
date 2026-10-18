@@ -326,7 +326,11 @@ S365_COMPETITIONS = {name: c["s365"] for name, c in COMPETITIONS.items()}
 # ODDS_COUNTRIES in builder/engine.js, which was fixed for the same drift.
 # Bet365 was also live at 8, 9, 10, 13, 28 and 39 on the same check.
 #
-# If Bet365 disappears again, `bet365_missing()` below is what says so.
+# CURRENTLY INERT. The only consumer of this list is s365_odds() below, and nothing
+# calls s365_odds() — this pipeline's odds are fd_upcoming_quotes(), football-data's
+# UK snapshot. The list is corrected so it is right if that function is ever wired
+# up, but no price HAWK publishes depends on it today. The live Bet365 path is
+# ODDS_COUNTRIES in builder/engine.js, which was fixed for this same drift on 1 Oct.
 S365_ODDS_COUNTRIES = (1, 21, 31, 37)
 
 
@@ -516,33 +520,7 @@ def s365_odds(game_id):
 
     with ThreadPoolExecutor(len(S365_ODDS_COUNTRIES)) as ex:
         batches = list(ex.map(fetch, S365_ODDS_COUNTRIES))
-    out = dedupe_quotes(q for batch in batches for q in batch)
-    _note_books(out)
-    return out
-
-
-# Which books the sweep actually reached, so a silent geo-drift can be seen rather
-# than guessed at. A sweep that loses Bet365 but still finds three other books looks
-# perfectly healthy from the outside — that is exactly how it went unnoticed.
-SEEN_BOOKS = set()
-
-
-def _note_books(quotes):
-    for q in quotes:
-        b = q.get("book")
-        if b:
-            SEEN_BOOKS.add(b)
-
-
-def bet365_missing():
-    """True once odds have been fetched and Bet365 was not among the books.
-
-    None while nothing has been fetched yet, so 'no odds at all' (a quiet night,
-    or 365Scores down) reads differently from 'odds, but not the one that matters'.
-    """
-    if not SEEN_BOOKS:
-        return None
-    return not any("bet365" in b.lower() for b in SEEN_BOOKS)
+    return dedupe_quotes(q for batch in batches for q in batch)
 
 
 def dedupe_quotes(quotes):

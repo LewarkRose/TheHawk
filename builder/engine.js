@@ -1460,44 +1460,36 @@
     }
     add("mostcorners:home", `${home} Most Corners`, "Most Corners", "most_corners", mask(n, (s) => sim.cornersTeam.home[s] > sim.cornersTeam.away[s]));
     add("mostcorners:away", `${away} Most Corners`, "Most Corners", "most_corners", mask(n, (s) => sim.cornersTeam.away[s] > sim.cornersTeam.home[s]));
-    // Offsides in the match: every player's own offsides added up, simulation by simulation.
-    const offs = new Int16Array(n);
-    for (const a of Object.values(sim.player)) if (a.offsides) for (let s = 0; s < n; s++) offs[s] += a.offsides[s];
-    if (mean(mask(n, (s) => offs[s] > 0)) > 0.2) for (const line of [1.5, 2.5, 3.5, 4.5]) {
-      add(`offs:o${line}`, withCount(`Over ${line} Offsides`, "Over", line), "Match Offsides", "offsides", mask(n, (s) => offs[s] > line), b365Whole("Over", line, "Offsides"));
-      add(`offs:u${line}`, withCount(`Under ${line} Offsides`, "Under", line), "Match Offsides", "offsides", mask(n, (s) => offs[s] < line), b365Whole("Under", line, "Offsides"));
-    }
-    // Offsides come from adding up each player's own record, which no one calibrates
-    // — so where the bookmakers price a line, HAWK's chance is blended with theirs
-    // (as the goals, corners and cards totals already are).
-    for (const id of Object.keys(legs).filter((k) => k.startsWith("offs:"))) {
-      const leg = legs[id], m2 = /^offs:([ou])([\d.]+)$/.exec(id), c = m2 && (an.cons || {})[`140|${m2[2]}`];
-      const pm = c && c.probs[m2[1] === "o" ? "Over" : "Under"];
-      if (!(pm > 0.01 && pm < 0.99) || !(leg.p > 0)) continue;
-      const p2 = blend(leg.p, pm);
-      leg.adj = p2 / leg.p; leg.p = p2; leg.fair = 1 / p2;
-    }
-    // A red card / a penalty in the match: HAWK doesn't simulate either, so the
-    // chance is the bookmakers' own (margin removed) and the leg is treated as
-    // independent of the rest. Without prices there's no leg at all.
+    // Match Offsides ("Over 2.5 Offsides") and the per-player version below were both
+    // removed on request, 2026-10-18. Nothing offers an offsides leg any more.
+    //
+    // Everything needed to grade one is deliberately left in place: learnKey still
+    // keys `offs:`, hawk-settle.js still settles it, and bookLine still maps it.
+    // Tickets already placed carry offsides legs and have to go on settling — a leg
+    // you can no longer be offered is not the same as a leg that never existed.
+    //
+    // The simulation still totals each player's offsides (sim.player[].offsides); it
+    // feeds the extras model generally and unpicking it would be a far larger change
+    // than this request. It is simply no longer read here.
+    // A red card in the match: HAWK doesn't simulate one, so the chance is the
+    // bookmakers' own (margin removed) and the leg is treated as independent of the
+    // rest. Without prices there's no leg at all.
+    //
+    // PENALTY was removed on 2026-10-18. 365Scores' team-stats block has no penalty
+    // row, so hawk-settle.js could never settle `pen:yes` — it was the one market
+    // HAWK offered that it had no way of ever marking right or wrong. Red cards do
+    // appear in that block, so that one is settled now rather than dropped.
+    //
+    // The No side of both went on 2026-10-17: "No Red Card in the Match" lands about
+    // nineteen times in twenty, so it added a leg to the ticket and almost nothing to
+    // its price — length that reads like conviction and is not.
+    //
+    // `bookLine` still maps `pen:yes` / `pen:no` / `redcard:no`, because tickets
+    // already placed carry those legs and still need their closing price looked up.
     const cons = consensus(an.quotes || []);
-    for (const [kind, type, market, label] of [["redcard", 142, "Red Card", "A Red Card in the Match"], ["pen", 143, "Penalty", "A Penalty in the Match"]]) {
+    for (const [kind, type, market, label] of [["redcard", 142, "Red Card", "A Red Card in the Match"]]) {
       const c = cons[`${type}|`];
       if (!c || !(c.probs.Yes > 0.01) || c.books < 2) continue;
-      // Only the Yes side is offered. "No Red Card in the Match" and "No Penalty in
-      // the Match" land around nineteen times in twenty, so they added a leg to the
-      // ticket and almost nothing to its price — length that reads like conviction
-      // and is not. Removed on request, 2026-10-17.
-      //
-      // `bookLine` below still maps `redcard:no` / `pen:no`, because tickets already
-      // placed carry those legs and still need their closing price looked up.
-      //
-      // Note hawk-settle.js has never been able to SETTLE either side of these: there
-      // is no redcard:/pen: branch in legResult, so they return "unknown" and the leg
-      // is never graded. Three tickets in the bet history carry a "No Red Card in the
-      // Match" leg and all three show result "unknown". Red cards would be easy to add
-      // (facts() already reads pair("Red Cards")); penalties are not in the team-stats
-      // block at all, so `pen:yes` is a leg HAWK offers and cannot grade.
       for (const [opt, id, text] of [["Yes", `${kind}:yes`, label]]) {
         const q = c.probs[opt];
         if (!(q > 0.01 && q < 0.99)) continue;
@@ -1551,7 +1543,9 @@
         add(`${pid}:fouled${k}`, `${p.name}: ${k}+ Fouls Won`, "Player Fouls Won", `${pid}:fouled`, mask(n, (s) => a.fouled[s] >= k), { ...common, ...hist("fouled", k) });
         add(`${pid}:tackles${k}`, `${p.name}: ${k}+ Tackles`, "Player Tackles", `${pid}:tackles`, mask(n, (s) => a.tackles[s] >= k), { ...common, ...hist("tackles", k) });
       }
-      for (const k of [1, 2]) add(`${pid}:offsides${k}`, `${p.name}: ${k}+ Offsides`, "Player Offsides", `${pid}:offsides`, mask(n, (s) => a.offsides[s] >= k), { ...common, ...hist("offsides", k) });
+      // "Player: 1+ Offsides" removed on request, 2026-10-18, with the match total.
+      // Its 11,620 graded legs stay on the board — removing a market from the builder
+      // does not unmake the record of how it behaved.
     }
     for (const leg of Object.values(legs)) {
       if (EXTRA_MARKETS.has(leg.market)) leg.extra = true;

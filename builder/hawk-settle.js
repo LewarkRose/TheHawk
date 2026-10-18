@@ -144,6 +144,17 @@
     // never graded and never reached the board — the learnKey they were given on
     // 2026-10-17 could not have helped on its own.
     offsides: pair("Offsides"),
+    // The RAW red-card pair, which is not the same as `red` above. That one carries a
+    // `|| [0, 0]` fallback because booking points need a number and a missing red is
+    // nearly always none — fine for counting cards, wrong for settling the red-card
+    // market, where "no data" and "no red card" are opposite answers and the fallback
+    // would mark every unknown match as "no red card shown".
+    //
+    // Verified on five finished matches with no sendings off: the stats block still
+    // carries two "Red Cards" rows reading "0", so a real zero is distinguishable
+    // from a missing block. A match with no statistics at all yields null here and
+    // settles "unknown", which is correct.
+    reds: pair("Red Cards"),
       // who went through (To Qualify legs: extra time and penalties included)
       qualified: game.homeCompetitor.isQualified ? "home" : game.awayCompetitor.isQualified ? "away" : null,
     });
@@ -254,6 +265,13 @@
     if ((m = /^t(corners|cards):(home|away):([ou])([\d.]+)$/.exec(id))) {
       const t = totals[m[1]];
       return t ? W(line(m[3], +m[4], t[m[2] === "home" ? 0 : 1])) : "unknown";
+    }
+    // A red card anywhere in the match, either side. Both `redcard:yes` and the
+    // retired `redcard:no` settle here: the Yes side is still offered and tickets
+    // already placed carry the No side.
+    if ((m = /^redcard:(yes|no)$/.exec(id))) {
+      const r = f.reds;
+      return r ? W((r[0] + r[1] > 0) === (m[1] === "yes")) : "unknown";
     }
     if ((m = /^mostcorners:(home|away)$/.exec(id))) {
       const t = f.corners;

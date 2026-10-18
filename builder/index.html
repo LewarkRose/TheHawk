@@ -1753,16 +1753,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       body[data-view="scores"] #fxPanel, body[data-view="scores"] .slipcol{display:none}
       /* The scores are capped: a row stretched across 1200px leaves the teams
          at opposite edges with the score marooned in the middle. */
-      /* `auto` and centred, not a fixed 370 pushed apart by space-between. The
-         right column holds one thing — your running bets — and on a day with none
-         it is empty. A fixed track still reserved its width and space-between then
-         shoved the whole list against the left edge with 388px of nothing beside
-         it, which is what a wide screen actually looked like most days. `auto`
-         collapses the track when nothing is in it, so the list sits in the middle;
-         with bets running the pair centres together instead of flying apart. */
-      body[data-view="scores"] #scList{display:grid;grid-template-columns:minmax(0,900px) auto;gap:18px;align-items:start;justify-content:center}
-      body[data-view="scores"] #scList > *{grid-column:1}
-      body[data-view="scores"] #scList > .myday{grid-column:2;grid-row:1 / span 99;margin:0;position:sticky;top:12px;width:370px}
+      /* One column now. The second track existed only to carry the sticky "Your
+         day" card beside the scores, and that card is no longer rendered here —
+         Live is the scores. The running bets are still on Today and in the drawer.
+         The 900px cap and the centring are unchanged. */
+      body[data-view="scores"] #scList{display:grid;grid-template-columns:minmax(0,900px);justify-content:center}
     }
     /* Picks tiles its cards once there's room for two. */
     @media (min-width:1251px){
@@ -6522,7 +6517,7 @@ function renderScoreList() {
   const shown = sc.status === "All" ? games : games.filter((g) => scBandOf(g) === sc.status);
   if (!shown.length) {
     const word = (SC_BANDS.find(([k]) => k === sc.status) || [, "that"])[1];
-    el.innerHTML = myDayCard(sc.data) + `<div class="note">Nothing ${esc(String(word).replace(/^\S+\s/, "").toLowerCase())}${
+    el.innerHTML = `<div class="note">Nothing ${esc(String(word).replace(/^\S+\s/, "").toLowerCase())}${
       grp ? " in " + esc(grp.name) : ""} on this day. <button class="linkbtn" data-st="All">show all ${games.length}</button></div>`;
     return;
   }
@@ -6545,7 +6540,7 @@ function renderScoreList() {
       <div class="sc-league">${leagueLogo(lg)}${esc(lg)}<button class="sc-tbl" data-table="${esc(lg)}" title="The ${esc(lg)} table, live while games are on">📊 Table</button></div>
       ${glist.map(g => scoreRow(g, mine, false)).join("")}`).join("");
   };
-  el.innerHTML = myDayCard(sc.data) + htStrip(sc.data) + (live ? `<div class="note" style="margin:0 0 10px"><span class="dot-live"></span>${live} live — updating every 15 seconds</div>` : "") +
+  el.innerHTML = htStrip(sc.data) + (live ? `<div class="note" style="margin:0 0 10px"><span class="dot-live"></span>${live} live — updating every 15 seconds</div>` : "") +
     bands.map(([k, title, list]) => (sc.status === "All" && bands.length > 1
         ? `<div class="sc-band"><span>${esc(title)}</span><i></i><b>${list.length}</b></div>` : "")
       + (k === "next" ? byTime(list) : byLeague(list))).join("");

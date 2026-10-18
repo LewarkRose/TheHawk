@@ -95,7 +95,44 @@ function sampleBuilders(id) {
 }
 const newBands = () => BANDS.map(([lo, hi]) => ({ lo, hi, n: 0, p: 0, won: 0 }));
 const newTotals = () => ({ matches: 0, legs: 0, byMarket: {}, byKey: {}, byLeague: {}, keyBands: {},
-                           recent: [], bands: newBands(), clv: {} });
+                           recent: [], bands: newBands(), clv: {}, builders: newBuilders() });
+
+// ---------- PHASE 1b: GRADING THE TICKET, NOT THE LEG ----------
+// Every other block here grades LEGS. Nothing grades a TICKET, which is the only
+// thing anyone actually bets. HAWK can be perfect on every leg and still wrong
+// about how often they land together — and `agree`, the factor that turns several
+// leg chances into one ticket chance, has never been measured at all.
+//
+// It matters right now: over 229 of the user's own tickets, 76 won against 59.8
+// expected (z +2.5), which is what a too-harsh `agree` would look like. But those
+// tickets cluster by match and cannot settle it. This does, from every match HAWK
+// rates, bet or not.
+//
+// MUST be graded in the same pass that settles the legs: grade.mjs deletes
+// state.pending[id] the moment a match is graded, and the recorded tickets go with
+// it. There is no history to come back for.
+//
+// `byAgree` is the block that settles the question. `byWorth` answers a different
+// one — whether the builder's "worth it" check is too harsh — by putting p x b365
+// against what the ticket really returned.
+const BUILDER_VERSION = 1;   // bump when the correlation path changes; resets this block alone
+const TICKET_BANDS = [[0, .1], [.1, .2], [.2, .3], [.3, .4], [.4, 1.01]];
+const AGREE_BANDS = [[0, 1.05], [1.05, 1.15], [1.15, 1.35], [1.35, 99]];
+const newCell = () => ({ n: 0, p: 0, won: 0, stake: 0, back: 0 });
+const newBuilders = () => ({
+  ver: BUILDER_VERSION, n: 0, won: 0, p: 0, matches: 0, skipped: 0, clamped: 0,
+  byLegs: {}, byOpen: {}, byFocus: {},
+  byChance: TICKET_BANDS.map(([lo, hi]) => ({ lo, hi, ...newCell() })),
+  byAgree: AGREE_BANDS.map(([lo, hi]) => ({ lo, hi, ...newCell() })),
+  byWorth: {},
+});
+// Staked flat at 1 unit so `back` is directly comparable across bands: a band's
+// return per unit is back/stake, and 1.00 means it broke even at Bet365's price.
+const tickTally = (c, p, won, b365) => {
+  if (!c) return;
+  c.n++; c.p = +(c.p + p).toFixed(4); if (won) c.won++;
+  if (b365 > 1) { c.stake++; if (won) c.back = +(c.back + b365).toFixed(3); }
+};
 
 // ---------- HAWK AGAINST THE CLOSING LINE ----------
 // Every other block here asks whether HAWK's chances are honest. This one asks the
@@ -325,10 +362,15 @@ for (const [id, pr] of Object.entries(state.pending)) {
     if (exp > 0) fitStat(pr.league, "tackles", exp, act);
   }
   let n = 0, won = 0, said = 0;
+  // id -> outcome, so a builder ticket can be resolved from the same settlements
+  // rather than re-settling its legs. A leg that returned "unknown" is simply
+  // absent, which is what makes a ticket containing it countable as skipped.
+  const legOut = new Map(), legP = new Map();
   for (const leg of pr.legs) {
     const r = HawkSettle.legResult(leg, f);
     if (r !== "won" && r !== "lost") continue;   // didn't play, or no data
     const w = r === "won";
+    legOut.set(leg.id, w); legP.set(leg.id, leg.p);
     n++; said += leg.p; if (w) won++;
     tally(T.byMarket[leg.market] ||= { n: 0, p: 0, won: 0 }, leg.p, w);
     // HAWK vs the closing line on this exact leg (see closingChance above).
@@ -414,6 +456,60 @@ for (const [id, pr] of Object.entries(state.pending)) {
     }
   }
   if (!n) continue;
+
+  // ---- 1b: grade the tickets HAWK would have offered for this match ----
+  // A ticket wins when every leg wins. One ungradeable leg makes the whole ticket
+  // ungradeable — counted as `skipped`, never silently dropped, or the record
+  // quietly excludes exactly the thin-lineup matches where props fail to settle.
+  if ((pr.builders || []).length) {
+    const B = (T.builders ||= newBuilders());
+    if ((B.ver || 1) !== BUILDER_VERSION) {
+      console.log(`[grade] builders: v${BUILDER_VERSION} — starting the ticket record over (was ${B.n})`);
+      Object.assign(B, newBuilders());
+    }
+    // What the ticket OPENED with. The builder seeds from the favourite's result
+    // leg, else its double chance, else the underdog's double chance — and that
+    // last rule is the one nobody can check without this split.
+    const fav = (pr.probs && (pr.probs.home || 0) >= (pr.probs.away || 0)) ? "home" : "away";
+    const dog = fav === "home" ? "away" : "home";
+    const openOf = (ids) =>
+      ids.includes(`res:${fav}`) ? "favourite to win"
+      : ids.includes(`dc:${fav}`) ? "favourite double chance"
+      : ids.includes(`dc:${dog}`) ? "underdog double chance"
+      : ids.includes(`res:${dog}`) ? "underdog to win"
+      : ids.includes("res:draw") ? "the draw"
+      : "no result leg";
+    let graded = 0;
+    for (const t of pr.builders) {
+      const ids = t.ids || [];
+      if (!ids.length || !ids.every((i) => legOut.has(i))) { B.skipped++; continue; }
+      const w = ids.every((i) => legOut.get(i));
+      const p = +t.p || 0, b365 = +t.b365 || 0;
+      graded++;
+      B.n++; B.p = +(B.p + p).toFixed(4); if (w) B.won++;
+      if (b365 > 1) { B.stake = (B.stake || 0) + 1; if (w) B.back = +((B.back || 0) + b365).toFixed(3); }
+      // The clamp in evaluate() caps a ticket at its smallest leg's chance. Watching
+      // how often it binds keeps it monitored rather than spot-checked.
+      const smallest = Math.min(...ids.map((i) => legP.get(i)));
+      if (p >= smallest - 1e-6) B.clamped++;
+      tickTally(B.byLegs[t.n || ids.length] ||= newCell(), p, w, b365);
+      tickTally(B.byOpen[openOf(ids)] ||= newCell(), p, w, b365);
+      if (t.focus) tickTally(B.byFocus[t.focus] ||= newCell(), p, w, b365);
+      tickTally(B.byChance.find((x) => p >= x.lo && p < x.hi), p, w, b365);
+      if (t.agree != null) tickTally(B.byAgree.find((x) => t.agree >= x.lo && t.agree < x.hi), p, w, b365);
+      // Was the "worth it" check right? p x b365 is what HAWK thought the ticket
+      // was worth at the offered price; `back` is what it really returned.
+      if (b365 > 1) {
+        const edge = p * b365 - 1;
+        const band = edge < -0.05 ? "HAWK said: poor value" : edge < 0.02 ? "HAWK said: about fair" : "HAWK said: worth it";
+        tickTally(B.byWorth[band] ||= newCell(), p, w, b365);
+      }
+    }
+    // Matches, not tickets. The ~10 tickets from one match open from the same result
+    // leg and rise and fall together, so the honest sample size is this one.
+    if (graded) B.matches++;
+  }
+
   // Matches as well as legs: one match brings hundreds of legs and they share a
   // referee, two teams and one afternoon, so they are nowhere near independent.
   // A league needs MATCHES behind it before its number is worth reading.
@@ -499,14 +595,34 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   // HAWK's Brier against the closing line's, on the same legs. `hawk` lower than
   // `market` means HAWK forecast that market better than the price did.
   clv: T.clv || {},
-  // Recording-only until 1b. `stored` is the inventory waiting to be graded —
-  // that is the number 1b's sample size is made of, not `seen`.
+  // 1a's counters: what the sampler is recording right now. `stored` is a QUEUE,
+  // not a stockpile — a match's tickets are deleted with its pending entry the
+  // moment it grades, which is why 1b has to grade them in the same pass.
   builders: { recorded: builtTickets, stored: storedTickets, matches: pendingBuilders.length,
     seen: state.builderSeen || 0, since: state.builderSince || null },
+  // 1b: the tickets themselves, graded. `byAgree` is the block that says whether
+  // the correlation factor is right; `matches` is the honest sample size.
+  tickets: T.builders || null,
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
-// Recording-only for now: this line is how the first run is checked.
-console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predicted} prediction(s) — not graded yet`);
+console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predicted} prediction(s)`);
+{
+  const B = T.builders || {};
+  if (B.n) {
+    const pct = (c) => c.n ? `${(100 * c.won / c.n).toFixed(1)}% vs ${(100 * c.p / c.n).toFixed(1)}% said` : "—";
+    const ret = (c) => c.stake ? ` · ${(c.back / c.stake).toFixed(2)} back per 1` : "";
+    console.log(`[grade] TICKETS (1b): ${B.n} graded over ${B.matches} match(es), ${B.skipped} skipped — `
+      + `${(100 * B.won / B.n).toFixed(1)}% landed vs ${(100 * B.p / B.n).toFixed(1)}% said`
+      + (B.stake ? ` · ${((B.back || 0) / B.stake).toFixed(2)} back per 1 staked` : ""));
+    // The one that settles whether `agree` is right: if HAWK's ticket chances are
+    // too harsh, the gap widens as `agree` climbs.
+    for (const b of B.byAgree) if (b.n) console.log(`[grade]   agree ${b.lo}-${b.hi}: ${b.n} tickets  ${pct(b)}${ret(b)}`);
+    for (const [k, c] of Object.entries(B.byOpen)) if (c.n) console.log(`[grade]   opened ${k}: ${c.n} tickets  ${pct(c)}${ret(c)}`);
+    console.log(`[grade]   the smallest-leg clamp bound on ${B.clamped} of ${B.n}`);
+  } else {
+    console.log(`[grade] TICKETS (1b): nothing graded yet (${(T.builders || {}).skipped || 0} skipped)`);
+  }
+}
 // Closing line: the markets where HAWK forecast better than the price, worst gap
 // first. A negative `edge` means the closing line beat HAWK on those legs.
 {

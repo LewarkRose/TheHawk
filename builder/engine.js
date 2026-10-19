@@ -1404,12 +1404,18 @@
       const other = side === "home" ? ag : hg;
       add(`cs:${side}`, `${name} Clean Sheet`, "Clean Sheet", `team_goals:${side === "home" ? "away" : "home"}`, mask(n, (s) => other[s] === 0));
     }
-    // 5.5 to 14.5 since 2026-10-19, from Bet365's own board: they price corners
-    // from 5 to 21, while this stopped at 7.5–11.5. Over 12 pays 5.50 (~18%) and
-    // Over 14 pays 13.00 (~8%) — both well inside what a builder can use, and
-    // neither was on offer. The low end was missing too: no Under 6.5 for a match
-    // between two sides who never win one.
-    for (const line of [5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5]) {
+    // 5.5 to 17.5 since 2026-10-19 (Bet365's own board runs 5 to 21). This used to
+    // stop at 7.5–11.5, which was short at BOTH ends and short by different amounts
+    // depending on the league — the reason the cap has to be generous rather than
+    // tuned. Measured the same day on real fixtures:
+    //
+    //   Eredivisie   Go Ahead v Telstar   Over 14.5 corners  18%
+    //   Serie A      Torino v Monza       Over 14.5 corners   5%
+    //
+    // A single cap that suits Serie A starves the Eredivisie. MIN_LEG_P sorts it
+    // out per match, so the honest move is to offer the whole plausible range and
+    // let the quiet games drop their own tail.
+    for (const line of [5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5, 17.5]) {
       add(`corners:o${line}`, withCount(`Over ${line} Corners`, "Over", line), "Corners", "corners", mask(n, (s) => sim.corners[s] > line), b365Whole("Over", line, "Corners"));
       add(`corners:u${line}`, withCount(`Under ${line} Corners`, "Under", line), "Corners", "corners", mask(n, (s) => sim.corners[s] < line), b365Whole("Under", line, "Corners"));
     }

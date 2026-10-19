@@ -7832,12 +7832,34 @@ function myDayCard(games) {
   const today = localDay(new Date());
   const onToday = (b) => (b.legs || []).some((l) => l.hawk && l.hawk.kickoff && localDay(new Date(l.hawk.kickoff)) === today);
   const mine = bets.filter((b) => b.status === "PENDING" && onToday(b));
-  const done = bets.filter((b) => b.status !== "PENDING" && onToday(b));
+  // SETTLED TODAY, by the same rule the sheet above uses — settledAt, not kickoff,
+  // and no requirement that the bet be linked to a match.
+  //
+  // These two sat side by side showing "TODAY −€3.60 · 7 settled" and "+€2.40 ·
+  // 2 won, 4 lost today" on 2026-10-19. Three reasons, all of them this line:
+  //   - the sheet counts by settledAt; this counted by KICK-OFF, and 9 of 324
+  //     settled bets settled on a different day from the match
+  //   - `onToday` needs l.hawk, so a bet not yet linked to its match was invisible
+  //     here while the sheet counted it. 80 of the settled bets have no link.
+  //   - a cash-out read `b.cashOut`, which does not exist — the field is
+  //     cashOutAmount — so every cashed-out ticket was booked as a total loss.
+  // The RUNNING list above still keys on kick-off, which is right: that half is
+  // about today's matches. Only the settled tally is about today's money.
+  const settledDay = (b) => b.settledAt ? localDay(new Date(b.settledAt)) === today : onToday(b);
+  const done = bets.filter((b) => b.status && b.status !== "PENDING" && settledDay(b));
   if (!mine.length && !done.length) return "";
   const staked = mine.reduce((a, b) => a + (+b.stake || 0), 0);
-  const pl = done.reduce((a, b) => a + (b.status === "WON" ? (+b.potentialReturn || 0) - (+b.stake || 0)
-    : b.status === "CASHED_OUT" ? (+b.cashOut || 0) - (+b.stake || 0) : -(+b.stake || 0)), 0);
+  // Same rule as daySheet's paid(): a cash-out pays what the book gave, a win pays
+  // the logged return, a void hands the stake back, a loss pays nothing.
+  const paidOut = (b) => b.status === "CASHED_OUT" ? (+b.cashOutAmount || 0)
+    : b.status === "WON" ? (+b.potentialReturn || (+b.stake || 0) * (+b.odds || 0))
+    : b.status === "VOID" ? (+b.stake || 0) : 0;
+  const pl = done.reduce((a, b) => a + paidOut(b) - (+b.stake || 0), 0);
   const won = done.filter((b) => b.status === "WON").length, lost = done.filter((b) => b.status === "LOST").length;
+  // Cashed out and void are neither, so "2 won, 4 lost" quietly dropped them and
+  // did not add up to the "7 settled" printed directly above it.
+  const other = done.length - won - lost;
+  const tally = `${won} won · ${lost} lost${other ? ` · ${other} cashed out or void` : ""}`;
   const clockOf = (id) => { const g = (games || []).find((x) => String(x.id) === String(id)); return g && g.status === 3 ? (g.clock || "live") : g && g.status === 4 ? "FT" : null; };
   // A leg that lands mid-match stayed amber until the whole match finished, because
   // h.result is only written when a bet settles — nothing marks one leg home while
@@ -7922,8 +7944,8 @@ function myDayCard(games) {
     <div class="mh"><span class="dot-live"></span><h4>Your day</h4><span style="flex:1"></span>
       ${mine.length ? `<span class="muted" style="font-size:11px">€${staked.toFixed(2)} running</span>` : ""}
       ${done.length ? `<span class="big" style="color:${pl >= 0 ? "var(--accent)" : "var(--red)"}">${pl >= 0 ? "+" : "−"}€${Math.abs(pl).toFixed(2)}</span>` : ""}</div>
-    ${rows || `<div class="mybet"><div class="muted" style="font-size:12px">Nothing running — ${won} won, ${lost} lost today.</div></div>`}
-    ${done.length && rows ? `<div class="mybet"><div class="muted" style="font-size:12px">Settled today: ${won} won · ${lost} lost</div></div>` : ""}
+    ${rows || `<div class="mybet"><div class="muted" style="font-size:12px">Nothing running — ${tally} today.</div></div>`}
+    ${done.length && rows ? `<div class="mybet"><div class="muted" style="font-size:12px">Settled today: ${tally}</div></div>` : ""}
   </div>`;
 }
 function htStrip(games) {

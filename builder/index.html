@@ -3821,6 +3821,55 @@ function legTiles(l, row, n) {
 // The reasoning under the tiles: plain lines with the real numbers —
 // 📊 what it rests on (his games, or HAWK against Bet365's price), 🔗 what the
 // other legs do to it, 💶 Bet365's price against what it's worth, 📉 a move.
+// ---------- HAWK's chance against Bet365's, like for like ----------
+// A price carries the bookmaker's margin, so 1/price OVERSTATES the chance on
+// EVERY side of a market. Comparing HAWK's number straight against it made the
+// app report "HAWK rates it lower" on the Over AND the Under of the same line —
+// which is arithmetically guaranteed, not a disagreement: HAWK's two sides sum to
+// 100% and Bet365's to about 108%, so HAWK is below both.
+//
+// Seen on Parma v Torino, Shots on Target 7.5: HAWK 53% / 47%, the app reporting
+// Bet365 at 58% / 50% and "HAWK rates it lower" twice. Divide the 108% out and
+// Bet365 is saying 53.6% / 46.4% — they agree almost exactly.
+//
+// Where the opposite side is on the board the margin is divided out. Where it
+// isn't, the figure says so rather than quietly flattering HAWK.
+const OPPOSITE_LEG = (id) => {
+  let m;
+  if ((m = /^(corners|cards|sot|offs|goals|h1goals|h2goals):([ou])([\d.]+)$/.exec(id || ""))) return `${m[1]}:${m[2] === "o" ? "u" : "o"}${m[3]}`;
+  if ((m = /^t(corners|cards):(home|away):([ou])([\d.]+)$/.exec(id || ""))) return `t${m[1]}:${m[2]}:${m[3] === "o" ? "u" : "o"}${m[4]}`;
+  if ((m = /^(btts|redcard|pen):(yes|no)$/.exec(id || ""))) return `${m[1]}:${m[2] === "yes" ? "no" : "yes"}`;
+  // A double chance and the opposite single result are exact complements:
+  // P(home or draw) + P(away) = 1. That covers the seed leg on nearly every
+  // ticket, where a 1X2 book runs about 105% and the gap read as disagreement.
+  if ((m = /^dc:(home|away)$/.exec(id || ""))) return `res:${m[1] === "home" ? "away" : "home"}`;
+  if ((m = /^res:(home|away)$/.exec(id || ""))) return `dc:${m[1] === "home" ? "away" : "home"}`;
+  // A clean sheet is the other side scoring none, so its complement is that side
+  // scoring at least one.
+  if ((m = /^cs:(home|away)$/.exec(id || ""))) return `team:${m[1] === "home" ? "away" : "home"}:o0.5`;
+  if ((m = /^team:(home|away):o0\.5$/.exec(id || ""))) return `cs:${m[1] === "home" ? "away" : "home"}`;
+  return null;
+};
+function vsMarketLine(hawkP, bookPrice, leg, lookup) {
+  const raw = 1 / bookPrice;
+  const src = lookup || S.legs || {};
+  const opp = leg && OPPOSITE_LEG(leg.id) ? src[OPPOSITE_LEG(leg.id)] : null;
+  let p = raw, fair = false;
+  if (opp && opp.bookPrice > 1) {
+    const book = raw + 1 / opp.bookPrice;
+    if (book > 1.0001) { p = raw / book; fair = true; }
+  }
+  const gap = hawkP - p;
+  // Without the opposite side the margin can't be removed, and a margin is worth
+  // five to eight points on the implied chance — more than most real disagreements.
+  // So a verdict there needs a gap big enough to survive any plausible margin;
+  // below that it says the comparison is rough rather than inventing a direction.
+  const tol = fair ? 0.04 : 0.09;
+  const verdict = Math.abs(gap) < tol
+    ? (fair ? " — they agree" : " — about the same once their margin is allowed for")
+    : gap > 0 ? " — HAWK rates it higher" : " — HAWK rates it lower";
+  return `HAWK makes it ${pct(hawkP)}; Bet365's price means about ${pct(p)}${fair ? "" : " with their margin still in"}${verdict}.`;
+}
 function whyShort(l, row, n) {
   const lines = [];
   // 📊 Form, or what the chance rests on.
@@ -3834,8 +3883,7 @@ function whyShort(l, row, n) {
   } else if (l.group === "result" && l.ep && l.pNoEp != null) {
     lines.push(["📊", `HAWK makes it ${pct(l.pNoEp)} to win, plus ${pct(Math.max(0, l.p - l.pNoEp), 1)} from Early Payout (paid if they go 2 goals up) = ${pct(l.p)}.`]);
   } else if (l.bookPrice > 1) {
-    const implied = 1 / l.bookPrice;
-    lines.push(["📊", `HAWK makes it ${pct(l.p)}; Bet365's price means about ${pct(implied)}${Math.abs(l.p - implied) < 0.04 ? " — they agree" : l.p > implied ? " — HAWK rates it higher" : " — HAWK rates it lower"}.`]);
+    lines.push(["📊", vsMarketLine(l.p, l.bookPrice, l)]);
   } else lines.push(["📊", `HAWK makes it ${pct(l.p)} on its own, from both teams' numbers.`]);
   // 🔗 With the other legs.
   if (row && n > 0) {
@@ -5881,7 +5929,7 @@ function whyPart(pt, price) {
     if (l.kind === "player" && l.games >= 3) {
       lines.push(["📊", `${formVerb(l.id, true)} in ${l.hits} of his last ${l.games} ${l.basis === "starts" ? "starts" : "games"}; HAWK gives him ${pct(l.p)} here.`]);
     } else if (l.ep && l.pNoEp != null) lines.push(["📊", `HAWK makes it ${pct(l.pNoEp)} to win, plus ${pct(Math.max(0, l.p - l.pNoEp), 1)} from Early Payout = ${pct(l.p)}.`]);
-    else if (price) lines.push(["📊", `HAWK makes it ${pct(l.p)}; Bet365's price means about ${pct(1 / price)}${Math.abs(l.p - 1 / price) < 0.04 ? " — they agree" : l.p > 1 / price ? " — HAWK rates it higher" : " — HAWK rates it lower"}.`]);
+    else if (price) lines.push(["📊", vsMarketLine(l.p, price, l, Object.fromEntries((pt.legs || []).map((x) => [x.id, x])))]);
     else lines.push(["📊", `HAWK makes it ${pct(l.p)}.`]);
     if (price) { const ev = price * pt.p - 1;
       lines.push(["💶", `Bet365 ${odds(price)} vs HAWK's fair ${odds(pt.fair)} — ${ev >= 0.02 ? `${(100 * ev).toFixed(0)}% more than it's worth. Value.` : ev >= -0.02 ? "about what it's worth." : ev >= -0.12 ? `${(100 * -ev).toFixed(0)}% less than it's worth, a normal acca leg.` : `${(100 * -ev).toFixed(0)}% less than it's worth — try 🔄 another leg from this match.`}`]); }

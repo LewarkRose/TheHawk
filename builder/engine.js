@@ -1404,12 +1404,28 @@
       const other = side === "home" ? ag : hg;
       add(`cs:${side}`, `${name} Clean Sheet`, "Clean Sheet", `team_goals:${side === "home" ? "away" : "home"}`, mask(n, (s) => other[s] === 0));
     }
-    for (const line of [7.5, 8.5, 9.5, 10.5, 11.5]) {
+    // 5.5 to 14.5 since 2026-10-19, from Bet365's own board: they price corners
+    // from 5 to 21, while this stopped at 7.5–11.5. Over 12 pays 5.50 (~18%) and
+    // Over 14 pays 13.00 (~8%) — both well inside what a builder can use, and
+    // neither was on offer. The low end was missing too: no Under 6.5 for a match
+    // between two sides who never win one.
+    for (const line of [5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5]) {
       add(`corners:o${line}`, withCount(`Over ${line} Corners`, "Over", line), "Corners", "corners", mask(n, (s) => sim.corners[s] > line), b365Whole("Over", line, "Corners"));
       add(`corners:u${line}`, withCount(`Under ${line} Corners`, "Under", line), "Corners", "corners", mask(n, (s) => sim.corners[s] < line), b365Whole("Under", line, "Corners"));
     }
     const tc = (s) => sim.teamCards.home[s] + sim.teamCards.away[s];
-    for (const line of [2.5, 3.5, 4.5, 5.5]) {
+    // 1.5 to 10.5 since 2026-10-19. It stopped at 5.5 and in a card-heavy match
+    // there was simply nothing left to bet: Getafe v Rayo produced NINE and the
+    // highest line on offer was 5.5, settled long before half-time. Bet365's own
+    // board runs 0 to 14, so even 10.5 is short of them — but Over 10 prices at
+    // 29.00 there (~3%), below the floor below, so going further adds nothing.
+    //
+    // Remember these settle in BOOKING POINTS, so 8.5 is nearer than it reads: four
+    // yellows and a sending-off is 6, and La Liga averages 4.6 before any of that.
+    //
+    // Costs nothing on a quiet match: add() drops any leg outside MIN_LEG_P..
+    // MAX_LEG_P, so the high lines only appear where they are actually plausible.
+    for (const line of [1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5]) {
       add(`cards:o${line}`, withCount(`Over ${line} Cards`, "Over", line), "Total Cards", "cards", mask(n, (s) => tc(s) > line), b365Whole("Over", line, "Cards"));
       add(`cards:u${line}`, withCount(`Under ${line} Cards`, "Under", line), "Total Cards", "cards", mask(n, (s) => tc(s) < line), b365Whole("Under", line, "Cards"));
     }
@@ -1449,11 +1465,15 @@
     // Team corners and cards, shots on target
     for (const [side, name] of [["home", home], ["away", away]]) {
       const c = sim.cornersTeam[side], k = sim.teamCards[side];
-      for (const line of [2.5, 3.5, 4.5, 5.5, 6.5, 7.5]) {
+      // 1.5 and 8.5/9.5 added with the match total's wider range — one side can
+      // take most of a corner-heavy game, and a pinned side can finish with one.
+      for (const line of [1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5]) {
         add(`tcorners:${side}:o${line}`, withCount(`${name} Over ${line} Corners`, "Over", line), "Team Corners", `team_corners:${side}`, mask(n, (s) => c[s] > line), b365Whole("Over", line, "Corners", name));
         add(`tcorners:${side}:u${line}`, withCount(`${name} Under ${line} Corners`, "Under", line), "Team Corners", `team_corners:${side}`, mask(n, (s) => c[s] < line), b365Whole("Under", line, "Corners", name));
       }
-      for (const line of [0.5, 1.5, 2.5, 3.5])
+      // 4.5 added with the match total's higher lines: one side can carry most of
+      // a card-heavy game on its own.
+      for (const line of [0.5, 1.5, 2.5, 3.5, 4.5])
         add(`tcards:${side}:o${line}`, withCount(`${name} Over ${line} Cards`, "Over", line), "Team Cards", `team_cards:${side}`, mask(n, (s) => k[s] > line), b365Whole("Over", line, "Cards", name));
       for (const line of [1.5, 2.5])
         add(`tcards:${side}:u${line}`, withCount(`${name} Under ${line} Cards`, "Under", line), "Team Cards", `team_cards:${side}`, mask(n, (s) => k[s] < line), b365Whole("Under", line, "Cards", name));

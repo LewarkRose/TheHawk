@@ -1565,10 +1565,16 @@
   // HAWK bets (see "learning" in index.html). Empty = no adjustment.
   let learning = {};
   function setLearning(shifts) { learning = shifts && typeof shifts === "object" ? shifts : {}; }
-  // Trusted markets: {market: factor} from HAWK's graded predictions (worked
+  // Trusted markets: {learnKey: factor} from HAWK's graded predictions (worked
   // out by the page). A factor under 1 marks a market where HAWK's chances
   // have landed less often than it said; auto-builds then prefer a similar
   // leg from a market it has proven accurate on. It never changes a chance.
+  //
+  // Keyed on learnKey, not the market name, since 2026-10-19. The page used to
+  // compute these from byMarket, which spans dead model versions — Player Tackles
+  // read 6.8 points low there while the live model is 2.2 high, so auto-builds were
+  // being steered by a model two versions gone. byMarket also can't judge a
+  // two-sided market at all: Over and Under are mirrors and average to 0.500.
   let trust = {};
   function setTrust(factors) { trust = factors && typeof factors === "object" ? factors : {}; }
   // Bet365's Early Payout on Result legs (paid once the team is 2 goals up).
@@ -1925,7 +1931,10 @@
           for (let s = 0; s < n; s++) c += m[s] & a[s];
           const joint = (c / n) * adjNow * (leg.adj || 1), cond = joint / pNow;
           if (cond < lo || cond > hi) continue;
-          const pr = joint > 0 ? priceOf(legs, [...chosen, leg.id], joint) : 0, reaches = pr >= target, t = trust[leg.market] || 1;
+          // trust is keyed on learnKey so a two-sided market is weighted per side;
+          // falls back to the market name for props, where the two are the same.
+          const pr = joint > 0 ? priceOf(legs, [...chosen, leg.id], joint) : 0, reaches = pr >= target,
+                t = trust[learnKey(leg.id, leg.market) || leg.market] || 1;
           const step = pr > 0 ? Math.log(pr / priceNow) : 0;
           const need = reaches ? 0 : Math.max(1, Math.ceil(Math.log(target / Math.max(pr, 1.0001)) / SAFE_STEP));
           const feasible = reaches || chosen.length + 1 + need <= maxLegs;

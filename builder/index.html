@@ -2295,7 +2295,7 @@ a.nav{text-decoration:none}
      evening of tests that were checking stale code. -->
 <!-- Bump this whenever engine.js changes, or browsers keep the old one: the
      query string is the only thing telling them the file is not the same. -->
-<script src="engine.js?v=20261018b"></script>
+<script src="engine.js?v=20261019a"></script>
 <script src="hawk-settle.js?v=20261018c"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
@@ -3689,7 +3689,7 @@ function renderLegList() {
   const shown = flat.slice(0, show);
   $("#lglist").innerHTML = shown.length ? `${head}${shown.map(l => `
     <div class="lrow"><div><b>${esc(l.label)}</b>${l.low_data ? ' <span class="badge warn">low data</span>' : ""}${hitChip(l)}${moveLine(l)}
-      <div class="lmkt">${esc(l.market)} ${trustBadge(l.market)}</div><div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div></div>
+      <div class="lmkt">${esc(l.market)} ${trustBadge(l)}</div><div class="pb"><span style="width:${(100 * l.p).toFixed(1)}%"></span></div></div>
       <div style="text-align:right;font-weight:700">${pct(l.p, 1)}</div><div class="muted" style="text-align:right">${odds(l.fair)}</div>
       <div style="text-align:right;font-weight:700;color:${l.bookPrice ? (l.bookPrice > l.fair ? "var(--accent)" : "var(--text)") : "var(--muted)"}">${l.bookPrice ? odds(l.bookPrice) : "–"}${moveMark(l)}${
         l.bookPrice ? `<span class="star ${isStarred(S.match.id, l.id) ? "on" : ""}" data-star="${l.id}" title="${isStarred(S.match.id, l.id) ? "Price alert on — click to stop" : `Alert me when Bet365 pays ${odds(l.fair * VALUE_EDGE)}+`}">★</span>` : ""}</div>
@@ -4026,7 +4026,7 @@ function renderSlip() {
       <div class="fa">
         <div class="sc-head">${legFace(l)}<div class="sc-name"><div class="lb">${esc(l.label)}${
           id === weakId ? ` <span class="weaktag" title="The leg least likely to land \u2014 swap this one first">weak link</span>` : ""}</div>
-          <div class="mk">${esc(l.market)} ${trustBadge(l.market, true)}</div></div>
+          <div class="mk">${esc(l.market)} ${trustBadge(l)}</div></div>
           <span class="verdict ${vd.tone}" title="${esc(vd.why)}">${vd.label}</span></div>
         ${l.b365 ? `<div class="b365" title="Bet365's corners and cards lines are 3-way (Over / Exactly / Under): its &quot;Over 3&quot; means 4 or more">On Bet365 pick: <b>${esc(l.b365)}</b></div>` : ""}
         ${legTiles(l, row, n)}
@@ -8339,19 +8339,41 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("../sw.js").c
 // high = landed 5+ points less often than said (auto-builds then prefer a
 // similar leg from another market); 🔹 runs low = landed 5+ points more often.
 const TRUST_MIN_LEGS = 200, TRUST_MIN_MATCHES = 15, TRUST_RUNS_HIGH = 0.9;
+// byKey, not byMarket — and this one mattered more than the display ones, because
+// the badge does not only label a market, it DOWNWEIGHTS it in auto-builds (see
+// setTrust below and `trust[...]` in engine.js).
+//
+// On byMarket, Player Tackles reads 6.8 points LOW while the live model is 2.2
+// points HIGH. So the builder was badging it "runs 7 pts low" on the strength of a
+// model two versions dead, and the Board — which reads byKey — said the opposite on
+// the same screen. That contradiction is what gave this away.
+//
+// Keyed by learnKey, so a two-sided market is judged per SIDE. Judging "Corners" as
+// one thing is meaningless: Over and Under are exact mirrors and always average to
+// 0.500. "Corners · Over" and "Corners · Under" each have a real answer.
+//
+// A market with no byKey record (results, goals — the ones priced off the
+// bookmakers and deliberately never learned) now gets no badge and no weight. That
+// is honest: there is no current-model record to judge them by.
 function computeTrust() {
   const g = S.graded, out = {};
   if (!g || (g.matches || 0) < TRUST_MIN_MATCHES) return out;
-  for (const [market, b] of Object.entries(g.byMarket || {})) {
+  for (const [key, b] of Object.entries(g.byKey || {})) {
     if (b.n < TRUST_MIN_LEGS) continue;
     const said = b.p / b.n, got = b.won / b.n, gap = got - said;
-    out[market] = { n: b.n, said, got, gap, kind: Math.abs(gap) <= 0.03 ? "ok" : gap <= -0.05 ? "hi" : gap >= 0.05 ? "lo" : "close" };
+    out[key] = { n: b.n, said, got, gap, kind: Math.abs(gap) <= 0.03 ? "ok" : gap <= -0.05 ? "hi" : gap >= 0.05 ? "lo" : "close" };
   }
   return out;
 }
+// A leg's trust key: its learnKey when it has one ("Corners · Over"), else the
+// market name (player props, where the two are the same thing).
+const trustKey = (l) => (l && l.id && HAWK.learnKey ? HAWK.learnKey(l.id, l.market) : null) || (l && l.market) || "";
 const learnsMarket = (market) => S.learn && S.learn.on && Object.keys(S.learn.shifts).some(k => k === market || k.startsWith(market + " · "));
-function trustBadge(market) {
-  const t = S.trust && S.trust[market];
+// Takes the LEG, not the market name, so a two-sided market is badged on the side
+// the leg is actually on.
+function trustBadge(leg) {
+  const market = typeof leg === "string" ? leg : (leg && leg.market) || "";
+  const t = S.trust && S.trust[typeof leg === "string" ? leg : trustKey(leg)];
   if (!t || t.kind === "close") return "";
   const nums = `HAWK said ${pct(t.said)} on average and ${pct(t.got)} landed, over ${t.n.toLocaleString()} graded legs.`;
   if (t.kind === "ok") return `<span class="tb ok" title="${esc("Trusted: HAWK's chances in this market come true as often as it says. " + nums)}">✅ Trusted</span>`;

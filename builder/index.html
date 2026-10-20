@@ -7832,6 +7832,15 @@ function myDayCard(games) {
   const today = localDay(new Date());
   const onToday = (b) => (b.legs || []).some((l) => l.hawk && l.hawk.kickoff && localDay(new Date(l.hawk.kickoff)) === today);
   const mine = bets.filter((b) => b.status === "PENDING" && onToday(b));
+  // Running, but on a LATER day's card — the Argentina games that kick off at
+  // 00:00 are the usual case. They belong to tomorrow and correctly aren't listed
+  // here, but the sheet above still counts their stake in "on the table", so this
+  // card said "Nothing running" beside €5.20 of live bets. Say where they are
+  // instead of nothing.
+  const laterStake = bets.filter((b) => b.status === "PENDING" && !onToday(b))
+    .reduce((a, b) => a + (+b.stake || 0), 0);
+  const laterNote = laterStake > 0
+    ? ` €${laterStake.toFixed(2)} is running on a later card.` : "";
   // SETTLED TODAY, by the same rule the sheet above uses — settledAt, not kickoff,
   // and no requirement that the bet be linked to a match.
   //
@@ -7847,7 +7856,10 @@ function myDayCard(games) {
   // about today's matches. Only the settled tally is about today's money.
   const settledDay = (b) => b.settledAt ? localDay(new Date(b.settledAt)) === today : onToday(b);
   const done = bets.filter((b) => b.status && b.status !== "PENDING" && settledDay(b));
-  if (!mine.length && !done.length) return "";
+  if (!mine.length && !done.length) return laterStake > 0
+    ? `<div class="myday"><div class="mh"><span class="dot-live"></span><h4>Your day</h4></div>
+       <div class="mybet"><div class="muted" style="font-size:12px">Nothing on today's card —${laterNote}</div></div></div>`
+    : "";
   const staked = mine.reduce((a, b) => a + (+b.stake || 0), 0);
   // Same rule as daySheet's paid(): a cash-out pays what the book gave, a win pays
   // the logged return, a void hands the stake back, a loss pays nothing.
@@ -7944,7 +7956,7 @@ function myDayCard(games) {
     <div class="mh"><span class="dot-live"></span><h4>Your day</h4><span style="flex:1"></span>
       ${mine.length ? `<span class="muted" style="font-size:11px">€${staked.toFixed(2)} running</span>` : ""}
       ${done.length ? `<span class="big" style="color:${pl >= 0 ? "var(--accent)" : "var(--red)"}">${pl >= 0 ? "+" : "−"}€${Math.abs(pl).toFixed(2)}</span>` : ""}</div>
-    ${rows || `<div class="mybet"><div class="muted" style="font-size:12px">Nothing running — ${tally} today.</div></div>`}
+    ${rows || `<div class="mybet"><div class="muted" style="font-size:12px">Nothing running — ${tally} today.${laterNote}</div></div>`}
     ${done.length && rows ? `<div class="mybet"><div class="muted" style="font-size:12px">Settled today: ${tally}</div></div>` : ""}
   </div>`;
 }

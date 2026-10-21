@@ -326,6 +326,29 @@
         .tr-fold .tr-hide, .tr-fold[open] .tr-show { display: none; }
         .tr-fold[open] .tr-hide { display: inline; }
         .vsec { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #71717a; margin: 10px 2px 2px; }
+        /* The Day / Week / Month switch, beside the status filters. It is a different
+           KIND of control from them — they remove tickets, this one only regroups the
+           same ones — so it is drawn in the accent rather than the bone the filters use. */
+        .vgrp { display: flex; background: #09090b; padding: 4px; border-radius: 12px;
+                border: 1px solid #27272a; gap: 4px; font-size: 11px; }
+        .vgrp button { padding: 5px 12px; border-radius: 8px; color: #a1a1aa; transition: .15s; }
+        .vgrp button:hover { color: #fff; }
+        .vgrp button.on { background: var(--accent); color: #fff; font-weight: 700; }
+        /* The week strip: eight weeks at a glance above the list. A readout, but a
+           clickable one — a tile switches the list to Week and opens that week. */
+        .wstrip { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+                  gap: 8px; margin: 2px 0 6px; }
+        .wk { border: 1px solid var(--v-line, #27272a); border-radius: 12px; background: #0f1417;
+              padding: 10px; text-align: left; transition: .15s; }
+        .wk:hover { border-color: rgba(232, 224, 207,.5); transform: translateY(-1px); }
+        .wk.now { border-color: rgba(232, 224, 207,.45); background: rgba(232, 224, 207,.05); }
+        .wk .k { font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em;
+                 text-transform: uppercase; color: #71717a; }
+        .wk .v { font-size: 17px; font-weight: 800; margin-top: 6px; font-variant-numeric: tabular-nums; }
+        .wk .n { font-size: 10.5px; color: var(--muted, #8d97ab); margin-top: 3px; }
+        .wk .bar { height: 4px; border-radius: 2px; background: #1b2433; margin-top: 8px;
+                   overflow: hidden; display: flex; }
+        .wk .bar i { display: block; height: 100%; }
 
         /* ---------- THE LEDGER ----------
            The same four ruled columns the builder's 📋 Board prints, carried over so a
@@ -864,6 +887,12 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
                     <h2 class="font-bold text-lg text-white flex items-center gap-2">
                         <span class="icon-gold">📋</span> Ticket History & Settlement Log
                     </h2>
+                    <div class="flex flex-wrap gap-2 items-center">
+                    <div class="vgrp" title="How the settled tickets are grouped. It doesn't remove anything.">
+                        <button onclick="setGroup('day')" id="group-day">Day</button>
+                        <button onclick="setGroup('week')" id="group-week">Week</button>
+                        <button onclick="setGroup('month')" id="group-month">Month</button>
+                    </div>
                     <div class="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs gap-1">
                         <button onclick="setFilter('ALL')" id="filter-ALL" class="px-3 py-1.5 rounded-lg bg-[#e8e0cf] text-black font-bold transition">All</button>
                         <button onclick="setFilter('PENDING')" id="filter-PENDING" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white transition">Pending</button>
@@ -871,6 +900,7 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
                         <button onclick="setFilter('LOST')" id="filter-LOST" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white transition">Lost</button>
                         <button onclick="setFilter('ACCA')" id="filter-ACCA" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white transition">Acca</button>
                         <button onclick="setFilter('CASHED_OUT')" id="filter-CASHED_OUT" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white transition">Cashed Out</button>
+                    </div>
                     </div>
                 </div>
 
@@ -2290,6 +2320,71 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
             renderHistory();
         }
 
+        // Day / Week / Month. Remembered, because the grouping you think in is a habit,
+        // not a per-visit choice.
+        let historyGroup = 'day';
+        try { historyGroup = localStorage.getItem('hawk_histGroup') || 'day'; } catch { /* private window */ }
+        if (!['day', 'week', 'month'].includes(historyGroup)) historyGroup = 'day';
+        function setGroup(mode, rerender = true) {
+            historyGroup = mode;
+            try { localStorage.setItem('hawk_histGroup', mode); } catch { /* private window */ }
+            ['day', 'week', 'month'].forEach(m => {
+                const el = document.getElementById(`group-${m}`);
+                if (el) el.className = m === mode ? 'on' : '';
+            });
+            if (rerender) renderHistory();
+        }
+        // A tile is a way in, not just a readout: it switches the list to Week, opens
+        // that week and scrolls to it. Clicking the week you are already in just
+        // scrolls — it does not fold the week shut under you.
+        function jumpWeek(key) {
+            if (historyGroup !== 'week') setGroup('week'); else renderHistory();
+            const row = document.querySelector(`.vday[data-gkey="${key}"]`);
+            if (!row) return;
+            row.open = true;
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        // THE WEEK STRIP — the last eight weeks at a glance, above the list.
+        //
+        // It groups by the same rule the rows below it use (betTime: the last kick-off),
+        // so the tiles and the rows always add up to each other. The Weekly HAWK Report
+        // further down this page groups by settleTime instead, so a ticket settled days
+        // after its match can sit in a different week there. One in the log does.
+        function renderWeekStrip(container, settled) {
+            const weeks = new Map();
+            settled.forEach(b => {
+                const t = betTime(b);
+                if (!t) return;
+                const mon = mondayOf(new Date(t)).getTime();
+                if (!weeks.has(mon)) weeks.set(mon, { mon, n: 0, won: 0, lost: 0, co: 0, pl: 0, staked: 0 });
+                const w = weeks.get(mon);
+                w.n++; w.pl += betProfit(b); w.staked += (+b.stake || 0);
+                w[b.status === 'WON' ? 'won' : b.status === 'CASHED_OUT' ? 'co' : 'lost']++;
+            });
+            // One week is not a strip — it says nothing you cannot read off the row below.
+            if (weeks.size < 2) return;
+            const thisMon = mondayOf(new Date()).getTime();
+            const list = [...weeks.values()].sort((a, b) => b.mon - a.mon).slice(0, 8);
+            const tiles = list.map(w => {
+                const d = new Date(w.mon), back = Math.round((thisMon - w.mon) / 6048e5);
+                const label = back === 0 ? 'This week' : back === 1 ? 'Last week'
+                    : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                const tone = w.pl > 0 ? 'text-emerald-400' : w.pl < 0 ? 'text-red-400' : 'text-zinc-400';
+                const hit = Math.round(100 * w.won / w.n);
+                const roi = w.staked ? `${w.pl >= 0 ? '+' : '−'}${Math.abs(100 * w.pl / w.staked).toFixed(0)}%` : '—';
+                return `<button class="wk${back === 0 ? ' now' : ''}" onclick="jumpWeek('w${w.mon}')"
+                    title="${w.n} settled · ${w.won} won · €${w.staked.toFixed(2)} staked · ${roi} ROI — click to open this week">
+                    <div class="k">${label}</div>
+                    <div class="v ${tone}">${w.pl >= 0 ? '+' : '−'}€${Math.abs(w.pl).toFixed(2)}</div>
+                    <div class="n">${w.n} · ${hit}% hit · ${roi}</div>
+                    <div class="bar"><i style="flex:${w.won + w.co};background:var(--up)"></i><i style="flex:${w.lost};background:#ff5d73"></i></div>
+                </button>`;
+            }).join('');
+            container.insertAdjacentHTML('beforeend',
+                `<div class="vsec" title="A week runs Monday to Sunday. A ticket belongs to the week of its last kick-off, the same rule the rows below use.">By week · ${list.length} shown · by match day</div>
+                 <div class="wstrip">${tiles}</div>`);
+        }
+
         function renderHistory() {
             // Self-heal tickets missing a valid, unique id — this is what silently breaks the
             // Edit/Delete/Reuse buttons (they look up the ticket by id; if it's missing, the
@@ -2443,21 +2538,31 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
                     })()}
                 `;
                 if (bet.status === 'PENDING') { container.appendChild(card); return; }
-                const when = betDay(bet);
+                const when = betGroup(bet, historyGroup);
                 if (!days.has(when.key)) days.set(when.key, { ...when, list: [] });
                 const g = days.get(when.key); g.t = Math.max(g.t, when.t); g.list.push({ bet, card });
             });
-            if (days.size && pendingN) container.insertAdjacentHTML('beforeend', `<div class="vsec">Settled</div>`);
             const money = (v) => `<b class="${v > 0 ? 'text-emerald-400' : v < 0 ? 'text-red-400' : 'text-zinc-400'}">${v > 0 ? '+' : v < 0 ? '−' : ''}€${Math.abs(v).toFixed(2)}</b>`;
+            // The week strip. Only under "All" — under a status filter it would read
+            // "100% hit" on Won and "0%" on Lost, which is the filter talking, not a week.
+            if (currentFilter === 'ALL') renderWeekStrip(container, filtered.filter(b => b.status !== 'PENDING'));
+            if (days.size && pendingN) container.insertAdjacentHTML('beforeend', `<div class="vsec">Settled</div>`);
             [...days.values()].sort((a, b) => b.t - a.t).forEach(g => {
                 const won = g.list.filter(x => x.bet.status === 'WON').length, co = g.list.filter(x => x.bet.status === 'CASHED_OUT').length;
                 const lost = g.list.length - won - co, pl = g.list.reduce((s, x) => s + betProfit(x.bet), 0);
+                // A week or a month is enough tickets for a rate to mean something, so
+                // those rows carry stake and ROI. A single day usually isn't, and the day
+                // rows have been readable precisely because they stayed short.
+                const staked = g.list.reduce((s, x) => s + (+x.bet.stake || 0), 0);
+                const wide = historyGroup !== 'day' && staked > 0
+                    ? `<span class="text-zinc-500">· €${staked.toFixed(2)} staked · <span class="${pl > 0 ? 'text-emerald-400' : pl < 0 ? 'text-red-400' : ''}">${pl >= 0 ? '+' : '−'}${Math.abs(100 * pl / staked).toFixed(0)}% ROI</span></span>` : '';
                 const day = document.createElement('details');
                 day.className = 'vday';
-                if (g.today) day.open = true;
+                day.dataset.gkey = g.key;
+                if (g.current) day.open = true;
                 day.innerHTML = `<summary><b class="text-white">${g.label}</b><span class="text-zinc-500">${g.list.length} ticket${g.list.length === 1 ? '' : 's'}</span>
                     <span class="text-zinc-400">${won ? `<span class="text-emerald-400">✓ ${won}</span> ` : ''}${lost ? `<span class="text-red-400">✗ ${lost}</span> ` : ''}${co ? `<span class="text-[#e8e0cf]">💰 ${co}</span>` : ''}</span>
-                    <span style="margin-left:auto">${money(pl)}</span></summary><div class="vday-body"></div>`;
+                    ${wide}<span style="margin-left:auto">${money(pl)}</span></summary><div class="vday-body"></div>`;
                 const body = day.querySelector('.vday-body');
                 g.list.forEach(({ bet, card }) => {
                     const row = document.createElement('details');
@@ -2475,16 +2580,42 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
             });
             updateAnalytics();
         }
-        // The day a ticket belongs to: its (last) match day, or when it was placed.
-        function betDay(bet) {
+        // WHEN a ticket belongs to: its (last) match day, or, failing that, when it was
+        // placed. Note this is NOT settleTime(), which the weekly report uses — a ticket
+        // settled days after the match belongs to the night it was played here, and to
+        // the week the money moved there. One ticket in the log so far falls in different
+        // weeks under the two rules (Bahia v Flamengo, settled a week late).
+        const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+        const mondayOf = (x) => { const m = new Date(x.getFullYear(), x.getMonth(), x.getDate());
+                                  m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); return m; };
+        function betTime(bet) {
             const kos = (bet.legs || []).map(l => l.hawk && Date.parse(l.hawk.kickoff)).filter(Boolean);
             const placed = /^bet_(\d{12,})/.exec(bet.id || '');
-            const t = kos.length ? Math.max(...kos) : placed ? +placed[1] : Date.parse(bet.settledAt || '') || 0;
+            return kos.length ? Math.max(...kos) : placed ? +placed[1] : Date.parse(bet.settledAt || '') || 0;
+        }
+        // The group a ticket falls in, for whichever grouping is switched on. Day keeps
+        // the behaviour it has always had, month rollup and all; week and month apply to
+        // the whole history, however old.
+        function betGroup(bet, mode) {
+            const t = betTime(bet);
             if (!t) return { key: 'older', label: 'Older', t: 0 };
-            const d = new Date(t), start = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-            const ago = Math.round((start(new Date()) - start(d)) / 864e5);
-            if (ago > 45) return { key: `m${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }), t };
-            return { key: `d${start(d)}`, t, today: ago <= 0,
+            const d = new Date(t);
+            const asMonth = () => ({ key: `m${d.getFullYear()}-${d.getMonth()}`, t,
+                current: d.getFullYear() === new Date().getFullYear() && d.getMonth() === new Date().getMonth(),
+                label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) });
+            if (mode === 'month') return asMonth();
+            if (mode === 'week') {
+                const mon = mondayOf(d), sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+                // Whole weeks apart, counted from Monday to Monday, so it can't drift on
+                // the hour the clocks change.
+                const back = Math.round((mondayOf(new Date()).getTime() - mon.getTime()) / 6048e5);
+                const fmt = (x) => x.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                return { key: `w${mon.getTime()}`, t, current: back === 0,
+                         label: back === 0 ? 'This week' : back === 1 ? 'Last week' : `${fmt(mon)} – ${fmt(sun)}` };
+            }
+            const ago = Math.round((startOfDay(new Date()) - startOfDay(d)) / 864e5);
+            if (ago > 45) return asMonth();
+            return { key: `d${startOfDay(d)}`, t, current: ago <= 0,
                      label: ago === 0 ? 'Today' : ago === 1 ? 'Yesterday' : d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) };
         }
         function betProfit(b) {
@@ -3977,6 +4108,7 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
         }
 
         renderUI();
+        setGroup(historyGroup, false);   // paint the Day/Week/Month switch; the list renders on its own
         onCategoryChange();
         onLeagueChange();
         // 3D tilt for the stat tiles and ticket cards: they lean towards the mouse

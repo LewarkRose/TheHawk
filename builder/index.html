@@ -454,8 +454,22 @@ img{max-width:100%}
    "gone" on a leg that was still perfectly alive. */
 .tk-leg.live .d{background:var(--gold);box-shadow:0 0 0 3px rgba(224,176,99,.14)}
 .tk-leg .l{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tk-leg.won .l{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(79,212,134,.45)}
-.tk-leg.lost .l{color:var(--red);text-decoration:line-through;text-decoration-color:rgba(255,93,115,.5)}
+.tk-leg .l .sel{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The strike-through sits on .sel, not on .l. text-decoration PROPAGATES to
+   descendants and a child cannot take it off again, so with it on .l the
+   fixture caption below was struck through too — and `text-decoration:none`
+   on .fx did nothing, which is the spec working as designed, not a cascade bug. */
+.tk-leg.won .l{color:var(--muted)}
+.tk-leg.won .l .sel{text-decoration:line-through;text-decoration-color:rgba(79,212,134,.45)}
+.tk-leg.lost .l{color:var(--red)}
+.tk-leg.lost .l .sel{text-decoration:line-through;text-decoration-color:rgba(255,93,115,.5)}
+/* On a multi-match ticket the selection alone says nothing about WHICH match it
+   is in — nine rows reading "Over 1.5 Goals" are indistinguishable. The fixture
+   rides above each one. Single-match tickets don't get it: the header already
+   names the fixture, and repeating it on every row is noise. */
+.tk-leg .l .fx{display:block;font:700 9px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--muted);opacity:.8;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tk-leg .c{font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
   color:var(--muted);text-transform:uppercase;white-space:nowrap}
 .tk-leg.live .c{color:var(--gold)}
@@ -7934,7 +7948,19 @@ function myDayCard(games) {
   // default — with them off, a leg waits for full time as it used to.)
   const liveLegs = loadPref("hawk.betStates", {});
   const rows = mine.map((b) => {
-    const legs = (b.legs || []).flatMap((l) => (l.hawk && l.hawk.legs || []).map((h) => ({ ...h, game: l.hawk.game })));
+    // Each sub-leg carries the match it came from, because on an acca that is the
+    // only thing that tells two identical selections apart.
+    const legs = (b.legs || []).flatMap((l) => (l.hawk && l.hawk.legs || []).map((h) => ({
+      ...h, game: l.hawk.game,
+      fx: l.fixture || (l.hawk.home && l.hawk.away ? `${l.hawk.home} v ${l.hawk.away}` : ""),
+    })));
+    // An ACCA is one bet across several matches. It is not "the first match's bet
+    // with extras": labelling it `legs[0].fixture +8` and painting the first
+    // match's two crests on it made a nine-fold read as a Lille v Galatasaray
+    // bet, which is how I misread one myself on 2026-10-21.
+    const nGames = new Set((b.legs || []).map((l) => l.hawk && l.hawk.game).filter(Boolean)).size
+      || (b.legs || []).length;
+    const acca = (b.legs || []).length > 1;
     // A leg with no readable label would just be an empty row.
     const named = legs.filter((h) => String(h.label || "").trim().length > 1);
     const seen = liveLegs[b.id] || {};
@@ -7944,12 +7970,25 @@ function myDayCard(games) {
       : clockOf(h.game) ? "live" : "";
     const home = named.filter((h) => stateOf(h) === "won").length;
     const live = legs.map((h) => clockOf(h.game)).find(Boolean) || "";
+    // One clock means something on a single-match ticket. On an acca "● 24'" is
+    // the clock of whichever match happened to be first in the list, so say how
+    // many are in play instead.
+    // clockOf returns "FT" for a finished match, which is truthy — counting it
+    // as in play put "● 3 in play" on an acca with two live games and one done.
+    const inPlay = new Set(legs.filter((h) => { const c = clockOf(h.game); return c && c !== "FT"; })
+      .map((h) => h.game)).size;
+    // On an acca the chip only ever means "how many are on right now". With none
+    // on, neither the first match's "FT" nor its "not started" says anything
+    // about the other eight, so the chip goes away and the rows carry it.
+    const liveChip = acca ? (inPlay ? `${inPlay} in play` : "") : live;
     // The rail carries the whole state of the bet in five pixels of height.
     const rail = named.map((h) => `<i class="${stateOf(h)}"></i>`).join("");
     const rows2 = named.map((h) => {
       const st = stateOf(h), clock = clockOf(h.game);
+      const fx = acca && h.fx ? `<span class="fx">${esc(h.fx)}</span>` : "";
       return `<div class="tk-leg ${st}"><span class="d"></span>
-        <span class="l" title="${esc(String(h.label || ""))}">${esc(String(h.label || "").slice(0, 46))}</span>
+        <span class="l" title="${esc(acca && h.fx ? `${h.fx} — ${h.label || ""}` : String(h.label || ""))}">${
+          fx}<span class="sel">${esc(String(h.label || "").slice(0, 46))}</span></span>
         <span class="c">${st === "won" ? "landed" : st === "lost" ? "gone"
           : clock ? esc(clock) : "not started"}</span></div>`;
     }).join("");
@@ -7974,7 +8013,7 @@ function myDayCard(games) {
     // The crests of the ticket's first match, from what was stored with the bet.
     // Anything logged before crests were saved simply has none, and the header
     // closes up around the gap rather than holding an empty box.
-    const h0 = (b.legs[0] || {}).hawk || {};
+    const h0 = acca ? {} : (b.legs[0] || {}).hawk || {};
     const crest = (src) => src ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()">` : "";
     const crests = (h0.homeCrest || h0.awayCrest)
       ? `<div class="cr">${crest(h0.homeCrest)}${crest(h0.awayCrest)}</div>` : "";
@@ -7987,10 +8026,10 @@ function myDayCard(games) {
       h0.awayCrest ? ` data-ac="${esc(h0.awayCrest)}"` : ""}>
       <div class="tk-h">
         ${crests}
-        <div class="f"><b>${esc((b.legs[0] || {}).fixture || "Your bet")}${
-          b.legs.length > 1 ? ` +${b.legs.length - 1}` : ""}</b>
+        <div class="f"><b>${acca ? `${nGames}-match acca`
+          : esc((b.legs[0] || {}).fixture || "Your bet")}</b>
           <span>&euro;${(+b.stake || 0).toFixed(2)} STAKE &middot; ${home} OF ${named.length} HOME</span></div>
-        ${live ? `<span class="mrlive">● ${esc(live)}</span>` : ""}
+        ${liveChip ? `<span class="mrlive">● ${esc(liveChip)}</span>` : ""}
         <div class="pr"><b>${odds(b.odds)}</b><span>price</span></div>
       </div>
       <div class="rail">${rail}</div>
@@ -9570,11 +9609,18 @@ function myBetsHTML(drawer = false) {
         // A settled row is one line, so there is no edge for a channel — it
         // gets the crest pair instead. Both carry club identity; neither
         // pretends to be the other.
-        const s0 = (b.legs[0] || {}).hawk || {};
+        // An acca gets neither: two crests out of nine matches claim the row
+        // belongs to one of them, and nine fixture names ellipsise into the
+        // first one and a half anyway. Say what it is instead.
+        const multi = (b.legs || []).length > 1;
+        const s0 = multi ? {} : (b.legs[0] || {}).hawk || {};
         const cr = (src) => src ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()">` : "";
         const crests = (s0.homeCrest || s0.awayCrest)
           ? `<span class="mb-cr">${cr(s0.homeCrest)}${cr(s0.awayCrest)}</span>` : "";
-        return `<div class="mb-done ${cls}"><span>${ic}</span><span class="mb-dfx">${crests}${esc((b.legs || []).map(l => l.fixture).join(" · "))}</span><span class="muted">@ ${odds(b.odds)}</span><b>${pl}</b></div>`; }).join("")}` : ""}
+        const title = multi
+          ? `${new Set((b.legs || []).map(l => (l.hawk || {}).game).filter(Boolean)).size || b.legs.length}-match acca`
+          : esc((b.legs || []).map(l => l.fixture).join(" · "));
+        return `<div class="mb-done ${cls}"><span>${ic}</span><span class="mb-dfx">${crests}${title}</span><span class="muted">@ ${odds(b.odds)}</span><b>${pl}</b></div>`; }).join("")}` : ""}
     <a class="ghost mb-vault" href="../">All bets in the Vault →</a></div>`;
 }
 // Clicks inside the popup or the drawer: open a match, back to the slip.

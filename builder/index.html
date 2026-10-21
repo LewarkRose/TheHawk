@@ -6445,8 +6445,18 @@ const localDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
 function myBetGames() {   // games you have a HAWK bet on (from the Vault)
   try {
     const out = {};
+    // A RUNNING bet always wins the badge. This used to be a plain overwrite, so
+    // with more than one bet on a match the last one in the array decided it —
+    // and a ticket cashed out earlier in the day then re-backed showed up as
+    // "cashed out" with real money still on the match, ten minutes before
+    // kick-off. 28 of 261 matches carry more than one bet and 10 of those have
+    // mixed statuses, so it was not a one-off.
     for (const b of vaultBets())
-      for (const l of b.legs || []) if (l.hawk && l.hawk.game) out[l.hawk.game] = b.status;
+      for (const l of b.legs || []) {
+        if (!l.hawk || !l.hawk.game) continue;
+        const g = l.hawk.game;
+        if (out[g] !== "PENDING") out[g] = b.status;
+      }
     return out;
   } catch { return {}; }
 }

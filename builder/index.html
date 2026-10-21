@@ -2826,8 +2826,25 @@ async function openMatch(id, refresh = false, prematch = false) {
 
 function renderMatch() {
   const m = S.match, p = m.probs, e = m.expected;
-  const chip = (side) => { const lu = m.lineups[side]; const ok = lu.status === "Confirmed";
-    return `<span class="badge ${ok ? "ok" : "warn"}">${ok ? "Lineup confirmed" : "Lineup predicted"}${lu.formation ? " · " + esc(lu.formation) : ""}</span>`; };
+  // Three states, not two. A lineup confirmed by 365Scores ALONE is not the same
+  // thing as one two sources agree on, and showing them identically cost a real
+  // afternoon: Levante v Athletic Bilbao read "Lineup confirmed" for a day, and
+  // when the teams actually came out 5 of Levante's 11 had changed (4-3-3 to
+  // 4-4-2) and 2 of Athletic's. 15 of 22. 365Scores had even downgraded itself to
+  // NotConfirmed in between and flipped back at kick-off with a different side.
+  //
+  // `source` is set in engine.js: "365Scores + ESPN" only when the two name the
+  // same XI, so it is already the corroboration flag — it just was not used.
+  const chip = (side) => {
+    const lu = m.lineups[side];
+    const ok = lu.status === "Confirmed", both = /ESPN/.test(lu.source || "");
+    const cls = !ok ? "warn" : both ? "ok" : "warn";
+    const text = !ok ? "Lineup predicted"
+      : both ? "Lineup confirmed"
+      : "Lineup confirmed by 365Scores only";
+    const why = !ok ? "" : both ? " title=\"365Scores and ESPN name the same XI\""
+      : " title=\"Only 365Scores has it — ESPN has not published, so nothing corroborates it yet. An early &quot;confirmed&quot; XI has been wrong before.\"";
+    return `<span class="badge ${cls}"${why}>${text}${lu.formation ? " · " + esc(lu.formation) : ""}</span>`; };
   const ord = (n) => { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
   // (a knockout tie: that table is the group / league phase, not a league table)
   const tbl = (side) => m.table[side] ? `${m.tie ? "Group stage: " : ""}${ord(m.table[side].position)} · ${Math.round(m.table[side].points)} pts` : "";
@@ -2897,12 +2914,21 @@ function renderMatch() {
       : `an ordinary scoreline — ${b(tot.toFixed(2))} goals expected`}${
       favName ? `, and from ${esc(favName)} doing ${esc(favName)} things at volume` : ""} — not from calling the score.</p>`);
 
-    const predictedXI = Object.values(m.lineups || {}).some((lu) => lu && lu.status !== "Confirmed");
+    // A lineup only 365Scores has is treated as PREDICTED here, whatever it calls
+    // itself. That is the warning sitting above every player leg on the page, and
+    // it stayed silent through the Levante case where 5 of 11 starters changed —
+    // because 365Scores said "Confirmed" and nothing asked whether anyone agreed.
+    const soleSource = (lu) => lu && lu.status === "Confirmed" && !/ESPN/.test(lu.source || "");
+    const lus = Object.values(m.lineups || {});
+    const predictedXI = lus.some((lu) => lu && lu.status !== "Confirmed");
+    const uncorroborated = !predictedXI && lus.some(soleSource);
     let calm = "";
     if (m.started)
       calm = `<div class="hcalm"><div class="ct">Careful with</div><p>This match has already kicked off. Everything above is the pre-match model and takes no account of what has happened since.</p></div>`;
     else if (predictedXI)
       calm = `<div class="hcalm"><div class="ct">Careful with</div><p>Lineups are predicted, not confirmed. HAWK assumes the named starters start, and most bookmakers void a player's legs if he does not play — check yours. Rebuild once the sheets land, about an hour before kick-off.</p></div>`;
+    else if (uncorroborated)
+      calm = `<div class="hcalm"><div class="ct">Careful with</div><p>Only 365Scores has these lineups — ESPN has not published, so nothing corroborates them. An XI marked confirmed this early has been wrong before: on Levante v Athletic Bilbao five of the eleven changed by kick-off. HAWK assumes the named starters start, and most bookmakers void a player's legs if he does not play. Rebuild once both sources agree.</p></div>`;
 
     return `<div class="hread"><div class="rk">HAWK's read <s>The match · before any number</s></div>
       <div class="lead">${esc(lead)}</div>${ps.join("")}${calm}</div>`;
@@ -6628,7 +6654,10 @@ function scoreRow(g, mine, withLeague) {
       : `<span class="sc-bet-done" title="You bet on this match — ${esc(String(betStatus).toLowerCase().replace("_", " "))}">🎟</span>`;
   // Upcoming: a bell for a lineup alert, or "XI ✓" once both lineups are out.
   const alert = g.status === 3 ? (() => { const f = followState(g.id); return `<button class="sc-bell ${f.on ? "on" : ""}" data-follow="${g.id}" title="${f.bet ? "You have a bet on it — alerts on" : f.on ? "Goal alerts on — tap to stop" : "Goal and red-card alerts for this match"}">${f.on ? "🔔" : "🔕"}</button>`; })()
-    : g.status !== 2 ? "" : g.lineupsConfirmed ? `<span class="sc-xi" title="Lineups confirmed">XI ✓</span>`
+    // "XI" without the tick: this list only knows what 365Scores says, and cannot
+    // check ESPN without a per-match fetch for every row. Open the match and the
+    // page there says whether anything corroborates it.
+    : g.status !== 2 ? "" : g.lineupsConfirmed ? `<span class="sc-xi" title="365Scores has a lineup for this match — open it to see whether ESPN agrees. An XI marked confirmed well before kick-off has been wrong before.">XI</span>`
     : `<button class="sc-bell ${isWatched(g.id) ? "on" : ""}" data-bell="${g.id}" title="${isWatched(g.id) ? "Lineup alert on — click to stop" : "Alert me when the lineups are confirmed"}">🔔</button>`;
   return `<div class="sc-row ${g.status === 3 ? "is-live" : ""}" data-sid="${g.id}" title="${g.status === 3 ? "Open the live view" : g.status === 4 ? "Match report" : "Open in the builder"}">
     <div class="sc-state">${state}</div>

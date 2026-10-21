@@ -79,10 +79,6 @@
   // aims at a smaller number than the one the bet is settled on, and for matches
   // where no card line is published it is the ONLY number, so nothing corrects it.
   const RED_POINTS = 0.25;
-  // How far ahead of kick-off a "confirmed XI" from 365Scores is believable.
-  // Teams are announced about an hour before; three is generous cover for the
-  // European nights that go earlier. See lineupsConfirmed in scores().
-  const LINEUPS_MAX_EARLY = 3 * 3600e3;
   // sim.py
   const N_SIMS = 12000, SCAN_SIMS = 4000, PRIOR_MINUTES = 450, REST_SHARE = 0.05, XG_WEIGHT = 0.6;
   const START_PROB = { true: { Starting: 1.0, Substitute: 0.0 }, false: { Starting: 1.0, Substitute: 0.08 } };
@@ -3213,19 +3209,18 @@
       winner: g.winner || 0,
       // 365Scores' lineupsStatus: 1 = only absences known, 2 = probable XI, 3 = confirmed XI
       //
-      // ...except it sometimes says 3 on a match a day away. Measured 2026-10-20:
-      // Levante v Athletic Bilbao came back lineupsStatus 3 while statusText was
-      // "Scheduled", kick-off was 21 hours off and the row carried no lineups at
-      // all; a Thursday game was flagged 26 hours out. Rare — 1 of 15 and 1 of 46 —
-      // but it put "XI ✓" on the Scores page for a match nobody had picked a team
-      // for, which is the sort of thing you would act on.
+      // A time window was briefly added here on 2026-10-20 and removed the same
+      // hour. Levante v Athletic Bilbao reported status 3 twenty-one hours before
+      // kick-off, which looked impossible — but it was true: the match endpoint
+      // carried both XIs, "Confirmed", 4-3-3 and 4-2-3-1, and the builder had
+      // already made 128 player legs from the named starters. Some clubs really do
+      // announce the day before and 365Scores picks it up.
       //
-      // Real confirmed lineups land about an hour before kick-off, so anything
-      // claiming them more than LINEUPS_MAX_EARLY ahead is the feed being wrong.
-      // The window is deliberately generous: suppressing a true badge for an hour
-      // costs nothing, showing a false one costs trust in the page.
-      lineupsConfirmed: g.lineupsStatus === 3
-        && Date.parse(g.startTime) - Date.now() < LINEUPS_MAX_EARLY,
+      // Suppressing the badge would have left the Scores page silent while the
+      // match page said "Lineup confirmed" and offered legs for every starter —
+      // a worse contradiction than the one it was meant to fix. The allscores row
+      // does not carry lineups for ANY match, so their absence there says nothing.
+      lineupsConfirmed: g.lineupsStatus === 3,
     })).sort((a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""));
   }
   const REPORT_STATS = [["Expected Goals", "Expected goals (xG)"], ["Total Shots", "Shots"], ["Shots On Target", "Shots on target"],

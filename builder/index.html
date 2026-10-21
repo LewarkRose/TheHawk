@@ -725,6 +725,9 @@ img{max-width:100%}
 .sc-team.win{color:var(--accent)}
 .sc-score{text-align:center;font-weight:900;font-size:16px;letter-spacing:.04em}
 .sc-bet{display:flex;align-items:center;justify-content:flex-end;gap:6px}
+/* A settled ticket still marks its match, but quietly — it is a record, not money
+   on the table, and at full strength it read as a live bet. */
+.sc-bet-done{opacity:.4;filter:grayscale(1)}
 .sc-bell{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-size:14px;
   filter:grayscale(1);opacity:.55;transition:.12s}
 .sc-bell:hover{opacity:1;filter:none;border-color:var(--gold)}
@@ -2295,7 +2298,7 @@ a.nav{text-decoration:none}
      evening of tests that were checking stale code. -->
 <!-- Bump this whenever engine.js changes, or browsers keep the old one: the
      query string is the only thing telling them the file is not the same. -->
-<script src="engine.js?v=20261020a"></script>
+<script src="engine.js?v=20261019c"></script>
 <script src="hawk-settle.js?v=20261018c"></script>
 <script>
 // Phones: which page is showing goes on <body data-view>, so the league list
@@ -6602,7 +6605,17 @@ function scoreRow(g, mine, withLeague) {
       : soon(g.kickoff) ? `<span class="sc-soon">in ${kickIn(g.kickoff)}</span>`
       : `<span class="muted">${new Date(g.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>`) : `<span class="muted">${esc(g.statusText)}</span>`;
   const sc0 = g.score[0] == null ? "" : g.score[0], sc1 = g.score[1] == null ? "" : g.score[1];
-  const bet = mine[g.id] ? `<span title="You have a HAWK bet on this match (${esc(mine[g.id].toLowerCase())})">🎟</span>` : "";
+  // myBetGames() returns EVERY bet's match, settled or not, so this said "You have
+  // a HAWK bet on this match" about tickets that finished weeks ago — on 2026-10-21
+  // all 261 marked matches were settled and not one was running. Knowing you backed
+  // a finished match is still worth showing, so the badge stays and the tense is
+  // fixed instead: a live ticket keeps the bright 🎟, a settled one is dimmed and
+  // says what it did.
+  const betStatus = mine[g.id];
+  const bet = !betStatus ? ""
+    : betStatus === "PENDING"
+      ? `<span title="You have a bet running on this match">🎟</span>`
+      : `<span class="sc-bet-done" title="You bet on this match — ${esc(String(betStatus).toLowerCase().replace("_", " "))}">🎟</span>`;
   // Upcoming: a bell for a lineup alert, or "XI ✓" once both lineups are out.
   const alert = g.status === 3 ? (() => { const f = followState(g.id); return `<button class="sc-bell ${f.on ? "on" : ""}" data-follow="${g.id}" title="${f.bet ? "You have a bet on it — alerts on" : f.on ? "Goal alerts on — tap to stop" : "Goal and red-card alerts for this match"}">${f.on ? "🔔" : "🔕"}</button>`; })()
     : g.status !== 2 ? "" : g.lineupsConfirmed ? `<span class="sc-xi" title="Lineups confirmed">XI ✓</span>`

@@ -3209,17 +3209,27 @@
       winner: g.winner || 0,
       // 365Scores' lineupsStatus: 1 = only absences known, 2 = probable XI, 3 = confirmed XI
       //
-      // A time window was briefly added here on 2026-10-20 and removed the same
-      // hour. Levante v Athletic Bilbao reported status 3 twenty-one hours before
-      // kick-off, which looked impossible — but it was true: the match endpoint
-      // carried both XIs, "Confirmed", 4-3-3 and 4-2-3-1, and the builder had
-      // already made 128 player legs from the named starters. Some clubs really do
-      // announce the day before and 365Scores picks it up.
+      // A 3-hour window was added here on 2026-10-20, ran live for about 17 hours,
+      // and was removed on the 21st. The episode is worth the space because the
+      // feed's answer CHANGES and the obvious guard is the wrong one.
       //
-      // Suppressing the badge would have left the Scores page silent while the
-      // match page said "Lineup confirmed" and offered legs for every starter —
-      // a worse contradiction than the one it was meant to fix. The allscores row
-      // does not carry lineups for ANY match, so their absence there says nothing.
+      // Levante v Athletic Bilbao reported status 3 twenty-one hours out. The match
+      // endpoint backed it up — both XIs, "Confirmed", 4-3-3 and 4-2-3-1, eleven
+      // named starters each, and 128 player legs built from them — so the window was
+      // reverted as over-cautious. Then, 3.5 hours before kick-off, 365Scores
+      // downgraded the SAME eleven to "NotConfirmed". It had been a prediction
+      // wearing a confirmed label, and the feed corrected itself.
+      //
+      // So the flag is genuinely unreliable early — but a time window does not fix
+      // it: it would have hidden the badge yesterday and still passed anything the
+      // feed mislabels within three hours. The real signal is CORROBORATION, which
+      // the match page already has (ESPN cross-check at ~line 819, and the
+      // "predicted, not confirmed" warning on the player legs). This row cannot see
+      // ESPN without a per-match fetch, and the feed self-corrects as kick-off
+      // nears, so it passes the flag through unchanged.
+      //
+      // Note the allscores row never carries lineups for ANY match, so their
+      // absence here says nothing about whether a lineup exists.
       lineupsConfirmed: g.lineupsStatus === 3,
     })).sort((a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""));
   }

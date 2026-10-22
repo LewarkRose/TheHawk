@@ -79,10 +79,45 @@ const COMMON = new Set(["manchester", "real", "atletico", "athletic", "inter", "
   "lisboa", "lisbon", "istanbul", "moscow", "moskva", "zagreb", "beograd", "belgrade",
   "bucuresti", "bucharest", "wien", "vienna", "munchen", "munich", "berlin", "hamburg",
   "koln", "cologne", "torino", "turin", "sevilla", "seville", "athens", "athina",
-  "glasgow", "bruxelles", "brussels", "warszawa", "warsaw", "budapest", "sofia", "kyiv", "kiev"]);
+  "glasgow", "bruxelles", "brussels", "warszawa", "warsaw", "budapest", "sofia", "kyiv", "kiev",
+  // `al` and `el` are the ARTICLE on half the clubs in the Gulf leagues. Leaving it
+  // out made "Al Fateh v Al Shabab Riyadh" match SEVEN fixtures across four
+  // competitions, so the first live run cross-checked nothing at all. Only the
+  // article belongs here: put the club's own word in and "Al Shabab" would have
+  // nothing left to identify it by.
+  "al", "el"]);
 
 export const clubTokens = (name) =>
   new Set(strip(name).replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w && !NOISE.has(w)));
+
+// Two tokens are the same word when they are equal, or one edit apart and both at
+// least four letters — which is how the Saudi league's transliterations differ
+// between the feeds ("Al Hazm" / "Al Hazem"). Short tokens are excluded because at
+// three letters one edit is a different word.
+function nearEq(a, b) {
+  if (a === b) return true;
+  if (a.length < 4 || b.length < 4 || Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++edits > 1) return false;
+    if (a.length === b.length) { i++; j++; }
+    else if (a.length > b.length) i++;
+    else j++;
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
+// The words that actually identify this club: shared, and not one of the words half
+// the league has in common. "Al Fateh" and "Shabab Al-Ahli Dubai" share only `al`.
+export function distinctive(a, b) {
+  const ta = clubTokens(a), tb = clubTokens(b);
+  let k = 0;
+  for (const w of ta) {
+    if (COMMON.has(w)) continue;
+    for (const v of tb) if (!COMMON.has(v) && nearEq(w, v)) { k++; break; }
+  }
+  return k;
+}
 
 export function sameClub(a, b) {
   if (AGE.test(strip(a)) !== AGE.test(strip(b))) return false;
@@ -127,13 +162,24 @@ export async function findMatch(kickoffISO, home, away) {
     const d = await matchesOn(stamp(new Date(t + off * 86400e3)));
     for (const lg of (d && d.leagues) || []) {
       for (const m of lg.matches || []) {
-        if (sameClub(home, m.home && m.home.name) && sameClub(away, m.away && m.away.name)) {
-          if (!hits.some((x) => x.id === m.id)) hits.push({ id: m.id, league: lg.name });
+        const hn = m.home && m.home.name, an = m.away && m.away.name;
+        if (sameClub(home, hn) && sameClub(away, an)) {
+          if (!hits.some((x) => x.id === m.id)) {
+            hits.push({ id: m.id, league: lg.name, score: distinctive(home, hn) + distinctive(away, an) });
+          }
         }
       }
     }
   }
-  return hits.length === 1 ? hits[0] : null;
+  if (!hits.length) return null;
+  // Several fixtures can clear the name test on a day — the Gulf leagues field a
+  // dozen clubs whose names differ only after the article. Rank them by how many
+  // words actually identify the two clubs, and take the winner only if it wins
+  // OUTRIGHT. A tie is still a reason to skip: picking one would mean comparing
+  // two different matches' players and calling the difference a disagreement.
+  const best = Math.max(...hits.map((h) => h.score));
+  const top = hits.filter((h) => h.score === best);
+  return best >= 1 && top.length === 1 ? top[0] : null;
 }
 
 // FotMob's titles for the numbers HAWK settles on. Its `key` field is a mix of

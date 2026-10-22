@@ -2927,8 +2927,19 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
             if (isOpen && weekTab === 'last' && seen < lastMon) { try { localStorage.setItem('hawk_weekSeen', String(lastMon)); } catch (e) { /* private window */ } }
 
             const inWeek = (t) => t >= from && t < to;
-            const settled = bets.filter(b => b.status !== 'PENDING' && inWeek(settleTime(b)));
-            const placed = bets.filter(b => inWeek(+((/bet_(\d+)/.exec(b.id || '') || [])[1] || 0)));
+            // ONE RULE FOR WHICH WEEK A TICKET BELONGS TO, shared with the history
+            // rows and the week strip: the night it was PLAYED (betTime — the last
+            // kick-off, falling back to when it was placed).
+            //
+            // This block used to bucket by settleTime instead. Exactly one ticket in
+            // the log falls in different weeks under the two rules — Bahia v Flamengo,
+            // settled a week after it was played — and it is worth €6, which was
+            // enough to flip last week's sign between this report and the rows below
+            // it on the same page: −€2.14 here, +€3.86 there. Lewzu chose match day on
+            // 2026-10-22, because it is what the rows already used and how he talks
+            // about a night of football.
+            const settled = bets.filter(b => b.status !== 'PENDING' && inWeek(betTime(b)));
+            const placed = bets.filter(b => inWeek(betTime(b)));
             const pending = placed.filter(b => b.status === 'PENDING').length;
             const staked = settled.reduce((s, b) => s + b.stake, 0), back = settled.reduce((s, b) => s + betReturn(b), 0), pl = back - staked;
             // Cashed out is counted, not inferred. It used to be "whatever is left over

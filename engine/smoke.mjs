@@ -138,6 +138,31 @@ const check = (ok, what) => { if (!ok) failures.push(what); return ok; };
   }
 }
 
+// 0b. ONE RULE FOR WHICH DAY OR WEEK A TICKET BELONGS TO.
+// The Vault had two: the history rows bucketed by the night a ticket was played,
+// the Weekly Report by the day it settled. One ticket in the log differs — settled
+// a week after the match — and €6 was enough to flip a week from −€2.14 to +€3.86
+// between two blocks on the same page. Settled on match day, 2026-10-22.
+//
+// This is a source check rather than a behaviour one, because the Vault's page
+// script is not loaded here. Crude, and it still catches the regression: the day
+// someone reaches for settleTime inside renderWeekly again, the deploy stops.
+{
+  const src = await readFile(path.join(ROOT, "index.html"), "utf8");
+  const start = src.indexOf("function renderWeekly");
+  const body = start < 0 ? "" : src.slice(start, start + 4000);
+  check(start >= 0, "index.html: renderWeekly has gone — the week-attribution check cannot run");
+  if (start >= 0) {
+    check(!/inWeek\(\s*settleTime/.test(body),
+      "index.html: the Weekly Report is bucketing by settleTime again. The history rows and the "
+      + "week strip use betTime (the night it was played), and two rules for the same week put two "
+      + "different totals on one page.");
+    check(/inWeek\(\s*betTime/.test(body),
+      "index.html: the Weekly Report no longer buckets by betTime — it must share the rule the "
+      + "history rows and the week strip use.");
+  }
+}
+
 // 1. The data files the site needs are there and readable.
 for (const f of ["data/meta.json", "data/fixtures.json"]) {
   try { JSON.parse(await readFile(path.join(ROOT, f), "utf8")); } catch (e) { failures.push(`${f} missing or broken (${e.message})`); }

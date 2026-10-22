@@ -215,6 +215,61 @@ const fitStat = (league, stat, exp, act) => {
 // 365Scores writes a tackle count as "2/3 (66.7%)": won out of made. The lines settle
 // on made, so that is the denominator — the same reading hawk-settle.js uses.
 const tacklesMade = (v) => { const m = /^(\d+)\s*\/\s*(\d+)/.exec(String(v ?? "")); return m ? +m[2] : null; };
+// ---------- DOES THE LEARNING HELP? ----------
+// The app corrects a market's chances by what the graded record says (see
+// computeLearning in builder/index.html, which merges graded.json's byKey into a
+// log-odds shift). The record itself is graded RAW, deliberately, so byKey measures
+// the model and not model-plus-correction. The consequence nobody had noticed: the
+// corrections have been applied live for weeks and NOTHING has ever measured whether
+// they help. A market reading +2.4 on the board may be perfectly corrected in the
+// app, or over-corrected, and the board cannot tell you which.
+//
+// So grade every leg twice. Once at its raw chance, once at the chance the live app
+// would have shown — using the shift computed from the record AS IT STOOD BEFORE
+// this match, which is what was live at the time. Brier score decides: lower is
+// better, and the difference between the two is the value of the learning.
+//
+// Not identical to the app: computeLearning also folds in Lewzu's own settled bets,
+// which this cannot see. So this measures the graded half of the correction, which
+// is the overwhelming majority of it (314,131 legs of 314,131 on 2026-10-22).
+const AB_VERSION = 1;
+const LEARN_MIN = 30, LEARN_SHRINK = 60, LEARN_CAP = 0.6;
+const lgit = (p) => Math.log(p / (1 - p));
+const ilgit = (x) => 1 / (1 + Math.exp(-x));
+const newAB = () => ({ ver: AB_VERSION, n: 0, shifted: 0, rawBrier: 0, adjBrier: 0, byKey: {} });
+// The same formula computeLearning uses, read off the record in hand.
+function learnShifts() {
+  const out = {};
+  for (const [key, g] of Object.entries(T.byKey || {})) {
+    if (!g.n || g.n < LEARN_MIN) continue;
+    const said = g.p / g.n;
+    if (!(said > 0 && said < 1)) continue;
+    const got = Math.min(Math.max(g.won / g.n, 0.02), 0.98);
+    const s = Math.max(-LEARN_CAP, Math.min(LEARN_CAP, (g.n / (g.n + LEARN_SHRINK)) * (lgit(got) - lgit(said))));
+    if (Math.abs(s) >= 0.02) out[key] = s;
+  }
+  return out;
+}
+function abTally(shifts, leg, w) {
+  const p = leg.p;
+  if (!(p > 0 && p < 1)) return;
+  const A = (T.ab ||= newAB());
+  if ((A.ver || 1) !== AB_VERSION) Object.assign(A, newAB());
+  const key = (HAWK.learnKey && HAWK.learnKey(leg.id, leg.market)) || leg.market;
+  const sh = shifts[(HAWK.learnKey && HAWK.learnKey(leg.id, leg.market)) || ""];
+  const q = sh ? ilgit(lgit(p) + sh) : p;
+  const o = w ? 1 : 0;
+  A.n++; if (sh) A.shifted++;
+  A.rawBrier = +(A.rawBrier + (p - o) ** 2).toFixed(4);
+  A.adjBrier = +(A.adjBrier + (q - o) ** 2).toFixed(4);
+  const c = (A.byKey[key] ||= { n: 0, raw: 0, adj: 0, said: 0, adjSaid: 0, won: 0 });
+  c.n++; if (w) c.won++;
+  c.raw = +(c.raw + (p - o) ** 2).toFixed(4);
+  c.adj = +(c.adj + (q - o) ** 2).toFixed(4);
+  c.said = +(c.said + p).toFixed(4);
+  c.adjSaid = +(c.adjSaid + q).toFixed(4);
+}
+
 // ---------- THE SECOND SOURCE ----------
 // Every player leg HAWK settles rests on one feed. FotMob is read alongside it and
 // RECORDED — never applied. See engine/fotmob.mjs for why it cannot reach the app,
@@ -446,6 +501,10 @@ for (const [id, pr] of Object.entries(state.pending)) {
   // player's tackles. Collected here so the second source can be asked what it
   // would have done with them — see crossCheck.
   const unknownTackles = [];
+  // Taken BEFORE this match's legs are added to byKey, so the shift is the one the
+  // app would have been using when these legs were offered, not one that has already
+  // seen their outcome.
+  const shiftsNow = learnShifts();
   for (const leg of pr.legs) {
     const r = HawkSettle.legResult(leg, f);
     if (r !== "won" && r !== "lost") {
@@ -458,6 +517,7 @@ for (const [id, pr] of Object.entries(state.pending)) {
     if (r !== "won" && r !== "lost") continue;   // didn't play, or no data
     const w = r === "won";
     legOut.set(leg.id, w); legP.set(leg.id, leg.p);
+    abTally(shiftsNow, leg, w);
     n++; said += leg.p; if (w) won++;
     tally(T.byMarket[leg.market] ||= { n: 0, p: 0, won: 0 }, leg.p, w);
     // HAWK vs the closing line on this exact leg (see closingChance above).
@@ -699,6 +759,8 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   tickets: T.builders || null,
   // The second source's running report. Recorded, never applied — see crossCheck.
   sources: T.sources || null,
+  // Raw chances against corrected ones, by Brier score: does the learning help?
+  ab: T.ab || null,
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
 console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predicted} prediction(s)`);
@@ -713,6 +775,28 @@ console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predict
     // The one that settles whether `agree` is right: if HAWK's ticket chances are
     // too harsh, the gap widens as `agree` climbs.
     for (const b of B.byAgree) if (b.n) console.log(`[grade]   agree ${b.lo}-${b.hi}: ${b.n} tickets  ${pct(b)}${ret(b)}`);
+  }
+}
+{
+  const A = T.ab;
+  if (A && A.n) {
+    const raw = A.rawBrier / A.n, adj = A.adjBrier / A.n;
+    const better = raw - adj;
+    console.log(`[grade] LEARNING A/B: ${A.n} legs (${A.shifted} carried a correction) — `
+      + `Brier raw ${raw.toFixed(5)} vs corrected ${adj.toFixed(5)}  `
+      + `${better > 0 ? `the correction HELPS by ${(better * 1e4).toFixed(1)} per 10k`
+                      : `the correction HURTS by ${(-better * 1e4).toFixed(1)} per 10k`}`);
+    // Only the markets a correction actually touched, worst first: a market where
+    // the shift makes things worse is one that is being over-corrected live.
+    const rows = Object.entries(A.byKey)
+      .filter(([, c]) => c.n >= 200 && Math.abs(c.said - c.adjSaid) > 0.5)
+      .map(([k, c]) => [k, c, (c.raw - c.adj) / c.n])
+      .sort((a, b) => a[2] - b[2]);
+    for (const [k, c, d] of rows.slice(0, 6)) {
+      console.log(`[grade]   ${k.padEnd(32)} n=${String(c.n).padStart(6)}  `
+        + `said ${(100 * c.said / c.n).toFixed(1)}% -> ${(100 * c.adjSaid / c.n).toFixed(1)}%  `
+        + `landed ${(100 * c.won / c.n).toFixed(1)}%  Brier ${d > 0 ? "better" : "WORSE"} by ${(Math.abs(d) * 1e4).toFixed(1)} per 10k`);
+    }
   }
 }
 {

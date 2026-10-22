@@ -17,6 +17,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
+import * as FotMob from "./fotmob.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOCAL = process.env.HAWK_LOCAL || "http://127.0.0.1:8000";
@@ -214,6 +215,81 @@ const fitStat = (league, stat, exp, act) => {
 // 365Scores writes a tackle count as "2/3 (66.7%)": won out of made. The lines settle
 // on made, so that is the denominator — the same reading hawk-settle.js uses.
 const tacklesMade = (v) => { const m = /^(\d+)\s*\/\s*(\d+)/.exec(String(v ?? "")); return m ? +m[2] : null; };
+// ---------- THE SECOND SOURCE ----------
+// Every player leg HAWK settles rests on one feed. FotMob is read alongside it and
+// RECORDED — never applied. See engine/fotmob.mjs for why it cannot reach the app,
+// and for the day's measurement that says the two agree.
+//
+// Recorded rather than used on purpose. Folding FotMob into settlement would start
+// grading the tackles legs 365Scores is silent on, and those are not a random
+// sample — they are the players who made a tackle without winning one, so the
+// low-count end. Adding them shifts Player Tackles' byKey record, which the builder
+// applies as a correction. Measure what it would do first, then decide.
+const SOURCE_VERSION = 1;
+const SRC_FIELDS = ["shots", "sot", "tackles", "fouled", "fouls", "offsides", "saves", "minutes"];
+const newSources = () => ({
+  ver: SOURCE_VERSION, matches: 0, resolved: 0, ambiguous: 0, players: 0, unmatched: 0,
+  // per field: compared both ways, how often they differ, total absolute gap, and
+  // how often one side has a number the other simply does not publish.
+  fields: Object.fromEntries(SRC_FIELDS.map((k) => [k, { n: 0, differ: 0, gap: 0, only365: 0, onlyFM: 0, silentNonZero: 0 }])),
+  // tackles legs HAWK could not grade, and what FotMob would have done with them.
+  rescue: { ungraded: 0, settleable: 0, wouldWin: 0 },
+});
+// 365Scores' own names for the same numbers, and how to read each one. A tackle is
+// written "2/3 (66.7%)" — won out of MADE — and the lines settle on made, so the
+// denominator is the only number worth comparing. Reading the numerator makes FotMob
+// look uniformly higher; that is a bug in the reader, not a disagreement.
+const S365_FIELD = {
+  shots: "Total Shots", sot: "Shots On Target", tackles: "Tackles Won", fouled: "Was Fouled",
+  fouls: "Fouls Made", offsides: "Offsides", saves: "Goalkeeper Saves", minutes: "Minutes",
+};
+const readS365 = (key, raw) => {
+  if (raw == null || raw === "") return null;
+  if (key === "tackles") return tacklesMade(raw);
+  const m = /^\s*(\d+(?:\.\d+)?)/.exec(String(raw));
+  return m ? +m[1] : null;
+};
+async function crossCheck(pr, f, unknownTackles) {
+  const S = (T.sources ||= newSources());
+  if ((S.ver || 1) !== SOURCE_VERSION) Object.assign(S, newSources());
+  S.matches++;
+  let hit = null, fm = null;
+  try {
+    hit = await FotMob.findMatch(pr.kickoff, pr.home, pr.away);
+    if (hit) fm = await FotMob.playerStats(hit.id);
+  } catch { /* a FotMob outage must never stop a match grading */ }
+  if (!fm) { if (!hit) S.ambiguous++; return; }
+  S.resolved++;
+  for (const side of ["home", "away"]) {
+    const index = FotMob.byLastName(fm[side]);
+    for (const p of (f.players || {})[side] || []) {
+      if (!(p.minutes > 0)) continue;
+      const q = index.get(FotMob.lastName(p.name));
+      if (!q) { S.unmatched++; continue; }
+      S.players++;
+      for (const key of SRC_FIELDS) {
+        const a = readS365(key, (p.stats || {})[S365_FIELD[key]]);
+        const b = q.stats[key];
+        const c = S.fields[key];
+        if (a == null && b == null) continue;
+        if (a == null) { c.onlyFM++; if (b > 0) c.silentNonZero++; continue; }
+        if (b == null) { c.only365++; continue; }
+        c.n++;
+        if (Math.abs(a - b) > 1e-9) { c.differ++; c.gap = +(c.gap + Math.abs(a - b)).toFixed(3); }
+      }
+    }
+    // What the second source would have rescued. A leg HAWK left ungraded because
+    // 365Scores never named the player's tackles is one FotMob usually can settle.
+    for (const leg of unknownTackles) {
+      if (leg.side !== side) continue;
+      S.rescue.ungraded++;
+      const q = index.get(FotMob.lastName(leg.player));
+      if (!q || q.stats.tackles == null) continue;
+      S.rescue.settleable++;
+      if (q.stats.tackles >= leg.need) S.rescue.wouldWin++;
+    }
+  }
+}
 const pairSum = (p) => (Array.isArray(p) && p[0] != null && p[1] != null ? p[0] + p[1] : null);
 const r3 = (v) => (typeof v === "number" && Number.isFinite(v) ? +v.toFixed(3) : null);
 // Every league-and-market cell is kept in state.json so it keeps accumulating, but a
@@ -366,8 +442,19 @@ for (const [id, pr] of Object.entries(state.pending)) {
   // rather than re-settling its legs. A leg that returned "unknown" is simply
   // absent, which is what makes a ticket containing it countable as skipped.
   const legOut = new Map(), legP = new Map();
+  // Tackles legs that could not be graded because 365Scores never named the
+  // player's tackles. Collected here so the second source can be asked what it
+  // would have done with them — see crossCheck.
+  const unknownTackles = [];
   for (const leg of pr.legs) {
     const r = HawkSettle.legResult(leg, f);
+    if (r !== "won" && r !== "lost") {
+      const t = /^p:(home|away):\d+:tackles(\d*)$/.exec(leg.id || "");
+      if (t && r === "unknown") {
+        unknownTackles.push({ side: t[1], need: +t[2] || 1,
+          player: leg.player || String(leg.label || "").split(/:| to /)[0] });
+      }
+    }
     if (r !== "won" && r !== "lost") continue;   // didn't play, or no data
     const w = r === "won";
     legOut.set(leg.id, w); legP.set(leg.id, leg.p);
@@ -522,6 +609,13 @@ for (const [id, pr] of Object.entries(state.pending)) {
   T.recent.unshift({ id, league: pr.league, home: pr.home, away: pr.away, kickoff: pr.kickoff, score: f.ft.join("-"),
                      n, said: +(said / n).toFixed(3), got: +(won / n).toFixed(3), upset });
   T.recent = T.recent.slice(0, KEEP_RECENT);
+  // Last, and in its own try/catch: the second source is a reader, and nothing it
+  // does may cost a match its grade. Only for matches with player legs — a match
+  // with none has nothing to cross-check and the fetch would be wasted.
+  if ((f.players || {}).home) {
+    try { await crossCheck(pr, f, unknownTackles); }
+    catch (e) { console.log(`[grade] cross-check skipped for ${id}: ${e.message}`); }
+  }
 }
 
 // 2. Save HAWK's chances for matches kicking off soon (the latest run before
@@ -603,6 +697,8 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   // 1b: the tickets themselves, graded. `byAgree` is the block that says whether
   // the correlation factor is right; `matches` is the honest sample size.
   tickets: T.builders || null,
+  // The second source's running report. Recorded, never applied — see crossCheck.
+  sources: T.sources || null,
 }));
 console.log(`graded ${graded} matches, saved predictions for ${predicted}; totals: ${T.matches} matches, ${T.legs} legs, ${Object.keys(state.pending).length} waiting`);
 console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predicted} prediction(s)`);
@@ -617,6 +713,26 @@ console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predict
     // The one that settles whether `agree` is right: if HAWK's ticket chances are
     // too harsh, the gap widens as `agree` climbs.
     for (const b of B.byAgree) if (b.n) console.log(`[grade]   agree ${b.lo}-${b.hi}: ${b.n} tickets  ${pct(b)}${ret(b)}`);
+  }
+}
+{
+  const S = T.sources;
+  if (S && S.matches) {
+    console.log(`[grade] SECOND SOURCE (FotMob): ${S.resolved}/${S.matches} matches resolved, `
+      + `${S.players} players compared, ${S.unmatched} unmatched`);
+    for (const k of SRC_FIELDS) {
+      const c = S.fields[k];
+      if (!c || (!c.n && !c.onlyFM && !c.only365)) continue;
+      console.log(`[grade]   ${k.padEnd(9)} ${String(c.n).padStart(6)} compared`
+        + (c.n ? `, ${(100 * c.differ / c.n).toFixed(1)}% differ` : "")
+        + `, 365-only ${c.only365}, fotmob-only ${c.onlyFM}`
+        + (c.silentNonZero ? ` (${c.silentNonZero} where 365Scores is silent and FotMob is NOT zero)` : ""));
+    }
+    const r = S.rescue;
+    if (r.ungraded) {
+      console.log(`[grade]   tackles legs HAWK left ungraded: ${r.ungraded}; FotMob could settle `
+        + `${r.settleable} of them, ${r.wouldWin} as winners. Recorded only — settlement unchanged.`);
+    }
     for (const [k, c] of Object.entries(B.byOpen)) if (c.n) console.log(`[grade]   opened ${k}: ${c.n} tickets  ${pct(c)}${ret(c)}`);
     console.log(`[grade]   the smallest-leg clamp bound on ${B.clamped} of ${B.n}`);
   } else {

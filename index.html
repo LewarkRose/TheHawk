@@ -349,6 +349,30 @@
         .wk .bar { height: 4px; border-radius: 2px; background: #1b2433; margin-top: 8px;
                    overflow: hidden; display: flex; }
         .wk .bar i { display: block; height: 100%; }
+        /* BY COMPETITION. Folded shut by default: it is a thing to go and look at,
+           not something to meet every time you open the Vault. */
+        .cblk { border: 1px solid var(--v-line, #27272a); border-radius: 14px; background: #0b0e16;
+                overflow: hidden; margin: 2px 0 10px; }
+        .cblk > summary { list-style: none; cursor: pointer; display: flex; align-items: center;
+                          gap: 10px; padding: 10px 14px; font-size: 12px; }
+        .cblk > summary::-webkit-details-marker { display: none; }
+        .cblk > summary::before { content: "▸"; color: #e8e0cf; transition: transform .15s; display: inline-block; }
+        .cblk[open] > summary::before { transform: rotate(90deg); }
+        .cblk > summary b { color: #fff; }
+        .cblk-body { padding: 0 12px 12px; }
+        /* The ones with too few tickets to read get a compact row, not a tile — a
+           number printed the same size as a real one gets believed like a real one,
+           and 13 tickets of Ligue 1 at −78% is not a finding. */
+        .crow { display: grid; grid-template-columns: minmax(0,1fr) 44px 86px 64px; gap: 10px;
+                align-items: center; padding: 6px 10px; border: 1px solid var(--v-line, #27272a);
+                border-radius: 9px; background: #0f1417; font-size: 12px; }
+        .crows { display: flex; flex-direction: column; gap: 4px; opacity: .6; }
+        .crow .cn { text-align: right; color: var(--muted, #8d97ab); font-variant-numeric: tabular-nums; }
+        .crow .cp { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .crow .cl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #e4e4e7; }
+        .crow .cbar { height: 5px; border-radius: 2px; background: #1b2433; overflow: hidden; display: flex; }
+        .crow .cbar i { display: block; height: 100%; }
+        .cnote { font-size: 10.5px; color: #71717a; margin: 10px 2px 0; line-height: 1.55; }
 
         /* ---------- THE LEDGER ----------
            The same four ruled columns the builder's 📋 Board prints, carried over so a
@@ -2385,6 +2409,80 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
                  <div class="wstrip">${tiles}</div>`);
         }
 
+        // BY COMPETITION — and the hard part is restraint, not arithmetic.
+        //
+        // Measured 2026-10-22 across 373 tickets: Conference League +73% ROI, Ligue 1
+        // −78%, Premier League −50%. All three are THIRTEEN TO THIRTY-ONE TICKETS.
+        // With 18 competitions on screen, one or two will look brilliant and one or
+        // two terrible however well you are betting — the strongest row, Nations
+        // League at z +2.63, stops being significant the moment you remember there
+        // were eighteen to pick from.
+        //
+        // So the design does the work the numbers can't: a competition earns a TILE
+        // only once it has enough tickets to be read, and everything else gets a
+        // faded row with no gap printed at all. A −78% set in the same type as a real
+        // figure gets believed like one, and would have you dropping a league on a
+        // fortnight of luck.
+        const COMP_ENOUGH = 25;
+        // A ticket's chance is the product across its legs, and only when every leg
+        // has one — the same rule the rest of this file uses, so the figures here
+        // match the ones on the tickets themselves.
+        function ticketChance(b) {
+            const legs = b.legs || [];
+            if (!legs.length) return null;
+            let p = 1;
+            for (const l of legs) {
+                const q = l.hawk && l.hawk.p;
+                if (!(q > 0)) return null;
+                p *= q;
+            }
+            return p;
+        }
+        function renderCompetitions(container, settled) {
+            const by = new Map();
+            for (const b of settled) {
+                const names = [...new Set((b.legs || []).map(l => (l.hawk && l.hawk.league) || l.league).filter(Boolean))];
+                if (!names.length) continue;
+                const key = names.length === 1 ? names[0] : 'Accas (several)';
+                if (!by.has(key)) by.set(key, { key, n: 0, won: 0, said: 0, scored: 0, pl: 0, staked: 0 });
+                const c = by.get(key), p = ticketChance(b);
+                c.n++; c.pl += betProfit(b); c.staked += (+b.stake || 0);
+                if (b.status === 'WON') c.won++;
+                if (p != null) { c.said += p; c.scored++; }
+            }
+            if (by.size < 2) return;
+            const all = [...by.values()].sort((a, b) => (b.staked ? b.pl / b.staked : 0) - (a.staked ? a.pl / a.staked : 0));
+            const big = all.filter(c => c.n >= COMP_ENOUGH), small = all.filter(c => c.n < COMP_ENOUGH);
+            const money = (v) => `<b class="${v > 0 ? 'text-emerald-400' : v < 0 ? 'text-red-400' : 'text-zinc-400'}">${v > 0 ? '+' : v < 0 ? '−' : ''}€${Math.abs(v).toFixed(2)}</b>`;
+            const bar = (c) => `<span class="cbar"><i style="flex:${c.won};background:var(--up)"></i><i style="flex:${c.n - c.won};background:var(--red)"></i></span>`;
+            const tile = (c) => {
+                const roi = c.staked ? 100 * c.pl / c.staked : 0;
+                const gap = c.scored ? 100 * (c.won / c.n - c.said / c.scored) : null;
+                return `<div class="wk" title="${escHtml(c.key)} — ${c.n} settled, ${c.won} won, €${c.staked.toFixed(2)} staked${
+                    gap == null ? '' : `, HAWK said ${(100 * c.said / c.scored).toFixed(1)}% and ${(100 * c.won / c.n).toFixed(1)}% landed`}">
+                    <div class="k">${escHtml(c.key)}</div>
+                    <div class="v ${c.pl > 0 ? 'text-emerald-400' : c.pl < 0 ? 'text-red-400' : ''}">${c.pl >= 0 ? '+' : '−'}€${Math.abs(c.pl).toFixed(2)}</div>
+                    <div class="n">${c.n} tickets · ${roi >= 0 ? '+' : '−'}${Math.abs(roi).toFixed(0)}%${
+                        gap == null ? '' : ` · ${gap >= 0 ? '+' : '−'}${Math.abs(gap).toFixed(1)} vs said`}</div>
+                    <div class="bar"><i style="flex:${c.won};background:var(--up)"></i><i style="flex:${c.n - c.won};background:var(--red)"></i></div>
+                </div>`;
+            };
+            const row = (c) => `<div class="crow" title="${escHtml(c.key)} — ${c.n} settled, too few to read a direction from">
+                <span class="cl">${escHtml(c.key)}</span><span class="cn">${c.n}</span>
+                <span class="cp">${money(c.pl)}</span>${bar(c)}</div>`;
+            container.insertAdjacentHTML('beforeend', `
+                <details class="cblk"><summary><b>By competition</b>
+                    <span class="text-zinc-500">${big.length} with ${COMP_ENOUGH}+ tickets · ${small.length} still too few</span></summary>
+                  <div class="cblk-body">
+                    ${big.length ? `<div class="wstrip">${big.map(tile).join('')}</div>` : `<div class="cnote">Nothing has ${COMP_ENOUGH} settled tickets yet.</div>`}
+                    ${small.length ? `<div class="vsec" style="margin-top:14px">Not enough yet</div>
+                      <div class="crows">${small.map(row).join('')}</div>` : ''}
+                    <p class="cnote">A competition gets a tile at ${COMP_ENOUGH} settled tickets. Below that only the money is shown,
+                      because with ${all.length} competitions here one or two will look brilliant and one or two terrible
+                      however well you are betting — and thirteen tickets is a fortnight, not a verdict.</p>
+                  </div></details>`);
+        }
+
         function renderHistory() {
             // Self-heal tickets missing a valid, unique id — this is what silently breaks the
             // Edit/Delete/Reuse buttons (they look up the ticket by id; if it's missing, the
@@ -2545,7 +2643,11 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
             const money = (v) => `<b class="${v > 0 ? 'text-emerald-400' : v < 0 ? 'text-red-400' : 'text-zinc-400'}">${v > 0 ? '+' : v < 0 ? '−' : ''}€${Math.abs(v).toFixed(2)}</b>`;
             // The week strip. Only under "All" — under a status filter it would read
             // "100% hit" on Won and "0%" on Lost, which is the filter talking, not a week.
-            if (currentFilter === 'ALL') renderWeekStrip(container, filtered.filter(b => b.status !== 'PENDING'));
+            if (currentFilter === 'ALL') {
+                const done = filtered.filter(b => b.status !== 'PENDING');
+                renderWeekStrip(container, done);
+                renderCompetitions(container, done);
+            }
             if (days.size && pendingN) container.insertAdjacentHTML('beforeend', `<div class="vsec">Settled</div>`);
             [...days.values()].sort((a, b) => b.t - a.t).forEach(g => {
                 const won = g.list.filter(x => x.bet.status === 'WON').length, co = g.list.filter(x => x.bet.status === 'CASHED_OUT').length;

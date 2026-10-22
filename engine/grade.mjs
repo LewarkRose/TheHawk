@@ -289,8 +289,16 @@ const newSources = () => ({
   // per field: compared both ways, how often they differ, total absolute gap, and
   // how often one side has a number the other simply does not publish.
   fields: Object.fromEntries(SRC_FIELDS.map((k) => [k, { n: 0, differ: 0, gap: 0, only365: 0, onlyFM: 0, silentNonZero: 0 }])),
-  // tackles legs HAWK could not grade, and what FotMob would have done with them.
-  rescue: { ungraded: 0, settleable: 0, wouldWin: 0 },
+  // Tackles legs HAWK could not grade, and what FotMob would have done with them.
+  //
+  // `said` is the number that decides whether this matters. The first live run found
+  // 228 settleable legs of which only 30 would have won — a 13% strike against the
+  // 57.7% Player Tackles shows on the board. If HAWK's chance on those legs was also
+  // low, they are cheap legs it priced correctly and nothing is wrong. If it was
+  // high, then the biggest market on the board is being flattered by quietly
+  // dropping its losers, and that is a calibration problem hiding inside a coverage
+  // one. Counting them without their chances could not tell the two apart.
+  rescue: { ungraded: 0, settleable: 0, wouldWin: 0, said: 0, saidWon: 0 },
 });
 // 365Scores' own names for the same numbers, and how to read each one. A tackle is
 // written "2/3 (66.7%)" — won out of MADE — and the lines settle on made, so the
@@ -343,7 +351,12 @@ async function crossCheck(pr, f, unknownTackles) {
       const q = index.get(FotMob.lastName(leg.player));
       if (!q || q.stats.tackles == null) continue;
       S.rescue.settleable++;
-      if (q.stats.tackles >= leg.need) S.rescue.wouldWin++;
+      const won = q.stats.tackles >= leg.need;
+      if (won) S.rescue.wouldWin++;
+      if (leg.p > 0 && leg.p < 1) {
+        S.rescue.said = +(S.rescue.said + leg.p).toFixed(3);
+        if (won) S.rescue.saidWon = +(S.rescue.saidWon + leg.p).toFixed(3);
+      }
     }
   }
 }
@@ -523,7 +536,7 @@ for (const [id, pr] of Object.entries(state.pending)) {
     if (r !== "won" && r !== "lost") {
       const t = /^p:(home|away):\d+:tackles(\d*)$/.exec(leg.id || "");
       if (t && r === "unknown") {
-        unknownTackles.push({ side: t[1], need: +t[2] || 1,
+        unknownTackles.push({ side: t[1], need: +t[2] || 1, p: leg.p,
           player: leg.player || String(leg.label || "").split(/:| to /)[0] });
       }
     }
@@ -827,8 +840,15 @@ console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predict
     }
     const r = S.rescue;
     if (r.ungraded) {
+      const said = r.settleable ? 100 * r.said / r.settleable : 0;
+      const got = r.settleable ? 100 * r.wouldWin / r.settleable : 0;
       console.log(`[grade]   tackles legs HAWK left ungraded: ${r.ungraded}; FotMob could settle `
-        + `${r.settleable} of them, ${r.wouldWin} as winners. Recorded only — settlement unchanged.`);
+        + `${r.settleable} of them — HAWK said ${said.toFixed(1)}%, ${got.toFixed(1)}% would have won `
+        + `(gap ${(got - said >= 0 ? "+" : "")}${(got - said).toFixed(1)}). Recorded only — settlement unchanged.`);
+      if (r.settleable >= 200 && said - got > 10) {
+        console.log(`[grade]   ^ these are legs the board never sees, and they lose far more often than `
+          + `HAWK said. Player Tackles' record is measured without them.`);
+      }
     }
     for (const [k, c] of Object.entries(B.byOpen)) if (c.n) console.log(`[grade]   opened ${k}: ${c.n} tickets  ${pct(c)}${ret(c)}`);
     console.log(`[grade]   the smallest-leg clamp bound on ${B.clamped} of ${B.n}`);

@@ -2568,10 +2568,14 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
                     const row = document.createElement('details');
                     row.className = 'vbet';
                     const icon = bet.status === 'WON' ? '✅' : bet.status === 'CASHED_OUT' ? '💰' : '❌';
-                    // Each match once. A bet builder is several legs on ONE game,
-                    // so joining every leg's fixture printed the same tie three
-                    // or four times across the row.
-                    row.innerHTML = `<summary><span>${icon}</span><span class="fx">${escHtml([...new Set(bet.legs.map(l => l.fixture).filter(Boolean))].join(' · '))}</span>
+                    // Each match once. A bet builder is several legs on ONE game, so
+                    // joining every leg's fixture printed the same tie three or four
+                    // times. An acca is the opposite problem — nine DIFFERENT matches
+                    // joined into a line that ellipsises after the first one and a half,
+                    // so it reads as a bet on that first match. Say what it is instead.
+                    const fxs = [...new Set(bet.legs.map(l => l.fixture).filter(Boolean))];
+                    const title = fxs.length > 1 ? `${fxs.length}-match acca` : escHtml(fxs.join(' · '));
+                    row.innerHTML = `<summary><span>${icon}</span><span class="fx">${title}</span>
                         <span class="text-zinc-500">@ ${bet.odds.toFixed(2)}</span>${money(betProfit(bet))}</summary>`;
                     row.appendChild(card);
                     body.appendChild(row);

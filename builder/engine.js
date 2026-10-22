@@ -2314,18 +2314,52 @@
     // the same cards line as alternatives. Loosen the rule, don't drop it, and
     // only take a near-copy once nothing better is left.
     const shared = (t, c) => t.legs.filter((l) => c.legs.some((x) => x.id === l.id)).length;
+    // TWO OPTIONS MUST NOT ARGUE WITH EACH OTHER.
+    //
+    // The diversity rule above counts legs with the same ID, so "Over 2.5 Goals" and
+    // "Under 3.5 Goals" read as pleasingly different and both get offered — one
+    // ticket betting on three or more, the next on three or fewer, in the same list.
+    // Lewzu reported exactly that on 2026-10-22, and the note above about "opposite
+    // sides of the same cards line" shows it was seen before and not actually fixed.
+    //
+    // Opposite sides are not always a contradiction: Over 2.5 and Under 4.5 both say
+    // "three or four goals" and sit together happily. What matters is how much room
+    // is left between the lines. Over Lo and Under Lu leave (Lu − Lo) whole numbers
+    // where both land, so one or fewer means the pair is effectively a single
+    // outcome, or impossible.
+    const OU = /^((?:t?goals|t?corners|t?cards|sot|offs|h[12]goals)(?::(?:home|away))?):([ou])([\d.]+)$/;
+    const lines = (t) => {
+      const out = [];
+      for (const l of t.legs) { const m = OU.exec(l.id || ""); if (m) out.push([m[1], m[2], +m[3]]); }
+      return out;
+    };
+    const argues = (t, c) => {
+      for (const [q, side, line] of lines(t)) {
+        for (const [q2, side2, line2] of lines(c)) {
+          if (q !== q2 || side === side2) continue;
+          const over = side === "o" ? line : line2, under = side === "o" ? line2 : line;
+          if (under - over <= 1) return true;
+        }
+      }
+      return false;
+    };
     const chosen = [];
-    const sweep = (limit) => {
+    const sweep = (limit, allowArguing = false) => {
       for (const t of pool) {
         if (chosen.length >= count) break;
         if (chosen.includes(t)) continue;
         if (limit != null && chosen.some((c) => shared(t, c) >= limit)) continue;
+        if (!allowArguing && chosen.some((c) => argues(t, c))) continue;
         chosen.push(t);
       }
     };
     sweep(Math.max(2, (pool[0].legs.length || 2) - 1));   // differ by two or more legs
     sweep(Math.max(2, (pool[0].legs.length || 2) - 1) + 1);   // differ by at least one
     sweep(null);                                           // rather than return fewer than asked
+    // Returning four options that agree with each other beats six that don't, so the
+    // no-arguing rule outlives the diversity one. It is dropped only to avoid handing
+    // back an empty list, which would be worse than an awkward pair.
+    if (!chosen.length) sweep(null, true);
     return chosen.map((t) => ({ ...t, worth: +worthOf(t).toFixed(3) }));
   }
   // 🎯 Auto: no target odds to pick. HAWK tries a few targets (about 2, 2.75 and

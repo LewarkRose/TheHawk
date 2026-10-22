@@ -606,6 +606,23 @@ img{max-width:100%}
 .sc-band i{flex:1;height:0;border-top:1px solid rgba(232, 224, 207,.22)}
 .sc-band b{flex:none;font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
 .sc-band + .sc-league{margin-top:10px}
+/* A WAVE: one kick-off time shared by a crowd of matches. On a European night 18
+   games start on the same minute, so "in 32 min" printed 18 times said nothing
+   and the competition — the thing that actually differs — was squeezed into a
+   92px column and cut off mid-word. The time is stated once up here instead, the
+   competition becomes a heading, and the row gets its clock column back as space.
+   Gold, not the band's accent: in this app gold is always about imminence
+   (.sc-soon), and a wave rule is a kick-off time, not a section. */
+.sc-wave{display:flex;align-items:center;gap:10px;margin:16px 0 2px}
+.sc-wave:first-child{margin-top:0}
+.sc-wave span{flex:none;font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.18em;color:var(--gold)}
+.sc-wave i{flex:1;height:0;border-top:1px solid rgba(232, 224, 207,.18)}
+.sc-wave b{flex:none;font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.sc-wave + .sc-league{margin-top:9px}
+/* How many matches under this competition — worth saying when a heading carries
+   nine of them, which only happens inside a wave. */
+.sc-league .sc-n{font-size:10px;font-weight:700;color:var(--faint);letter-spacing:.08em}
 /* The competition, on a row that isn't under a league heading. One line: the score
    column is narrow, and "Argentina Primera" wrapping made those rows half again as
    tall as the ones around them. */
@@ -650,6 +667,9 @@ img{max-width:100%}
 .sc-upset.miss{color:var(--faint);font-weight:600}
 .sc-row{display:grid;grid-template-columns:58px 1fr 92px 1fr 64px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;
   border:1px solid transparent;transition:.12s}
+/* Inside a wave the kick-off is in the heading above, so the column goes rather
+   than repeating the same four digits all the way down. */
+.sc-row.no-time{grid-template-columns:1fr 92px 1fr 64px}
 .sc-row:hover{background:var(--panel2);border-color:var(--line)}
 .sc-row.is-live{background:rgba(255,93,115,.05)}
 .sc-state{font-size:12px;font-weight:700}
@@ -755,6 +775,7 @@ img{max-width:100%}
 /* Phones: the two teams stack (home over away), the score and HAWK's line beside them, the bell and 🎟 in their own column. */
 @media (max-width:560px){
   .sc-row{grid-template-columns:46px minmax(0,1fr) auto auto;grid-template-areas:"st home sc bet" "st away sc bet";gap:3px 8px;font-size:13.5px;padding:8px 6px}
+  .sc-row.no-time{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"home sc bet" "away sc bet"}
   .sc-state{grid-area:st;font-size:11px;line-height:1.25}.sc-soon{white-space:normal}
   .sc-team{grid-area:home;gap:6px}.sc-team.away{grid-area:away;flex-direction:row-reverse;justify-content:flex-end;text-align:left}
   .sc-team img{width:16px;height:16px}
@@ -6632,14 +6653,46 @@ function renderScoreList() {
   // league like the rest. When something starts in eight minutes it belongs at the
   // top whatever competition it is in; grouping by league buried it under a match
   // five hours away in whichever league sorts higher.
-  const byTime = (list) => [...list].sort((a, b) => String(a.kickoff || "").localeCompare(String(b.kickoff || "")))
-    .map(g => scoreRow(g, mine, true)).join("");
-  const byLeague = (list) => {
+  const byLeague = (list, noClock) => {
     const groups = {};
     for (const g of list) (groups[g.league] ||= []).push(g);
     return Object.entries(groups).sort((a, b) => order(a[0]) - order(b[0])).map(([lg, glist]) => `
-      <div class="sc-league">${leagueLogo(lg)}${esc(lg)}<button class="sc-tbl" data-table="${esc(lg)}" title="The ${esc(lg)} table, live while games are on">📊 Table</button></div>
-      ${glist.map(g => scoreRow(g, mine, false)).join("")}`).join("");
+      <div class="sc-league">${leagueLogo(lg)}${esc(lg)}${
+        // Only inside a wave: there the heading can carry nine matches and the
+        // count earns its place. Everywhere else the headings have never had one
+        // and a sweep of numbers up the page is not what was asked for.
+        noClock && glist.length > 1 ? `<span class="sc-n">${glist.length}</span>` : ""
+      }<button class="sc-tbl" data-table="${esc(lg)}" title="The ${esc(lg)} table, live while games are on">📊 Table</button></div>
+      ${glist.map(g => scoreRow(g, mine, false, noClock)).join("")}`).join("");
+  };
+  // A WAVE is a crowd of matches sharing one kick-off time. A European night puts
+  // 36 of them on this page at two or three times, and the band printed "in 32 min"
+  // on every row while the competition — the only thing that differed — was cut off
+  // mid-word in a 92px column. Four is the floor: below it a heading costs more
+  // rows than it saves.
+  //
+  // Matches already PAST their kick-off that 365Scores hasn't started yet never join
+  // a wave. They are the most imminent thing on the page, their state cell says
+  // "Kick-off" rather than a time, and they belong at the top on their own — which is
+  // the whole reason this band is in kick-off order rather than grouped by league.
+  const WAVE_MIN = 4;
+  const koLabel = (g) => new Date(g.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  const byTime = (list) => {
+    const dues = list.filter(due), rest = [...list].filter(g => !due(g))
+      .sort((a, b) => String(a.kickoff || "").localeCompare(String(b.kickoff || "")));
+    // Runs of equal kick-off, in time order.
+    const runs = [];
+    for (const g of rest) {
+      const k = String(g.kickoff || "");
+      const last = runs[runs.length - 1];
+      if (last && last.k === k) last.list.push(g); else runs.push({ k, list: [g] });
+    }
+    return dues.sort((a, b) => String(a.kickoff || "").localeCompare(String(b.kickoff || "")))
+        .map(g => scoreRow(g, mine, true)).join("")
+      + runs.map(r => r.list.length >= WAVE_MIN
+        ? `<div class="sc-wave"><span>${esc(koLabel(r.list[0]))}</span><i></i><b>${r.list.length} kicking off together</b></div>`
+          + byLeague(r.list, true)
+        : r.list.map(g => scoreRow(g, mine, true)).join("")).join("");
   };
   el.innerHTML = htStrip(sc.data) + (live ? `<div class="note" style="margin:0 0 10px"><span class="dot-live"></span>${live} live — updating every 15 seconds</div>` : "") +
     bands.map(([k, title, list]) => (sc.status === "All" && bands.length > 1
@@ -6648,7 +6701,7 @@ function renderScoreList() {
 }
 // One row in the Scores list. `withLeague` puts the competition on the row itself,
 // for the bands that are not grouped under a league heading.
-function scoreRow(g, mine, withLeague) {
+function scoreRow(g, mine, withLeague, noClock) {
   const state = g.status === 3 ? `<span class="sc-live">${esc(g.clock || "LIVE")}</span>`
     : g.status === 4 ? `<span class="muted">${/postpon|cancel|abandon/i.test(g.statusText) ? esc(g.statusText) : "FT"}</span>`
     : g.status === 2 ? (due(g) ? `<span class="sc-soon" title="Past kick-off time — the score shows as soon as 365Scores has the game started">Kick-off</span>`
@@ -6673,8 +6726,8 @@ function scoreRow(g, mine, withLeague) {
     // page there says whether anything corroborates it.
     : g.status !== 2 ? "" : g.lineupsConfirmed ? `<span class="sc-xi" title="365Scores has a lineup for this match — open it to see whether ESPN agrees. An XI marked confirmed well before kick-off has been wrong before.">XI</span>`
     : `<button class="sc-bell ${isWatched(g.id) ? "on" : ""}" data-bell="${g.id}" title="${isWatched(g.id) ? "Lineup alert on — click to stop" : "Alert me when the lineups are confirmed"}">🔔</button>`;
-  return `<div class="sc-row ${g.status === 3 ? "is-live" : ""}" data-sid="${g.id}" title="${g.status === 3 ? "Open the live view" : g.status === 4 ? "Match report" : "Open in the builder"}">
-    <div class="sc-state">${state}</div>
+  return `<div class="sc-row ${g.status === 3 ? "is-live" : ""} ${noClock ? "no-time" : ""}" data-sid="${g.id}" title="${g.status === 3 ? "Open the live view" : g.status === 4 ? "Match report" : "Open in the builder"}">
+    ${noClock ? "" : `<div class="sc-state">${state}</div>`}
     <div class="sc-team ${g.winner === 1 ? "win" : ""}"><img src="${esc(g.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><span class="tn">${esc(g.home)}</span></div>
     <div class="sc-score">${g.score[0] == null ? "–" : `${sc0} – ${sc1}`}${predLine(g)}${
       withLeague ? `<div class="sc-lg" title="${esc(g.league)}">${esc(g.league)}</div>` : ""}</div>

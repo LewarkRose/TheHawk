@@ -1825,6 +1825,39 @@
     return (leg.bookPrice > 1 ? leg.bookPrice * leg.p - 1 : est ? est * leg.p - 1 : UNPRICED_EDGE) + (leg.agree === true ? 0.015 : leg.agree === false ? -0.015 : 0);
   };
   const playerKey = (leg) => (leg.kind === "player" ? `${leg.side}|${leg.player}` : null);
+  // TWO OPTIONS MUST NOT ARGUE WITH EACH OTHER.
+  //
+  // Both places that pick which tickets to show you judged variety by counting legs
+  // with the same ID — so "Over 2.5 Goals" and "Under 3.5 Goals" read as pleasingly
+  // different and both got offered: one ticket on three or more, the next on three
+  // or fewer, in the same list. Lewzu reported it on 2026-10-22, and a note already
+  // in searchOptions about "opposite sides of the same cards line" shows it had been
+  // seen before and never actually fixed.
+  //
+  // Opposite sides are not always a contradiction. Over 2.5 and Under 4.5 both say
+  // "three or four goals" and sit together happily. What matters is the room left
+  // between the lines: Over Lo and Under Lu leave (Lu − Lo) whole numbers where both
+  // land, so one or fewer means the pair is a single outcome, or impossible.
+  //
+  // Lives out here because there are TWO selection paths — searchOptions and autoTop
+  // — and fixing one while the other kept contradicting is how this survived the
+  // first time.
+  const OU_LINE = /^((?:t?goals|t?corners|t?cards|sot|offs|h[12]goals)(?::(?:home|away))?):([ou])([\d.]+)$/;
+  const ouLines = (t) => {
+    const out = [];
+    for (const l of t.legs || []) { const m = OU_LINE.exec((l && l.id) || ""); if (m) out.push([m[1], m[2], +m[3]]); }
+    return out;
+  };
+  const argues = (t, c) => {
+    for (const [q, side, line] of ouLines(t)) {
+      for (const [q2, side2, line2] of ouLines(c)) {
+        if (q !== q2 || side === side2) continue;
+        const over = side === "o" ? line : line2, under = side === "o" ? line2 : line;
+        if (under - over <= 1) return true;
+      }
+    }
+    return false;
+  };
   // Compare two scores item by item: the first difference decides.
   const isBetter = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
   function maskOf(legs, ids, n) { const m = new Uint8Array(n).fill(1); for (const id of ids) { const a = legs[id].arr; for (let s = 0; s < n; s++) m[s] &= a[s]; } return m; }
@@ -2314,35 +2347,6 @@
     // the same cards line as alternatives. Loosen the rule, don't drop it, and
     // only take a near-copy once nothing better is left.
     const shared = (t, c) => t.legs.filter((l) => c.legs.some((x) => x.id === l.id)).length;
-    // TWO OPTIONS MUST NOT ARGUE WITH EACH OTHER.
-    //
-    // The diversity rule above counts legs with the same ID, so "Over 2.5 Goals" and
-    // "Under 3.5 Goals" read as pleasingly different and both get offered — one
-    // ticket betting on three or more, the next on three or fewer, in the same list.
-    // Lewzu reported exactly that on 2026-10-22, and the note above about "opposite
-    // sides of the same cards line" shows it was seen before and not actually fixed.
-    //
-    // Opposite sides are not always a contradiction: Over 2.5 and Under 4.5 both say
-    // "three or four goals" and sit together happily. What matters is how much room
-    // is left between the lines. Over Lo and Under Lu leave (Lu − Lo) whole numbers
-    // where both land, so one or fewer means the pair is effectively a single
-    // outcome, or impossible.
-    const OU = /^((?:t?goals|t?corners|t?cards|sot|offs|h[12]goals)(?::(?:home|away))?):([ou])([\d.]+)$/;
-    const lines = (t) => {
-      const out = [];
-      for (const l of t.legs) { const m = OU.exec(l.id || ""); if (m) out.push([m[1], m[2], +m[3]]); }
-      return out;
-    };
-    const argues = (t, c) => {
-      for (const [q, side, line] of lines(t)) {
-        for (const [q2, side2, line2] of lines(c)) {
-          if (q !== q2 || side === side2) continue;
-          const over = side === "o" ? line : line2, under = side === "o" ? line2 : line;
-          if (under - over <= 1) return true;
-        }
-      }
-      return false;
-    };
     const chosen = [];
     const sweep = (limit, allowArguing = false) => {
       for (const t of pool) {
@@ -2479,6 +2483,7 @@
       // the result leg and going a different way after it is.
       if (chosen.some((c) => t.legs.filter((l) => c.legs.some((x) => x.id === l.id)).length
                              >= Math.max(2, Math.min(t.legs.length, c.legs.length)))) continue;
+      if (chosen.some((c) => argues(t, c))) continue;   // see argues(): Auto contradicted too
       chosen.push(t);
     }
     return chosen.map(({ rank, ...t }) => t);

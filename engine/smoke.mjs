@@ -54,8 +54,89 @@ function ungradeableMarkets(legs) {
   return bad;
 }
 
+// ---------- HAWK MUST NOT CONTRADICT ITSELF ----------
+// Every block above asks whether HAWK is RIGHT. These ask whether it is COHERENT,
+// which is a different property and the one a person actually experiences. On
+// 2026-10-22 a session's worth of bugs turned out to be nine contradictions and
+// zero wrong models: two offered tickets taking opposite sides of the same goals
+// line, a badge disagreeing with the board it reads from, two totals for the same
+// day, a double chance priced at half its real chance. Lewzu found two thirds of
+// them. These checks exist so the deploy finds them first.
+//
+// Each one is here because something really went wrong in the way it describes.
+const OU_ID = /^((?:t?goals|t?corners|t?cards|sot|offs|h[12]goals)(?::(?:home|away))?):([ou])([\d.]+)$/;
+const ouOf = (t) => (t.legs || []).map((l) => OU_ID.exec((l && l.id) || "")).filter(Boolean);
+// Two tickets argue when one needs a total above a line and the other needs it
+// below one no higher — leaving a single scoreline where both land, or none.
+function arguingPair(options) {
+  for (let i = 0; i < options.length; i++) {
+    for (let j = i + 1; j < options.length; j++) {
+      for (const a of ouOf(options[i])) {
+        for (const b of ouOf(options[j])) {
+          if (a[1] !== b[1] || a[2] === b[2]) continue;
+          const over = a[2] === "o" ? +a[3] : +b[3], under = a[2] === "o" ? +b[3] : +a[3];
+          if (under - over <= 1) return `option ${i + 1} "${a[0]}" vs option ${j + 1} "${b[0]}"`;
+        }
+      }
+    }
+  }
+  return null;
+}
+// A market HAWK prices on both sides must have the two sides add to one. This is
+// the invariant behind the de-margining bug and behind "HAWK rates it lower" having
+// once appeared on the Over AND the Under of the same line.
+function brokenPairs(legs) {
+  const by = new Map();
+  for (const l of legs) {
+    const m = OU_ID.exec(l.id || "");
+    if (m) by.set(`${m[1]}|${m[3]}|${m[2]}`, l.p);
+  }
+  const bad = [];
+  for (const [k, p] of by) {
+    const [q, line, side] = k.split("|");
+    if (side !== "o") continue;
+    const u = by.get(`${q}|${line}|u`);
+    // A line can legitimately be offered on one side only (the other fell outside
+    // MIN_LEG_P / MAX_LEG_P), which is not a contradiction.
+    if (u == null) continue;
+    if (Math.abs(p + u - 1) > 0.02) bad.push(`${q} ${line}: over ${(100 * p).toFixed(1)}% + under ${(100 * u).toFixed(1)}% = ${(100 * (p + u)).toFixed(1)}%`);
+  }
+  return bad;
+}
+
 const failures = [];
 const check = (ok, what) => { if (!ok) failures.push(what); return ok; };
+
+// 0. De-margining, on markets with a known answer. grade.mjs divides a leg's
+// implied chance by the sum of every option's — which is only right when the
+// options are mutually exclusive AND cover everything. Double Chance is neither
+// (1X, 12 and X2 each contain two results, so they sum to 2), and for weeks the
+// closing-line block read Bet365 at 30.9% on double chances that landed 58.3%.
+// That one error was the whole of HAWK's apparent edge over the market.
+// Priced here with a deliberate margin so a check that ignored it would fail.
+{
+  const mod = await import(new URL("./grade-demargin.mjs", import.meta.url)).catch(() => null);
+  const demargin = mod && mod.closingChanceFor;
+  if (!demargin) {
+    failures.push("engine/grade-demargin.mjs is missing — the de-margin check cannot run");
+  } else {
+    const cases = [
+      // [line type, options, the one we want, roughly what it should be]
+      [1, { "1": 1.70, X: 3.80, "2": 5.00 }, "1", 0.56, "1X2 home"],
+      [14, { "1X": 1.30, "12": 1.25, X2: 2.30 }, "1X", 0.77, "double chance 1X"],
+      [14, { "1X": 1.30, "12": 1.25, X2: 2.30 }, "X2", 0.43, "double chance X2"],
+      [3, { Over: 1.90, Under: 1.90 }, "Over", 0.50, "a two-way total"],
+    ];
+    for (const [type, opts, want, expect, label] of cases) {
+      const q = demargin(type, opts, want);
+      check(q != null && Math.abs(q - expect) < 0.04,
+        `de-margining is wrong for ${label}: got ${q == null ? "null" : (100 * q).toFixed(1) + "%"}, expected about ${(100 * expect).toFixed(0)}%`);
+    }
+    // Every option present is what makes the overlap correction safe.
+    check(demargin(14, { "1X": 1.30, X2: 2.30 }, "1X") == null,
+      "de-margining a double chance with an option missing must return null, not a halved number");
+  }
+}
 
 // 1. The data files the site needs are there and readable.
 for (const f of ["data/meta.json", "data/fixtures.json"]) {
@@ -92,6 +173,20 @@ for (const league of [...new Set(leagues)]) {
     const t = HAWK.build({ id: f.id, target: 3, style: "Balanced", focus: "Mix", maxLegs: 10, favourite: true });
     check(t.legs.length > 0 && t.p > 0 && t.p < 1, `${name}: the builder returned no ticket`);
   } catch (e) { failures.push(`${name}: build crashed — ${e.message}`); }
+  // The two sides of a line HAWK prices itself must add to one.
+  for (const bad of brokenPairs(m.legs))
+    check(false, `${name}: the two sides of a line don't add up — ${bad}`);
+  // Neither route to a list of options may offer two that argue. Both are tested
+  // because the first fix went into one of them and the other kept contradicting.
+  for (const [label, body] of [["Build", { id: f.id, target: 3, style: "Balanced", focus: "Mix", maxLegs: 10, favourite: true, options: 6 }],
+                               ["Auto", { id: f.id, auto: true, style: "Balanced", focus: "Mix", maxLegs: 10, favourite: true, options: 6 }]]) {
+    let opts = null;
+    try { opts = (HAWK.buildOptions(body, 6) || {}).options || []; }
+    catch (e) { failures.push(`${name}: ${label} options crashed — ${e.message}`); continue; }
+    const clash = arguingPair(opts);
+    check(!clash, `${name}: ${label} offered two options that contradict each other — ${clash}. `
+      + `See argues() in engine.js: opposite sides of the same total with no room between the lines.`);
+  }
   for (const [market, why] of ungradeableMarkets(m.legs))
     check(false, `${name}: "${market}" is offered but cannot be graded — ${why}. `
       + `Give it a branch in hawk-settle.js legResult, or stop offering it in engine.js.`);

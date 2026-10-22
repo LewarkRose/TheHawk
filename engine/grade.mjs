@@ -18,6 +18,7 @@ import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import * as FotMob from "./fotmob.mjs";
+import { closingChanceFor } from "./grade-demargin.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOCAL = process.env.HAWK_LOCAL || "http://127.0.0.1:8000";
@@ -157,30 +158,17 @@ const tickTally = (c, p, won, b365) => {
 // at that line is read, the implied chances are summed, and each is divided by the
 // total. Legs where only one side closed are counted separately and left out of the
 // comparison rather than scored with the margin still in.
-// Dividing by the sum of the implied chances only works when the options are
-// mutually exclusive and between them cover everything. DOUBLE CHANCE is neither:
-// its three options are 1X, 12 and X2, and every result appears in two of them, so
-// the true chances sum to 2. Normalising to 1 halved every one — the block read
-// Bet365 at 30.9% on a double chance that HAWK had at 62.0% and that landed 58.3%,
-// which made HAWK look 903 per 10k better than the market on the leg that opens
-// nearly every ticket. It was the whole of HAWK's apparent edge; without it the
-// margin over the close is 10.5 per 10k across 2,519 legs, which is nothing.
-// Found 2026-10-22 because a double chance at 30.9% would be odds of 3.24.
-const OVERLAP = { 14: 2 };   // 365Scores line type -> how many options each result appears in
+// The de-margining itself lives in grade-demargin.mjs, so engine/smoke.mjs can test
+// the very code this runs rather than a copy of it. See that file for why Double
+// Chance needed its own treatment and what it cost while it didn't have one.
 function closingChance(leg, f) {
   const b = HawkSettle.bookLine(leg.id);
   if (!b || !f.closing) return null;
   const opts = f.closing[`${b[0]}|${b[1]}`];
-  const mine = opts && opts[b[2]];
-  if (!(mine > 1)) return null;
-  const all = Object.values(opts).filter((v) => v > 1);
-  if (all.length < 2) return { q: 1 / mine, demargined: false };
-  const cover = OVERLAP[b[0]] || 1;
-  // Only safe when every option is present: with 1X missing, the two that remain
-  // sum to about 1 and dividing by 2 would halve them for real.
-  if (cover > 1 && all.length < 3) return null;
-  const book = all.reduce((a, v) => a + 1 / v, 0) / cover;
-  return book > 0 ? { q: (1 / mine) / book, demargined: true } : null;
+  if (!opts) return null;
+  const q = closingChanceFor(b[0], opts, b[2]);
+  if (q == null) return null;
+  return { q, demargined: Object.values(opts).filter((v) => v > 1).length >= 2 };
 }
 // Upset radar record, per level (Low … Very high): how often the favourite
 // really failed to win / the underdog won, against what the radar said.

@@ -4573,6 +4573,55 @@ function checkerInputs() {
   return { price, boost, stake, eff: price > 1 ? 1 + (price - 1) * (1 + boost / 100) : NaN };
 }
 
+/* ---------- the tickets you turned down ---------- */
+// Phase 1a records the tickets HAWK OFFERS. The Vault records the ones you PLACE.
+// Nothing has ever recorded the ones you were SHOWN AND PASSED ON, and that gap is
+// why the biggest open question in this app cannot be answered.
+//
+// Over 268 scored tickets yours land 33.2% against the 26.1% HAWK said. The gap is
+// absent at two legs (−1.5) and +8.4 at three or more, z +3.05. Five explanations
+// have been tested and died: a raw-vs-learned bookkeeping error, thematically
+// aligned legs, a hot streak, placing late with a confirmed XI, and market mix.
+// The sixth is that the edge is in what you DON'T back — and testing that needs
+// the rejects, which have never been kept.
+//
+// Like 1b, this cannot be written retroactively: it starts from zero the day it
+// ships, so it ships before the thing that will read it. Capped, kept in this
+// browser, sent nowhere.
+const DECLINED_KEY = "hawk.declined", DECLINED_MAX = 500;
+const snapTicket = (t) => {
+  const ids = (t.legs || []).map((l) => l.id).filter(Boolean);
+  const r4 = (v) => (typeof v === "number" && isFinite(v) ? +v.toFixed(4) : null);
+  const r2 = (v) => (typeof v === "number" && isFinite(v) ? +v.toFixed(2) : null);
+  return { ids, n: ids.length, p: r4(t.p), b365: r2(t.b365), fair: r2(t.fair), worth: r4(t.worth) };
+};
+function recordDeclined(price, stake) {
+  try {
+    const m = S.match, o = S.options;
+    // Only when there was a real choice: one option is not a decision, and if the
+    // list belongs to another match or another set of settings it says nothing.
+    if (!m || !o || !Array.isArray(o.list) || o.list.length < 2 || !sameOptions()) return;
+    const placed = S.slip.slice();
+    const isPlaced = (t) => {
+      const ids = (t.legs || []).map((l) => l.id);
+      return ids.length === placed.length && ids.every((i) => placed.includes(i));
+    };
+    const taken = o.list.find(isPlaced);
+    const log = loadPref(DECLINED_KEY, []);
+    log.unshift({
+      t: new Date().toISOString(), game: String(m.id), league: m.league, kickoff: m.kickoff,
+      shown: o.list.length, at: o.at,
+      // The slip can be edited after an option is shown, so what you placed is not
+      // always one of them. `fromOption` says which case this was — a ticket you
+      // built yourself is a different kind of choice from one you picked.
+      placed: { ids: placed, n: placed.length, p: S.result ? snapTicket({ legs: [], p: S.result.p }).p : null,
+                price: +price || null, stake: +stake || null, fromOption: !!taken },
+      passed: o.list.filter((t) => !isPlaced(t)).map(snapTicket),
+    });
+    savePref(DECLINED_KEY, log.slice(0, DECLINED_MAX));
+  } catch { /* never let bookkeeping stop a bet being logged */ }
+}
+
 // Logs the builder in the HAWK Vault (the main page of this site). Both pages
 // share this browser's storage, so it uses the Vault's own format: one
 // "builder" leg with the selections joined by " & ", status PENDING, and the
@@ -4597,8 +4646,10 @@ function sendToVault() {
     hawk: hawkPart(m, legs, r.p),
   };
   recordB365Price();
-  if (saveToVault([leg], stake, price, { source: "hawk", hawkP: r.p }))
+  if (saveToVault([leg], stake, price, { source: "hawk", hawkP: r.p })) {
+    recordDeclined(price, stake);
     toast(`🦅 Logged in your Vault: €${stake.toFixed(2)} @ ${odds(price)}${boost ? ` (boosted from ${odds(quoted)})` : ""}. It settles itself after the match.`);
+  }
 }
 // What the Vault needs to settle a match's legs by itself after the final
 // whistle (and to check HAWK's track record): the 365Scores game, and each
@@ -8700,6 +8751,7 @@ function logBetToVault(price, stake) {
     const bank = parseFloat(localStorage.getItem("hawk_bankroll"));
     if (isFinite(bank)) localStorage.setItem("hawk_bankroll", (bank - stake).toFixed(2));
   } catch { return false; }
+  recordDeclined(price, stake);   // the other door a builder goes through
   return true;
 }
 function toggleBrainDetail() { const d = $("#brainDetail"); if (d) d.hidden = !d.hidden; }

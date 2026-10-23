@@ -3810,10 +3810,30 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
                 //
                 // A HAWK BACKUP is welcome here: it carries `bets` and goes through
                 // the same merge. Only say "wrong file" when it truly is one.
+                // READ IT THE WAY THE IMPORT BUTTON DOES.
+                //
+                // This used `await f.text()` and Android threw NotFoundError on a file
+                // the picker had just handed over — scoped storage revokes the content
+                // URI before the page gets to read it. importData() a few hundred lines
+                // up has always used FileReader and has always worked on the same phone
+                // with the same file, so the two paths now read files the same way.
+                // Seen 2026-10-23 on "hawk_backup_2026-10-23 (1).json".
+                const readFile = (file) => new Promise((resolve, reject) => {
+                    const r = new FileReader();
+                    r.onload = () => resolve(String(r.result || ""));
+                    r.onerror = () => reject(r.error || new Error("read failed"));
+                    r.readAsText(file);
+                });
                 let text = "", data = null;
-                try { text = await f.text(); } catch (err) {
-                    alert(`Couldn't read "${f.name}" (${err.name}). Try sharing it to this browser rather than picking it from Downloads.`);
-                    return;
+                try { text = await readFile(f); } catch (err) {
+                    // Fall back to the newer API in case this browser prefers it.
+                    try { text = await f.text(); } catch (err2) {
+                        alert(`Couldn't read "${f.name}" (${(err && err.name) || "error"}).\n\n`
+                            + `Android sometimes locks a file the moment after you pick it. `
+                            + `Open the file from your Files app and use Share → this browser, `
+                            + `or copy it somewhere else first and pick that copy.`);
+                        return;
+                    }
                 }
                 const size = f.size != null ? f.size : text.length;
                 if (!text.trim()) {

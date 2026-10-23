@@ -3801,9 +3801,36 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
             wrap.querySelector('[data-file-in]').onchange = async (e) => {
                 const f = e.target.files && e.target.files[0];
                 if (!f) return;
-                let data = null;
-                try { data = JSON.parse(await f.text()); } catch (err) { alert("That file isn't a HAWK sync file."); return; }
-                if (!data || !Array.isArray(data.bets)) { alert("That file has no HAWK tickets in it."); return; }
+                // SAY WHAT IS WRONG WITH IT. "That file isn't a HAWK sync file" told
+                // you nothing you could act on — not which file was read, not how big
+                // it was, not what was in it. On a phone the picker hands back
+                // whatever it likes, and from the message there was no way to tell a
+                // zero-byte file from a screenshot from the right file read wrongly.
+                // Hit 2026-10-23.
+                //
+                // A HAWK BACKUP is welcome here: it carries `bets` and goes through
+                // the same merge. Only say "wrong file" when it truly is one.
+                let text = "", data = null;
+                try { text = await f.text(); } catch (err) {
+                    alert(`Couldn't read "${f.name}" (${err.name}). Try sharing it to this browser rather than picking it from Downloads.`);
+                    return;
+                }
+                const size = f.size != null ? f.size : text.length;
+                if (!text.trim()) {
+                    alert(`"${f.name}" is empty (${size} bytes).\n\nThat usually means the picker handed back a placeholder rather than the file — try sharing the file to the browser instead.`);
+                    return;
+                }
+                try { data = JSON.parse(text); } catch (err) {
+                    const head = text.trim().slice(0, 60).replace(/\s+/g, " ");
+                    alert(`"${f.name}" isn't a HAWK file.\n\nIt's ${size} bytes and starts with:\n${head}…\n\n`
+                        + (/^</.test(head) ? "That looks like a web page or an image, not a saved Vault."
+                           : "A sync file or a HAWK backup is JSON and starts with {."));
+                    return;
+                }
+                if (!data || !Array.isArray(data.bets)) {
+                    alert(`"${f.name}" is JSON but has no HAWK tickets in it.\n\nIt holds: ${Object.keys(data || {}).slice(0, 6).join(", ") || "nothing"}.`);
+                    return;
+                }
                 wrap.remove();
                 await applySyncData(data);
             };

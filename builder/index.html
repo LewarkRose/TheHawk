@@ -3821,7 +3821,17 @@ function legFace(l, part = null) {
   if (side && m && (side === "home" ? m.homeCrest : m.awayCrest)) return `<div class="lface crest ${side}"><img src="${esc(side === "home" ? m.homeCrest : m.awayCrest)}" alt="" onerror="this.remove()"></div>`;
   return `<div class="lface ball"><span class="ini">${/corner/i.test(l.market) ? "⛳" : /card/i.test(l.market) ? "🟨" : "⚽"}</span></div>`;
 }
-// One word on the leg: Solid pick · Good price · OK · Weak link · Swap it — from its chance, form, how it fits, and the price.
+// One word on the leg, from its chance, its form, how it fits the others, and the
+// price. Each warning NAMES ITS OWN CAUSE, which it did not used to.
+//
+// Three different problems all said "⚠️ Weak leg": a poor price, bad form, and a
+// leg whose chance drops once the others are applied. Beside it, the card tagged
+// the lowest-chance leg "weak link" — a fourth, unrelated meaning of the same word.
+// Lewzu hit the result on 2026-10-23: a 72% leg marked "Weak leg" sitting above a
+// 59% leg marked "👍 OK", with the 59% one wearing the "WEAK LINK" tag. Every
+// label was correct by its own definition and together they were nonsense.
+//
+// Nothing here changes which legs are flagged. Only what they are called.
 function legVerdict(l, row, n) {
   const pr = legPrice(l), has = pr && pr.price, ev = has ? pr.price * l.p - 1 : null;
   const rate = l.kind === "player" && l.games >= 3 ? l.hits / l.games : null, lift = row && n > 0 ? row.cond - l.p : 0;
@@ -3831,8 +3841,12 @@ function legVerdict(l, row, n) {
   if (has && pr.price <= HAWK.DEAD_PRICE) return { label: "🔄 Swap it", tone: "bad", why: "Bet365 pays next to nothing for it, but it can still lose the bet" };
   if (formGap < -0.35) return { label: "🔄 Swap it", tone: "bad", why: `Only ${l.hits} of his last ${l.games}, far below HAWK's ${pct(l.p)} — the chance leans on this one matchup` };
   if (ev != null && ev >= 0.02) return { label: "💰 Good price", tone: "good", why: `Bet365 pays more than HAWK thinks it's worth (+${(100 * ev).toFixed(0)}%)` };
-  if (ev != null && ev < -0.15) return { label: "⚠️ Weak leg", tone: "warn", why: "Bet365 pays well under what it's worth" };
-  if (formGap < -0.2 || lift < -0.08) return { label: "⚠️ Weak leg", tone: "warn", why: formGap < -0.2 ? `HAWK gives ${pct(l.p)} but it landed in only ${l.hits} of his last ${l.games} — if this matchup doesn't play out as HAWK expects, it's the leg most likely to fail` : "It works against the legs above, so it lowers the whole builder's chance more than its own % suggests" };
+  if (ev != null && ev < -0.15) return { label: "⚠️ Poor price", tone: "warn", why: "Bet365 pays well under what it's worth" };
+  if (formGap < -0.2) return { label: "⚠️ Form says no", tone: "warn", why: `HAWK gives ${pct(l.p)} but it landed in only ${l.hits} of his last ${l.games} — if this matchup doesn't play out as HAWK expects, it's the leg most likely to fail` };
+  // NOT a weak leg: it can be the likeliest on the ticket and still belong here.
+  // It means this leg and the ones above pull in opposite directions, so adding it
+  // costs the builder more than its own percentage suggests.
+  if (lift < -0.08) return { label: "⚠️ Pulls against", tone: "warn", why: `${pct(l.p)} on its own but ${pct(row.cond)} with the legs above — it works against them, so it costs the builder more than its own % suggests` };
   if (l.p >= 0.65 && (rate == null || l.games < 6 || rate >= 0.6) && lift >= -0.04)
     return { label: "✅ Safe", tone: "good", why: `Likely to land: HAWK gives it ${pct(l.p)}${rate != null && l.games >= 6 ? `, his recent games back it up (${l.hits} of ${l.games})` : ""}${lift > 0.04 ? ", and it goes with the other legs" : ""}` };
   if (l.p < 0.4) return { label: "🎲 Long shot", tone: "", why: "The least likely leg — it's the one that makes the price" };
@@ -3865,7 +3879,21 @@ function legTiles(l, row, n) {
   const edit = l.kind === "player" && pr && pr.src !== "bet365"
     ? (S.ppEdit === l.id ? ` <input class="pp-in" data-pprice="${esc(l.id)}" inputmode="decimal" placeholder="${has ? odds(pr.price) : "price"}">`
                          : ` <button class="linkbtn" data-ppedit="${esc(l.id)}" title="Type this leg's Bet365 price (optional)">✎</button>`) : "";
-  const bet = `<div class="tile ${tone}"><div class="tk">Bet365${edit}</div><div class="tv ${src}">${mark}${has ? odds(pr.price) : "—"}</div><div class="ts">${verdict}</div></div>`;
+  // A PRICE MOVE BELONGS TO THE BOOK THAT MOVED. It used to be printed under the
+  // FAIR ODDS tile — "Fair odds 1.47 ▲ from 1.33" — where 1.47 is HAWK's number and
+  // 1.33 was BET365's opening price. The card then said 1.33 was the origin of
+  // HAWK's figure and, two lines below, the origin of Bet365's. Lewzu caught it on
+  // 2026-10-23. HAWK's fair odds had not moved at all.
+  //
+  // The move now sits in Bet365's own tile. Nothing is lost: the "below HAWK's
+  // price" verdict it displaces is already spelled out underneath, with both
+  // numbers, by the 💶 line in whyLeg.
+  const bookMoved = l.bookOpen > 1 && l.bookPrice > 1 && Math.abs(l.bookPrice / l.bookOpen - 1) >= 0.03;
+  const bookDown = bookMoved && l.bookPrice < l.bookOpen;
+  const betSub = bookMoved
+    ? `<span class="${bookDown ? "dn" : "up"}">${bookDown ? "▼" : "▲"} from ${odds(l.bookOpen)}</span>`
+    : verdict;
+  const bet = `<div class="tile ${tone}"><div class="tk">Bet365${edit}</div><div class="tv ${src}">${mark}${has ? odds(pr.price) : "—"}</div><div class="ts">${betSub}</div></div>`;
   let third;
   if (l.kind === "player" && l.games >= 3) {
     const r5 = (l.recent || []).slice(0, 5), h5 = r5.filter(v => v >= l.threshold).length, rate = l.hits / l.games;
@@ -3873,10 +3901,10 @@ function legTiles(l, row, n) {
       <div class="tk">Form</div><div class="tv">${l.hits}/${l.games}<small> ${l.basis === "starts" ? "starts" : "games"}</small></div>
       <div class="ts">${l.games > 5 ? `last 5: ${h5}/${r5.length}` : "tap for the games"}</div></div>`;
   } else {
-    const moved = l.bookOpen > 1 && l.bookPrice > 1 && Math.abs(l.bookPrice / l.bookOpen - 1) >= 0.03;
-    const down = moved && l.bookPrice < l.bookOpen;
+    // Always HAWK's price, and only HAWK's: this tile carries one book's number and
+    // must not narrate another's. See the Bet365 tile above for the move.
     third = `<div class="tile"><div class="tk">Fair odds</div><div class="tv">${odds(l.fair)}</div>
-      <div class="ts">${moved ? `<span class="${down ? "dn" : "up"}">${down ? "▼" : "▲"} from ${odds(l.bookOpen)}</span>` : "HAWK's price"}</div></div>`;
+      <div class="ts">HAWK's price</div></div>`;
   }
   return `<div class="tiles">${chance}${bet}${third}</div>`;
 }
@@ -4137,7 +4165,7 @@ function renderSlip() {
     return `<div class="leg card tilt3d fcard ${src}${id === weakId ? " weakleg" : ""} ${S.flipped.has(id) ? "flipped" : ""}" data-fid="${id}" style="animation-delay:${n * 60}ms"><div class="fin">
       <div class="fa">
         <div class="sc-head">${legFace(l)}<div class="sc-name"><div class="lb">${esc(l.label)}${
-          id === weakId ? ` <span class="weaktag" title="The leg least likely to land \u2014 swap this one first">weak link</span>` : ""}</div>
+          id === weakId ? ` <span class="weaktag" title="The lowest chance on this ticket \u2014 the one to swap first. It is not a criticism of the leg: every builder has a least likely one.">least likely</span>` : ""}</div>
           <div class="mk">${esc(l.market)} ${trustBadge(l)}</div></div>
           <span class="verdict ${vd.tone}" title="${esc(vd.why)}">${vd.label}</span></div>
         ${l.b365 ? `<div class="b365" title="Bet365's corners and cards lines are 3-way (Over / Exactly / Under): its &quot;Over 3&quot; means 4 or more">On Bet365 pick: <b>${esc(l.b365)}</b></div>` : ""}
@@ -5684,7 +5712,7 @@ function scanOption(o, params, ref, n) {
           const prop = legIsProp(l) && !(l.bookPrice > 1);
           return `<span class="lchip ${l.kind === "player" ? "pl" : ""}${isWeak ? " weak" : ""}${prop ? " prop" : ""}"${
             prop ? ` title="Bet365 doesn't publish a price for this one and marks it up about 27% inside a builder — measured blind on 20 Sep."`
-                 : isWeak ? ` title="The weak link — least likely to land. Swap this one first."` : ""}>${esc(l.label)}${
+                 : isWeak ? ` title="The lowest chance on this ticket — swap this one first."` : ""}>${esc(l.label)}${
             prop ? ` <b>−27%</b>` : isWeak && l.p ? ` <b>${Math.round(100 * l.p)}%</b>` : ""}</span>`; }).join(""); })()}
         <span class="muted" style="font-size:11.5px">${o.legs.length} legs${short ? " · short of target" : ""}</span></div>
       <div class="sfoot">
@@ -6014,14 +6042,16 @@ function partRow(pt, actions) {
     <div class="tiles">
       <div class="tile"><div class="tk">Chance</div><div class="tv">${pct(pt.p, pt.p < 0.1 ? 1 : 0)}</div><div class="ts">${single ? "this leg" : `${pt.legs.length} legs together`}</div></div>
       <div class="tile ${tone}"><div class="tk">Bet365</div><div class="tv">${price ? odds(price) : "—"}</div>
-        <div class="ts">${!price ? "Bet365 prices the builder"
+        <div class="ts">${moved ? `<span class="${pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "dn" : "up"}">${
+            pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "▼" : "▲"} from ${odds(pt.legs[0].bookOpen)}</span>`
+          : !price ? "Bet365 prices the builder"
           : single
             // one leg on its own: no edge claim, because there isn't one to claim
             ? (ev >= 0.02 ? "above HAWK's price" : ev >= -0.02 ? "level with HAWK's price" : "below HAWK's price")
             // a whole builder is a different thing — that comparison is the point of the app
             : (ev >= 0.02 ? `value +${(100 * ev).toFixed(0)}%` : ev >= -0.02 ? "fair price" : `${(100 * -ev).toFixed(0)}% under fair`)}</div></div>
       <div class="tile"><div class="tk">Fair odds</div><div class="tv">${odds(pt.fair || (pt.p > 0 ? 1 / pt.p : null))}</div>
-        <div class="ts">${moved ? `<span class="${pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "dn" : "up"}">${pt.legs[0].bookPrice < pt.legs[0].bookOpen ? "▼" : "▲"} from ${odds(pt.legs[0].bookOpen)}</span>` : "HAWK's price"}</div></div>
+        <div class="ts">HAWK's price</div></div>
     </div>
     </div>
     <div class="fb"><div class="fb-h"><div class="pcrests">${crest(pt.homeCrest)}${crest(pt.awayCrest)}</div><div class="lb">${esc(pt.home)} v ${esc(pt.away)}</div><span class="verdict ${vd.tone}">${vd.label}</span></div>
@@ -6032,7 +6062,7 @@ function partRow(pt, actions) {
 function partVerdict(pt, price) {
   const ev = price ? price * pt.p - 1 : null, single = pt.legs.length === 1;
   if (ev != null && ev >= 0.02) return { label: "💰 Good price", tone: "good", why: `Bet365 pays more than HAWK thinks it's worth (+${(100 * ev).toFixed(0)}%)` };
-  if (ev != null && ev < -0.12) return { label: "⚠️ Weak leg", tone: "warn", why: "Bet365 pays well under what it's worth — swap it for another leg from this match" };
+  if (ev != null && ev < -0.12) return { label: "⚠️ Poor price", tone: "warn", why: "Bet365 pays well under what it's worth — swap it for another leg from this match" };
   if (pt.p >= (single ? 0.7 : 0.5)) return { label: "✅ Safe", tone: "good", why: single ? "Likely, at a normal price" : "A likely builder for this match" };
   if (pt.p < (single ? 0.4 : 0.25)) return { label: "🎲 Long shot", tone: "", why: "One of the less likely parts — it's what makes the acca's price" };
   return { label: "👍 OK", tone: "", why: "A normal part: fair chance, normal price" };

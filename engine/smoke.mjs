@@ -163,6 +163,38 @@ const check = (ok, what) => { if (!ok) failures.push(what); return ok; };
   }
 }
 
+// 0c. NO TWO LABELS MAY SHARE A WORD FOR DIFFERENT THINGS.
+// The builder put "⚠️ Weak leg" on three unrelated problems — a poor price, bad
+// form, and a leg whose chance falls once the others are applied — while the card
+// beside it tagged the LOWEST-CHANCE leg "weak link", a fourth meaning again. The
+// result Lewzu saw on 2026-10-23: a 72% leg marked "Weak leg" above a 59% leg
+// marked "OK", the 59% one wearing the "WEAK LINK" tag. Every label was right on
+// its own and together they were nonsense.
+{
+  const src = await readFile(path.join(ROOT, "builder/index.html"), "utf8");
+  // The words a verdict label may be built from, and the tag words, must not meet.
+  const labels = [...src.matchAll(/label:\s*"([^"]+)"/g)].map((m) => m[1]);
+  const tagWords = new Set(["weak", "link"]);
+  const clash = labels.filter((l) => l.toLowerCase().split(/\W+/).some((w) => w && tagWords.has(w)));
+  check(!clash.length,
+    `builder/index.html: a leg VERDICT is using a word the leg TAG already owns — ${clash.join(", ")}. `
+    + `"weak" belongs to the lowest-chance tag only. A verdict must name its own cause `
+    + `(poor price / form says no / pulls against), or the two labels contradict on one card.`);
+  check(labels.length >= 5, "builder/index.html: leg verdict labels have gone — this check cannot run");
+
+  // 0d. A TILE MAY ONLY NARRATE ITS OWN SOURCE.
+  // The "Fair odds" tile showed HAWK's number with "▲ from 1.33" beneath it, and
+  // 1.33 was BET365's opening price — so one card presented the same figure as the
+  // origin of HAWK's estimate and, two lines lower, of Bet365's. HAWK's fair odds
+  // had not moved at all. A price move belongs to the book that moved.
+  for (const m of src.matchAll(/<div class="tk">Fair odds<\/div>([\s\S]{0,400}?)<\/div>\s*<\/div>/g)) {
+    check(!/bookOpen|bookPrice/.test(m[1]),
+      "builder/index.html: a Fair odds tile is reading Bet365's bookOpen/bookPrice. That tile carries "
+      + "HAWK's number only — a price move goes in the Bet365 tile, or the card tells you one book's "
+      + "figure came from another's.");
+  }
+}
+
 // 1. The data files the site needs are there and readable.
 for (const f of ["data/meta.json", "data/fixtures.json"]) {
   try { JSON.parse(await readFile(path.join(ROOT, f), "utf8")); } catch (e) { failures.push(`${f} missing or broken (${e.message})`); }

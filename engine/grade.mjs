@@ -282,7 +282,14 @@ function abTally(shifts, leg, w) {
 // sample — they are the players who made a tackle without winning one, so the
 // low-count end. Adding them shifts Player Tackles' byKey record, which the builder
 // applies as a correction. Measure what it would do first, then decide.
-const SOURCE_VERSION = 1;
+// 2 — 2026-10-23. `said` was added a run after the counters it had to be divided
+// BY, so it accumulated over a handful of legs while `settleable` carried every leg
+// since the block began. The ratio read 0.7% per leg, which is impossible —
+// MIN_LEG_P is 0.04, so nothing HAWK prices can sit under 4% — and `saidWon` came
+// out null, which is NaN from `undefined + number`. Both are the same mistake: a
+// numerator and a denominator that do not count the same thing. The block restarts
+// so every field begins together, and each sum now carries its own count.
+const SOURCE_VERSION = 2;
 const SRC_FIELDS = ["shots", "sot", "tackles", "fouled", "fouls", "offsides", "saves", "minutes"];
 const newSources = () => ({
   ver: SOURCE_VERSION, matches: 0, resolved: 0, ambiguous: 0, players: 0, unmatched: 0,
@@ -298,7 +305,10 @@ const newSources = () => ({
   // high, then the biggest market on the board is being flattered by quietly
   // dropping its losers, and that is a calibration problem hiding inside a coverage
   // one. Counting them without their chances could not tell the two apart.
-  rescue: { ungraded: 0, settleable: 0, wouldWin: 0, said: 0, saidWon: 0 },
+  // saidN is the count `said` is averaged over, and it is NOT settleable: a leg
+  // only joins `said` if it carried a usable chance. Divide by the wrong one and
+  // the answer is off by whatever fraction of legs that is.
+  rescue: { ungraded: 0, settleable: 0, wouldWin: 0, said: 0, saidN: 0, wonOfSaidN: 0 },
 });
 // 365Scores' own names for the same numbers, and how to read each one. A tackle is
 // written "2/3 (66.7%)" — won out of MADE — and the lines settle on made, so the
@@ -353,9 +363,12 @@ async function crossCheck(pr, f, unknownTackles) {
       S.rescue.settleable++;
       const won = q.stats.tackles >= leg.need;
       if (won) S.rescue.wouldWin++;
+      // `|| 0` on every read so a field added later can never turn the running
+      // total into NaN, which is how saidWon came out null the first time.
       if (leg.p > 0 && leg.p < 1) {
-        S.rescue.said = +(S.rescue.said + leg.p).toFixed(3);
-        if (won) S.rescue.saidWon = +(S.rescue.saidWon + leg.p).toFixed(3);
+        S.rescue.said = +((S.rescue.said || 0) + leg.p).toFixed(3);
+        S.rescue.saidN = (S.rescue.saidN || 0) + 1;
+        if (won) S.rescue.wonOfSaidN = (S.rescue.wonOfSaidN || 0) + 1;
       }
     }
   }
@@ -840,14 +853,19 @@ console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predict
     }
     const r = S.rescue;
     if (r.ungraded) {
-      const said = r.settleable ? 100 * r.said / r.settleable : 0;
-      const got = r.settleable ? 100 * r.wouldWin / r.settleable : 0;
-      console.log(`[grade]   tackles legs HAWK left ungraded: ${r.ungraded}; FotMob could settle `
-        + `${r.settleable} of them — HAWK said ${said.toFixed(1)}%, ${got.toFixed(1)}% would have won `
-        + `(gap ${(got - said >= 0 ? "+" : "")}${(got - said).toFixed(1)}). Recorded only — settlement unchanged.`);
-      if (r.settleable >= 200 && said - got > 10) {
-        console.log(`[grade]   ^ these are legs the board never sees, and they lose far more often than `
-          + `HAWK said. Player Tackles' record is measured without them.`);
+      console.log(`[grade]   tackles legs HAWK left ungraded: ${r.ungraded}; FotMob could settle ${r.settleable}.`);
+      // Both figures over the SAME legs — the ones that had a chance to compare.
+      if (r.saidN) {
+        const said = 100 * r.said / r.saidN, got = 100 * r.wonOfSaidN / r.saidN;
+        console.log(`[grade]   of ${r.saidN} with a chance attached: HAWK said ${said.toFixed(1)}%, `
+          + `${got.toFixed(1)}% would have won (gap ${got - said >= 0 ? "+" : ""}${(got - said).toFixed(1)}). `
+          + `Recorded only — settlement unchanged.`);
+        if (r.saidN >= 200 && said - got > 10) {
+          console.log(`[grade]   ^ the board never sees these, and they lose far more often than HAWK said. `
+            + `Player Tackles' record is measured without its losers.`);
+        }
+      } else {
+        console.log(`[grade]   none of them carried a chance yet — no verdict.`);
       }
     }
     for (const [k, c] of Object.entries(B.byOpen)) if (c.n) console.log(`[grade]   opened ${k}: ${c.n} tickets  ${pct(c)}${ret(c)}`);

@@ -3835,19 +3835,22 @@ function legFace(l, part = null) {
 function legVerdict(l, row, n) {
   const pr = legPrice(l), has = pr && pr.price, ev = has ? pr.price * l.p - 1 : null;
   const rate = l.kind === "player" && l.games >= 3 ? l.hits / l.games : null, lift = row && n > 0 ? row.cond - l.p : 0;
-  // Form only counts with enough games (6+), and against what HAWK expects: a 36% scorer
-  // who scored in 1 of 4 isn't "bad form"; a 75% leg that landed in 1 of 8 is.
-  const formGap = rate != null && l.games >= 6 ? rate - l.p : 0;
+  // "His record falls short of the chance" comes from HAWK.formZ, the same call the
+  // builder's leg score uses. It was a flat −0.2 / −0.35 in points here, which fires
+  // on noise: 0 of 6 against a 25% chance is a 25-point shortfall and happens 18% of
+  // the time by luck. Measured against its own standard error instead, so a warning
+  // on the card and a demotion in the build always mean the same thing.
+  const fz = HAWK.formZ ? HAWK.formZ(l) : null;
   if (has && pr.price <= HAWK.DEAD_PRICE) return { label: "🔄 Swap it", tone: "bad", why: "Bet365 pays next to nothing for it, but it can still lose the bet" };
-  if (formGap < -0.35) return { label: "🔄 Swap it", tone: "bad", why: `Only ${l.hits} of his last ${l.games}, far below HAWK's ${pct(l.p)} — the chance leans on this one matchup` };
+  if (fz != null && fz < HAWK.FORM_HARD_Z) return { label: "🔄 Swap it", tone: "bad", why: `Only ${l.hits} of his last ${l.games}, far below HAWK's ${pct(l.p)} — the chance leans on this one matchup` };
   if (ev != null && ev >= 0.02) return { label: "💰 Good price", tone: "good", why: `Bet365 pays more than HAWK thinks it's worth (+${(100 * ev).toFixed(0)}%)` };
   if (ev != null && ev < -0.15) return { label: "⚠️ Poor price", tone: "warn", why: "Bet365 pays well under what it's worth" };
-  if (formGap < -0.2) return { label: "⚠️ Form says no", tone: "warn", why: `HAWK gives ${pct(l.p)} but it landed in only ${l.hits} of his last ${l.games} — if this matchup doesn't play out as HAWK expects, it's the leg most likely to fail` };
+  if (fz != null && fz < HAWK.FORM_SOFT_Z) return { label: "⚠️ Form says no", tone: "warn", why: `HAWK gives ${pct(l.p)} but it landed in only ${l.hits} of his last ${l.games} — if this matchup doesn't play out as HAWK expects, it's the leg most likely to fail` };
   // NOT a weak leg: it can be the likeliest on the ticket and still belong here.
   // It means this leg and the ones above pull in opposite directions, so adding it
   // costs the builder more than its own percentage suggests.
   if (lift < -0.08) return { label: "⚠️ Pulls against", tone: "warn", why: `${pct(l.p)} on its own but ${pct(row.cond)} with the legs above — it works against them, so it costs the builder more than its own % suggests` };
-  if (l.p >= 0.65 && (rate == null || l.games < 6 || rate >= 0.6) && lift >= -0.04)
+  if (l.p >= 0.65 && (fz == null || fz >= HAWK.FORM_SOFT_Z) && lift >= -0.04)
     return { label: "✅ Safe", tone: "good", why: `Likely to land: HAWK gives it ${pct(l.p)}${rate != null && l.games >= 6 ? `, his recent games back it up (${l.hits} of ${l.games})` : ""}${lift > 0.04 ? ", and it goes with the other legs" : ""}` };
   if (l.p < 0.4) return { label: "🎲 Long shot", tone: "", why: "The least likely leg — it's the one that makes the price" };
   return { label: "👍 OK", tone: "", why: "A normal leg: fair chance, normal builder price" };

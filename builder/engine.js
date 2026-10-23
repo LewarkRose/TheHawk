@@ -1825,6 +1825,35 @@
     return (leg.bookPrice > 1 ? leg.bookPrice * leg.p - 1 : est ? est * leg.p - 1 : UNPRICED_EDGE) + (leg.agree === true ? 0.015 : leg.agree === false ? -0.015 : 0);
   };
   const playerKey = (leg) => (leg.kind === "player" ? `${leg.side}|${leg.player}` : null);
+  // HOW FAR A PLAYER'S OWN RECORD FALLS SHORT OF THE CHANCE HAWK GIVES HIM,
+  // measured against the noise in a handful of games rather than in flat points.
+  //
+  // A fixed gap cannot do this job. "0 of his last 6" against a 25% chance is a
+  // 25-point shortfall and completely ordinary — a 25% leg misses six in a row
+  // 18% of the time. "1 of his last 8" against 70% is a 57-point shortfall and
+  // means something. Scored in points they look two apart; scored against their
+  // own standard error they are −1.4 and −3.6.
+  //
+  // Returns a multiplier for the leg's score, and it is deliberately gentle:
+  // HAWK's chance is shrunk towards a position prior and adjusted for the
+  // opponent and expected minutes, so it is ALLOWED to disagree with a raw count.
+  // A substitute who has started twice in eight appearances should read low.
+  //
+  // One definition, exported, because the card says "Form says no" from the same
+  // numbers and two thresholds would put a warning on a leg the builder was busy
+  // preferring. That is this app's most common bug, not a hypothetical one.
+  const FORM_MIN_GAMES = 6, FORM_SOFT_Z = -2, FORM_HARD_Z = -3;
+  function formZ(leg) {
+    if (!leg || leg.kind !== "player" || !(leg.games >= FORM_MIN_GAMES)) return null;
+    const p = leg.p;
+    if (!(p > 0 && p < 1)) return null;
+    const se = Math.sqrt((p * (1 - p)) / leg.games);
+    return se > 0 ? (leg.hits / leg.games - p) / se : null;
+  }
+  function formPenalty(leg) {
+    const z = formZ(leg);
+    return z == null ? 1 : z < FORM_HARD_Z ? 0.7 : z < FORM_SOFT_Z ? 0.85 : 1;
+  }
   // TWO OPTIONS MUST NOT ARGUE WITH EACH OTHER.
   //
   // Both places that pick which tickets to show you judged variety by counting legs
@@ -1997,8 +2026,22 @@
           const step = pr > 0 ? Math.log(pr / priceNow) : 0;
           const need = reaches ? 0 : Math.max(1, Math.ceil(Math.log(target / Math.max(pr, 1.0001)) / SAFE_STEP));
           const feasible = reaches || chosen.length + 1 + need <= maxLegs;
-          const score = picks === "value" ? [reaches ? 1 : 0, valueScore(leg) - (1 - t), cond]
-            : feasible ? [1, joint * t * SAFE_P ** need] : [0, step];
+          // WHAT HIS OWN RECORD SAYS. The score had the ticket's chance, a trust
+          // weight per market and a penalty for needing more legs — and nothing at
+          // all about the player. So a leg HAWK gives 70% while the man has done it
+          // in 1 of his last 8 scored exactly like one he has done in 7 of 8, and
+          // the builder picked it just as happily. The card has warned about this
+          // for months ("Form says no"); the thing choosing the legs could not see
+          // the warning. Lewzu asked why it is offered at all, 2026-10-23.
+          //
+          // A nudge, not a ban. HAWK's chance is shrunk towards a position prior and
+          // adjusted for the opponent and the minutes, so it is allowed to disagree
+          // with a raw count — a man who has started twice in eight appearances
+          // SHOULD read low. It needs 6+ games before it counts at all, the same
+          // floor the card uses, and it only ever demotes a leg behind an equal one.
+          const fPen = formPenalty(leg);
+          const score = picks === "value" ? [reaches ? 1 : 0, valueScore(leg) * fPen - (1 - t), cond]
+            : feasible ? [1, joint * t * fPen * SAFE_P ** need] : [0, step];
           if (!bestScore || isBetter(score, bestScore)) { best = leg.id; bestScore = score; }
         }
         if (best) break;
@@ -3352,6 +3395,9 @@
   // where it is a debugging handle rather than something the pages read.
 
   global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, INTL: [...INTL], MODEL_VERSION, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, refOff, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
+                  // one definition of "his form disagrees with the chance", shared
+                  // by the builder's leg score and the card's verdict
+                  formZ, formPenalty, FORM_SOFT_Z, FORM_HARD_Z,
                   // a scan runs a lighter simulation than opening a match does, and the
                   // page says so rather than letting both be called "12,000 sims"
                   N_SIMS, SCAN_SIMS,

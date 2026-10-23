@@ -117,7 +117,13 @@ const newTotals = () => ({ matches: 0, legs: 0, byMarket: {}, byKey: {}, byLeagu
 // `byAgree` is the block that settles the question. `byWorth` answers a different
 // one — whether the builder's "worth it" check is too harsh — by putting p x b365
 // against what the ticket really returned.
-const BUILDER_VERSION = 1;   // bump when the correlation path changes; resets this block alone
+// Bump when the tickets HAWK OFFERS change; resets this block alone.
+//   2 — 2026-10-23. autoBuild's leg score now carries a form penalty: a player leg
+//       HAWK rates well above the man's own last 6+ games is demoted (×0.85, or
+//       ×0.7 past 35 points). The 894 tickets recorded under v1 were chosen by a
+//       scorer that could not see form at all, so they describe a builder that no
+//       longer exists — and byAgree/byLegs read off them would be measuring it.
+const BUILDER_VERSION = 2;
 const TICKET_BANDS = [[0, .1], [.1, .2], [.2, .3], [.3, .4], [.4, 1.01]];
 const AGREE_BANDS = [[0, 1.05], [1.05, 1.15], [1.15, 1.35], [1.35, 99]];
 const newCell = () => ({ n: 0, p: 0, won: 0, stake: 0, back: 0 });

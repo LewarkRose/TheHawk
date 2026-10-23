@@ -3446,8 +3446,39 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
             } finally { settling = false; }
         }
 
+        // THE TICKETS YOU TURNED DOWN travel with the backup.
+        //
+        // The builder records, for every builder you place, the other options it had
+        // just shown you (hawk.declined — see recordDeclined in builder/index.html).
+        // It is the only evidence that can explain why Lewzu's 3+ leg tickets beat
+        // HAWK's own number by 8 points, and like phase 1b it CANNOT be rebuilt
+        // afterwards: it starts from zero the day it ships.
+        //
+        // It was left out of the export, so it lived in one browser's storage with no
+        // copy anywhere. Tickets survive a cleared browser because they are exported;
+        // these would not have. Spotted 2026-10-23, the same evening the recorder went
+        // live, before there was anything in it to lose.
+        const DECLINED_KEY = 'hawk.declined', DECLINED_MAX = 500;
+        const loadDeclined = () => { try { const v = JSON.parse(localStorage.getItem(DECLINED_KEY)); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
+        const saveDeclined = (list) => { try { localStorage.setItem(DECLINED_KEY, JSON.stringify(list.slice(0, DECLINED_MAX))); } catch (e) { /* private window */ } };
+        // MERGED, never replaced. Every other field here is a snapshot and the newer
+        // file wins; this one only ever grows, so importing an older backup must not
+        // throw away decisions made since. Keyed on the moment plus the match, which
+        // is unique per placement.
+        function mergeDeclined(incoming) {
+            if (!Array.isArray(incoming) || !incoming.length) return loadDeclined().length;
+            const out = loadDeclined(), seen = new Set(out.map(x => `${x && x.t}|${x && x.game}`));
+            for (const x of incoming) {
+                const k = `${x && x.t}|${x && x.game}`;
+                if (x && x.t && !seen.has(k)) { out.push(x); seen.add(k); }
+            }
+            out.sort((a, b) => String(b.t || '').localeCompare(String(a.t || '')));
+            saveDeclined(out);
+            return out.length;
+        }
+
         function exportData() {
-            const blob = new Blob([JSON.stringify({ bankroll, bets, customMatches, bankrollLog }, null, 2)], { type: 'application/json' });
+            const blob = new Blob([JSON.stringify({ bankroll, bets, customMatches, bankrollLog, declined: loadDeclined() }, null, 2)], { type: 'application/json' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = `hawk_backup_${new Date().toISOString().slice(0,10)}.json`;
@@ -3535,8 +3566,12 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
                     if(data.bets) bets = data.bets;
                     if(data.customMatches) customMatches = data.customMatches;
                     if(data.bankrollLog) { bankrollLog = data.bankrollLog; localStorage.setItem('hawk_bankroll_log', JSON.stringify(bankrollLog)); }
+                    // Merged, not replaced — see mergeDeclined. A backup taken before
+                    // tonight must not erase tonight's decisions.
+                    const declinedNow = mergeDeclined(data.declined);
                     saveState();
-                    alert("Data imported successfully!");
+                    alert(`Data imported successfully!${data.declined && data.declined.length
+                        ? `\n\nDeclined-ticket records merged (kept ${declinedNow}).` : ''}`);
                 } catch(err) { alert("Invalid backup file."); }
             };
             reader.readAsText(file);

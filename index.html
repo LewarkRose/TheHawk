@@ -646,7 +646,11 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
                 <div class="vgroup">
                     <button onclick="openSync()" class="vbtn" title="Send your bets to your phone or PC with a link"><span class="icon-gold">📲</span> Sync</button>
                     <button onclick="exportData()" class="vbtn" title="Download a backup of your Vault"><span class="icon-gold">💾</span> Export</button>
-                    <label class="vbtn" title="Load a backup (replaces your current data)"><span class="icon-gold">📂</span> Import<input type="file" id="import-file" onchange="importData(event)" class="hidden" accept=".json"></label>
+                    <!-- No accept filter, for the same reason as the sync picker: on Android,
+                         filtering to .json routed the chooser through a document provider whose
+                         handle neither FileReader nor File.text() could open. importData checks
+                         the contents anyway, which is the check that matters. -->
+                    <label class="vbtn" title="Load a backup (replaces your current data)"><span class="icon-gold">📂</span> Import<input type="file" id="import-file" onchange="importData(event)" class="hidden"></label>
                     <button onclick="archiveOld()" class="vbtn" title="Back up the Vault, then clear settled tickets older than six months to free up storage"><span class="icon-gold">🗄️</span> Archive</button>
                     <button onclick="resetVault()" class="vbtn vicon" title="Reset the Vault (downloads a backup first)"><span class="icon-gold">⚙️</span></button>
                 </div>

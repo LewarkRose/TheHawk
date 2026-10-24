@@ -943,6 +943,23 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* the printed header rule, the way a ticket carries its issuer along the top */
 .ticket::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;z-index:2;
   background:linear-gradient(90deg,var(--accent-d),var(--accent) 45%,var(--accent-d))}
+/* THE TORN EDGE, where the card leaves the roll. Cut with a mask rather than drawn
+   with a pseudo-element: .ticket is overflow:hidden (it has to be, for the header
+   rule to follow the radius), so teeth hanging outside the box would be clipped
+   away. A mask removes them from the card itself and works with the clip.
+   The teeth are on the BOTTOM only — the top carries the printed rule, and a card
+   torn at both ends reads as a scrap rather than something issued.
+   .stub below gets the same cut from its own copy of this, and the two must stay
+   identical: see the warning above the .stub rule. */
+.ticket,.stub{--tooth-w:15px;--tooth-h:8px}
+.ticket{
+  -webkit-mask:linear-gradient(#000 0 0) 0 0/100% calc(100% - var(--tooth-h)) no-repeat,
+    linear-gradient(45deg,#000 50%,#0000 50%) 0 100%/var(--tooth-w) var(--tooth-h) repeat-x,
+    linear-gradient(-45deg,#000 50%,#0000 50%) calc(var(--tooth-w)/2) 100%/var(--tooth-w) var(--tooth-h) repeat-x;
+  mask:linear-gradient(#000 0 0) 0 0/100% calc(100% - var(--tooth-h)) no-repeat,
+    linear-gradient(45deg,#000 50%,#0000 50%) 0 100%/var(--tooth-w) var(--tooth-h) repeat-x,
+    linear-gradient(-45deg,#000 50%,#0000 50%) calc(var(--tooth-w)/2) 100%/var(--tooth-w) var(--tooth-h) repeat-x;
+  padding-bottom:var(--tooth-h)}
 /* THE PERFORATION. Two holes punched through the edges and a dashed score between
    them, with the fold line labelled. Everything under it is the stub you keep.
    The score is drawn as two line segments either side of the label rather than one
@@ -1369,6 +1386,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     .scard .sfoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
     .iconbtn{flex:none;width:44px;height:44px;padding:0;margin-top:0;display:inline-flex;align-items:center;justify-content:center}
     /* the recipe: what HAWK is about to build, in a sentence, with chips that change a word each */
+    /* The fold's handle: the full setting line while it is shut, a short label once
+       it is open and the controls below are saying the same thing. */
+    .tune:not([open]) .topen,.tune[open] .tsum{display:none}
+    .tune[open] .topen{display:inline}
+    .tune .topen span{margin-left:8px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
     .recipe{margin-top:2px;font-size:13.5px;line-height:1.85;color:var(--muted)}
     .recipe b{color:var(--text)}
     .recipe .hl{color:var(--gold)}
@@ -1390,6 +1412,14 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     /* Max legs: a stepper, not a chip. As a chip it looked like a label and
        nobody tapped it, so the cap stayed at its default and quietly stopped
        the bigger prices being reachable at all. */
+    /* The settings block only: a grid so each control keeps its place when a label
+       changes length. minOddsControl's preset chips keep the plain .rchips flow —
+       they are a row of equal pills and wrap correctly. */
+    .tgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:stretch}
+    .tgrid > .wide{grid-column:1/-1}
+    .tgrid > button.cyc{width:100%}
+    .tgrid > .legstep{width:100%;justify-content:space-between}
+    .tgrid > .legstep b{min-width:0;flex:1}
     .legstep{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--line);border-radius:999px;
       background:var(--panel2);overflow:hidden;min-height:36px}
     .legstep button{border:0;background:transparent;border-radius:0;min-width:34px;padding:7px 0;
@@ -4348,20 +4378,30 @@ function renderSlip() {
       <button class="xix" onclick="xiDismiss()" title="Hide this">✕</button></div>` : ""}
     <button class="build" id="go" style="margin-top:0" ${m ? "" : "disabled"}>${sameOptions() && S.options.list.length > 1
       ? `🔄 BUILD AGAIN — option ${(S.options.at + 1) % S.options.list.length + 1} of ${S.options.list.length}` : "⚡ BUILD MY BET BUILDER"}</button>
-    <details class="tune" id="tune" ${S.tuneOpen ? "open" : ""}><summary>${tuneSummary()}</summary>
+    ${/* The summary IS the fold's handle, so it cannot simply go — but it only
+          repeats the controls while the fold is OPEN. Closed it carries the whole
+          setting line, which is the one place that information is wanted; open, it
+          shrinks to a label, and the controls below speak for themselves. Both are
+          rendered and CSS picks, so nothing has to re-render on toggle. */""}
+    <details class="tune" id="tune" ${S.tuneOpen ? "open" : ""}><summary><span class="tsum">${tuneSummary()}</span><span class="topen">⚙️ Build settings<span>close</span></span></summary>
     <div class="seg" id="autoSeg" title="Auto: HAWK picks the odds and legs for you">${[[true, "🎯 Auto"], [false, "🎚 My odds"]].map(([k, lab]) => `<button class="${S.auto === k ? "on" : ""}" data-auto="${k ? 1 : 0}">${lab}</button>`).join("")}</div>
-    ${S.auto ? `${minOddsControl("auto")}
-    <div class="hint">${S.scan.minOdds
-      ? "HAWK stacks legs (up to your max, below) until Bet365's likely price gets there, likeliest build first. This is the same setting Picks scans with."
-      : "HAWK tries odds from about 2 to 4 with up to your max legs (below) and only keeps builders that land at least 1 time in 4 — worth-it ones at Bet365 first."}</div>` : ""}
+    ${/* The generic hint that used to sit here said the same thing as recipeLine()
+          below, in weaker words and without the numbers you actually chose. One
+          sentence, not two — and the one that reads back your own settings. */""}
+    ${S.auto ? minOddsControl("auto") : ""}
     <div class="target" ${S.auto ? 'style="display:none"' : ""}><div><div class="muted" style="font-size:12px;letter-spacing:.1em" title="HAWK builds until Bet365's likely price for the builder reaches this">TARGET · BET365 PRICE</div><div class="big" id="tgt">${S.target.toFixed(2)}</div></div>
       <div class="muted" style="text-align:right;font-size:12px">${r && r.p && S.slip.length ? `this one lands<br><b style="font-size:16px;color:var(--text)">${pct(r.p, 1)}</b>` : `HAWK builds to<br><b style="font-size:13px;color:var(--text)">Bet365's price</b>`}</div></div>
     <input type="range" min="0" max="100" step="0.5" value="${oddsToSlider(S.target)}" id="rng" ${S.auto ? 'style="display:none"' : ""}>
     ${recipeLine()}
-    <div class="rchips" id="rchips">
+    ${/* A grid, not a wrapping chip row. Five controls of different widths wrapped
+          into a ragged three-then-two that moved whenever a label changed length
+          ("Mix of markets" against "No result leg"), so nothing sat in the same
+          place twice. Fixed columns: the two one-word cycles share a row, the long
+          one takes its own, and the two steppers pair up underneath. */""}
+    <div class="rchips tgrid" id="rchips">
       <button class="cyc" data-cyc="style" title="How likely each leg should be — click to change"><i>Legs</i><b>${STYLES[S.style].label}</b></button>
-      <button class="cyc" data-cyc="focus" title="What the builder is made of — click to change"><i>Made of</i><b>${{ Mix: "Mix of markets", Players: "Player props", Match: "Match stats", Stats: "No result leg" }[S.focus]}</b></button>
       <button class="cyc" data-cyc="picks" title="How HAWK chooses between legs — click to change"><i>Picks</i><b>${S.picks === "value" ? "Best value" : "Most likely"}</b></button>
+      <button class="cyc wide" data-cyc="focus" title="What the builder is made of — click to change"><i>Made of</i><b>${{ Mix: "Mix of markets", Players: "Player props", Match: "Match stats", Stats: "No result leg" }[S.focus]}</b></button>
       <span class="legstep" title="The most legs HAWK will use. More legs reach a bigger price, but the builder lands less often — and a price you've asked for may need more legs than this to be reachable at all.">
         <button data-legs="-1" aria-label="Fewer legs" ${S.maxLegs <= LEG_STEPS[0] ? "disabled" : ""}>−</button>
         <b>Max ${S.maxLegs} legs</b>

@@ -112,6 +112,25 @@
                 0 2px 0 #141219, 0 3px 0 #100e14,
                 0 8px 12px -6px rgba(0,0,0,.8), 0 26px 42px -24px rgba(0,0,0,.95) !important;
         }
+        /* THE TORN EDGE, where the card leaves the roll. The builder's .ticket
+           carries the identical cut — same 15px tooth, same 8px depth — because a
+           ticket has to look like itself before and after it settles, which is the
+           whole point of the note above. Cut with a mask, not a pseudo-element:
+           the card clips its own overflow for the header rule's radius, so teeth
+           drawn outside the box would be clipped away. Bottom only; a card torn at
+           both ends reads as a scrap rather than something issued. */
+        html body .stub {
+            --tooth-w: 15px; --tooth-h: 8px;
+            -webkit-mask:
+                linear-gradient(#000 0 0) 0 0/100% calc(100% - var(--tooth-h)) no-repeat,
+                linear-gradient(45deg, #000 50%, #0000 50%) 0 100%/var(--tooth-w) var(--tooth-h) repeat-x,
+                linear-gradient(-45deg, #000 50%, #0000 50%) calc(var(--tooth-w)/2) 100%/var(--tooth-w) var(--tooth-h) repeat-x;
+            mask:
+                linear-gradient(#000 0 0) 0 0/100% calc(100% - var(--tooth-h)) no-repeat,
+                linear-gradient(45deg, #000 50%, #0000 50%) 0 100%/var(--tooth-w) var(--tooth-h) repeat-x,
+                linear-gradient(-45deg, #000 50%, #0000 50%) calc(var(--tooth-w)/2) 100%/var(--tooth-w) var(--tooth-h) repeat-x;
+            padding-bottom: calc(15px + var(--tooth-h));
+        }
         html body .stub::before {
             content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
             border-radius: 5px 5px 0 0;

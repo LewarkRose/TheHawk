@@ -227,7 +227,13 @@
     ["Real Madrid", "Barcelona"], ["Real Madrid", "Atletico"],
     ["Atletico", "Barcelona"], ["Sevilla", "Betis"],
     ["Athletic Bilbao", "Real Sociedad"], ["Espanyol", "Barcelona"],
-    ["Valencia", "Levante"],
+    // Valencia's two: Levante is the city derby, Villarreal the Derbi de la
+    // Comunitat — both clubs in the Valencian Community, about 65km apart. Added
+    // 2026-10-24 after Valencia v Villarreal produced 6+ cards and HAWK priced it
+    // without the lift. One match is not evidence (per-fixture noise here is 2.2
+    // cards wide); it is in because it is a derby, which is the only test this
+    // list applies.
+    ["Valencia", "Levante"], ["Valencia", "Villarreal"],
     // "Inter" alone also matches Inter Turku and Inter Escaldes, both of which
     // play European ties, so the Milan club is named in full.
     ["Inter Milan", "AC Milan"], ["Inter Milan", "Juventus"],

@@ -216,6 +216,64 @@ const check = (ok, what) => { if (!ok) failures.push(what); return ok; };
   }
 }
 
+// 0d. THE DERBY FACTOR MAY ONLY TOUCH CARDS.
+// Measured 2026-10-24 over 3,106 matches, a derby brings 1.01 cards more than the
+// two clubs' own non-derby average (z +3.97) — but only 0.08 more GOALS (z +0.37).
+// Derbies are cardier without being cagier, so a derby multiplier applied to the
+// goals, corners or shots total would be inventing an effect that was measured and
+// found absent. The same loop in teamExpectations handles all four stats, so one
+// careless edit is all it would take.
+{
+  const f = HAWK.DERBY_CARD_FACTOR, list = HAWK.DERBIES || [];
+  check(typeof f === "number" && f > 1 && f <= 1.35,
+    `builder/engine.js: DERBY_CARD_FACTOR is ${f}. The measurement put it at 1.23 on 62 derbies; `
+    + "anything outside 1.00-1.35 is not that measurement any more.");
+  // Both of these were real bugs in the first list: "Paris" matched Paris FC
+  // instead of PSG, and the accented names were missed entirely.
+  check(HAWK.derbyOf("PSG", "Olympique de Marseille") === "PSG v Marseille",
+    "builder/engine.js: derbyOf no longer recognises PSG v Marseille under the feed's own names");
+  check(!HAWK.derbyOf("Paris FC", "Olympique de Marseille"),
+    "builder/engine.js: derbyOf is firing on Paris FC v Marseille, which is not Le Classique");
+  check(!!HAWK.derbyOf("1. FC Köln", "Borussia Mönchengladbach"),
+    "builder/engine.js: derbyOf misses 1. FC Köln v Borussia Mönchengladbach — accent handling broke");
+  check(!!HAWK.derbyOf("Hamburger SV", "Werder Bremen"),
+    "builder/engine.js: derbyOf misses Hamburger SV v Werder Bremen");
+  // Word boundaries are what keep these apart from the clubs they contain.
+  check(!HAWK.derbyOf("Lillestrom", "Lens"),
+    "builder/engine.js: derbyOf is firing on Lillestrom v Lens — the Lille fragment lost its word boundary");
+  check(!HAWK.derbyOf("Juventus", "Inter Turku"),
+    "builder/engine.js: derbyOf is firing on Juventus v Inter Turku — the Inter fragment is too loose");
+  check(list.length >= 10, `builder/engine.js: the derby list has only ${list.length} fixtures`);
+  // A pair against itself, or the same pair twice, means the list was edited by hand
+  // and the edit went wrong. Both would silently change which matches get the factor.
+  const seen = new Set(), dups = [], selves = [];
+  for (const [x, y] of list) {
+    if (String(x).toLowerCase() === String(y).toLowerCase()) selves.push(x);
+    const k = [String(x).toLowerCase(), String(y).toLowerCase()].sort().join("|");
+    if (seen.has(k)) dups.push(k);
+    seen.add(k);
+  }
+  check(!selves.length, `builder/engine.js: the derby list pairs a club with itself: ${selves.join(", ")}`);
+  check(!dups.length, `builder/engine.js: the derby list repeats a fixture: ${dups.join(", ")}`);
+  // It must fire on a derby and stay silent otherwise, in both running orders.
+  check(!!HAWK.derbyOf("Arsenal", "Tottenham") && !!HAWK.derbyOf("Tottenham", "Arsenal"),
+    "builder/engine.js: derbyOf does not recognise Arsenal v Tottenham in both orders");
+  check(!HAWK.derbyOf("Arsenal", "Burnley"),
+    "builder/engine.js: derbyOf is firing on Arsenal v Burnley, which is not a derby");
+  check(!HAWK.derbyOf("", ""), "builder/engine.js: derbyOf must return null for empty club names");
+  // Source check: every line that multiplies a total by the derby factor has to be
+  // the cards line. Nothing else was measured to move.
+  const eng = await readFile(path.join(ROOT, "builder", "engine.js"), "utf8");
+  const applied = eng.split("\n").filter((l) => /\*\s*\(\s*derby\s*\?/.test(l));
+  check(applied.length > 0,
+    "builder/engine.js: nothing multiplies a total by the derby factor any more — either it was "
+    + "removed or it moved, and a 1.18x factor that is defined but never applied reads as shipped.");
+  for (const l of applied) {
+    check(/"cards"|'cards'/.test(l),
+      `builder/engine.js: the derby factor is being applied on a line that is not the cards line: ${l.trim()}`);
+  }
+}
+
 // 1. The data files the site needs are there and readable.
 for (const f of ["data/meta.json", "data/fixtures.json"]) {
   try { JSON.parse(await readFile(path.join(ROOT, f), "utf8")); } catch (e) { failures.push(`${f} missing or broken (${e.message})`); }

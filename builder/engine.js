@@ -163,6 +163,110 @@
   const MODEL_VERSION = { "Player Tackles": 3, "Player Offsides": 2,
                           "Total Cards · Over": 2, "Total Cards · Under": 2,
                           "Team Cards · Over": 2, "Team Cards · Under": 2 };
+  // ---------------------------------------------------------------------------
+  // Derbies
+  // ---------------------------------------------------------------------------
+  // Measured 2026-10-24 over 3,106 finished matches (the five big leagues plus
+  // the three European competitions), with cards counted from the itemised card
+  // EVENTS rather than the team-stats line that under-counts. Across 62 derbies
+  // the effect is almost exactly one extra card, and it hardly moves whichever
+  // way it is controlled:
+  //     raw, derby 5.15 v baseline 4.15   +1.00   z +3.29
+  //     against those clubs' own average   +1.06   z +3.66
+  //     against that referee's own average +1.00   z +3.81
+  //     against both (the baseline below)  +1.01   z +3.97
+  // So it is not card-prone clubs and not strict officials. It is the fixture.
+  //
+  // Why a multiplier and not an addition: the same 62 derbies came in at 1.229x
+  // expected (z +3.70 against 1.0), and the excess grew with the base — +1.18
+  // cards where expectation was 4 or more, +0.78 below it. An addition would
+  // over-correct a cagey fixture and under-correct a fiery one.
+  //
+  // It multiplies the MODEL total only, at the same point the referee factor
+  // applies, and that placement is the whole safety argument. Where Bet365
+  // publishes a card line the total is 0.7 market / 0.3 model, so a market that
+  // already prices the derby holds this to roughly a 5% uplift and it cannot
+  // double-count. Where no card line is published the model is the only number —
+  // precisely the case RED_POINTS above warns that nothing corrects.
+  //
+  // Nine other context factors were measured the same day and every one failed:
+  // rest days (five bands, all flat), European midweek (+0.10, z +0.88 once the
+  // sample doubled from a false +0.37), manager changes (346 of them, effect
+  // -0.02), attendance (identical in all three bands, so no gradient), head to
+  // head (r +0.04), last-5 form (r +0.118 against the season rate's +0.229, so
+  // the short window is WORSE), travel distance (was this derby effect in
+  // disguise — remove derbies and it falls to z +1.09), weather, and the derby
+  // effect on GOALS (+0.08, z +0.37). Derbies are cardier without being cagier,
+  // so this touches the card markets and nothing else.
+  //
+  // MODEL_VERSION is deliberately NOT bumped. Only 62 of 3,106 matches are
+  // derbies, so under 2% of card legs are repriced, where the last reset was
+  // justified by 14%. Throwing away corrections standing on 17,469 Player to be
+  // Booked legs and some 7,500 card-total legs to fix one match in fifty would
+  // cost far more than it buys.
+  //
+  // The list below is a football judgement and cannot be refined by the numbers:
+  // at three matches per fixture against a residual spread of 2.2 cards, Chelsea
+  // v Arsenal reading +2.45 and the Manchester derby reading -0.40 are both
+  // noise. Add and remove on football grounds only.
+  const DERBY_CARD_FACTOR = 1.23;
+  // Fragments, not full names: 365Scores writes "Newcastle United", "Real Betis",
+  // "Borussia Dortmund". Each one was checked against all 340 club names the feed
+  // actually used across 3,106 matches, because a fragment that matches nothing
+  // is a derby that silently never fires, and one that matches two clubs is worse.
+  // Audited 2026-10-24, which caught: "Paris" matching Paris FC and not PSG (so
+  // three "Le Classique" fixtures in the measurement were a different match
+  // entirely), "Koln" missing "1. FC Köln" on the umlaut, and "Saint-Etienne"
+  // missing "Saint-Étienne" on the accent.
+  const DERBIES = [
+    ["Manchester United", "Manchester City"], ["Arsenal", "Tottenham"],
+    ["Liverpool", "Everton"], ["Liverpool", "Manchester United"],
+    ["Chelsea", "Tottenham"], ["Chelsea", "Arsenal"],
+    ["Newcastle", "Sunderland"], ["Aston Villa", "Birmingham"],
+    ["Crystal Palace", "Brighton"], ["West Ham", "Tottenham"],
+    ["Real Madrid", "Barcelona"], ["Real Madrid", "Atletico"],
+    ["Atletico", "Barcelona"], ["Sevilla", "Betis"],
+    ["Athletic Bilbao", "Real Sociedad"], ["Espanyol", "Barcelona"],
+    ["Valencia", "Levante"],
+    // "Inter" alone also matches Inter Turku and Inter Escaldes, both of which
+    // play European ties, so the Milan club is named in full.
+    ["Inter Milan", "AC Milan"], ["Inter Milan", "Juventus"],
+    ["AS Roma", "Lazio"], ["Juventus", "Torino"], ["Napoli", "AS Roma"],
+    ["Genoa", "Sampdoria"],
+    ["Bayern", "Dortmund"], ["Dortmund", "Schalke"],
+    // "Gladbach" sits inside "Mönchengladbach" with a letter before it, and
+    // "Hamburg" inside "Hamburger SV" with one after, so both are spelled the way
+    // the feed does — word boundaries would otherwise miss these two entirely.
+    ["Köln", "Mönchengladbach"], ["Hamburger", "Werder"],
+    ["PSG", "Marseille"], ["Lyon", "Saint-Étienne"],
+    ["Nice", "Monaco"], ["Lille", "Lens"],
+  ];
+  // Accents are stripped from both sides before comparing, so "Koln" finds
+  // "1. FC Köln" and "Saint-Etienne" finds "Saint-Étienne" — the feed is not
+  // consistent about either. The match is then on WORD BOUNDARIES rather than a
+  // bare substring, which is what stops "Lille" claiming Lillestrom and "Roma"
+  // claiming Romania. Boundaries are tested after stripping, so they work on
+  // plain ASCII and JavaScript's \b behaves predictably.
+  const deburr = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const DERBY_RE = new Map();
+  const fragRe = (frag) => {
+    let re = DERBY_RE.get(frag);
+    if (!re) {
+      re = new RegExp(`(^|[^a-z0-9])${deburr(frag).replace(/[.*+?^${}()|[\]\\-]/g, "\\$&")}([^a-z0-9]|$)`);
+      DERBY_RE.set(frag, re);
+    }
+    return re;
+  };
+  function derbyOf(home, away) {
+    const h = deburr(home), a = deburr(away);
+    if (!h || !a) return null;
+    for (const [x, y] of DERBIES) {
+      const rx = fragRe(x), ry = fragRe(y);
+      if ((rx.test(h) && ry.test(a)) || (ry.test(h) && rx.test(a))) return `${x} v ${y}`;
+    }
+    return null;
+  }
+
   // Simulated matches kept in memory: each holds ~12 MB of legs, so a phone keeps
   // fewer — eight of them was enough to crash the tab on a phone browser.
   const MATCHES_KEPT = typeof matchMedia === "function" && matchMedia("(max-width:820px)").matches ? 3 : 6;
@@ -872,11 +976,14 @@
     }
     if (ignored) warnings.push("HAWK's goal model disagrees strongly with the bookmakers on this match (usually a big favourite it underrates) — trusting the market instead.");
 
+    const derby = derbyOf(home, away);
     const statModel = {}, statMarket = {}, statBlend = {};
     for (const [t, stat] of Object.entries(STAT_TYPES)) {
       const pair = profH && profA ? expectedPair(profH, fdH, profA, fdA, stat) : null;
       let total = pair ? pair[0] + pair[1] : null;
-      if (total && stat === "cards") total = total * refFactor + RED_POINTS;
+      // The derby multiplier sits beside the referee's, on the model total only:
+      // see DERBY_CARD_FACTOR above for why here and not on the blended number.
+      if (total && stat === "cards") total = total * refFactor * (derby ? DERBY_CARD_FACTOR : 1) + RED_POINTS;
       statModel[stat] = total;
       const lines = Object.entries(cons).filter(([k, c]) => k.startsWith(`${t}|`) && halfLine(k.split("|")[1]) != null && "Over" in c.probs)
         .map(([k, c]) => [parseFloat(k.split("|")[1]), c.probs.Over]);
@@ -887,6 +994,9 @@
       id, league, home, away, homeComp: hc, awayComp: ac, kickoff, inPlay: !!(kickoff && kickoff < new Date()),
       quotes, cons, polymarket: pm, lineups, confirmed, espn, lineupCheck, detail, table, form: { home: formH, away: formA }, recentForm: { home: recentH, away: recentA },
       referee: { name: refName, avg: refAvg, games: refGames, source: refSource, factor: refFactor },
+      // The fixture's name when it is a derby, else null. Carried so the card can
+      // say why the card lines moved, and so grading can score derby matches apart.
+      derby, derbyFactor: derby ? DERBY_CARD_FACTOR : 1,
       profiles: [profH, fdH, profA, fdA], lamModel, lamMarket, lamBlend, M: lamBlend ? scoreMatrix(...lamBlend) : null, marketW, ignored,
       // Both teams rated within the same league: only then can HAWK's own
       // ratings be compared head to head (a League One side isn't "45%" v Brentford).
@@ -2299,6 +2409,9 @@
     return {
       id: an.id, league: an.league, home: an.home, away: an.away, homeCrest: crest(an.homeComp), awayCrest: crest(an.awayComp),
       kickoff: an.kickoff ? an.kickoff.toISOString() : null, started: an.inPlay, referee: an.referee,
+      // the fixture's name when it is a derby, so the card can explain the lifted
+      // card lines and grade.mjs can score derby matches as their own block
+      derby: an.derby, derbyFactor: an.derbyFactor,
       // guess: 365Scores had no lineup yet, so HAWK picked the XI from the team's last 5 games
       lineups: Object.fromEntries(Object.entries(an.lineups).map(([s, v]) => [s, { ...v, guess: !!(an.lineupGuess || {})[s],
                                                                                    check: (an.lineupCheck || {})[s] || null }])),
@@ -3398,6 +3511,9 @@
                   // one definition of "his form disagrees with the chance", shared
                   // by the builder's leg score and the card's verdict
                   formZ, formPenalty, FORM_SOFT_Z, FORM_HARD_Z,
+                  // one definition of "this fixture is a derby", shared by the engine,
+                  // the match card and the consistency gate
+                  derbyOf, DERBIES, DERBY_CARD_FACTOR,
                   // a scan runs a lighter simulation than opening a match does, and the
                   // page says so rather than letting both be called "12,000 sims"
                   N_SIMS, SCAN_SIMS,

@@ -759,6 +759,11 @@ for (const league of HAWK.LEAGUES) {
       builtTickets += builders.length;
       state.pending[String(f.id)] = {
         league, home: f.home, away: f.away, kickoff: f.kickoff, at: new Date().toISOString(),
+        // The derby flag HAWK priced this match with. Recorded so the card total
+        // it lifted can be graded on derby matches alone: 59 derbies in 3,106
+        // matches means the all-match card record would hide a 1.18x factor
+        // whether it is right or wrong.
+        ...(m.derby ? { derby: m.derby } : {}),
         legs: m.legs.filter((l) => !l.low_data).map((l) => ({ id: l.id, market: l.market, p: +(l.pRaw ?? l.p).toFixed(4),
                                                              ...(l.player ? { player: l.player } : {}) })),
         upset: m.upset ? { level: m.upset.level, fav: m.upset.fav, favFail: +m.upset.favFail.toFixed(3),

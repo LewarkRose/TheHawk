@@ -295,7 +295,12 @@ function abTally(shifts, leg, w) {
 // out null, which is NaN from `undefined + number`. Both are the same mistake: a
 // numerator and a denominator that do not count the same thing. The block restarts
 // so every field begins together, and each sum now carries its own count.
-const SOURCE_VERSION = 2;
+//   3 — 2026-10-24. Added `graded`: the tackles legs that DID settle, over the same
+//       matches as the discarded ones. v2 could only set 616 discarded legs against
+//       Player Tackles' all-time byKey, which spans every match ever graded — the
+//       same mismatched-denominator trap, a third time. Reset so both halves start
+//       together and the pair is finally comparable.
+const SOURCE_VERSION = 3;
 const SRC_FIELDS = ["shots", "sot", "tackles", "fouled", "fouls", "offsides", "saves", "minutes"];
 const newSources = () => ({
   ver: SOURCE_VERSION, matches: 0, resolved: 0, ambiguous: 0, players: 0, unmatched: 0,
@@ -314,7 +319,13 @@ const newSources = () => ({
   // saidN is the count `said` is averaged over, and it is NOT settleable: a leg
   // only joins `said` if it carried a usable chance. Divide by the wrong one and
   // the answer is off by whatever fraction of legs that is.
-  rescue: { ungraded: 0, settleable: 0, wouldWin: 0, said: 0, saidN: 0, wonOfSaidN: 0 },
+  // `graded` is the missing half. Without it the discarded legs can only be set
+  // against Player Tackles' all-time byKey, which spans every match ever graded
+  // while these come from the handful since the block reset — mismatched
+  // denominators for the third time in two days. Counted over the SAME matches,
+  // the two are finally comparable and the board's real gap can be stated.
+  rescue: { ungraded: 0, settleable: 0, wouldWin: 0, said: 0, saidN: 0, wonOfSaidN: 0,
+            graded: 0, gradedWon: 0, gradedSaid: 0 },
 });
 // 365Scores' own names for the same numbers, and how to read each one. A tackle is
 // written "2/3 (66.7%)" — won out of MADE — and the lines settle on made, so the
@@ -563,6 +574,13 @@ for (const [id, pr] of Object.entries(state.pending)) {
     const w = r === "won";
     legOut.set(leg.id, w); legP.set(leg.id, leg.p);
     abTally(shiftsNow, leg, w);
+    // Tackles legs that DID grade, over the same matches as the discarded ones.
+    if (/^p:(home|away):\d+:tackles\d*$/.test(leg.id || "") && leg.p > 0 && leg.p < 1) {
+      const R = ((T.sources ||= newSources()).rescue);
+      R.graded = (R.graded || 0) + 1;
+      if (w) R.gradedWon = (R.gradedWon || 0) + 1;
+      R.gradedSaid = +((R.gradedSaid || 0) + leg.p).toFixed(3);
+    }
     n++; said += leg.p; if (w) won++;
     tally(T.byMarket[leg.market] ||= { n: 0, p: 0, won: 0 }, leg.p, w);
     // HAWK vs the closing line on this exact leg (see closingChance above).
@@ -869,6 +887,17 @@ console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predict
         if (r.saidN >= 200 && said - got > 10) {
           console.log(`[grade]   ^ the board never sees these, and they lose far more often than HAWK said. `
             + `Player Tackles' record is measured without its losers.`);
+        }
+        // The comparison that means something: both halves, same matches.
+        if (r.graded) {
+          const gs = 100 * r.gradedSaid / r.graded, gw = 100 * r.gradedWon / r.graded;
+          const allN = r.graded + r.saidN, allW = r.gradedWon + r.wonOfSaidN, allS = r.gradedSaid + r.said;
+          console.log(`[grade]   over the same matches: ${r.graded} tackles legs GRADED `
+            + `(said ${gs.toFixed(1)}%, landed ${gw.toFixed(1)}%) and ${r.saidN} DISCARDED `
+            + `(said ${said.toFixed(1)}%, landed ${got.toFixed(1)}%).`);
+          console.log(`[grade]   both together: ${allN} legs, said ${(100 * allS / allN).toFixed(1)}%, `
+            + `landed ${(100 * allW / allN).toFixed(1)}% — gap ${(100 * (allW - allS) / allN).toFixed(1)} `
+            + `against the board's ${(gw - gs).toFixed(1)}. THAT difference is what dropping them hides.`);
         }
       } else {
         console.log(`[grade]   none of them carried a chance yet — no verdict.`);

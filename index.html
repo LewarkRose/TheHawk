@@ -3836,16 +3836,40 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
                     r.onerror = () => reject(r.error || new Error("read failed"));
                     r.readAsText(file);
                 });
-                let text = "", data = null;
-                try { text = await readFile(f); } catch (err) {
-                    // Fall back to the newer API in case this browser prefers it.
-                    try { text = await f.text(); } catch (err2) {
-                        alert(`Couldn't read "${f.name}" (${(err && err.name) || "error"}).\n\n`
-                            + `Android sometimes locks a file the moment after you pick it. `
-                            + `Open the file from your Files app and use Share → this browser, `
-                            + `or copy it somewhere else first and pick that copy.`);
-                        return;
-                    }
+                // THREE WAYS TO READ IT, because Android keeps refusing two of them.
+                // FileReader and File.text() both throw NotFoundError when the content
+                // URI behind the picked file has been revoked — seen on 2026-10-23 and
+                // again on the 24th with a freshly downloaded file and no accept filter,
+                // so it is the handle that is dead, not the API or the picker. An object
+                // URL fetch goes through the network stack rather than the file reader
+                // and occasionally survives where they do not. If all three fail the file
+                // genuinely cannot be opened from here, and the message says what to do
+                // instead rather than asking you to try the same thing again.
+                const readers = [
+                    ["FileReader", () => new Promise((res, rej) => {
+                        const r = new FileReader();
+                        r.onload = () => res(String(r.result || ""));
+                        r.onerror = () => rej(r.error || new Error("read failed"));
+                        r.readAsText(f);
+                    })],
+                    ["File.text", () => f.text()],
+                    ["objectURL", async () => {
+                        const u = URL.createObjectURL(f);
+                        try { return await (await fetch(u)).text(); } finally { URL.revokeObjectURL(u); }
+                    }],
+                ];
+                let text = "", data = null, lastErr = null, usedReader = null;
+                for (const [name, read] of readers) {
+                    try { text = await read(); usedReader = name; break; }
+                    catch (err) { lastErr = err; }
+                }
+                if (usedReader == null) {
+                    alert(`Couldn't read "${f.name}" (${(lastErr && lastErr.name) || "error"}), and all three ways of opening it failed.\n\n`
+                        + `Android has locked the file. Two things that do work:\n\n`
+                        + `1. Use the sync LINK instead — on the other device tap Copy link, send it to yourself, `
+                        + `then paste it in the box above and tap "Add to this Vault". It never touches a file.\n\n`
+                        + `2. Or open the file in your Files app and use Share → this browser.`);
+                    return;
                 }
                 const size = f.size != null ? f.size : text.length;
                 if (!text.trim()) {

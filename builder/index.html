@@ -6892,7 +6892,16 @@ function predLine(g) {
     const why = `${esc(dogName)} not to lose — the radar's calibrated half. Over 207 graded matches at this risk it said 55.8% and 53.1% landed. It is much worse at saying the underdog will WIN (22.7% against 28.9% said), so it does not claim that.`;
     const done = g.status === 4 && g.score[0] != null;
     if (!done) {
-      call = `<div class="sc-upset" title="${why}">⚡ ${notLose}% not to lose</div>`;
+      // SAY WHICH TEAM. The bolt sits in the middle of the row and named nobody, so
+      // "44% not to lose" floated between two clubs — and the eye lands on the
+      // FAVOURITE, where it reads as a contradiction: Manchester City at 56% to win
+      // with 44% not to lose underneath it. The team it means is Aston Villa, the one
+      // the number is furthest from. Lewzu flagged it on 2026-10-24.
+      //
+      // An arrow rather than the name: the column is 92px and nowrap, and "Borussia
+      // Mönchengladbach 44% not to lose" has nowhere to go. The arrow points at the
+      // side of the row the team's name is already on, which costs one character.
+      call = `<div class="sc-upset" title="${why}">⚡ ${favHome ? "" : "◀ "}${notLose}% not to lose${favHome ? " ▶" : ""}</div>`;
     } else {
       const fg = favHome ? g.score[0] : g.score[1], dg = favHome ? g.score[1] : g.score[0];
       const landed = fg <= dg;   // the favourite did not win

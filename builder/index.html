@@ -667,9 +667,11 @@ img{max-width:100%}
 .sc-upset.miss{color:var(--faint);font-weight:600}
 .sc-row{display:grid;grid-template-columns:58px 1fr 92px 1fr 64px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;
   border:1px solid transparent;transition:.12s}
-/* A wave row keeps the clock column — it shows the kick-off, muted, rather than
-   the countdown. The column was removed here once and the rows immediately read
-   as broken against the un-waved ones above them. */
+/* A wave row keeps the clock column and carries both numbers: the countdown in
+   gold, as everywhere else, with the kick-off underneath it. The column was
+   emptied here once and the rows read as broken against the un-waved ones above. */
+.sc-state .kob{display:block;font:700 9px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.04em;color:var(--faint)}
 .sc-row:hover{background:var(--panel2);border-color:var(--line)}
 .sc-row.is-live{background:rgba(255,93,115,.05)}
 .sc-state{font-size:12px;font-weight:700}
@@ -6815,8 +6817,15 @@ function scoreRow(g, mine, withLeague, noClock) {
   // tidy, and "where's the time?" was the first thing Lewzu asked. The noise that
   // started this was "in 32 min" repeated down the page, not the time itself — a
   // quiet 13:30 answers the question without the repetition.
+  // Inside a wave the row carries BOTH: the live countdown it would have anyway,
+  // and the kick-off quietly under it. The column was emptied once ("the heading
+  // says 13:30") and the rows read as broken next to the un-waved ones above; then
+  // it showed the kick-off alone and lost the number you actually watch. Lewzu
+  // picked this shape on 2026-10-24 from three options. A wave never contains a
+  // match that is already past its kick-off — those stay out as single rows — so
+  // the countdown here is always a real one.
   const waveState = noClock && g.kickoff
-    ? `<span class="muted">${new Date(g.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>`
+    ? `${state}<span class="kob">${new Date(g.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>`
     : state;
   return `<div class="sc-row ${g.status === 3 ? "is-live" : ""}" data-sid="${g.id}" title="${g.status === 3 ? "Open the live view" : g.status === 4 ? "Match report" : "Open in the builder"}">
     <div class="sc-state">${waveState}</div>

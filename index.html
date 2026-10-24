@@ -2445,7 +2445,14 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
         function renderCompetitions(container, settled) {
             const by = new Map();
             for (const b of settled) {
-                const names = [...new Set((b.legs || []).map(l => (l.hawk && l.hawk.league) || l.league).filter(Boolean))];
+                // Through leagueName, because the log holds one competition under two names:
+                // "Champions League" from HAWK's own feed and "UEFA Champions League" from the
+                // selector. Unnormalised that split a single 58-ticket record into a 34-ticket
+                // tile and a 24-ticket row held back as "not enough yet" — so the tile read as
+                // the whole Champions League history when it was well under two thirds of it.
+                // Normalise BEFORE the Set, so a ticket carrying both spellings stays one
+                // competition instead of being filed as an acca spanning several.
+                const names = [...new Set((b.legs || []).map(l => (l.hawk && l.hawk.league) || l.league).filter(Boolean).map(leagueName))];
                 if (!names.length) continue;
                 const key = names.length === 1 ? names[0] : 'Accas (several)';
                 if (!by.has(key)) by.set(key, { key, n: 0, won: 0, said: 0, scored: 0, pl: 0, staked: 0 });

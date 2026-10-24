@@ -182,6 +182,27 @@ const check = (ok, what) => { if (!ok) failures.push(what); return ok; };
     + `(poor price / form says no / pulls against), or the two labels contradict on one card.`);
   check(labels.length >= 5, "builder/index.html: leg verdict labels have gone — this check cannot run");
 
+  // 0e. EVERY DOOR INTO THE VAULT STORES THE SAME THING.
+  // Three places build the `hawk` object a logged ticket carries — "Send to Vault",
+  // "I placed it", and the linker that adopts a ticket typed into the Vault by hand.
+  // Only the first stored the clubs' crests, so two tickets on the SAME match could
+  // sit in the list with one wearing its badges and the other blank. 87 of 298
+  // linked tickets had them. Once a match leaves the feed there is nothing left to
+  // look them up by, so a ticket logged without them is blank for good.
+  {
+    // A window around each `linked: true`, not a brace match: one of these objects
+    // nests `legs.map((l) => ({...}))` inside it, and a [^{}] pattern skipped it
+    // entirely — so the first version of this check silently covered one of the two.
+    const sites = [...src.matchAll(/\blinked:\s*true/g)].map((m) => src.slice(Math.max(0, m.index - 400), m.index + 400));
+    check(sites.length >= 2, `builder/index.html: expected at least 2 \`linked: true\` sites, found ${sites.length} — this check cannot run`);
+    for (const b of sites) {
+      check(/homeCrest/.test(b) && /awayCrest/.test(b),
+        "builder/index.html: a ticket is being linked to a match without storing homeCrest/awayCrest. "
+        + "Every door into the Vault must store the same thing, or the same match shows up twice "
+        + "with only one of them wearing its badges.");
+    }
+  }
+
   // 0d. A TILE MAY ONLY NARRATE ITS OWN SOURCE.
   // The "Fair odds" tile showed HAWK's number with "▲ from 1.33" beneath it, and
   // 1.33 was BET365's opening price — so one card presented the same figure as the

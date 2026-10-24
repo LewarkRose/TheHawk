@@ -8769,7 +8769,13 @@ function logBetToVault(price, stake) {
   const m = S.match, r = S.result;
   const legs = S.slip.map((id) => S.legs[id]).filter(Boolean);
   if (!m || !legs.length || !(price > 1) || !(stake > 0)) return false;
+  // The crests travel WITH the bet, exactly as hawkPart does for "Send to Vault".
+  // Once a match leaves the feed there is nothing left to look it up by, so a
+  // ticket logged without them is blank forever. This door forgot them, which is
+  // why two tickets on the same match could sit in the list with only one wearing
+  // its badges — Lewzu spotted the pair on 2026-10-24.
   const hawk = { game: String(m.id), league: m.league, home: m.home, away: m.away, kickoff: m.kickoff, linked: true,
+                 homeCrest: m.homeCrest || null, awayCrest: m.awayCrest || null,
                  legs: legs.map((l) => ({ id: l.id, label: l.label, market: l.market, player: l.player || null, side: l.side || null })) };
   const bet = { id: "bet_" + Date.now(),
     date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
@@ -9651,7 +9657,11 @@ async function linkVaultBets() {
       // Player selections need the lineups: wait for them (they're out about an hour before kick-off).
       if (!haveXI && parts.some(HAWK.isPlayerText)) continue;
       const legs = parts.map(t => HAWK.readLeg(t, { home: g.home, away: g.away, players }) || { id: `text:${t}`, label: t, market: "", player: null, side: null });
-      found[`${b.id}|${l.fixture}`] = { game: String(g.id), league: g.league, home: g.home, away: g.away, kickoff: g.kickoff, linked: true, legs };
+      // Crests too — a ticket you typed yourself should look like one you built.
+      // This is the third place that assembles a `hawk` object and the second that
+      // was leaving them out; see logBetToVault and hawkPart for the other two.
+      found[`${b.id}|${l.fixture}`] = { game: String(g.id), league: g.league, home: g.home, away: g.away, kickoff: g.kickoff, linked: true,
+                                        homeCrest: g.homeCrest || null, awayCrest: g.awayCrest || null, legs };
     }
     if (!Object.keys(found).length) return;
     // Save into the freshest copy of your bets (the Vault may have changed them meanwhile).

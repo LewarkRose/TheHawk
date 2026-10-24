@@ -7773,6 +7773,25 @@ function dayRows() {
     .filter((r) => !r.kickoff || Date.parse(r.kickoff) > now)
     .sort((a, b) => (a.kickoff || "").localeCompare(b.kickoff || ""));
 }
+// WHICH DAY A TICKET BELONGS TO — the night it was PLAYED, not the moment the
+// Vault got round to settling it. Same rule as the Vault's betTime(), which the
+// history rows, the week strip and the Weekly Report all use since 2026-10-23.
+//
+// These two panels still counted by settledAt, and the difference showed the next
+// morning: an Ipswich v Forest ticket kicked off at 21:00 on the Friday, was typed
+// in by hand so it had no match to settle against, got linked at 11:39 on the
+// Saturday and settled there and then. "TODAY" read −€3.75 on a day Lewzu had no
+// match running, while the history rows filed it under Friday where it belonged.
+// A late settle is a bookkeeping event, not a day of betting.
+const betTimeOf = (b) => {
+  const kos = (b.legs || []).map((l) => l.hawk && Date.parse(l.hawk.kickoff)).filter(Boolean);
+  if (kos.length) return Math.max(...kos);
+  const placed = /^bet_(\d{12,})/.exec(b.id || "");
+  if (placed) return +placed[1];
+  return Date.parse(b.settledAt || "") || 0;
+};
+const betDayOf = (b) => { const t = betTimeOf(b); return t ? localDay(new Date(t)) : null; };
+
 function daySheet(bank, fit) {
   const rows = dayRows();
   const d = S.scan.data || {};
@@ -7781,8 +7800,7 @@ function daySheet(bank, fit) {
   const atRisk = bets.filter((b) => b.status === "PENDING").reduce((a, b) => a + (b.stake || 0), 0);
   const back = bets.filter((b) => b.status === "PENDING").reduce((a, b) => a + (b.stake || 0) * (b.odds || 0), 0);
   const today = localDay(new Date());
-  const settledToday = bets.filter((b) => b.status && b.status !== "PENDING" && b.settledAt
-    && localDay(new Date(b.settledAt)) === today);
+  const settledToday = bets.filter((b) => b.status && b.status !== "PENDING" && betDayOf(b) === today);
   // What a settled ticket actually paid. The Vault has its own betReturn(); this
   // side does not, and importing one for three lines would be worse than stating
   // the rule here: a cash-out pays what the book gave you, a win pays the return
@@ -8055,9 +8073,10 @@ function myDayCard(games) {
   //     here while the sheet counted it. 80 of the settled bets have no link.
   //   - a cash-out read `b.cashOut`, which does not exist — the field is
   //     cashOutAmount — so every cashed-out ticket was booked as a total loss.
-  // The RUNNING list above still keys on kick-off, which is right: that half is
-  // about today's matches. Only the settled tally is about today's money.
-  const settledDay = (b) => b.settledAt ? localDay(new Date(b.settledAt)) === today : onToday(b);
+  // Both halves now key on the match, through the shared betDayOf above. The
+  // settled tally used to count by settledAt — "today's money" — which filed a
+  // ticket under the morning it was settled rather than the night it was played.
+  const settledDay = (b) => betDayOf(b) === today;
   const done = bets.filter((b) => b.status && b.status !== "PENDING" && settledDay(b));
   if (!mine.length && !done.length) return laterStake > 0
     ? `<div class="myday"><div class="mh"><span class="dot-live"></span><h4>Your day</h4></div>
@@ -9645,6 +9664,18 @@ async function linkVaultBets() {
     let games = [];
     for (const k of [-1, 0, 1]) { const d = new Date(); d.setDate(d.getDate() + k); try { games = games.concat(await HAWK.scores(localDay(d))); } catch { /* try later */ } }
     const found = {};
+    // Crests for tickets linked BEFORE they were stored — the linker skips anything
+    // already carrying `hawk`, so a ticket linked last night keeps its blank badges
+    // for ever. Only works while the match is still in the three-day scores window;
+    // older ones cannot be recovered, because a finished fixture leaves the feed and
+    // the ticket keeps nothing but the teams' names.
+    const topUp = {};
+    for (const b of open(vaultBets())) for (const l of b.legs) {
+      const h = l.hawk;
+      if (!h || !h.game || h.homeCrest) continue;
+      const g = games.find((x) => String(x.id) === String(h.game));
+      if (g && g.homeCrest) topUp[`${b.id}|${l.fixture}`] = { homeCrest: g.homeCrest, awayCrest: g.awayCrest || null };
+    }
     for (const b of open(vaultBets())) for (const l of b.legs) {
       if (l.hawk || !l.fixture) continue;
       const [h, a] = String(l.fixture).split(/\s+(?:vs?\.?|-)\s+/i);
@@ -9663,10 +9694,15 @@ async function linkVaultBets() {
       found[`${b.id}|${l.fixture}`] = { game: String(g.id), league: g.league, home: g.home, away: g.away, kickoff: g.kickoff, linked: true,
                                         homeCrest: g.homeCrest || null, awayCrest: g.awayCrest || null, legs };
     }
-    if (!Object.keys(found).length) return;
+    if (!Object.keys(found).length && !Object.keys(topUp).length) return;
     // Save into the freshest copy of your bets (the Vault may have changed them meanwhile).
     const bets = vaultBets();
-    for (const b of bets) for (const l of b.legs || []) { const f = found[`${b.id}|${l.fixture}`]; if (f && !l.hawk) l.hawk = f; }
+    for (const b of bets) for (const l of b.legs || []) {
+      const f = found[`${b.id}|${l.fixture}`];
+      if (f && !l.hawk) l.hawk = f;
+      const t = topUp[`${b.id}|${l.fixture}`];
+      if (t && l.hawk && !l.hawk.homeCrest) { l.hawk.homeCrest = t.homeCrest; l.hawk.awayCrest = t.awayCrest; }
+    }
     try { localStorage.setItem("hawk_bets", JSON.stringify(bets)); } catch { return; }
     const n = Object.keys(found).length;
     toast(`🔗 Linked ${n} bet${n > 1 ? "s" : ""} from your Vault to ${n > 1 ? "their matches" : "its match"}`);

@@ -2408,6 +2408,9 @@
     const tableRow = (c) => { const r = an.table[c.id]; return r ? { position: r.position, points: r.points } : null; };
     return {
       id: an.id, league: an.league, home: an.home, away: an.away, homeCrest: crest(an.homeComp), awayCrest: crest(an.awayComp),
+      // the club ids, so the page can ask for each side's last games without
+      // first re-fetching the fixture to find out who is playing
+      homeId: String((an.homeComp || {}).id || ""), awayId: String((an.awayComp || {}).id || ""),
       kickoff: an.kickoff ? an.kickoff.toISOString() : null, started: an.inPlay, referee: an.referee,
       // the fixture's name when it is a derby, so the card can explain the lifted
       // card lines and grade.mjs can score derby matches as their own block
@@ -2679,6 +2682,46 @@
                corners: pair("Corners"), cards: yellow ? [yellow[0] + 2 * red[0], yellow[1] + 2 * red[1]] : null, sot: pair("Shots On Target") };
     }));
     return { home: g.homeCompetitor.name, away: g.awayCompetitor.name, games };
+  }
+
+  // The last games one side has played, with the same per-match stats the head to
+  // head shows. `games/results` is a request HAWK already makes — recentForm reads
+  // it for the W/D/L letters and discards everything else, though the opponent, the
+  // score, the date and the competition are all sitting in the same response.
+  // Stats come from the endpoint h2h uses: one call a match, cached for a day,
+  // because a finished match's corners never change.
+  //
+  // Friendlies are dropped for the same reason recentForm drops them — a pre-season
+  // run-out is not form — and so are ties with no score, which are usually a fixture
+  // 365Scores has listed but not settled.
+  async function recentGames(competitorId, want = 5) {
+    const d = await s365("games/results", { competitors: competitorId }, 30 * 60 * 1000);
+    if (!d) throw new Error("365Scores didn't return recent results");
+    const past = (d.games || [])
+      .filter((g) => g.statusGroup === 4 && g.homeCompetitor && g.awayCompetitor
+        && !/postpon|cancel|abandon/i.test(g.statusText || "")
+        && !/friendl/i.test(g.competitionDisplayName || "")
+        && Math.trunc(g.homeCompetitor.score) >= 0 && Math.trunc(g.awayCompetitor.score) >= 0)
+      .sort((a, b) => (b.startTime || "").localeCompare(a.startTime || ""))
+      .slice(0, want);
+    return Promise.all(past.map(async (x) => {
+      const st = await s365("game/stats", { games: x.id }, 24 * 3600 * 1000);
+      const one = (name, cid) => { const s = ((st && st.statistics) || []).find((v) => v.name === name && v.competitorId === cid); return s ? parseFloat(s.value) || 0 : null; };
+      const pair = (name) => { const a = one(name, x.homeCompetitor.id), b = one(name, x.awayCompetitor.id); return a == null && b == null ? null : [a || 0, b || 0]; };
+      const yellow = pair("Yellow Cards"), red = pair("Red Cards") || [0, 0];
+      const atHome = String(x.homeCompetitor.id) === String(competitorId);
+      const me = atHome ? 0 : 1;
+      return { id: String(x.id), date: x.startTime, comp: x.competitionDisplayName || "",
+               atHome, opp: (atHome ? x.awayCompetitor : x.homeCompetitor).name,
+               score: [Math.trunc(x.homeCompetitor.score), Math.trunc(x.awayCompetitor.score)],
+               // from this club's point of view, so the UI never has to flip them
+               mine: Math.trunc((atHome ? x.homeCompetitor : x.awayCompetitor).score),
+               theirs: Math.trunc((atHome ? x.awayCompetitor : x.homeCompetitor).score),
+               corners: pair("Corners"),
+               // booking points the way a card market settles: yellow 1, red 2
+               cards: yellow ? [yellow[0] + 2 * red[0], yellow[1] + 2 * red[1]] : null,
+               sot: pair("Shots On Target"), me };
+    }));
   }
 
   async function lineups(id) {
@@ -3513,7 +3556,7 @@
                   formZ, formPenalty, FORM_SOFT_Z, FORM_HARD_Z,
                   // one definition of "this fixture is a derby", shared by the engine,
                   // the match card and the consistency gate
-                  derbyOf, DERBIES, DERBY_CARD_FACTOR,
+                  derbyOf, DERBIES, DERBY_CARD_FACTOR, recentGames,
                   // a scan runs a lighter simulation than opening a match does, and the
                   // page says so rather than letting both be called "12,000 sims"
                   N_SIMS, SCAN_SIMS,

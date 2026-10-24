@@ -2125,6 +2125,26 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .h2h-sc.l{background:rgba(255,93,115,.18);color:var(--red)}
 .h2h-comp{font-size:11.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:560px){.h2h-row{grid-template-columns:62px minmax(0,1fr) auto}.h2h-comp{display:none}}
+/* last 5 — the two sides in parallel, because form is read as a comparison
+   ("who is in better shape") rather than one team at a time. The 1px gap over a
+   --line background draws the divider without a border on either column. */
+.l5{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.l5-col{background:var(--panel);min-width:0}
+.l5-ch{display:flex;align-items:center;gap:8px;padding:9px 11px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.l5-ch img{width:20px;height:20px;flex:none;object-fit:contain}
+.l5-ch .nm{font-weight:650;font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.l5-row{display:flex;align-items:center;gap:7px;padding:7px 11px;border-bottom:1px solid rgba(34,43,60,.45);
+  font-size:12px;cursor:pointer}
+.l5-row:hover{background:var(--panel2)}
+.l5-row .sc{font:700 12px/1 ui-monospace,Menlo,Consolas,monospace;width:32px;flex:none}
+.l5-row .sc.w{color:var(--green)} .l5-row .sc.l{color:var(--red)} .l5-row .sc.d{color:var(--muted)}
+.l5-row .ha{font:700 9px/1 "Segoe UI";color:var(--faint);flex:none;width:8px}
+.l5-row .op{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#c3cbda}
+.l5-row .st{font:600 10px/1 ui-monospace,Menlo,Consolas,monospace;color:var(--faint);white-space:nowrap;flex:none}
+.l5-avg{display:flex;flex-wrap:wrap;gap:4px 11px;padding:9px 11px;background:#0a0e18;font-size:10.5px;color:var(--faint)}
+.l5-avg b{color:var(--text);font:700 12px/1 ui-monospace,Menlo,Consolas,monospace}
+@media (max-width:620px){.l5{grid-template-columns:1fr}}
 .pl .nm,.pl .ph{cursor:pointer}
 .pl .nm:hover{color:var(--accent)}
 /* the count on 🎟 My bets in the page menu */
@@ -2665,6 +2685,7 @@ async function api(path, body) {
     case "/api/scores": return HAWK.scores(q.day);
     case "/api/report": return HAWK.matchReport(q.id);
     case "/api/h2h": return HAWK.h2h(q.id);
+    case "/api/recent": return HAWK.recentGames(q.team, +q.n || 5);
     case "/api/ticketlive": return HAWK.ticketLive(q.id, body.legs);
     case "/api/legprices": return HAWK.legPrices(body.items);
     case "/api/monster": return body ? HAWK.startMonster(body) : HAWK.monsterStatus();
@@ -3119,6 +3140,8 @@ function renderMatch() {
           <div class="note">Rows: ${esc(m.home)} goals · columns: ${esc(m.away)} goals</div></div>
         <div><h3>Market value check</h3>${valueCard(m.value)}</div>
       </div>`)}
+    ${mFold("last5", "📅 Last 5 games", "each side's recent form, with corners, cards and shots",
+      `<div class="section" id="last5"><div class="note">Loading each side's last five…</div></div>`)}
     ${mFold("h2h", "⚔️ Head to head", "their last meetings, with corners, cards and shots",
       `<div class="section" id="h2h"><div class="note">Loading the last meetings…</div></div>`)}
     <div class="section">
@@ -3134,6 +3157,7 @@ function renderMatch() {
   renderLive();
   renderCountdown();
   loadH2H(m);
+  loadLast5(m);
 }
 
 /* ---------- kick-off countdown (last hour only) ---------- */
@@ -9708,6 +9732,61 @@ async function loadH2H(m) {
     }).join("")}</div>
     <div class="note">Colours are from ${esc(m.home)}'s side: green won, red lost. Old meetings say less than current form — HAWK's chances don't use them.</div>`;
   el.querySelector(".h2h-list").onclick = (e) => { const r = e.target.closest("[data-rep]"); if (r) showReport(r.dataset.rep); };
+}
+
+/* ---------- last 5 games ---------- */
+// Each side's last five, side by side, with the corners, cards and shots the head
+// to head already shows — the difference being that this is per CLUB, so it covers
+// the pairings that have never met. Loaded after the page like the h2h, since it
+// costs a request per match for the stats.
+//
+// This is a reader, not an input. HAWK's chances use season-long rates, and the
+// short window was measured on 2,237 matches: last-5 card rate correlates with the
+// match's cards at r +0.118 against the season rate's +0.229. The five games below
+// are here to be looked at, not to move a price.
+async function loadLast5(m) {
+  const el = $("#last5");
+  if (!el) return;
+  if (!m.homeId || !m.awayId) { el.innerHTML = `<div class="note">HAWK doesn't have club ids for this fixture.</div>`; return; }
+  let d = S.last5 && S.last5.id === m.id ? S.last5.d : null;   // the tabs re-render the page: don't fetch twice
+  if (!d) {
+    try {
+      d = await Promise.all([api(`/api/recent?team=${encodeURIComponent(m.homeId)}`),
+                             api(`/api/recent?team=${encodeURIComponent(m.awayId)}`)]);
+    } catch (err) { el.innerHTML = `<div class="note">Couldn't load the last five (${esc(err.message)}).</div>`; return; }
+    S.last5 = { id: m.id, d };
+  }
+  if (!S.match || S.match.id !== m.id || !$("#last5")) return;
+  const date = (iso) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  const col = (games, name, crest) => {
+    if (!games.length) return `<div class="l5-col"><div class="l5-ch"><div class="nm">${esc(name)}</div></div>
+      <div class="note" style="padding:11px">No recent games.</div></div>`;
+    const n = games.length;
+    const avg = (k) => { const l = games.filter((g) => g[k]); return l.length ? (l.reduce((s, g) => s + g[k][0] + g[k][1], 0) / l.length).toFixed(1) : "–"; };
+    const gf = (games.reduce((s, g) => s + g.mine, 0) / n).toFixed(1);
+    const ga = (games.reduce((s, g) => s + g.theirs, 0) / n).toFixed(1);
+    const form = games.map((g) => (g.mine > g.theirs ? "W" : g.mine < g.theirs ? "L" : "D")).join("");
+    const tot = (g, k) => (g[k] ? g[k][0] + g[k][1] : null);
+    return `<div class="l5-col">
+      <div class="l5-ch">${crest ? `<img src="${esc(crest)}" alt="" onerror="this.remove()">` : ""}
+        <div class="nm">${esc(name)}</div>${formHTML(form, true)}</div>
+      ${games.map((g) => {
+        const r = g.mine > g.theirs ? "w" : g.mine < g.theirs ? "l" : "d";
+        const c = tot(g, "corners"), k = tot(g, "cards"), s = tot(g, "sot");
+        return `<div class="l5-row" data-rep="${esc(g.id)}" title="${esc(`${date(g.date)} · ${g.comp}\n${g.atHome ? "vs" : "at"} ${g.opp} ${g.mine}–${g.theirs}`)}">
+          <span class="sc ${r}">${g.mine}–${g.theirs}</span>
+          <span class="ha">${g.atHome ? "H" : "A"}</span>
+          <span class="op">${esc(g.opp)}</span>
+          <span class="st">${c == null ? "" : `🚩${c}`}${k == null ? "" : ` 🟨${k}`}${s == null ? "" : ` 🎯${s}`}</span></div>`;
+      }).join("")}
+      <div class="l5-avg"><span>⚽ <b>${gf}</b>–<b>${ga}</b></span><span>🚩 <b>${avg("corners")}</b></span>
+        <span>🟨 <b>${avg("cards")}</b></span><span>🎯 <b>${avg("sot")}</b></span></div></div>`;
+  };
+  el.innerHTML = `<div class="l5">${col(d[0] || [], m.home, m.homeCrest)}${col(d[1] || [], m.away, m.awayCrest)}</div>
+    <div class="note">Averages are per game, counting both teams — the same way a corners or cards line settles.
+      Friendlies are left out. HAWK's chances use season-long rates, not these five: measured over 2,237 matches
+      the short window predicts a match's cards at r +0.12 against the season rate's +0.23.</div>`;
+  el.querySelector(".l5").onclick = (e) => { const r = e.target.closest("[data-rep]"); if (r) showReport(r.dataset.rep); };
 }
 
 /* ---------- player deep-dive ---------- */

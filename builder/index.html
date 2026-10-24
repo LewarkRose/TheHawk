@@ -2125,6 +2125,26 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .h2h-sc.l{background:rgba(255,93,115,.18);color:var(--red)}
 .h2h-comp{font-size:11.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:560px){.h2h-row{grid-template-columns:62px minmax(0,1fr) auto}.h2h-comp{display:none}}
+/* "the lineups landed and this build predates them". Deliberately a notice and a
+   strike-through, never an edit: the slip is not touched, the price is not
+   recalculated, nothing is removed. Finding your price had already moved while
+   you were out of the room is a worse surprise than a line through a leg. */
+.xiban{display:flex;align-items:center;gap:9px;padding:10px 12px;margin:0 0 10px;border-radius:12px;
+  font-size:12.5px;line-height:1.5;color:#e2cda4;
+  background:rgba(224,176,99,.09);border:1px solid rgba(224,176,99,.28)}
+.xiban .i{flex:none;font-size:14px}
+.xiban .t{flex:1}
+.xiban .t b{color:var(--gold)}
+.xiban .xirb{flex:none;padding:7px 11px;border-radius:9px;border:1px solid rgba(224,176,99,.45);
+  background:rgba(224,176,99,.14);color:var(--gold);font:700 11.5px/1 inherit;cursor:pointer;white-space:nowrap}
+.xiban .xirb:hover{background:rgba(224,176,99,.24)}
+.xiban .xix{flex:none;background:none;border:0;color:var(--faint);font-size:13px;cursor:pointer;padding:2px 4px}
+/* The leg itself: struck on the LEAF, because text-decoration inherits down and a
+   child cannot take it off again — the label would carry the line into its badges. */
+.leg.legdead{opacity:.72}
+.leg.legdead .lb{text-decoration:line-through;color:var(--muted)}
+.deadnote{font-size:11px;line-height:1.5;color:#e8a6b0;background:rgba(255,107,127,.1);
+  border:1px solid rgba(255,107,127,.26);border-radius:9px;padding:6px 9px;margin-bottom:9px}
 /* last 5 — the two sides in parallel, because form is read as a comparison
    ("who is in better shape") rather than one team at a time. The 1px gap over a
    --line background draws the divider without a border on either column. */
@@ -2933,6 +2953,9 @@ async function openMatch(id, refresh = false, prematch = false) {
   try {
     const m = await api(`/api/match?league=${encodeURIComponent(S.league)}&id=${id}${refresh ? "&refresh=1" : ""}`);
     S.built.add(String(id));
+    // A fresh build is never stale — and a build of a different match has nothing
+    // to do with the XI that landed for the last one.
+    xiCheck = null;
     S.match = m; S.legs = Object.fromEntries(m.legs.map(l => [l.id, l]));
     foldFixtures(true);   // phones: the league list folds away once a match is open
     if (!refresh) { S.slip = []; S.locked = new Set(); S.banned = new Set(); S.result = null; S.cat = "All"; }
@@ -4284,6 +4307,7 @@ function renderSlip() {
   // swapping first, so it's named rather than left for you to work out.
   const weakId = S.slip.length > 1
     ? S.slip.filter((i) => S.legs[i]).reduce((w, i) => (!w || (S.legs[i].p || 1) < (S.legs[w].p || 1) ? i : w), null) : null;
+  const dead = deadLegIds();
   const legRows = S.slip.map((id, n) => {
     const l = S.legs[id]; if (!l) return "";
     const row = r && r.legs ? r.legs.find(x => x.id === id) : null;
@@ -4293,8 +4317,9 @@ function renderSlip() {
     // On a phone the card flips (tap it): the front has the numbers, the back
     // the reasoning. On a bigger screen both show, one under the other.
     const src = l.bookPrice > 1 || typedLegIds().includes(id) ? "priced" : l.refBooks >= 2 ? "ref" : "guess";
-    return `<div class="leg card tilt3d fcard ${src}${id === weakId ? " weakleg" : ""} ${S.flipped.has(id) ? "flipped" : ""}" data-fid="${id}" style="animation-delay:${n * 60}ms"><div class="fin">
+    return `<div class="leg card tilt3d fcard ${src}${id === weakId ? " weakleg" : ""}${dead.has(id) ? " legdead" : ""} ${S.flipped.has(id) ? "flipped" : ""}" data-fid="${id}" style="animation-delay:${n * 60}ms"><div class="fin">
       <div class="fa">
+        ${dead.has(id) ? `<div class="deadnote" title="HAWK compared the confirmed XI against this leg's player — it has not re-run the match">⛔ ${esc(l.player || "This player")} is not in the confirmed XI — most bookmakers void this leg</div>` : ""}
         <div class="sc-head">${legFace(l)}<div class="sc-name"><div class="lb">${esc(l.label)}${
           id === weakId ? ` <span class="weaktag" title="The lowest chance on this ticket \u2014 the one to swap first. It is not a criticism of the leg: every builder has a least likely one.">least likely</span>` : ""}</div>
           <div class="mk">${esc(l.market)} ${trustBadge(l)}</div></div>
@@ -4315,6 +4340,12 @@ function renderSlip() {
   // One button, then everything else out of the way. You came here to build,
   // not to set six dials — the dials are one tap away for when you want them.
   $("#slip").innerHTML = `
+    ${xiCheck && m && String(xiCheck.id) === String(m.id) ? `<div class="xiban">
+      <span class="i">⚠️</span>
+      <span class="t"><b>Lineups are in.</b> This build came from a predicted XI${dead.size
+        ? ` — <b>${dead.size} leg${dead.size === 1 ? "" : "s"}</b> can no longer settle` : ", and the chances behind it may have moved"}.</span>
+      <button class="xirb" onclick="openMatch('${esc(String(m.id))}', true)" title="Re-run the simulation on the confirmed XI">↻ Rebuild</button>
+      <button class="xix" onclick="xiDismiss()" title="Hide this">✕</button></div>` : ""}
     <button class="build" id="go" style="margin-top:0" ${m ? "" : "disabled"}>${sameOptions() && S.options.list.length > 1
       ? `🔄 BUILD AGAIN — option ${(S.options.at + 1) % S.options.list.length + 1} of ${S.options.list.length}` : "⚡ BUILD MY BET BUILDER"}</button>
     <details class="tune" id="tune" ${S.tuneOpen ? "open" : ""}><summary>${tuneSummary()}</summary>
@@ -9101,6 +9132,29 @@ async function toggleWatchFor(g) {
   if (S.view === "scores") renderScoreList();
 }
 let checkingLineups = false;
+// The confirmed XI for the match currently open, once the bell has fired on it.
+// Kept apart from S.match because the analysis is deliberately NOT re-run: the
+// point is to say which legs just died without touching anything else.
+let xiCheck = null;
+// A player leg whose man is not in the confirmed XI cannot settle — most
+// bookmakers void it. Comparing the names costs nothing, so this can be shown
+// the instant the lineups land rather than after a rebuild. Matched with
+// nameSimilarity, the same way the Vault links a typed selection to a player,
+// because the two feeds spell people differently ("Vinicius Júnior" / "Vinicius Jr").
+function deadLegIds() {
+  const m = S.match;
+  if (!m || !xiCheck || String(xiCheck.id) !== String(m.id) || !xiCheck.xi) return new Set();
+  const out = new Set();
+  for (const id of S.slip) {
+    const l = S.legs[id];
+    if (!l || l.kind !== "player" || !l.player || !l.side) continue;
+    const xi = xiCheck.xi[l.side];
+    if (!Array.isArray(xi) || !xi.length) continue;        // no XI for that side: say nothing
+    const inXI = xi.some((n) => n === l.player || HAWK.nameSimilarity(n, l.player) >= 0.8);
+    if (!inXI) out.add(id);
+  }
+  return out;
+}
 async function checkLineups() {
   if (checkingLineups || !S.watch.length) return;
   checkingLineups = true;
@@ -9110,7 +9164,7 @@ async function checkLineups() {
       try { st = await api(`/api/lineups?id=${encodeURIComponent(w.id)}`); } catch { continue; }
       if (st.confirmed || st.started) {
         S.watch = S.watch.filter(x => String(x.id) !== String(w.id));
-        if (st.confirmed) lineupsIn(w, st.source);
+        if (st.confirmed) lineupsIn(w, st.source, st.xi);
       }
     }
   } finally {
@@ -9118,7 +9172,14 @@ async function checkLineups() {
     saveWatch(); renderWatch(); renderFixtures();
   }
 }
-async function lineupsIn(w, source) {
+function xiDismiss() { xiCheck = null; renderSlip(); }
+async function lineupsIn(w, source, xi) {
+  // If this is the match you are looking at, the build on screen came from a
+  // predicted XI and is now out of date. Mark it immediately — struck legs and a
+  // stale price — and leave the rebuild to you. Nothing on the slip is changed
+  // or removed: finding your price already moved while you were elsewhere is a
+  // worse surprise than a leg with a line through it.
+  if (xi && S.match && String(S.match.id) === String(w.id)) { xiCheck = { id: String(w.id), xi }; renderSlip(); }
   const msg = `Lineups confirmed: ${w.home} v ${w.away}${source === "ESPN" ? " (ESPN — first to publish)" : ""}`;
   beep(); flashTitle("🔔 Lineups in!");
   noticeCard({ icon: "🔔", word: "Lineups confirmed", tone: "info", text: `${w.home} v ${w.away}${source === "ESPN" ? " (ESPN — first to publish)" : ""}`,
@@ -9129,11 +9190,17 @@ async function lineupsIn(w, source) {
   savePref("hawk.goalFollow", follow);
   systemNotify("🔔 Lineups in!", `${msg}\nTap to rebuild your builder with them.`,
                { tag: `lineups-${w.id}`, url: `?view=build&id=${w.id}&league=${encodeURIComponent(w.league || "")}` });
-  if (S.view === "match" && S.match && String(S.match.id) === String(w.id)) {
-    await openMatch(w.id, true);   // keeps your slip and locked legs
-    await build();
-    toast("Builder rebuilt with the confirmed lineups.");
-  }
+  // It used to re-run openMatch AND build() here, which reads as "rebuilt with the
+  // confirmed lineups" but is not what it did: openMatch keeps your slip, and the
+  // build() straight after it throws that slip away and auto-picks a new one. A
+  // ticket you had assembled by hand was replaced while you were looking at
+  // something else, and the toast made it sound like a refresh.
+  //
+  // Now it marks instead of acting. Comparing the confirmed XI against the players
+  // already on your slip needs no simulation and no second request, so the legs
+  // that can no longer settle are struck through the instant the bell fires, with
+  // a Rebuild button next to them. Nothing is removed, nothing is re-priced, and
+  // the decision stays yours — see .xiban and deadLegIds above.
 }
 /* ---------- goal alerts ---------- */
 // A goal pops up bottom-right (top on a phone) for the matches you follow: ones

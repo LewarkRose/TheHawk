@@ -2734,7 +2734,23 @@
       const e = await espnLineups(LEAGUE_OF[g.competitionId], g.homeCompetitor.name, g.awayCompetitor.name, new Date(g.startTime)).catch(() => null);
       if (e && e.confirmed) { confirmed = true; source = "ESPN"; }
     }
-    return { ...st, confirmed, source, started: !!(g.startTime && new Date(g.startTime) < new Date()) };
+    // The starting names as well as the status. Comparing a confirmed XI against
+    // the players already on your slip costs nothing — no simulation, no second
+    // request — so the page can say WHICH leg just died the instant the lineups
+    // land, instead of only that something may have changed. The lineup lists
+    // ids; game.members carries the names for them.
+    const names = {};
+    for (const mm of (g.members || [])) {
+      if (mm.athleteId != null) names[mm.athleteId] = mm.name;
+      if (mm.id != null) names[mm.id] = mm.name;
+    }
+    const xi = {};
+    for (const [side, key] of [["home", "homeCompetitor"], ["away", "awayCompetitor"]])
+      xi[side] = ((((g[key] || {}).lineups || {}).members) || [])
+        .filter((p) => String(p.statusText) === "Starting")
+        .map((p) => names[p.id] || names[p.athleteId] || "")
+        .filter(Boolean);
+    return { ...st, confirmed, source, xi, started: !!(g.startTime && new Date(g.startTime) < new Date()) };
   }
 
   // Background jobs over every fixture in a time window, two matches at a

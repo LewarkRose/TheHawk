@@ -667,9 +667,9 @@ img{max-width:100%}
 .sc-upset.miss{color:var(--faint);font-weight:600}
 .sc-row{display:grid;grid-template-columns:58px 1fr 92px 1fr 64px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;
   border:1px solid transparent;transition:.12s}
-/* Inside a wave the kick-off is in the heading above, so the column goes rather
-   than repeating the same four digits all the way down. */
-.sc-row.no-time{grid-template-columns:1fr 92px 1fr 64px}
+/* A wave row keeps the clock column — it shows the kick-off, muted, rather than
+   the countdown. The column was removed here once and the rows immediately read
+   as broken against the un-waved ones above them. */
 .sc-row:hover{background:var(--panel2);border-color:var(--line)}
 .sc-row.is-live{background:rgba(255,93,115,.05)}
 .sc-state{font-size:12px;font-weight:700}
@@ -775,7 +775,6 @@ img{max-width:100%}
 /* Phones: the two teams stack (home over away), the score and HAWK's line beside them, the bell and 🎟 in their own column. */
 @media (max-width:560px){
   .sc-row{grid-template-columns:46px minmax(0,1fr) auto auto;grid-template-areas:"st home sc bet" "st away sc bet";gap:3px 8px;font-size:13.5px;padding:8px 6px}
-  .sc-row.no-time{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"home sc bet" "away sc bet"}
   .sc-state{grid-area:st;font-size:11px;line-height:1.25}.sc-soon{white-space:normal}
   .sc-team{grid-area:home;gap:6px}.sc-team.away{grid-area:away;flex-direction:row-reverse;justify-content:flex-end;text-align:left}
   .sc-team img{width:16px;height:16px}
@@ -6810,8 +6809,17 @@ function scoreRow(g, mine, withLeague, noClock) {
     // page there says whether anything corroborates it.
     : g.status !== 2 ? "" : g.lineupsConfirmed ? `<span class="sc-xi" title="365Scores has a lineup for this match — open it to see whether ESPN agrees. An XI marked confirmed well before kick-off has been wrong before.">XI</span>`
     : `<button class="sc-bell ${isWatched(g.id) ? "on" : ""}" data-bell="${g.id}" title="${isWatched(g.id) ? "Lineup alert on — click to stop" : "Alert me when the lineups are confirmed"}">🔔</button>`;
-  return `<div class="sc-row ${g.status === 3 ? "is-live" : ""} ${noClock ? "no-time" : ""}" data-sid="${g.id}" title="${g.status === 3 ? "Open the live view" : g.status === 4 ? "Match report" : "Open in the builder"}">
-    ${noClock ? "" : `<div class="sc-state">${state}</div>`}
+  // Inside a wave the row keeps its clock, but shows the KICK-OFF rather than the
+  // countdown. Removing the column altogether was the wrong call: the loose rows
+  // just above still carry a time, so the wave rows read as broken rather than
+  // tidy, and "where's the time?" was the first thing Lewzu asked. The noise that
+  // started this was "in 32 min" repeated down the page, not the time itself — a
+  // quiet 13:30 answers the question without the repetition.
+  const waveState = noClock && g.kickoff
+    ? `<span class="muted">${new Date(g.kickoff).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>`
+    : state;
+  return `<div class="sc-row ${g.status === 3 ? "is-live" : ""}" data-sid="${g.id}" title="${g.status === 3 ? "Open the live view" : g.status === 4 ? "Match report" : "Open in the builder"}">
+    <div class="sc-state">${waveState}</div>
     <div class="sc-team ${g.winner === 1 ? "win" : ""}"><img src="${esc(g.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><span class="tn">${esc(g.home)}</span></div>
     <div class="sc-score">${g.score[0] == null ? "–" : `${sc0} – ${sc1}`}${predLine(g)}${
       withLeague ? `<div class="sc-lg" title="${esc(g.league)}">${esc(g.league)}</div>` : ""}</div>

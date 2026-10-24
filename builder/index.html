@@ -181,7 +181,12 @@ img{max-width:100%}
 .pill.sm{padding:4px 10px;font-size:12px}
 .lpsum{font-size:12px;color:var(--muted)}
 .grid{display:grid;grid-template-columns:290px minmax(0,1fr) 400px;gap:16px;padding:16px 22px;align-items:start}
-@media (max-width:1250px){.grid{grid-template-columns:260px minmax(0,1fr)}.slipcol{grid-column:1/-1}}
+/* A laptop at 1280 used to drop the slip to a full-width block below the legs,
+   which also un-sticks it — so the price and the value verdict scrolled away
+   exactly on the screens most likely to be building a bet. Narrow the two rails
+   instead and keep three columns down to 1050, where there genuinely is not room. */
+@media (max-width:1250px){.grid{grid-template-columns:240px minmax(0,1fr) 330px;gap:12px;padding:12px 14px}}
+@media (max-width:1050px){.grid{grid-template-columns:230px minmax(0,1fr)}.slipcol{grid-column:1/-1}}
 /* minmax(0,1fr), not 1fr: a plain 1fr track has an auto minimum, so any child wider
    than the screen — a nowrap chip strip, a long leg list — stretches the column and
    the whole page scrolls sideways instead of the child scrolling inside it. */
@@ -514,13 +519,51 @@ img{max-width:100%}
 .hero{position:relative}
 .hero{padding:22px 24px;border-radius:16px 16px 0 0;
   background:radial-gradient(1200px 200px at 50% -60px,rgba(107,143,224,.2),transparent),linear-gradient(180deg,var(--panel2),var(--panel))}
-.vs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px}
-.side{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
-.side img{width:64px;height:64px;filter:drop-shadow(0 6px 12px rgba(0,0,0,.4))}
-.side .nm{font-size:18px;font-weight:800}
-.mid{text-align:center}
-.mid .ko{font-size:13px;color:var(--muted)}
+/* The header used to stack each side as a centred column — crest over name over
+   form over badge — and the middle column stacked VS, the date, the countdown,
+   the referee, two buttons and the odds-checked line on top of each other. The
+   two sides then had to stretch to match the tallest thing on the card, which
+   was never the crests: 223px before HAWK's read even began. One row a side,
+   and everything that is not the fixture itself moved to .hacts below. */
+.vs{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:14px}
+.side{display:flex;flex-direction:row;align-items:center;gap:10px;text-align:left;min-width:0}
+.side.r{flex-direction:row-reverse;text-align:right}
+.side img{width:42px;height:42px;flex:none;filter:drop-shadow(0 4px 9px rgba(0,0,0,.4))}
+.side .who{min-width:0}
+.side .nm{font-size:15.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smeta{font-size:11.5px;color:var(--muted);margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.side.r .smeta{justify-content:flex-end}
+.mid{text-align:center;flex:none;max-width:170px}
+.mid .ko{font-size:15px;font-weight:800;color:var(--gold)}
 .mid .x{font-size:28px;font-weight:900;color:#4a4a4a;letter-spacing:.1em}
+/* A row a side needs width the old centred column did not. Once the middle
+   column is narrow — which is any laptop, because the page grid takes 570px for
+   the two rails — `auto` on .mid let the countdown eat 228px of a 426px row and
+   squeezed each side to 77px, wrapping "Lineup confirmed by 365Scores only" over
+   four lines. Below 1250 the kick-off block becomes its own centred line instead,
+   and the two sides get half the width each. */
+@media (max-width:1250px){
+  .vs{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px 10px}
+  .vs .mid{grid-column:1/-1;order:-1;max-width:none;display:flex;align-items:center;
+    justify-content:center;gap:9px;flex-wrap:wrap;padding-bottom:9px;
+    border-bottom:1px solid rgba(34,43,60,.6)}
+  .vs .mid .kick-cd{display:inline-block}
+}
+/* Everything you read once and then ignore: referee, last odds check, and the
+   buttons. Quiet, one line, under a rule — not competing with the fixture. */
+.hacts{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:11px;padding-top:10px;
+  border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+/* No flex:1 spacer in here. In a wrapping flex row a spacer eats its whole line,
+   so everything after it was pushed onto a new one — the action row stayed three
+   lines tall even at 819px, where it all fits on one. It flows left instead. */
+.hacts .ghost{width:auto;padding:5px 10px;margin:0}
+/* .badge and .live-odds each carry their own top margin from where they used to
+   live (stacked in the centre column). Inside a single flex row those margins
+   offset each item differently and stop them sharing a line. */
+.hacts .badge,.hacts .live-odds{margin-top:0}
+.hacts .live-odds{display:inline-flex}
+.luwrap{display:inline-flex;align-items:center;gap:5px;min-width:0}
+.lucrest{width:15px;height:15px;flex:none;object-fit:contain}
 .chips{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:6px}
 .section{padding:16px 24px;border-top:1px solid var(--line)}
 .section h3{margin:0 0 12px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
@@ -535,7 +578,22 @@ img{max-width:100%}
 .ng-stats{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;margin-top:6px;color:var(--muted)}.ng-stats b{color:var(--text)}
 .ng-scorers{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;margin-top:8px}
 .ng-p{padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--panel)}.ng-p b{color:var(--accent)}
-.srcs{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--muted)}
+.srcs{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:12px;color:var(--muted)}
+/* Signpost to the radar below, not a replacement for it: the full section still
+   sits where it always did, and this jumps you to it. */
+.upjump{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--gold);background:rgba(224,176,99,.12);
+  border:1px solid rgba(224,176,99,.3);padding:4px 9px;border-radius:999px;text-decoration:none;cursor:pointer}
+.upjump:hover{background:rgba(224,176,99,.2)}
+/* HAWK's expectation for the match, always on. These four numbers are what every
+   goals, corners and cards leg is priced from, and they used to be one line of
+   grey summary text inside a fold that is shut by default — the least readable
+   thing on the card, for the figures the card legs depend on. */
+.mtot{display:flex;border-top:1px solid var(--line)}
+.mtot > div{flex:1;padding:9px 6px;text-align:center;border-right:1px solid var(--line);min-width:0}
+.mtot > div:last-child{border-right:0}
+.mtot .k{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.mtot .v{font-size:17px;font-weight:800;margin-top:5px}
 .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .tile{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .tile .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
@@ -586,7 +644,8 @@ img{max-width:100%}
   scrollbar-width:thin;scrollbar-color:#3b3b3b transparent}
 .slipcol::-webkit-scrollbar{width:8px}
 .slipcol::-webkit-scrollbar-thumb{background:#3b3b3b;border-radius:8px}
-@media (max-width:1250px){.slipcol{position:static;max-height:none;overflow:visible}}
+/* Matches the grid above: it stays pinned while it is still its own column. */
+@media (max-width:1050px){.slipcol{position:static;max-height:none;overflow:visible}}
 .bp{font-size:12px;color:var(--muted)}
 .bp b{color:var(--text);font-weight:700}
 .bp.val b{color:var(--accent)}
@@ -2207,11 +2266,18 @@ a.nav{text-decoration:none}
   .lpgroup{min-width:0}
   .grid{padding:10px;gap:10px}
   .fixtures{position:static;max-height:60vh}
-  .hero{padding:16px 12px}
+  .hero{padding:12px}
   .section{padding:12px 14px}
-  .side img{width:46px;height:46px}
-  .side .nm{font-size:15px}
+  .vs{gap:8px}
+  .side img{width:34px;height:34px}
+  .side{gap:8px}
+  .side .nm{font-size:13.5px}
+  .smeta{font-size:10.5px;gap:5px;margin-top:3px}
+  .mid .ko{font-size:13px}
   .mid .x{font-size:20px}
+  .hacts{gap:6px;font-size:11px;margin-top:9px;padding-top:9px}
+  .mtot .v{font-size:15px}
+  .mtot .k{font-size:9px;letter-spacing:.06em}
   .cs{font-size:11px}
   .cs .c{padding:6px 0}
   .lrow{grid-template-columns:1fr 52px 44px 50px 28px;gap:6px;padding:7px 4px}
@@ -2871,16 +2937,33 @@ function renderMatch() {
   //
   // `source` is set in engine.js: "365Scores + ESPN" only when the two name the
   // same XI, so it is already the corroboration flag — it just was not used.
+  // One mapping from (confirmed?, corroborated?) to how it is said, so the single
+  // badge and the combined one below can never drift apart in wording or colour.
+  const luState = (ok, both) => ({
+    cls: !ok ? "warn" : both ? "ok" : "warn",
+    text: !ok ? "predicted" : both ? "confirmed" : "confirmed by 365Scores only",
+    why: !ok ? "" : both ? " title=\"365Scores and ESPN name the same XI\""
+      : " title=\"Only 365Scores has it — ESPN has not published, so nothing corroborates it yet. An early &quot;confirmed&quot; XI has been wrong before.\"",
+  });
   const chip = (side) => {
     const lu = m.lineups[side];
-    const ok = lu.status === "Confirmed", both = /ESPN/.test(lu.source || "");
-    const cls = !ok ? "warn" : both ? "ok" : "warn";
-    const text = !ok ? "Lineup predicted"
-      : both ? "Lineup confirmed"
-      : "Lineup confirmed by 365Scores only";
-    const why = !ok ? "" : both ? " title=\"365Scores and ESPN name the same XI\""
-      : " title=\"Only 365Scores has it — ESPN has not published, so nothing corroborates it yet. An early &quot;confirmed&quot; XI has been wrong before.\"";
-    return `<span class="badge ${cls}"${why}>${text}${lu.formation ? " · " + esc(lu.formation) : ""}</span>`; };
+    const s = luState(lu.status === "Confirmed", /ESPN/.test(lu.source || ""));
+    return `<span class="badge ${s.cls}"${s.why}>Lineup ${s.text}${lu.formation ? " · " + esc(lu.formation) : ""}</span>`; };
+  // Both sides nearly always share a lineup status, and saying the same sentence
+  // twice cost three lines in the header's action row at laptop width. Said once,
+  // with both formations, it is the same information at half the length — and the
+  // moment the two sides disagree it falls back to a badge each, crest-tagged,
+  // because that difference is exactly when you need to see which side is which.
+  const lineupLine = () => {
+    const H = m.lineups.home, A = m.lineups.away;
+    const hb = /ESPN/.test(H.source || ""), ab = /ESPN/.test(A.source || "");
+    const crestBadge = (side, src) => `<span class="luwrap"><img class="lucrest" src="${esc(src)}" alt="" onerror="this.remove()">${chip(side)}</span>`;
+    if (H.status !== A.status || hb !== ab)
+      return crestBadge("home", m.homeCrest) + crestBadge("away", m.awayCrest);
+    const s = luState(H.status === "Confirmed", hb);
+    const f = [H.formation, A.formation].filter(Boolean);
+    return `<span class="badge ${s.cls}"${s.why}>Lineups ${s.text}${f.length === 2 ? ` · ${esc(f[0])} v ${esc(f[1])}` : f.length ? ` · ${esc(f[0])}` : ""}</span>`;
+  };
   const ord = (n) => { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
   // (a knockout tie: that table is the group / league phase, not a league table)
   const tbl = (side) => m.table[side] ? `${m.tie ? "Group stage: " : ""}${ord(m.table[side].position)} · ${Math.round(m.table[side].points)} pts` : "";
@@ -2973,19 +3056,29 @@ function renderMatch() {
   $("#match").innerHTML = `
     <div class="hero">
       <div class="vs">
-        <div class="side"><img src="${esc(m.homeCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(m.home)}</div>
-          <div class="muted">${esc(tbl("home"))}${m.form.home ? " · " + formHTML(m.form.home, true) : ""}</div>${chip("home")}</div>
-        <div class="mid"><div class="x">VS</div><div class="ko">${esc(fmtKick(m.kickoff))}</div><div class="kick-cd" id="kickCountdown"></div>${tieBanner(m)}
-          ${m.started ? '<div class="chips"><span class="badge live">STARTED — pre-match model</span></div>' : ""}
-          ${m.referee && m.referee.name ? `<div class="ko" style="margin-top:6px">Ref: ${esc(m.referee.name)}${m.referee.avg ? ` · ${m.referee.avg.toFixed(2)} cards/g` : ""}</div>` : ""}
-          ${m.table && (m.table.home || m.table.away) ? `<button class="ghost tbl-open" data-table="${esc(m.league)}" data-hl="${esc(JSON.stringify([m.home, m.away]))}">📊 ${m.tie ? "Group table" : "League table"}</button>` : ""}
-          <button class="ghost" style="width:auto;padding:5px 10px;margin-top:8px" onclick="openMatch('${m.id}', true)" title="Re-run everything: odds, lineups and the simulation">↻ Refresh</button>
-          <div class="ko live-odds" id="liveOdds"></div>
-          ${!m.started && !(m.lineups.home.status === "Confirmed" && m.lineups.away.status === "Confirmed") ?
-            `<br><button class="ghost" style="width:auto;padding:5px 10px;margin-top:6px;${isWatched(m.id) ? "color:var(--gold);border-color:var(--gold)" : ""}"
-              onclick="toggleWatch()">${isWatched(m.id) ? "🔕 Stop lineup alert" : "🔔 Alert me when lineups are confirmed"}</button>` : ""}</div>
-        <div class="side"><img src="${esc(m.awayCrest)}" alt="" onerror="this.style.visibility='hidden'"><div class="nm">${esc(m.away)}</div>
-          <div class="muted">${esc(tbl("away"))}${m.form.away ? " · " + formHTML(m.form.away, true) : ""}</div>${chip("away")}</div>
+        <div class="side"><img src="${esc(m.homeCrest)}" alt="" onerror="this.style.visibility='hidden'">
+          <div class="who"><div class="nm">${esc(m.home)}</div>
+            <div class="smeta">${esc(tbl("home"))}${m.form.home ? formHTML(m.form.home, true) : ""}</div></div></div>
+        <div class="mid"><div class="ko">${esc(fmtKick(m.kickoff))}</div><div class="kick-cd" id="kickCountdown"></div>${tieBanner(m)}
+          ${m.started ? '<div class="chips"><span class="badge live">STARTED — pre-match model</span></div>' : ""}</div>
+        <div class="side r"><img src="${esc(m.awayCrest)}" alt="" onerror="this.style.visibility='hidden'">
+          <div class="who"><div class="nm">${esc(m.away)}</div>
+            <div class="smeta">${esc(tbl("away"))}${m.form.away ? formHTML(m.form.away, true) : ""}</div></div></div>
+      </div>
+      <div class="hacts">
+        ${/* The lineup badge carries a real warning ("confirmed by 365Scores only"),
+             so it is not shortened — it is moved here, where there is width for it
+             on one line. In the side column at 200px it wrapped over three lines and
+             was most of the header's height. Each one is tagged with its own crest
+             rather than a team name, because "Manchester" would not tell you which. */""}
+        ${lineupLine()}
+        ${m.referee && m.referee.name ? `<span>Ref: ${esc(m.referee.name)}${m.referee.avg ? ` · ${m.referee.avg.toFixed(2)} cards/g` : ""}</span>` : ""}
+        <span class="ko live-odds" id="liveOdds"></span>
+        ${m.table && (m.table.home || m.table.away) ? `<button class="ghost tbl-open" data-table="${esc(m.league)}" data-hl="${esc(JSON.stringify([m.home, m.away]))}">📊 ${m.tie ? "Group table" : "League table"}</button>` : ""}
+        <button class="ghost" onclick="openMatch('${m.id}', true)" title="Re-run everything: odds, lineups and the simulation">↻ Refresh</button>
+        ${!m.started && !(m.lineups.home.status === "Confirmed" && m.lineups.away.status === "Confirmed") ?
+          `<button class="ghost" style="${isWatched(m.id) ? "color:var(--gold);border-color:var(--gold)" : ""}"
+            onclick="toggleWatch()">${isWatched(m.id) ? "🔕 Stop alert" : "🔔 Alert me on lineups"}</button>` : ""}
       </div>
     </div>
     ${hread}
@@ -2994,14 +3087,24 @@ function renderMatch() {
       <div class="bar3" title="HAWK's chances: its own ratings blended with the market (the bookmakers get most of the weight)">
         <div class="h" style="flex:${p.home}">${hp[0]}%</div><div class="d" style="flex:${p.draw}">${hp[1]}%</div><div class="a" style="flex:${p.away}">${hp[2]}%</div></div>
       <div class="bar3-legend"><span>${esc(m.home)}</span><span>Draw</span><span>${esc(m.away)}</span></div>
-      <div class="srcs">${srcs.join("")}</div>
+      <div class="srcs">${srcs.join("")}${m.upset && m.upset.label
+        ? `<a class="upjump" href="#upDet" title="How likely the favourite is to slip up — the full radar is just below"
+             onclick="const d=document.getElementById('upDet');if(d){d.open=true;d.scrollIntoView({behavior:'smooth',block:'center'})}return false">⚡ Upset: ${esc(String(m.upset.label).toLowerCase())}</a>` : ""}</div>
       ${how ? `<div class="note" style="margin-top:6px">${esc(how)}</div>` : ""}
+    </div>
+    <div class="mtot" title="What HAWK expects across 12,000 simulations — the numbers every goals, corners and cards leg is priced from">
+      <div><div class="k">Goals</div><div class="v">${(e.goals[0] + e.goals[1]).toFixed(2)}</div></div>
+      <div><div class="k">On target</div><div class="v">${(e.sot[0] + e.sot[1]).toFixed(1)}</div></div>
+      <div><div class="k">Corners</div><div class="v">${e.corners.toFixed(1)}</div></div>
+      <div><div class="k">Cards</div><div class="v">${(e.cards[0] + e.cards[1]).toFixed(1)}</div></div>
     </div>
     ${upsetCard(m)}
     ${intlNote(m)}
     ${lineupCard(m)}
     ${teamNews(m)}
-    ${mFold("numbers", "📊 Match numbers", `xG ${e.goals[0].toFixed(2)}–${e.goals[1].toFixed(2)} · ${e.sot[0].toFixed(1)}–${e.sot[1].toFixed(1)} on target · ${e.corners.toFixed(1)} corners · ${(e.cards[0] + e.cards[1]).toFixed(1)} cards`,
+    ${/* The match totals now sit in the strip above, always on, so this fold carries
+          what the strip cannot: the per-team split behind each of those numbers. */""}
+    ${mFold("numbers", "📊 Match numbers", `per team — xG ${e.goals[0].toFixed(2)}–${e.goals[1].toFixed(2)} · ${e.sot[0].toFixed(1)}–${e.sot[1].toFixed(1)} on target`,
       `<div class="section"><div class="tiles">
         <div class="tile"><div class="k">Expected goals</div><div class="v">${e.goals[0].toFixed(2)} – ${e.goals[1].toFixed(2)}</div></div>
         <div class="tile"><div class="k">Shots on target</div><div class="v">${e.sot[0].toFixed(1)} – ${e.sot[1].toFixed(1)}</div></div>

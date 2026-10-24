@@ -300,7 +300,22 @@ function abTally(shifts, leg, w) {
 //       Player Tackles' all-time byKey, which spans every match ever graded — the
 //       same mismatched-denominator trap, a third time. Reset so both halves start
 //       together and the pair is finally comparable.
-const SOURCE_VERSION = 3;
+//   4 — 2026-10-24, same day, because v3 answered the question and the answer was
+//       not believable. Over 54 matches it read: discarded legs said 56.7% and
+//       landed 14.3%, against graded legs saying 62.2% and landing 54.6%. A
+//       42-point miss on one half and 8 on the other cannot both describe the same
+//       market. It was not a units mismatch — where both feeds name a player's
+//       tackles they agree on 570 of 579 — it was WHO was being counted. A leg
+//       became `settleable` the moment the second source had any tackles number,
+//       zero included, and zero was then scored as a LOSS. But 678 of 860
+//       second-source-only readings were zero, and the two feeds disagreed about
+//       minutes for 733 of 1,439 players, so most of those zeros are players who
+//       never came on. At Bet365 an absent player VOIDS the leg; it does not lose
+//       it. So v3 was measuring absences and calling them bad prices. v4 requires
+//       real minutes from the second source before a leg counts, and records the
+//       exclusions in `noMinutes` so the explanation can be checked rather than
+//       assumed: if that counter lands near the settleable one, this was the cause.
+const SOURCE_VERSION = 4;
 const SRC_FIELDS = ["shots", "sot", "tackles", "fouled", "fouls", "offsides", "saves", "minutes"];
 const newSources = () => ({
   ver: SOURCE_VERSION, matches: 0, resolved: 0, ambiguous: 0, players: 0, unmatched: 0,
@@ -324,7 +339,11 @@ const newSources = () => ({
   // while these come from the handful since the block reset — mismatched
   // denominators for the third time in two days. Counted over the SAME matches,
   // the two are finally comparable and the board's real gap can be stated.
-  rescue: { ungraded: 0, settleable: 0, wouldWin: 0, said: 0, saidN: 0, wonOfSaidN: 0,
+  // `noMinutes` is the v4 addition and the one to read first: legs the second
+  // source could put a number against but whose player it shows no minutes for.
+  // Those are voids at the book, not losses, and counting them as losses is what
+  // made v3 read 14% against a 57% price.
+  rescue: { ungraded: 0, settleable: 0, noMinutes: 0, wouldWin: 0, said: 0, saidN: 0, wonOfSaidN: 0,
             graded: 0, gradedWon: 0, gradedSaid: 0 },
 });
 // 365Scores' own names for the same numbers, and how to read each one. A tackle is
@@ -377,6 +396,10 @@ async function crossCheck(pr, f, unknownTackles) {
       S.rescue.ungraded++;
       const q = index.get(FotMob.lastName(leg.player));
       if (!q || q.stats.tackles == null) continue;
+      // Minutes first, and counted separately. A player who never came on reads as
+      // zero tackles here, and "0 >= need" is false, so without this the leg scored
+      // as a loss when the book would have voided it. See SOURCE_VERSION 4 above.
+      if (!(q.stats.minutes > 0)) { S.rescue.noMinutes++; continue; }
       S.rescue.settleable++;
       const won = q.stats.tackles >= leg.need;
       if (won) S.rescue.wouldWin++;

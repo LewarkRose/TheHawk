@@ -3769,7 +3769,15 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
                     <textarea data-in rows="2" placeholder="Paste the sync link here" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white" style="font-size:16px"></textarea>
                     <div class="flex gap-2">${navigator.clipboard && navigator.clipboard.readText ? '<button data-clip class="flex-1 bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm">📋 Paste</button>' : ''}
                         <button data-add class="flex-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold rounded-xl py-2.5 text-sm">Add to this Vault</button></div>
-                    <label class="block text-center w-full bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm cursor-pointer">📂 Add from a sync file<input type="file" accept=".json,application/json" data-file-in class="hidden"></label>
+                    <!-- No accept filter, deliberately. With accept of .json/application/json,
+                         Android routed the picker through a document provider that handed back a
+                         URI the page could not read: BOTH FileReader and File.text() threw
+                         NotFoundError on a file sitting right there. Seen 2026-10-23 on
+                         hawk_backup_2026-10-23 (1).json. An unfiltered picker returns a handle
+                         that can actually be opened, and the file's CONTENTS are checked below,
+                         which is the only check that ever mattered.
+                         (No backticks in here: this comment lives inside a template literal.) -->
+                    <label class="block text-center w-full bg-zinc-900 border border-zinc-700 text-white font-bold rounded-xl py-2.5 text-sm cursor-pointer">📂 Add from a sync file<input type="file" data-file-in class="hidden"></label>
                 </div>
             </div>`;
             wrap.onclick = async (e) => {

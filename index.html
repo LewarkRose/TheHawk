@@ -136,6 +136,62 @@
             border-radius: 5px 5px 0 0;
             background: linear-gradient(90deg, var(--accent-d), var(--accent) 45%, var(--accent-d));
         }
+
+        /* ════ THE STATEMENT ═════════════════════════════════════════════════
+           Your numbers, set as the bank statement they are: the same stock as
+           the ticket and the stub, a printed rule along the top, dashed rules
+           between entries. Figures are tabular mono and right-aligned so the
+           column reads straight down — which is the whole reason a statement
+           has ever been set this way, and what six separate boxes cannot do.
+           html body for the same reason as .stub: Tailwind is underneath. */
+        html body .vledger {
+            position: relative; border-radius: 5px; padding: 0 16px;
+            background:
+                repeating-linear-gradient(135deg, rgba(255,255,255,.012) 0 2px, transparent 2px 5px),
+                linear-gradient(180deg, #141620 0%, #101219 55%, #0d0f16 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,.06), inset 0 0 0 1px rgba(232,224,207,.09),
+                0 2px 0 #0a0c12, 0 3px 0 #070910, 0 16px 26px -14px rgba(0,0,0,.9);
+        }
+        html body .vledger::before {
+            content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+            border-radius: 5px 5px 0 0;
+            background: linear-gradient(90deg, var(--accent-d), var(--accent) 45%, var(--accent-d));
+        }
+        html body .vl-head {
+            display: flex; align-items: baseline; gap: 12px;
+            padding: 17px 0 13px; border-bottom: 1px dashed #2c3648;
+        }
+        html body .vl-head .t {
+            font: 600 9px/1 "Segoe UI"; letter-spacing: .26em; text-transform: uppercase; color: var(--muted);
+        }
+        html body .vl-head .t2 {
+            font: 600 9px/1 "Segoe UI"; letter-spacing: .2em; text-transform: uppercase; color: var(--faint);
+        }
+        html body .vl-r {
+            display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 14px; align-items: baseline;
+            padding: 12px 0; border-bottom: 1px dashed #222b3c;
+        }
+        html body .vl-r:last-child { border-bottom: 0; }
+        html body .vl-r .k {
+            font: 600 10px/1.3 "Segoe UI"; letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+        }
+        html body .vl-r .k s {
+            display: block; text-decoration: none; margin-top: 5px;
+            font: 400 11px/1.5 "Segoe UI"; letter-spacing: .01em; text-transform: none; color: var(--faint);
+        }
+        /* Tabular mono, right-aligned: the point of the whole block. Tailwind's
+           text-lg/font-bold are gone from the markup, so no !important needed. */
+        html body .vl-r .v {
+            font: 700 16px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+            color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums;
+        }
+        @media (max-width: 560px) {
+            html body .vledger { padding: 0 13px; }
+            html body .vl-r .k { font-size: 9.5px; letter-spacing: .1em; }
+            html body .vl-r .k s { font-size: 10.5px; }
+            html body .vl-r .v { font-size: 14.5px; }
+        }
         html body .stub .perf { position: relative; display: flex; align-items: center; gap: 10px; margin: 12px 0 }
         html body .stub .perf i { flex: 1; height: 0; border-top: 2px dashed rgba(232, 224, 207,.26) }
         html body .stub .perf::before, html body .stub .perf::after {
@@ -877,30 +933,30 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
                 <div id="weekly-container"></div>
             </div>
             <div class="vband"><span>Your numbers</span><i></i></div>
-            <div class="vwells grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80">
-                    <span class="text-[10px] text-zinc-400 uppercase tracking-wider flex items-center gap-1"><span class="icon-gold">💰</span> Total Profit / Loss</span>
-                    <span id="stat-net" class="text-lg font-bold text-zinc-200">€0.00</span>
-                </div>
-                <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80">
-                    <span class="text-[10px] text-zinc-400 uppercase tracking-wider flex items-center gap-1"><span class="icon-gold">📊</span> ROI %</span>
-                    <span id="stat-roi" class="text-lg font-bold text-zinc-200">0.0%</span>
-                </div>
-                <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80">
-                    <span class="text-[10px] text-zinc-400 uppercase tracking-wider flex items-center gap-1"><span class="icon-gold">🎯</span> Win Rate</span>
-                    <span id="stat-winrate" class="text-lg font-bold text-zinc-200">0%</span>
-                </div>
-                <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80">
-                    <span class="text-[10px] text-zinc-400 uppercase tracking-wider flex items-center gap-1"><span class="icon-gold">📋</span> Record (W-L-P)</span>
-                    <span id="stat-record" class="text-lg font-bold text-zinc-200">0 - 0 - 0</span>
-                </div>
-                <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80">
-                    <span class="text-[10px] text-zinc-400 uppercase tracking-wider flex items-center gap-1"><span class="icon-gold">🔥</span> Current Streak</span>
-                    <span id="stat-streak" class="text-lg font-bold text-zinc-200">—</span>
-                </div>
-                <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80">
-                    <span class="text-[10px] text-zinc-400 uppercase tracking-wider flex items-center gap-1"><span class="icon-gold">📉</span> Max Drawdown</span>
-                    <span id="stat-drawdown" class="text-lg font-bold text-zinc-200">€0.00</span>
+            <!-- THE STATEMENT. Was six identical rounded boxes in a grid, each with an
+                 emoji, a grey label and a bold figure — which gave the bankroll and the
+                 average stake exactly the same weight, so none of them was the headline.
+                 It is a bank statement, so it is set as one: card stock, a printed rule
+                 along the top, dashed rules between entries, and every figure in tabular
+                 mono and right-aligned so the column reads straight down.
+                 The ids are untouched — the same six the JS writes into. The bankroll is
+                 deliberately NOT repeated here; it lives in the header, where it stays
+                 visible as you scroll. -->
+            <div class="vledger">
+                <div class="vl-head"><span class="t">Hawk &middot; Vault</span><span class="t2">statement</span></div>
+                <div class="vl-rows">
+                    <div class="vl-r"><span class="k"><span class="icon-gold">💰</span> Total profit / loss<s>across every settled ticket</s></span>
+                        <span id="stat-net" class="v">€0.00</span></div>
+                    <div class="vl-r"><span class="k"><span class="icon-gold">📊</span> Return on everything staked<s>profit as a share of turnover</s></span>
+                        <span id="stat-roi" class="v">0.0%</span></div>
+                    <div class="vl-r"><span class="k"><span class="icon-gold">🎯</span> Strike rate<s>how often a ticket lands</s></span>
+                        <span id="stat-winrate" class="v">0%</span></div>
+                    <div class="vl-r"><span class="k"><span class="icon-gold">📋</span> Record<s>won &middot; lost &middot; pending</s></span>
+                        <span id="stat-record" class="v">0 - 0 - 0</span></div>
+                    <div class="vl-r"><span class="k"><span class="icon-gold">🔥</span> Current streak<s>wins or losses in a row</s></span>
+                        <span id="stat-streak" class="v">—</span></div>
+                    <div class="vl-r"><span class="k"><span class="icon-gold">📉</span> Max drawdown<s>the deepest the bankroll has been</s></span>
+                        <span id="stat-drawdown" class="v">€0.00</span></div>
                 </div>
             </div>
 

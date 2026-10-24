@@ -3864,11 +3864,23 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
                     catch (err) { lastErr = err; }
                 }
                 if (usedReader == null) {
-                    alert(`Couldn't read "${f.name}" (${(lastErr && lastErr.name) || "error"}), and all three ways of opening it failed.\n\n`
-                        + `Android has locked the file. Two things that do work:\n\n`
-                        + `1. Use the sync LINK instead — on the other device tap Copy link, send it to yourself, `
-                        + `then paste it in the box above and tap "Add to this Vault". It never touches a file.\n\n`
-                        + `2. Or open the file in your Files app and use Share → this browser.`);
+                    // SAY WHAT IS KNOWN, NOT WHAT IS GUESSED. This used to assert
+                    // "Android has locked the file", which was a story rather than a
+                    // finding — the failures have come back as NotFoundError twice and
+                    // TypeError once, and all three only mean the bytes could not be
+                    // reached. The SIZE separates the real cases: a file the picker
+                    // reports as 0 bytes is a stub or a cloud placeholder whose contents
+                    // are not on the phone, while a real size with no readable bytes is
+                    // a revoked or one-shot URI.
+                    const size = f.size;
+                    const why = size === 0
+                        ? "The picker says it is 0 bytes, so its contents aren't on this device — that usually means it lives in Drive, OneDrive or Samsung Cloud and hasn't been downloaded."
+                        : `The picker says it is ${size.toLocaleString()} bytes but none of them could be read, which usually means the file was opened from a Downloads notification or a "recent files" list whose permission is already spent.`;
+                    alert(`Couldn't read "${f.name}".\n\n${why}\n\n`
+                        + `What works instead:\n\n`
+                        + `1. The sync LINK — on the other device tap Copy link, send it to yourself, paste it in the box above and tap "Add to this Vault". It never touches a file.\n\n`
+                        + `2. Or open the file in your Files app and use Share → this browser.\n\n`
+                        + `(Technical: ${(lastErr && lastErr.name) || "error"} from all three readers.)`);
                     return;
                 }
                 const size = f.size != null ? f.size : text.length;

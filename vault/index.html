@@ -173,6 +173,85 @@
   </div>
 </details>
 
+<!-- =====================================================================
+     The bankroll itself: correcting it, and the record of every correction.
+     Without this a mis-settled ticket can never be put right, and the log
+     is the only audit trail of money that moved outside a bet.
+     ===================================================================== -->
+<details class="calm fold" id="bankWrap" data-fold="vBank">
+  <summary><div class="wrap"><div class="lede"><h3>Bankroll</h3>
+    <span class="n" id="bankN"></span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div class="lgf" style="max-width:640px">
+      <div><label for="bkNew">Set it to (€)</label>
+        <input id="bkNew" class="num" inputmode="decimal" placeholder="e.g. 133.46"></div>
+      <div><label for="bkWhy">Why</label>
+        <input id="bkWhy" placeholder="e.g. topped up, or a settle HAWK got wrong"></div>
+      <div><button class="btn gold btn-sm" id="bkSet" type="button">Change it</button></div>
+    </div>
+    <p class="note" id="bkOut"></p>
+    <p class="note">Every change is written to the log below with what it was, what it became and
+      why. A sync carries these across, which is how money you moved by hand on one device
+      reaches the other — a ticket's own stake and return travel with the ticket.</p>
+    <div class="lede" style="margin:34px 0 14px"><h3 style="font-size:19px">Edit log</h3>
+      <span class="n" id="bkLogN"></span></div>
+    <div id="bkLog"></div>
+  </div>
+</details>
+
+<!-- =====================================================================
+     Sync. Four ways across because each fails differently: a link is
+     easiest until an app truncates it, a QR needs no app at all, a file
+     cannot be cut short, and pasting covers the link opening in the wrong
+     browser. The protocol lives in assets/hawk-sync.js.
+     ===================================================================== -->
+<details class="calm fold" id="syncWrap" data-fold="vSync">
+  <summary><div class="wrap"><div class="lede"><h3>Send to your other device</h3>
+    <span class="n" id="syncN"></span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div class="sw" id="syncMode"></div>
+    <div style="display:flex;gap:11px;flex-wrap:wrap;margin-top:22px">
+      <button class="btn gold btn-sm" id="syLink" type="button">Copy link</button>
+      <button class="btn ghost btn-sm" id="syQR" type="button">Show a QR code</button>
+      <button class="btn ghost btn-sm" id="syFile" type="button">Send as a file</button>
+    </div>
+    <div id="syOut" style="margin-top:22px"></div>
+
+    <div class="lede" style="margin:36px 0 14px"><h3 style="font-size:19px">Bring one in</h3></div>
+    <div class="lgf" style="max-width:640px">
+      <div style="grid-column:1/-1"><label for="syPaste">Paste a sync link</label>
+        <input id="syPaste" placeholder="https://…#sync=… or the code itself"></div>
+      <div><button class="btn gold btn-sm" id="syTake" type="button">Add it</button></div>
+      <div><label class="btn ghost btn-sm" style="cursor:pointer">Add from a file
+        <input type="file" id="syFileIn" accept="application/json,.json" hidden></label></div>
+    </div>
+    <p class="note">Nothing leaves your devices. A link carries only what changed since the last
+      sync unless you ask for everything; a QR is cut into frames your phone collects in any
+      order. Tickets already here are kept, and one you deleted is never put back.</p>
+  </div>
+</details>
+
+<!-- =====================================================================
+     Two questions the Vault can answer and nothing else can: does its
+     balance agree with the bookmaker's, and has following HAWK actually
+     paid. Both are checks on HAWK rather than reports from it.
+     ===================================================================== -->
+<details class="calm fold" id="chkWrap" data-fold="vCheck">
+  <summary><div class="wrap"><div class="lede"><h3>Check against your bookmaker</h3>
+    <span class="n" id="chkN"></span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div class="lgf" style="max-width:520px">
+      <div><label for="chkReal">What Bet365 actually says (€)</label>
+        <input id="chkReal" class="num" inputmode="decimal" placeholder="your real balance"></div>
+      <div><button class="btn gold btn-sm" id="chkGo" type="button">Compare</button></div>
+    </div>
+    <div id="chkOut" style="margin-top:22px"></div>
+    <div class="lede" style="margin:36px 0 14px"><h3 style="font-size:19px">Did following HAWK pay?</h3>
+      <span class="n" id="payN"></span></div>
+    <div id="payOut"></div>
+  </div>
+</details>
+
 <details class="calm fold" id="bkWrap" data-fold="vBackup">
   <summary><div class="wrap"><div class="lede"><h3>Backup</h3>
     <span class="n" id="bkN"></span><span class="mk-t"></span></div></div></summary>
@@ -196,6 +275,11 @@
     bets and bankroll are this browser's, shared with the old site</div>
 </footer>
 
+<script src="../qr.js?v=1"></script>
+<script src="../assets/hawk-sync.js"></script>
+<!-- Reuse puts a ticket's legs back on the acca, so the Vault needs the
+     acca store. Without it the button was here and did nothing at all. -->
+<script src="../assets/hawk-acca.js"></script>
 <script src="../assets/hawk-bg.js"></script>
 <script src="../assets/hawk-fold.js"></script>
 <script src="../assets/hawk-alerts.js"></script>
@@ -229,8 +313,10 @@
   // "match" pluralises to "matches", not "matchs"
   const plural = (n, w) => `${n} ${w}${n === 1 ? "" : /(ch|sh|s|x|z)$/.test(w) ? "es" : "s"}`;
   const round2 = (v) => Math.round((+v || 0) * 100) / 100;
+  // a typed number, accepting the comma a European keyboard gives you
+  const num = (s) => parseFloat(String(s == null ? "" : s).replace(",", "."));
 
-  const S = { bets: [], bank: 0, filter: "ALL", cashing: null };
+  const S = { bets: [], bank: 0, filter: "ALL", cashing: null, editing: null };
 
   /* ------------------------------------------------------------- storage */
   function load() {
@@ -559,7 +645,228 @@
              <button class="c" data-docash="${esc(b.id)}">Confirm</button>
              <button data-cancel="1">Cancel</button>`
           : `<button class="c" data-cash="${esc(b.id)}">Cash out</button>`}
-      </div>` : ""}</div>`;
+      </div>` : ""}
+      <!-- on every ticket, settled or not: correct what it was, or take its
+           legs again. Reuse only offers itself where HAWK has the legs. -->
+      <div class="act minor">
+        ${S.editing === b.id
+          ? `<input id="edStake" inputmode="decimal" placeholder="stake €" value="${esc((+b.stake || 0).toFixed(2))}">
+             <input id="edOdds" inputmode="decimal" placeholder="price" value="${esc((+b.odds || 0).toFixed(2))}">
+             <button class="c" data-doedit="${esc(b.id)}">Save</button>
+             <button data-cancel="1">Cancel</button>`
+          : `<button data-edit="${esc(b.id)}">Edit</button>`}
+        ${hawkLegs.length ? `<button data-reuse="${esc(b.id)}">Reuse</button>` : ""}
+      </div></div>`;
+  }
+
+  /* ========================================================= SYNC
+     The protocol is in assets/hawk-sync.js; this is the panel. It hands
+     the module the few things only this page can do. */
+  let syMode = "diff";
+  const syCtx = () => ({
+    bets: () => S.bets, bank: () => S.bank,
+    setBank: (v) => { S.bank = v; },
+    save: () => save(), draw: () => draw(),
+  });
+
+  function syncPanel() {
+    if (!SY()) { $("#syncWrap").hidden = true; return; }
+    const fresh = SY().newCount(S.bets);
+    const mark = SY().syncMark();
+    $("#syncN").textContent = mark.at
+      ? `${fresh ? plural(fresh, "new ticket") : "nothing new"} since ${
+          new Date(mark.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
+      : "never synced";
+    $("#syncMode").innerHTML = [
+      ["diff", "Only what's new", fresh
+        ? `${plural(fresh, "ticket")} this device hasn't sent. Small enough for any app.`
+        : "Nothing new to send — the other device already has it all."],
+      ["full", "Everything", `All ${plural(S.bets.length, "ticket")} and what HAWK has learned about prices. `
+        + `Large: a QR or a file, not a message.`],
+    ].map(([k, t, why]) => `<button type="button" data-sy="${k}" aria-pressed="${String(syMode === k)}">
+      <b>${t}</b><span>${why}</span></button>`).join("");
+  }
+
+  async function syLink() {
+    const code = await SY().packSync(S.bets, S.bank, syMode);
+    const url = `${location.origin}${location.pathname}#sync=${code}`;
+    let ok = false;
+    try { await navigator.clipboard.writeText(url); ok = true; } catch { /* no clipboard */ }
+    SY().setSyncMark(S.bets.map((b) => b.id));
+    syncPanel();
+    $("#syOut").innerHTML = ok
+      ? `<p class="note" style="margin:0">Copied — ${url.length.toLocaleString()} characters.
+         Send it to yourself and open it on the other device.
+         ${url.length > 12000 ? `<b>That is long enough for some apps to cut it short.</b>
+           If the other device says the link arrived incomplete, use a file instead.` : ""}</p>`
+      : `<p class="note" style="margin:0 0 10px">This browser wouldn't let HAWK use the clipboard,
+           so here it is to copy by hand:</p>
+         <textarea readonly rows="3" style="width:100%;background:var(--ink);color:var(--muted);
+           border:0;box-shadow:inset 0 0 0 1px var(--rule-2);padding:11px;font:400 11px/1.5 var(--mono)"
+           >${esc(url)}</textarea>`;
+  }
+
+  /* The QR cycles its frames: a Vault needs more than one code, and the
+     phone collects them in any order over as many passes as it needs. */
+  let qrTimer = 0;
+  async function syQR() {
+    clearInterval(qrTimer);
+    const code = await SY().packSync(S.bets, S.bank, syMode);
+    const frames = SY().qrFrames(code);
+    let i = 0;
+    const box = $("#syOut");
+    const tick = () => {
+      box.innerHTML = `<div class="qrbox">${SY().qrSvg(frames[i % frames.length], 300)}
+        <p class="note" style="margin:12px 0 0">Frame <b>${(i % frames.length) + 1}</b> of
+          <b>${frames.length}</b> — hold your phone on it and let it cycle. The phone takes them
+          in any order and will tell you when it has them all.</p></div>`;
+      i++;
+    };
+    tick();
+    qrTimer = setInterval(tick, 1200);
+    SY().setSyncMark(S.bets.map((b) => b.id));
+    syncPanel();
+  }
+
+  async function syFile() {
+    const data = SY().syncData(S.bets, S.bank, syMode);
+    const name = `hawk-sync-${new Date().toISOString().slice(0, 10)}.json`;
+    const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+    const file = new File([blob], name, { type: "application/json" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: "My HAWK Vault" }); }
+      catch (e) { if (!e || e.name !== "AbortError") downloadBlob(blob, name); }
+    } else downloadBlob(blob, name);
+    SY().setSyncMark(S.bets.map((b) => b.id));
+    syncPanel();
+    $("#syOut").innerHTML = `<p class="note" style="margin:0">A file can't be cut short by a
+      messaging app, which is why it is here. On the other device: <b>Add from a file</b>.</p>`;
+  }
+  function downloadBlob(blob, name) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+
+  /* ============================================ CHECK YOUR BOOKMAKER
+     The Vault's balance is worked out from tickets. The bookmaker's is
+     what is actually there. When they disagree the gap is real, and
+     naming it is the only way it ever gets closed. */
+  function bookCheck() {
+    const real = num($("#chkReal").value);
+    const out = $("#chkOut");
+    if (!Number.isFinite(real)) { out.innerHTML = `<p class="note" style="margin:0">Type what your account says.</p>`; return; }
+    const gap = round2(real - S.bank);
+    const open = S.bets.filter((b) => b.status === "PENDING");
+    const atRisk = open.reduce((a, b) => a + (+b.stake || 0), 0);
+    out.innerHTML = `<div class="grid m4 rec">
+        <div><div class="n">${money(S.bank)}</div><div class="k">HAWK says</div>
+          <div class="s">from ${plural(S.bets.length, "ticket")}</div></div>
+        <div><div class="n">${money(real)}</div><div class="k">Bet365 says</div>
+          <div class="s">what you typed</div></div>
+        <div><div class="n ${gap > 0 ? "up" : gap < 0 ? "dn" : ""}">${gap > 0 ? "+" : ""}${money(gap)}</div>
+          <div class="k">Gap</div><div class="s">${Math.abs(gap) < 0.01 ? "they agree" : "unexplained"}</div></div>
+        <div><div class="n">${money(atRisk)}</div><div class="k">Still running</div>
+          <div class="s">${plural(open.length, "ticket")} not settled</div></div></div>
+      <p class="note">${Math.abs(gap) < 0.01
+        ? "They agree. Nothing to do."
+        : `${atRisk > 0 ? `Bet365 usually takes a running stake out of your balance straight away,
+             so a gap close to ${money(-atRisk)} is the ${plural(open.length, "ticket")} you have on
+             rather than an error. ` : ""}`
+          + `Anything left over is a ticket settled wrong, a bet placed outside HAWK, or money moved.
+             <b>Correct it under Bankroll</b> and the reason goes in the log.`}</p>`;
+  }
+
+  /* Did following HAWK pay? Two numbers that are not the same question:
+     what your tickets returned, and what they would have returned if every
+     one had been staked flat. The gap between them is staking, not reading. */
+  function payPanel() {
+    const done = settled();
+    const n = done.length;
+    if (!n) {
+      $("#payN").textContent = "nothing settled yet";
+      $("#payOut").innerHTML = `<p class="note" style="margin:0">Settle a few and this fills in.</p>`;
+      return;
+    }
+    const staked = done.reduce((a, b) => a + (+b.stake || 0), 0);
+    const pl = done.reduce((a, b) => a + profit(b), 0);
+    const roi = staked ? 100 * pl / staked : 0;
+    // the same tickets at one stake each: selection without staking
+    const flatStake = staked / n;
+    const flat = done.reduce((a, b) => {
+      const mult = (+b.stake || 0) > 0 ? flatStake / (+b.stake || 1) : 0;
+      return a + profit(b) * mult;
+    }, 0);
+    const flatRoi = staked ? 100 * flat / staked : 0;
+    const won = done.filter((b) => b.status === "WON").length;
+    $("#payN").textContent = `${plural(n, "settled bet")}`;
+    $("#payOut").innerHTML = `<div class="grid m4 rec">
+        <div><div class="n ${pl > 0 ? "up" : pl < 0 ? "dn" : ""}">${pl > 0 ? "+" : ""}${money(pl)}</div>
+          <div class="k">What you made</div><div class="s">on ${money(staked)} staked</div></div>
+        <div><div class="n ${roi > 0 ? "up" : roi < 0 ? "dn" : ""}">${roi > 0 ? "+" : ""}${roi.toFixed(1)}%</div>
+          <div class="k">Return</div><div class="s">per euro through the book</div></div>
+        <div><div class="n ${flatRoi > 0 ? "up" : flatRoi < 0 ? "dn" : ""}">${flatRoi > 0 ? "+" : ""}${flatRoi.toFixed(1)}%</div>
+          <div class="k">Flat stakes</div><div class="s">same picks, ${money(flatStake)} each</div></div>
+        <div><div class="n">${Math.round(100 * won / n)}%</div>
+          <div class="k">Strike rate</div><div class="s">${won} of ${n}</div></div></div>
+      <p class="note">${Math.abs(roi - flatRoi) < 1
+        ? "Your stakes are even enough that staking has barely changed the answer — this is your selection, for better or worse."
+        : roi > flatRoi
+          ? `Staking has <b>helped</b>: ${(roi - flatRoi).toFixed(1)} points better than the same picks at ${money(flatStake)} each. That means you put more on the ones that landed.`
+          : `Staking has <b>cost</b> you ${(flatRoi - roi).toFixed(1)} points against the same picks at ${money(flatStake)} each. The reading was better than the staking.`}
+        ${roi < 0 ? ` Over ${plural(n, "bet")} a negative return is the bookmaker's margin doing what it does — the question is whether it is shrinking.` : ""}</p>`;
+  }
+
+  /* ===================================================== EDIT A TICKET
+     Only the stake and the price, because those are the two a bookmaker
+     can disagree with you about — the legs are what HAWK read and changing
+     those would make the grading a lie. Settled money is re-applied: a
+     WON ticket already paid its old return into the balance. */
+  function editTicket(id) {
+    const b = S.bets.find((x) => x.id === id);
+    if (!b) return;
+    const stake = num($("#edStake").value), odds = num($("#edOdds").value);
+    if (!Number.isFinite(stake) || stake <= 0) { alert("That stake isn't a number."); return; }
+    if (!Number.isFinite(odds) || odds <= 1) { alert("That price doesn't look like decimal odds."); return; }
+    const oldStake = +b.stake || 0, oldOdds = +b.odds || 0;
+    const oldRet = +b.potentialReturn || 0;
+    if (Math.abs(stake - oldStake) < 0.005 && Math.abs(odds - oldOdds) < 0.005) { S.editing = null; draw(); return; }
+
+    const was = S.bank;
+    // the stake came off when it was logged; a settled ticket also paid out
+    S.bank += oldStake - stake;
+    const newRet = round2(stake * odds);
+    if (b.status === "WON") S.bank += newRet - oldRet;
+    b.stake = round2(stake); b.odds = round2(odds); b.potentialReturn = newRet;
+    S.bank = round2(S.bank);
+    if (!save()) return;
+    if (SY() && Math.abs(S.bank - was) >= 0.005)
+      SY().logEdit(was, S.bank, `Edited a ticket: ${money(oldStake)} @ ${oldOdds.toFixed(2)} → ${money(stake)} @ ${odds.toFixed(2)}`, true);
+    S.editing = null;
+    draw();
+  }
+
+  /* ================================================== REUSE SELECTIONS
+     The legs again, on a fresh acca, so a ticket that worked can be put on
+     again without rebuilding it. It goes to the Acca rather than straight
+     into the Vault: prices move, and the old one is not the one you'd get. */
+  function reuse(id) {
+    const b = S.bets.find((x) => x.id === id);
+    const A = window.HAWKAcca;
+    if (!b || !A) return;
+    const parts = (b.legs || []).filter((l) => l && l.hawk && (l.hawk.legs || []).length);
+    if (!parts.length) { alert("HAWK didn't record the legs on that one, so there is nothing to reuse."); return; }
+    if (A.list().length && !confirm(`Replace what is on your acca with these ${plural(parts.length, "match")}?`)) return;
+    A.clear();
+    for (const l of parts) {
+      const h = l.hawk;
+      A.add({ id: h.game, league: h.league, home: h.home, away: h.away,
+              homeCrest: h.homeCrest, awayCrest: h.awayCrest, kickoff: h.kickoff, upset: null },
+            h.legs, h.p || (h.legs || []).reduce((a, x) => a * (x.p || 1), 1));
+    }
+    alert(`${plural(parts.length, "match")} put on your acca. Prices move, so check them before you place it.`);
+    location.href = "../acca/";
   }
 
   /* ------------------------------------------------------------ settling */
@@ -580,6 +887,45 @@
   function draw() {
     const f = moment();
     stats(f); chart(f); leagues(f); betList();
+    bankPanel(); syncPanel(); payPanel();
+  }
+
+  /* ===================================================== THE BANKROLL
+     Correcting it by hand, and the record of every correction. v1 kept
+     both under hawk_bankroll_log and a sync carries the entries across,
+     which is how money moved by hand on one device reaches the other —
+     a ticket's own stake and return travel with the ticket instead. */
+  const SY = () => window.HAWKSync || null;
+  const bankLog = () => (SY() ? SY().bankrollLog() : []);
+
+  function bankPanel() {
+    const log = bankLog();
+    $("#bankN").textContent = money(S.bank);
+    $("#bkLogN").textContent = log.length ? plural(log.length, "change") : "no changes yet";
+    $("#bkLog").innerHTML = log.length
+      ? `<div class="bklog">${log.slice(0, 60).map((e) => `<div class="r">
+          <span class="w"><b>${money(e.from)} → ${money(e.to)}</b>
+            <i>${esc(e.reason || "no reason given")}${e.derived ? " · from a sync" : ""}</i></span>
+          <span class="d ${e.delta > 0 ? "up" : e.delta < 0 ? "dn" : ""}">${
+            e.delta > 0 ? "+" : ""}${money(e.delta)}</span>
+          <time>${new Date(e.timestamp).toLocaleString("en-GB",
+            { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</time></div>`).join("")}</div>`
+      : `<p class="note" style="margin:0">Nothing yet. Every change you make above lands here.</p>`;
+  }
+
+  function setBank() {
+    const v = num($("#bkNew").value);
+    if (!Number.isFinite(v)) { $("#bkOut").textContent = "That isn't a number."; return; }
+    const was = S.bank, now = round2(v);
+    if (Math.abs(now - was) < 0.005) { $("#bkOut").textContent = "That is what it already is."; return; }
+    const why = String($("#bkWhy").value || "").trim();
+    if (!confirm(`Change the bankroll from ${money(was)} to ${money(now)}?`)) return;
+    S.bank = now;
+    if (!save()) return;
+    if (SY()) SY().logEdit(was, now, why || "changed by hand", false);
+    $("#bkNew").value = ""; $("#bkWhy").value = "";
+    $("#bkOut").textContent = `Changed from ${money(was)} to ${money(now)}.`;
+    draw();
   }
 
   /* ======================================================== AUTO-SETTLE
@@ -1124,9 +1470,33 @@
     if (lost) { if (confirm("Mark this ticket LOST?")) settle(lost.dataset.lost, "LOST"); return; }
 
     const cash = e.target.closest("[data-cash]");
-    if (cash) { S.cashing = cash.dataset.cash; betList(); const i = $("#co"); if (i) i.focus(); return; }
+    if (cash) { S.cashing = cash.dataset.cash; S.editing = null; betList(); const i = $("#co"); if (i) i.focus(); return; }
 
-    if (e.target.closest("[data-cancel]")) { S.cashing = null; betList(); return; }
+    if (e.target.closest("[data-cancel]")) { S.cashing = null; S.editing = null; betList(); return; }
+
+    const ed = e.target.closest("[data-edit]");
+    if (ed) { S.editing = ed.dataset.edit; S.cashing = null; betList(); const i = $("#edStake"); if (i) i.focus(); return; }
+
+    const doEd = e.target.closest("[data-doedit]");
+    if (doEd) { editTicket(doEd.dataset.doedit); return; }
+
+    const re = e.target.closest("[data-reuse]");
+    if (re) { reuse(re.dataset.reuse); return; }
+
+    /* ---- bankroll, sync and the checks ---- */
+    if (e.target.closest("#bkSet")) { setBank(); return; }
+    if (e.target.closest("#chkGo")) { bookCheck(); return; }
+
+    const sy = e.target.closest("#syncMode [data-sy]");
+    if (sy) { syMode = sy.dataset.sy; syncPanel(); return; }
+    if (e.target.closest("#syLink")) { syLink(); return; }
+    if (e.target.closest("#syQR")) { syQR(); return; }
+    if (e.target.closest("#syFile")) { syFile(); return; }
+    if (e.target.closest("#syTake")) {
+      const t = $("#syPaste").value;
+      SY().applyText(syCtx(), t).then((ok) => { if (ok) $("#syPaste").value = ""; });
+      return;
+    }
 
     const wk = e.target.closest("#wkTabs button[data-wk]");
     if (wk) { wkTab = wk.dataset.wk; weekly(S.G); return; }
@@ -1208,6 +1578,17 @@
       { attributes: true, attributeFilter: ["hidden"], subtree: true });
     sync();
   })();
+
+  /* a sync file picked from disk — the one route an app cannot truncate */
+  $("#syFileIn").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f || !SY()) return;
+    try { await SY().applySyncData(syCtx(), JSON.parse(await f.text())); }
+    catch { alert("That file isn't a HAWK sync or backup file."); }
+    e.target.value = "";
+  });
+  // a sync link opened ON this device: #sync=… in the address
+  if (SY()) SY().fromHash(syCtx());
 
   paintRules();
   $("#asGo").addEventListener("click", () => autoSettle(true));

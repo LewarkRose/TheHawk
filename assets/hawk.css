@@ -419,6 +419,33 @@ img{display:block;max-width:100%}
 .note.as{margin:-14px 0 20px;color:var(--muted)}
 .note.as b{color:var(--gold-hi);font-weight:600}
 .lede .tbtn{margin-left:auto;align-self:center}
+/* the bankroll's own history: what it was, what it became, and why */
+.bklog{display:grid;gap:1px;background:var(--rule)}
+.bklog .r{display:grid;grid-template-columns:minmax(0,1fr) 92px 112px;gap:14px;align-items:center;
+  background:var(--ink);padding:12px 13px;font-size:13px}
+.bklog .r .w b{display:block;font:400 13px/1.4 var(--mono);color:var(--text)}
+.bklog .r .w i{display:block;margin-top:4px;font:400 11px/1.5 var(--sans);
+  font-style:normal;color:var(--faint)}
+.bklog .r .d{text-align:right;font:400 12.5px/1 var(--mono);
+  font-variant-numeric:tabular-nums;color:var(--muted)}
+.bklog .r .d.up{color:var(--up)}
+.bklog .r .d.dn{color:var(--down)}
+.bklog .r time{text-align:right;font:400 10.5px/1 var(--mono);color:var(--faint)}
+@media (max-width:620px){
+  .bklog .r{grid-template-columns:minmax(0,1fr) auto}
+  .bklog .r time{grid-column:1/-1;text-align:left}
+}
+/* Edit / Reuse: quieter than Won / Lost, because they are not the job */
+.rcpt .act.minor{margin-top:8px}
+.rcpt .act.minor button{color:var(--faint);box-shadow:inset 0 0 0 1px var(--rule)}
+.rcpt .act.minor button:hover{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+.rcpt .act input{width:88px;background:var(--ink);border:0;color:var(--text);
+  box-shadow:inset 0 0 0 1px var(--rule-2);padding:6px 8px;
+  font:400 11.5px/1 var(--mono);font-variant-numeric:tabular-nums}
+/* the QR, big enough to scan at arm's length */
+.qrbox{text-align:center}
+.qrbox img{display:inline-block;background:#fff;padding:10px;image-rendering:pixelated}
+
 /* ------------------------------------------------------- the meta strip
    What is true about the fixture and what you can do about it, on one line
    under the hero. The referee carries a gold edge because his cards a game

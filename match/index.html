@@ -64,7 +64,10 @@
       <div class="b3k" id="bark"></div>
       <p class="derby" id="derby" hidden></p>
       <!-- set before kick-off: goals and red cards once it starts -->
-      <div style="margin-top:20px"><button class="fol" id="fol" type="button" hidden></button></div>
+      <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="fol" id="fol" type="button" hidden></button>
+        <!-- opens the table with these two teams lit and already expanded -->
+        <button class="tbtn" id="tblBtn" type="button" hidden>League table</button></div>
     </div>
   </div>
 </header>
@@ -179,6 +182,7 @@
 <script src="../assets/hawk-acca.js"></script>
 <script src="../assets/hawk-fold.js"></script>
 <script src="../assets/hawk-alerts.js"></script>
+<script src="../assets/hawk-table.js"></script>
 <script src="../assets/hawk-nav.js"></script>
 <script>
 /* ===========================================================================
@@ -270,6 +274,13 @@
       $("#fol").hidden = false;
       window.HAWKAlerts.followButton($("#fol"), S.id,
         { league: S.league, home: m.home, away: m.away, started: !!m.started });
+    }
+    // the league table, with these two teams lit and already open
+    if (m.league) {
+      const tb = $("#tblBtn");
+      tb.dataset.table = m.league;
+      tb.dataset.hl = JSON.stringify([m.home, m.away]);
+      tb.hidden = false;
     }
     $("#read").hidden = false;
 

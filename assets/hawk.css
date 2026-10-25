@@ -114,6 +114,108 @@ img{display:block;max-width:100%}
 .hero::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
   box-shadow:inset 0 0 200px 70px rgba(4,4,6,.9)}
 
+/* ------------------------------------------------- the hero, split
+   The moment kept its height by holding a column of air to the right of it.
+   It carries the thing you opened HAWK for instead: on Home that is the
+   biggest match in play, elsewhere whatever that page is about. Under both
+   columns, across the full width, is where you actually stand.
+
+   Nothing shrank to make room — the headline is the same size and the hero
+   is shorter than it was, because the width was doing nothing. */
+.hsplit{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);
+  gap:clamp(24px,4.4vw,64px);align-items:center}
+/* The moment is sized for the full width of the page. In half of it the same
+   clamp runs to three lines and the hero gets TALLER than the one it
+   replaced, which is the opposite of the point. Sized for the column it is
+   actually in. */
+.hsplit .moment,.hsplit .moment.mid{font-size:clamp(34px,5vw,68px)}
+.hsplit .said{margin-top:clamp(16px,2vw,22px)}
+.hsplit .acts{margin-top:clamp(20px,2.6vw,28px)}
+@media (max-width:900px){
+  .hsplit{grid-template-columns:1fr;gap:clamp(26px,5vw,40px)}
+  .hsplit .moment,.hsplit .moment.mid{font-size:clamp(40px,8.4vw,86px)}
+}
+
+.hlead{padding:clamp(20px,2.4vw,28px);background:rgba(14,15,19,.56);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  box-shadow:inset 0 0 0 1px var(--rule-2);
+  animation:rise 1.1s .75s var(--film) both}
+.hlead .top{display:flex;align-items:center;gap:9px;
+  font:700 9px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.hlead .top .d{width:6px;height:6px;border-radius:50%;background:var(--live);
+  animation:ping 2.8s ease-out infinite}
+.hlead .top.q{color:var(--gold-hi)}
+.hlead .top.q .d{background:var(--gold);animation:none}
+.hlead .fx2{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+  gap:clamp(8px,1.8vw,18px);margin-top:20px}
+.hlead .side{text-align:center;min-width:0}
+.hlead .side img{width:clamp(38px,4vw,54px);height:clamp(38px,4vw,54px);object-fit:contain;
+  margin:0 auto 11px;display:block}
+.hlead .side h3{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  font-size:clamp(13px,1.6vw,19px);line-height:1.1;letter-spacing:.02em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hlead .sc{text-align:center;font-family:var(--disp);font-weight:700;
+  font-size:clamp(30px,4.2vw,52px);line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hlead .ck{margin-top:7px;text-align:center;font:700 9px/1 var(--mono);letter-spacing:.17em;
+  text-transform:uppercase;color:var(--live)}
+.hlead .ck.q{color:var(--faint)}
+.hlead .b3h{display:flex;height:9px;gap:2px;margin-top:24px}
+.hlead .b3h i{display:block;height:100%;min-width:3px}
+.hlead .b3h .h{background:var(--gold)}
+.hlead .b3h .d{background:#3a3a46}
+.hlead .b3h .a{background:var(--navy)}
+.hlead .b3hk{display:flex;justify-content:space-between;gap:10px;margin-top:11px;
+  font:700 8.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--faint)}
+.hlead .b3hk b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hlead .b3hk b:first-child{color:var(--gold-hi)}
+.hlead .b3hk b:last-child{color:var(--navy-hi);text-align:right}
+/* the shape of a day, inside the card: one row per band, each a bar against
+   the biggest band, so eighty matches become a silhouette you read in one
+   look rather than a number you have to hold in your head */
+.dayshape{margin-top:20px}
+.dayshape .row{display:grid;grid-template-columns:86px minmax(0,1fr) 34px;gap:12px;
+  align-items:center;padding:9px 0}
+.dayshape .row .k{font:700 8.5px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;
+  color:var(--faint)}
+.dayshape .row .t{height:7px;background:rgba(242,242,242,.07);position:relative}
+.dayshape .row .t i{position:absolute;inset:0 auto 0 0;background:var(--muted)}
+.dayshape .row .n{text-align:right;font:400 12px/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--muted)}
+.dayshape .row.live .k,.dayshape .row.live .n{color:var(--live)}
+.dayshape .row.live .t i{background:var(--live)}
+.dayshape .row.soon .k,.dayshape .row.soon .n{color:var(--gold-hi)}
+.dayshape .row.soon .t i{background:var(--gold)}
+.dayshape .row.done .t i{background:#3a3a46}
+
+/* the legs of a ticket, inside the card */
+.hlead .hlegs{margin:20px 0 0;padding:0;list-style:none}
+.hlead .hlegs li{display:grid;grid-template-columns:16px minmax(0,1fr) 44px;gap:10px;
+  align-items:center;padding:9px 0;border-top:1px solid var(--rule);
+  font-size:12.5px;line-height:1.4}
+.hlead .hlegs li .i{font:700 9px/1 var(--mono);color:var(--faint)}
+.hlead .hlegs li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hlead .hlegs li b{text-align:right;font:400 11px/1 var(--mono);font-weight:400;
+  font-variant-numeric:tabular-nums;color:var(--muted)}
+
+.hlead .foot2{display:flex;gap:clamp(14px,2.4vw,26px);flex-wrap:wrap;margin-top:22px;
+  padding-top:18px;border-top:1px solid var(--rule)}
+.hlead .foot2 div .k{font:700 8px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--faint)}
+.hlead .foot2 div .v{margin-top:8px;font:400 13.5px/1 var(--mono);font-variant-numeric:tabular-nums}
+.hlead .foot2 div .v.g{color:var(--gold-hi)}
+
+/* where you stand, across the foot of the hero */
+.hmoney{display:flex;gap:clamp(20px,4vw,52px);flex-wrap:wrap;
+  margin-top:clamp(26px,3.6vw,40px);padding-top:clamp(20px,2.6vw,26px);
+  border-top:1px solid var(--rule);animation:rise 1s 1.25s var(--film) both}
+.hmoney div .k{font:700 8.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+.hmoney div .v{margin-top:10px;font-family:var(--disp);font-weight:700;
+  font-size:clamp(21px,2.5vw,30px);line-height:1;font-variant-numeric:tabular-nums}
+.hmoney div .v.g{color:var(--gold-hi)}
+.hmoney div .v.up{color:var(--up)}
+.hmoney div .v.dn{color:var(--down)}
+.hmoney div .v.live{color:var(--live)}
+.hmoney div .s{margin-top:8px;font:400 10px/1 var(--mono);color:var(--faint)}
+
 .tag{display:inline-flex;align-items:center;gap:10px;padding:8px 15px;
   border:1px solid rgba(212,169,78,.35);
   font:700 9.5px/1 var(--mono);letter-spacing:.24em;text-transform:uppercase;color:var(--gold-hi);
@@ -1002,8 +1104,8 @@ img{display:block;max-width:100%}
    that is the point of the ledger and it does not move — but the slack now
    goes to the read, which is information, rather than to the gutter. */
 .lg-row{display:grid;
-  grid-template-columns:54px minmax(0,1fr) 72px minmax(0,1fr) 20px 124px 66px;
-  gap:12px;align-items:center;padding:12px 10px;
+  grid-template-columns:50px minmax(0,1fr) 62px minmax(0,1fr) 206px 52px 32px;
+  gap:11px;align-items:center;padding:12px 10px;
   border-bottom:1px solid var(--rule-2);
   /* a ledger on pure black reads as text floating in a void; the faintest
      surface under each row is what makes it a row */
@@ -1011,9 +1113,14 @@ img{display:block;max-width:100%}
   text-decoration:none;color:inherit;transition:background .4s var(--film)}
 .lg-row:hover{background:rgba(242,242,242,.062)}
 .lg-row .t{font:400 10.5px/1 var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
-.lg-row .h{text-align:right;min-width:0}
-.lg-row .a{text-align:left;min-width:0}
-.lg-row .h,.lg-row .a{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* crests in the row. The club you are looking for is found by its badge long
+   before its name is read, which is the whole reason every scores page in the
+   world carries them. */
+.lg-row .h,.lg-row .a{display:flex;align-items:center;gap:9px;min-width:0;font-size:13.5px}
+.lg-row .h{justify-content:flex-end;text-align:right}
+.lg-row .a{justify-content:flex-start;text-align:left}
+.lg-row .h span,.lg-row .a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lg-row .h img,.lg-row .a img{width:19px;height:19px;object-fit:contain;flex:none}
 .lg-row .s{text-align:center;font-family:var(--disp);font-weight:700;font-size:21px;line-height:1;
   font-variant-numeric:tabular-nums;white-space:nowrap}
 .lg-row .s em{font-style:normal;color:var(--faint);font-weight:600;padding:0 .1em}
@@ -1029,10 +1136,42 @@ img{display:block;max-width:100%}
 /* a fixture with no score yet has nothing to set in the display face */
 .lg-row.is-next .s,.lg-row.is-soon .s{font-family:var(--mono);font-size:13px;font-weight:400;color:var(--faint)}
 
-/* HAWK's pre-match read. A bar, not three numbers: at eighty rows a figure per
-   side is unreadable, and the shape is what you are scanning for anyway. It
-   was 5px tall in a 60px column, which is a hairline you had to hunt for. */
-.sbar{display:flex;height:8px;gap:1px}
+/* ------------------------------------------------- HAWK's read, on the row
+   The bar alone made you guess at the numbers. Bar, then the three figures
+   under it with the likeliest one lit, then — only where the radar has
+   something to say — one line saying what it is: an arrow at the underdog
+   and how often they come out of it without losing. */
+.read3{display:grid;gap:7px;min-width:0}
+/* The bar carries the shape; the line under it names the favourite. Three
+   figures made you read a row of digits on every one of eighty rows — a
+   name and one number is the same information in the way you would say it
+   out loud. The draw is still there on hover. */
+.read3 .say{display:flex;align-items:center;gap:0;min-width:0;
+  font:400 12px/1.3 var(--sans);color:var(--muted)}
+.read3 .say .mark{flex:none;margin-right:6px;opacity:.9}
+.read3 .say .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.read3 .say b{flex:none;margin-left:5px;color:var(--text);font-weight:600;
+  font-variant-numeric:tabular-nums}
+.read3 .say.h b{color:var(--gold-hi)}
+.read3 .say.a b{color:var(--navy-hi)}
+.read3 .say.q .nm{color:var(--faint)}
+.read3 .ups{display:flex;align-items:center;gap:6px;min-width:0;
+  font:700 11.5px/1.3 var(--sans);color:var(--down)}
+.read3 .ups .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.read3 .ups .lv3{animation:upPulse 3.2s ease-in-out infinite}
+.read3 .ups .ar{flex:none;font-size:10px;opacity:.9}
+.read3 .ups b{flex:none;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* the bell, per row */
+.lg-row .fol-b{justify-self:end;width:26px;height:26px;display:grid;place-items:center;
+  border:0;background:none;cursor:pointer;font-size:12px;line-height:1;
+  color:var(--faint);box-shadow:inset 0 0 0 1px var(--rule);
+  transition:color .3s var(--film),box-shadow .3s var(--film)}
+.lg-row .fol-b:hover{color:var(--text);box-shadow:inset 0 0 0 1px var(--rule-2)}
+.lg-row .fol-b.on{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+
+/* a bar, not three numbers, at the top of the read */
+.sbar{display:flex;height:11px;gap:2px}
 .sbar i{display:block;height:100%;min-width:2px}
 .sbar i.h{background:var(--gold)}
 .sbar i.d{background:#3a3a46}
@@ -1047,10 +1186,10 @@ img{display:block;max-width:100%}
    3 very high — and the Scores page fetched it and threw it away. A quarter
    of a day's card sits at 2 or above, so 3 is the loud one and 2 is a nudge:
    flag everything equally and the flag stops meaning anything. */
-.up{display:grid;place-items:center;font-size:12px;line-height:1;
+.upf{display:grid;place-items:center;font-size:12px;line-height:1;
   filter:grayscale(1) brightness(1.6);opacity:.5}
-.up.lv3{filter:none;opacity:1;animation:upPulse 3.2s ease-in-out infinite}
-.up.lv2{filter:none;opacity:.62}
+.upf.lv3{filter:none;opacity:1;animation:upPulse 3.2s ease-in-out infinite}
+.upf.lv2{filter:none;opacity:.62}
 @keyframes upPulse{0%,100%{opacity:1}50%{opacity:.52}}
 
 /* the day picker */
@@ -1166,6 +1305,36 @@ img{display:block;max-width:100%}
 .bt .act input{width:104px;padding:8px 11px;border:0;background:var(--ink);color:var(--text);
   font:400 13px/1 var(--mono);box-shadow:inset 0 0 0 1px var(--rule-2)}
 .bt .act input:focus{outline:0;box-shadow:inset 0 0 0 1px var(--gold)}
+
+/* ---------------------------------------------------------- by week
+   Eight weeks at a glance. The report below tells you about one week; this
+   says which week to look at — and the split bar makes a 30% hit rate a
+   shape rather than a figure you have to compare in your head. */
+.wks{display:flex;gap:9px;flex-wrap:wrap}
+.wks > div{flex:1 1 150px;min-width:140px;padding:15px 16px 14px;
+  box-shadow:inset 0 0 0 1px var(--rule);background:rgba(242,242,242,.022)}
+.wks .k{font:700 8.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--faint)}
+.wks .v{margin-top:11px;font-family:var(--disp);font-weight:700;font-size:26px;line-height:1;
+  font-variant-numeric:tabular-nums}
+.wks .v.up{color:var(--up)}.wks .v.dn{color:var(--down)}.wks .v.q{color:var(--muted)}
+.wks .s{margin-top:9px;font:400 10px/1.5 var(--mono);color:var(--faint)}
+.wks .sp{display:flex;height:4px;margin-top:11px;background:rgba(242,242,242,.07)}
+.wks .sp i{display:block;height:100%}
+.wks .sp i.w{background:var(--up)}
+.wks .sp i.l{background:var(--down)}
+.wks > div.now{box-shadow:inset 0 0 0 1px var(--gold)}
+.wks > div.now .k{color:var(--gold-hi)}
+
+/* HAWK said → landed, per market, for the week's own legs */
+.mks{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.mks span{padding:8px 11px;font:400 11px/1.3 var(--sans);color:var(--muted);
+  box-shadow:inset 0 0 0 1px var(--rule)}
+.mks span b{color:var(--text);font-weight:600}
+.mks span i{font-style:normal;color:var(--faint);font:400 10px/1 var(--mono);margin-left:5px}
+.mks span.good{box-shadow:inset 0 0 0 1px rgba(79,212,134,.4)}
+.mks span.good b{color:var(--up)}
+.mks span.bad{box-shadow:inset 0 0 0 1px rgba(255,107,127,.38)}
+.mks span.bad b{color:var(--down)}
 
 .lgt{width:100%;border-collapse:collapse}
 .lgt th{padding:11px 12px;text-align:right;font:700 8.5px/1 var(--mono);letter-spacing:.15em;
@@ -1319,6 +1488,90 @@ img{display:block;max-width:100%}
 @media (max-width:760px){
   .pkh span:nth-child(4),.pkr .v.p{display:none}
   .pkh,.pkr{grid-template-columns:46px minmax(0,1fr) 34px 56px 84px;gap:10px}
+}
+
+/* ============================ THE LEAGUE TABLE ==========================
+   A panel, because a twenty-row table is most of a screen and unfolding it
+   in place pushes the fixtures you were reading off the bottom. Same gesture
+   as the player card: over the page, Escape or outside to close.
+   ======================================================================== */
+.tpanel{position:fixed;inset:0;z-index:500;display:grid;place-items:start center;
+  padding:clamp(12px,3vw,40px);background:rgba(4,4,6,.78);
+  backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+  animation:pcIn .35s var(--film) both;overflow-y:auto}
+.tpanel .in{width:min(700px,100%);background:var(--raise);
+  box-shadow:inset 0 0 0 1px var(--rule-2),0 40px 90px -30px #000;
+  padding:clamp(18px,2.6vw,28px);animation:pcUp .5s var(--film) both}
+.tpanel .hd{display:flex;align-items:baseline;gap:14px;padding-bottom:16px}
+.tpanel .hd h3{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  font-size:clamp(21px,2.8vw,28px);line-height:1;letter-spacing:.02em}
+.tpanel .hd .x{margin-left:auto;align-self:flex-start;width:32px;height:32px;border:0;
+  background:none;cursor:pointer;color:var(--faint);font:400 15px/1 var(--sans);
+  transition:color .3s var(--film)}
+.tpanel .hd .x:hover{color:var(--text)}
+
+/* All / Home / Away — "who is best at home" is a different question and the
+   feed answers it, so it is not a filter, it is a different table */
+.tseg{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+.tseg button{appearance:none;border:0;background:none;cursor:pointer;padding:8px 15px;
+  font:700 9.5px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--faint);
+  box-shadow:inset 0 0 0 1px var(--rule);transition:color .3s var(--film),box-shadow .3s var(--film)}
+.tseg button:hover{color:var(--text);box-shadow:inset 0 0 0 1px var(--rule-2)}
+.tseg button[aria-pressed="true"]{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+
+.ltable .tname{margin:22px 0 10px;font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  font-size:17px;line-height:1;letter-spacing:.02em;color:var(--gold-hi)}
+.lteam{border-bottom:1px solid var(--rule)}
+.lteam > summary{list-style:none;cursor:pointer}
+.lteam > summary::-webkit-details-marker{display:none}
+.trow{display:flex;align-items:center;gap:11px;padding:10px 8px;
+  transition:background .35s var(--film)}
+.lteam > summary:hover .trow,.lteam[open] > summary .trow{background:rgba(242,242,242,.05)}
+/* the two teams of the match you came from */
+.lteam.hl > summary .trow{background:rgba(212,169,78,.09)}
+.lteam.hl .ln{color:var(--gold-hi);font-weight:600}
+.trow .lp{width:42px;flex:none;text-align:right;position:relative;
+  font:400 12px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--faint)}
+.trow .lp .tdst{position:absolute;left:0;top:-3px;width:3px;height:16px}
+.trow .lp b{font-weight:400;font-size:8px;margin-left:3px}
+.trow .lp b.up{color:var(--up)}
+.trow .lp b.dn{color:var(--down)}
+.trow .lc{width:20px;height:20px;flex:none;object-fit:contain}
+.trow .ln{flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow .tl{flex:none;font-style:normal;font:700 10.5px/1 var(--mono);padding:5px 8px;
+  background:var(--ink);box-shadow:inset 0 0 0 1px var(--rule-2);white-space:nowrap}
+.trow .tl.w{color:var(--up)}
+.trow .tl.l{color:var(--down)}
+.trow .tl.d{color:var(--gold-hi)}
+.trow .tl small{font-weight:400;color:var(--faint);margin-left:5px}
+.trow .lform{flex:none}
+.fmr{display:flex;gap:2px}
+.fmr i{display:grid;place-items:center;width:15px;height:15px;
+  font:700 8px/1 var(--mono);font-style:normal;color:var(--ink)}
+.fmr i.fw{background:var(--up)}
+.fmr i.fd{background:#3a3a46;color:var(--text)}
+.fmr i.fl{background:var(--down)}
+.trow .lpts{width:30px;flex:none;text-align:right;
+  font-family:var(--disp);font-weight:700;font-size:17px;line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--text)}
+.lopen{padding:4px 10px 16px 64px;font-size:12.5px;line-height:1.85;color:var(--muted);
+  background:rgba(242,242,242,.022)}
+.lopen b{color:var(--text);font-weight:600}
+.lopen .hot,.lopen b.hot{color:var(--gold-hi)}
+.tleg{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:16px;
+  font:400 10.5px/1 var(--mono);color:var(--faint)}
+.tleg span{display:flex;align-items:center;gap:7px}
+.tleg .tdst{width:3px;height:12px;display:block}
+
+/* the button that opens it */
+.tbtn{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:0;background:none;
+  cursor:pointer;color:var(--faint);font:700 9px/1 var(--mono);letter-spacing:.15em;
+  text-transform:uppercase;box-shadow:inset 0 0 0 1px var(--rule);
+  transition:color .3s var(--film),box-shadow .3s var(--film)}
+.tbtn:hover{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+@media (max-width:620px){
+  .trow .lform{display:none}
+  .lopen{padding-left:44px}
 }
 
 /* ================================ ALERTS ================================

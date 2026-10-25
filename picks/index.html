@@ -36,21 +36,36 @@
 <header class="hero">
   <canvas aria-hidden="true"></canvas>
   <div class="wrap">
-    <span class="tag" id="tag"><span class="dot off"></span>Nothing scanned yet</span>
-    <h1 class="moment mid" id="moment">Where the price<span class="q">is wrong</span></h1>
-    <p class="said" id="said">HAWK builds its best ticket for every fixture in the window and
-      compares it with what Bet365 would pay. Most days nothing beats the price — and the
-      page will say so.</p>
+    <div class="hsplit">
+      <div>
+        <span class="tag" id="tag"><span class="dot off"></span>Nothing scanned yet</span>
+        <h1 class="moment mid" id="moment">Where the price<span class="q">is wrong</span></h1>
+        <p class="said" id="said">HAWK builds its best ticket for every fixture in the window and
+          compares it with what Bet365 would pay. Most days nothing beats the price — and the
+          page will say so.</p>
+        <div class="pk-run">
+          <button class="btn gold" id="go" type="button">Scan</button>
+          <div class="pk-bar" id="bar" hidden><i style="width:0"></i></div>
+          <span class="pr" id="pr"></span>
+        </div>
+      </div>
 
-    <div class="read" id="read" hidden>
-      <div class="pkh" style="border-bottom:0;padding-bottom:0"></div>
+      <!-- the one the whole scan is for: whatever came closest to beating the
+           price, with its legs. Before a scan it says what it is waiting for
+           rather than sitting empty. -->
+      <a class="hlead" id="lead" href="#" style="text-decoration:none;color:inherit" hidden>
+        <div class="top" id="leadTop"><span class="d"></span><span id="leadWhen"></span></div>
+        <div class="fx2">
+          <div class="side"><img id="lH" alt="" onerror="this.style.visibility='hidden'"><h3 id="lHN"></h3></div>
+          <div><div class="sc" id="lSC"></div><div class="ck" id="lCK"></div></div>
+          <div class="side"><img id="lA" alt="" onerror="this.style.visibility='hidden'"><h3 id="lAN"></h3></div>
+        </div>
+        <ul class="hlegs" id="lLegs"></ul>
+        <div class="foot2" id="lFoot"></div>
+      </a>
     </div>
 
-    <div class="pk-run">
-      <button class="btn gold" id="go" type="button">Scan</button>
-      <div class="pk-bar" id="bar" hidden><i style="width:0"></i></div>
-      <span class="pr" id="pr"></span>
-    </div>
+    <div class="hmoney" id="money" hidden></div>
   </div>
 </header>
 
@@ -136,6 +151,7 @@
 <script src="../assets/hawk-acca.js"></script>
 <script src="../assets/hawk-fold.js"></script>
 <script src="../assets/hawk-alerts.js"></script>
+<script src="../assets/hawk-table.js"></script>
 <script src="../assets/hawk-nav.js"></script>
 <script>
 /* ===========================================================================
@@ -396,6 +412,73 @@
           predict a winner — 254 settled bets, −2.6%. Shown because you asked for it.</p></div>` : ""}`;
   }
 
+  /* ------------------------------------------- the hero's right half
+     The one the scan is for: whatever came closest to beating the price,
+     with its legs. On the usual day that is a ticket paying under a euro
+     per euro, and the card says so in the same breath as naming it — the
+     point of the page is that you can see the answer, not that the answer
+     is good. */
+  function paintLead(best, running, total) {
+    const el = $("#lead");
+    if (!best) {
+      if (running || !total) { el.hidden = true; return; }
+      el.hidden = true; return;
+    }
+    const w = best.worth || 0, good = w >= 1;
+    el.href = `../match/?league=${encodeURIComponent(best.league || "")}&id=${encodeURIComponent(best.id)}`;
+    $("#leadTop").className = good ? "top" : "top q";
+    $("#leadWhen").textContent = good ? "Pays over the odds" : "The closest it got";
+    $("#lH").src = best.homeCrest || ""; $("#lA").src = best.awayCrest || "";
+    $("#lHN").textContent = best.home; $("#lAN").textContent = best.away;
+    $("#lSC").textContent = odds(best.b365);
+    $("#lCK").className = good ? "ck" : "ck q";
+    $("#lCK").textContent = `${esc(S.book || "Bet365")} would pay`;
+
+    $("#lLegs").innerHTML = (best.legs || []).slice(0, 4).map((l, i) =>
+      `<li><span class="i">${i + 1}</span><span>${esc(l.label)}</span>
+        <b>${pct(l.p)}</b></li>`).join("");
+
+    $("#lFoot").innerHTML =
+      `<div><div class="k">Lands</div><div class="v g">${pct(best.p, best.p < 0.1 ? 1 : 0)}</div></div>`
+      + `<div><div class="k">Fair odds</div><div class="v">${odds(best.fair)}</div></div>`
+      + `<div><div class="k">Pays back</div><div class="v" style="color:${
+          good ? "var(--up)" : "var(--down)"}">€${w.toFixed(3)}</div></div>`;
+    el.hidden = false;
+  }
+
+  /* The same four money figures as every other page, in the same order. */
+  function moneyStrip() {
+    let bets = [];
+    try { const b = JSON.parse(localStorage.getItem("hawk_bets") || "[]"); if (Array.isArray(b)) bets = b; } catch { /* none */ }
+    let bank = null;
+    try { const b = parseFloat(localStorage.getItem("hawk_bankroll")); if (Number.isFinite(b)) bank = b; } catch { /* none */ }
+    if (bank == null && !bets.length) { $("#money").hidden = true; return; }
+    const prof = (b) => (b.status === "WON" ? (+b.potentialReturn || 0) - (+b.stake || 0)
+      : b.status === "CASHED_OUT" ? (+b.cashOutAmount || 0) - (+b.stake || 0)
+      : b.status === "PENDING" || b.status === "VOID" ? 0 : -(+b.stake || 0));
+    const money = (n) => `${n < 0 ? "−" : ""}€${Math.abs(+n || 0).toFixed(2)}`;
+    const pending = bets.filter((b) => b.status === "PENDING");
+    const atRisk = pending.reduce((a, b) => a + (+b.stake || 0), 0);
+    const settled = bets.filter((b) => b.status && b.status !== "PENDING");
+    const net = settled.reduce((a, b) => a + prof(b), 0);
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    const todayBets = settled.filter((b) => Date.parse(b.settledAt || "") >= midnight.getTime());
+    const todayPl = todayBets.reduce((a, b) => a + prof(b), 0);
+    const cls = (n) => (n > 0 ? " up" : n < 0 ? " dn" : "");
+    $("#money").innerHTML =
+      `<div><div class="k">Bankroll</div><div class="v g">${bank == null ? "—" : money(bank)}</div>
+        <div class="s">${plural(bets.length, "ticket")} logged</div></div>`
+      + `<div><div class="k">At risk</div><div class="v${atRisk ? " live" : ""}">${money(atRisk)}</div>
+        <div class="s">${pending.length ? plural(pending.length, "ticket") + " running" : "nothing running"}</div></div>`
+      + `<div><div class="k">Today</div><div class="v${cls(todayPl)}">${
+        todayBets.length ? `${todayPl > 0 ? "+" : ""}${money(todayPl)}` : "—"}</div>
+        <div class="s">${todayBets.length ? plural(todayBets.length, "ticket") + " settled" : "nothing settled yet"}</div></div>`
+      + `<div><div class="k">All time</div><div class="v${cls(net)}">${
+        settled.length ? `${net > 0 ? "+" : ""}${money(net)}` : "—"}</div>
+        <div class="s">${settled.length ? `across ${plural(settled.length, "ticket")}` : "nothing settled"}</div></div>`;
+    $("#money").hidden = false;
+  }
+
   /* ============================================================== painting */
   function paint() {
     const d = S.data, running = !!(d && d.running);
@@ -430,7 +513,7 @@
         + `the reason this page exists is so you can see it rather than guess at it.`);
     }
 
-    $("#read").hidden = !list.length;
+    paintLead(best, running, total);
     $("#resN").textContent = list.length
       ? `${plural(list.length, "match")}${running ? " so far" : ""}`
       : running ? "scanning…" : "";
@@ -546,6 +629,7 @@
   } else {
     fillSelects();
     leaguePicker();
+    moneyStrip();
     // a scan left running by another HAWK tab is still running in this one's
     // engine? no — the engine is per page. But a scan this page started and
     // you navigated away from is gone, and saying "Scan" is the honest state.

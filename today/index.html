@@ -19,14 +19,32 @@
 <header class="hero">
   <canvas aria-hidden="true"></canvas>
   <div class="wrap">
-    <span class="tag" id="tag"><span class="dot off"></span>Reading your day</span>
-    <h1 class="moment mid" id="day">Today</h1>
-    <p class="said" id="said">Checking what is running and what is still to come…</p>
-    <div class="acts">
-      <a class="btn gold" href="../picks/">Find today's value</a>
-      <a class="btn ghost" href="../scores/">Build a bet</a>
-      <a class="btn ghost" href="../acca/">Your acca</a>
+    <div class="hsplit">
+      <div>
+        <span class="tag" id="tag"><span class="dot off"></span>Reading your day</span>
+        <h1 class="moment mid" id="day">Today</h1>
+        <p class="said" id="said">Checking what is running and what is still to come…</p>
+        <div class="acts">
+          <a class="btn gold" href="../picks/">Find today's value</a>
+          <a class="btn ghost" href="../scores/">Build a bet</a>
+          <a class="btn ghost" href="../acca/">Your acca</a>
+        </div>
+      </div>
+
+      <!-- the next thing that happens to you: the soonest kick-off you have a
+           stake on, or, with nothing running, the next match of the day -->
+      <a class="hlead" id="lead" href="#" style="text-decoration:none;color:inherit" hidden>
+        <div class="top" id="leadTop"><span class="d"></span><span id="leadWhen"></span></div>
+        <div class="fx2">
+          <div class="side"><img id="lH" alt="" onerror="this.style.visibility='hidden'"><h3 id="lHN"></h3></div>
+          <div><div class="sc" id="lSC"></div><div class="ck" id="lCK"></div></div>
+          <div class="side"><img id="lA" alt="" onerror="this.style.visibility='hidden'"><h3 id="lAN"></h3></div>
+        </div>
+        <div class="foot2" id="lFoot"></div>
+      </a>
     </div>
+
+    <div class="hmoney" id="money" hidden></div>
   </div>
 </header>
 
@@ -70,6 +88,7 @@
 <script src="../assets/hawk-bg.js"></script>
 <script src="../assets/hawk-fold.js"></script>
 <script src="../assets/hawk-alerts.js"></script>
+<script src="../assets/hawk-table.js"></script>
 <script src="../assets/hawk-nav.js"></script>
 <script>
 /* ===========================================================================
@@ -183,6 +202,87 @@
     }).join("");
   }
 
+  /* --------------------------------------------- the hero's right half
+     The next thing that happens TO YOU: the soonest kick-off you have a
+     stake on, in play or not. With nothing running it falls back to the
+     next match of the day, because "nothing of yours" is still an answer
+     and an empty box is not. */
+  function paintLead(run) {
+    const byId = new Map(S.games.map((g) => [String(g.id), g]));
+    let g = null, mine = null;
+    for (const r of (run && run.rows) || []) {
+      const live = r.gs.find((x) => band(x) === "live");
+      const soon = r.gs.slice().sort((a, b) => (Date.parse(a.kickoff || 0) || 0) - (Date.parse(b.kickoff || 0) || 0))[0];
+      const pick = live || soon;
+      if (pick && (!g || band(pick) === "live" || (Date.parse(pick.kickoff || 0) || 0) < (Date.parse(g.kickoff || 0) || 0))) {
+        g = pick; mine = r.b;
+        if (band(pick) === "live") break;
+      }
+    }
+    if (!g) {
+      // nothing of yours: the BIGGEST match in play, by the same league order
+      // the card below uses — otherwise the hero leads with whatever the feed
+      // happened to list first, which is how the Eredivisie ends up above the
+      // Premier League
+      const byRank = (a, b) => GROUP_RANK(a.league) - GROUP_RANK(b.league)
+        || (Date.parse(a.kickoff || 0) || 0) - (Date.parse(b.kickoff || 0) || 0);
+      g = S.games.filter((x) => band(x) === "live").sort(byRank)[0]
+        || S.games.filter((x) => band(x) === "next").sort(byRank)[0] || null;
+    }
+    if (!g) { $("#lead").hidden = true; return; }
+
+    const live = band(g) === "live";
+    $("#lead").href = `${live ? "../live/" : "../match/"}`
+      + `?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}`;
+    $("#leadTop").className = live ? "top" : "top q";
+    $("#leadWhen").textContent = mine
+      ? (live ? "Your bet is in play" : "Your next kick-off")
+      : (live ? "Biggest match in play" : "Next up");
+    $("#lH").src = g.homeCrest || ""; $("#lA").src = g.awayCrest || "";
+    $("#lHN").textContent = g.home; $("#lAN").textContent = g.away;
+    $("#lSC").textContent = live ? `${g.score[0]}–${g.score[1]}` : (hhmm(g.kickoff) || "TBC");
+    $("#lCK").className = live ? "ck" : "ck q";
+    $("#lCK").textContent = live ? (g.clock || "Live") : "kick-off";
+
+    $("#lFoot").innerHTML =
+      `<div><div class="k">Competition</div><div class="v">${esc(g.league || "—")}</div></div>`
+      + (mine
+        ? `<div><div class="k">Your stake</div><div class="v g">${money(+mine.stake || 0)}</div></div>`
+          + `<div><div class="k">Returns</div><div class="v">${money(+mine.potentialReturn || 0)}</div></div>`
+        : `<div><div class="k">Kick-off</div><div class="v">${esc(hhmm(g.kickoff) || "TBC")}</div></div>`
+          + `<div><div class="k">Yours</div><div class="v">nothing on it</div></div>`);
+    $("#lead").hidden = false;
+  }
+
+  /* Where you stand, across the foot of the hero — the same four figures in
+     the same order on every page that shows them. */
+  function moneyStrip() {
+    const bets = vault();
+    let bank = null;
+    try { const b = parseFloat(localStorage.getItem("hawk_bankroll")); if (Number.isFinite(b)) bank = b; } catch { /* none */ }
+    if (bank == null && !bets.length) { $("#money").hidden = true; return; }
+    const pending = bets.filter((b) => b.status === "PENDING");
+    const atRisk = pending.reduce((a, b) => a + (+b.stake || 0), 0);
+    const settled = bets.filter((b) => b.status && b.status !== "PENDING");
+    const net = settled.reduce((a, b) => a + profit(b), 0);
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    const todayBets = settled.filter((b) => Date.parse(b.settledAt || "") >= midnight.getTime());
+    const todayPl = todayBets.reduce((a, b) => a + profit(b), 0);
+    const cls = (n) => (n > 0 ? " up" : n < 0 ? " dn" : "");
+    $("#money").innerHTML =
+      `<div><div class="k">Bankroll</div><div class="v g">${bank == null ? "—" : money(bank)}</div>
+        <div class="s">${plural(bets.length, "ticket")} logged</div></div>`
+      + `<div><div class="k">At risk</div><div class="v${atRisk ? " live" : ""}">${money(atRisk)}</div>
+        <div class="s">${pending.length ? plural(pending.length, "ticket") + " running" : "nothing running"}</div></div>`
+      + `<div><div class="k">Today</div><div class="v${cls(todayPl)}">${
+        todayBets.length ? `${todayPl > 0 ? "+" : ""}${money(todayPl)}` : "—"}</div>
+        <div class="s">${todayBets.length ? plural(todayBets.length, "ticket") + " settled" : "nothing settled yet"}</div></div>`
+      + `<div><div class="k">All time</div><div class="v${cls(net)}">${
+        settled.length ? `${net > 0 ? "+" : ""}${money(net)}` : "—"}</div>
+        <div class="s">${settled.length ? `across ${plural(settled.length, "ticket")}` : "nothing settled"}</div></div>`;
+    $("#money").hidden = false;
+  }
+
   /* ----------------------------------------------------------- running --
      Pending bets, ordered by how soon they matter: in play, then kicking off
      today, then everything else. A live chance is asked of the engine only for
@@ -197,7 +297,7 @@
         placed is settled.</div></div>`;
       $("#runN").textContent = "";
       $("#runNote").innerHTML = `Bets you log in the builder appear here until they settle.`;
-      return { pending: [], atRisk: 0, liveN: 0, todayN: 0 };
+      return { pending: [], rows: [], atRisk: 0, liveN: 0, todayN: 0 };
     }
 
     const rows = pending.map((b) => {
@@ -251,7 +351,7 @@
          only time the number is live rather than the pre-match one wearing a badge.`
       : `Chances appear here once a match kicks off.`;
 
-    return { pending, atRisk, liveN, todayN };
+    return { pending, rows, atRisk, liveN, todayN };
   }
 
   /* ------------------------------------------------------ today's money -- */
@@ -319,6 +419,8 @@
     const r = await paintRunning();
     paintMoney(r);
     paintMoment(r);
+    paintLead(r);
+    moneyStrip();
     // only worth repeating while something is actually moving
     clearTimeout(S.timer);
     if (S.games.some((g) => band(g) === "live")) S.timer = setTimeout(run, 60000);

@@ -100,6 +100,17 @@
   </div>
 </details>
 
+<details class="calm fold" id="wksWrap" data-fold="vWeeks" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>By week</h3>
+    <span class="n" id="wksN"></span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div class="wks" id="wks"></div>
+    <p class="note">By match day, not settle day — the night a ticket was played is the week it
+      belongs to, which is the same rule the report above and the rows below use. The bar is won
+      against lost; the figures are tickets, strike rate and return on what you staked.</p>
+  </div>
+</details>
+
 <details class="calm fold" id="chartWrap" data-fold="vChart" hidden>
   <summary><div class="wrap"><div class="lede"><h3>Profit over time</h3>
     <span class="n" id="chartN"></span><span class="mk-t"></span></div></div></summary>
@@ -328,24 +339,38 @@
   function leagues(f) {
     const by = new Map();
     for (const b of f.s) {
-      const k = ((b.legs || [])[0] || {}).league || "Other";
+      /* An acca across three competitions was being filed under whichever one
+         its first leg happened to be in, which credits Serie A for a ticket
+         the Bundesliga half of it lost. A ticket that spans leagues gets its
+         own bucket instead: it is a different kind of bet and it is not
+         evidence about any single competition. */
+      const names = [...new Set((b.legs || []).map((l) => l && l.league).filter(Boolean))];
+      const k = names.length > 1 ? "Across competitions" : (names[0] || "Other");
       if (!by.has(k)) by.set(k, []);
       by.get(k).push(b);
     }
-    // under three settled bets a return is noise, so it is left out rather
-    // than printed as if it meant something
     const rows = [...by.entries()].map(([name, list]) => {
       const st = list.reduce((a, b) => a + (+b.stake || 0), 0);
       const pl = list.reduce((a, b) => a + profit(b), 0);
-      return { name, n: list.length, st, pl, roi: st ? (100 * pl / st) : 0 };
-    }).filter((r) => r.n >= 3).sort((a, b) => b.pl - a.pl);
+      const won = list.filter((b) => b.status === "WON").length;
+      return { name, n: list.length, won, hit: list.length ? won / list.length : 0,
+               st, pl, roi: st ? (100 * pl / st) : 0 };
+    }).sort((a, b) => b.pl - a.pl);
     if (!rows.length) { $("#lgWrap").hidden = true; return; }
 
+    // Everything is shown, thin samples included — hiding them made the page
+    // claim you had never bet a competition you had lost money in. A row of
+    // three tickets is marked as what it is rather than left out.
+    const thin = rows.filter((r) => r.n < 5).length;
+    $("#lgN").textContent = `${plural(rows.length, "competition")}${
+      thin ? ` · ${thin} too thin to read` : ""}`;
     const cap = Math.max(50, ...rows.map((r) => Math.abs(r.roi)));
-    $("#lgN").textContent = `${plural(rows.length, "competition")}`;
-    $("#lgt").innerHTML = `<thead><tr><th>Competition</th><th>Bets</th><th>Staked</th>
+    $("#lgt").innerHTML = `<thead><tr><th>Competition</th><th>Tickets</th><th>Win rate</th>
         <th></th><th>Profit</th><th>Return</th></tr></thead><tbody>${rows.map((r) => `
-      <tr><td>${esc(r.name)}</td><td>${r.n}</td><td>${money(r.st)}</td>
+      <tr${r.n < 5 ? ' style="opacity:.55"' : ""}><td>${esc(r.name)}${
+          r.n < 5 ? ` <span style="color:var(--faint);font-size:11px">· thin</span>` : ""}</td>
+        <td>${r.n}</td>
+        <td>${(100 * r.hit).toFixed(0)}%</td>
         <td><div class="bar"><i class="${r.roi >= 0 ? "p" : "m"}"
           style="width:${Math.min(50, 50 * Math.abs(r.roi) / cap).toFixed(1)}%"></i></div></td>
         <td class="${r.pl > 0 ? "up" : r.pl < 0 ? "dn" : ""}">${r.pl > 0 ? "+" : ""}${money(r.pl)}</td>
@@ -521,6 +546,32 @@
     const byPl = done.map((b) => ({ b, pl: payout(b) - (+b.stake || 0) })).sort((x, y) => y.pl - x.pl);
     const nameOf = (b) => (b.legs || []).map((l) => l.fixture).filter(Boolean).slice(0, 2).join(" + ") || "a ticket";
 
+    /* The week's own legs: what you were paid against Bet365's closing price,
+       and how each market did against the chance HAWK gave it.
+
+       Closing price is the one external mark on whether a bet was good
+       independently of whether it won — the book's own final word on the same
+       selection. It only exists for legs HAWK settled, which is why the count
+       is quoted beside it rather than implied. */
+    const hLegs = done.flatMap((b) => (b.legs || []).flatMap((l) => (l.hawk && l.hawk.legs) || []));
+    const clvLegs = hLegs.filter((h) => h.bookPrice > 1 && h.close > 1);
+    const clv = clvLegs.length
+      ? clvLegs.reduce((a, h) => a + h.bookPrice / h.close - 1, 0) / clvLegs.length : null;
+    const beat = clvLegs.filter((h) => h.bookPrice > h.close).length;
+
+    const settledLegs = hLegs.filter((h) => (h.result === "won" || h.result === "lost") && h.p > 0);
+    const mk = {};
+    for (const h of settledLegs) {
+      const g = (mk[h.market || "Other"] ||= { n: 0, said: 0, got: 0 });
+      g.n++; g.said += h.p; if (h.result === "won") g.got++;
+    }
+    // two legs is not a market's record, but it is the week's record of it
+    const markets = Object.entries(mk).filter(([, g]) => g.n >= 2)
+      .map(([m, g]) => ({ m, n: g.n, said: g.said / g.n, got: g.got / g.n, gap: g.got / g.n - g.said / g.n }))
+      .sort((a, b) => b.n - a.n);
+    const working = markets.filter((x) => x.gap >= 0.1).sort((a, b) => b.gap - a.gap).slice(0, 2);
+    const costing = markets.filter((x) => x.gap <= -0.1).sort((a, b) => a.gap - b.gap).slice(0, 2);
+
     // HAWK's own week, from the graded file: what it said against what landed
     const p2 = (n) => String(n).padStart(2, "0");
     const wkKey = `${d1.getFullYear()}-${p2(d1.getMonth() + 1)}-${p2(d1.getDate())}`;
@@ -540,10 +591,30 @@
           <div class="s">${done.length ? `${(100 * won / done.length).toFixed(0)}% strike` : "—"}</div></div>
         <div><div class="n g">${money(staked)}</div><div class="k">Staked</div>
           <div class="s">${plural(placed.length, "ticket")} played</div></div>
-        <div><div class="n${W ? "" : " "}">${W ? `${(100 * W.won / W.legs).toFixed(1)}%` : "—"}</div>
-          <div class="k">HAWK landed</div>
-          <div class="s">${W ? `said ${(100 * W.said / W.legs).toFixed(1)}% · ${W.legs.toLocaleString()} legs` : "no graded week"}</div></div>
+        <div><div class="n${clv == null ? "" : clv >= 0 ? " up" : " dn"}">${
+          clv == null ? "—" : `${clv > 0 ? "+" : ""}${(100 * clv).toFixed(1)}%`}</div>
+          <div class="k">Vs closing price</div>
+          <div class="s">${clv == null ? "no closing prices yet"
+            : `beat it on ${beat} of ${plural(clvLegs.length, "leg")}`}</div></div>
+        <div><div class="n">${W ? `${(100 * W.said / W.legs).toFixed(0)}% → ${(100 * W.won / W.legs).toFixed(0)}%` : "—"}</div>
+          <div class="k">HAWK on every match</div>
+          <div class="s">${W ? `said → landed · ${W.matches} matches${
+            W.bigCalls ? ` · ⚡ ${W.bigRight}/${W.bigCalls} upset calls right` : ""}` : "no graded week"}</div></div>
       </div>
+
+      ${markets.length ? `<div style="margin-top:30px">
+        <div class="k" style="font:700 8.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--faint)">
+          Your markets this week · HAWK said → landed</div>
+        <div class="mks">${markets.map((x) => `<span class="${
+          x.gap >= 0.1 ? "good" : x.gap <= -0.1 ? "bad" : ""}" title="${esc(x.m)}: HAWK gave these ${
+          (100 * x.said).toFixed(0)}% on average and ${x.got === 1 ? "all" : `${Math.round(x.got * x.n)}`} of ${x.n} landed">
+          ${esc(x.m)} <b>${(100 * x.said).toFixed(0)}% → ${(100 * x.got).toFixed(0)}%</b><i>${x.n}</i></span>`).join("")}</div>
+        ${working.length || costing.length ? `<p class="note">${
+          working.length ? `Working for you: <b>${working.map((x) => esc(x.m)).join(", ")}</b> — they landed more
+            often than HAWK said. ` : ""}${
+          costing.length ? `Costing you: <b>${costing.map((x) => esc(x.m)).join(", ")}</b> — they landed less. ` : ""}
+          One week is a handful of legs per market, so this is what happened rather than what is true.</p>` : ""}
+      </div>` : ""}
       ${byPl.length ? `<div style="margin-top:30px">
         <div class="bt" style="border-bottom:1px solid var(--rule-2)">
           <span class="w"><b>${esc(nameOf(byPl[0].b))}</b><i>best of the week</i></span>
@@ -560,6 +631,48 @@
     $("#wkWrap").hidden = false;
   }
 
+  /* ------------------------------------------------------------ by week
+     Eight weeks side by side. The report above explains one week; this is
+     for spotting which week is worth explaining. Same week rule as
+     everything else on the page: the night the ticket was played. */
+  function weekStrip() {
+    const MS = 7 * 864e5;
+    const [thisFrom] = weekRange("this");
+    const cards = [];
+    for (let i = 0; i < 8; i++) {
+      const from = thisFrom - i * MS, to = from + MS;
+      const placed = S.bets.filter((b) => { const t = betTime(b); return t >= from && t < to; });
+      const done = placed.filter((b) => b.status && b.status !== "PENDING");
+      if (!placed.length && i > 1) continue;              // an empty old week is not news
+      const staked = done.reduce((a, b) => a + (+b.stake || 0), 0);
+      const pl = done.reduce((a, b) => a + profit(b), 0);
+      const won = done.filter((b) => b.status === "WON").length;
+      const lost = done.filter((b) => b.status === "LOST").length;
+      const d = new Date(from);
+      cards.push({ i, from, label: i === 0 ? "This week" : i === 1 ? "Last week"
+                     : d.toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+                   n: placed.length, done: done.length, staked, pl, won, lost,
+                   hit: done.length ? won / done.length : null,
+                   roi: staked ? (100 * pl / staked) : null });
+    }
+    if (!cards.some((c) => c.n)) { $("#wksWrap").hidden = true; return; }
+    const live = cards.filter((c) => c.n).length;
+    $("#wksN").textContent = `${plural(live, "week")} with tickets`;
+    $("#wks").innerHTML = cards.map((c) => {
+      const tone = c.done ? (c.pl > 0 ? "up" : c.pl < 0 ? "dn" : "q") : "q";
+      const tot = c.won + c.lost;
+      return `<div class="${c.i === 0 ? "now" : ""}">
+        <div class="k">${esc(c.label)}</div>
+        <div class="v ${tone}">${c.done ? `${c.pl > 0 ? "+" : ""}${money(c.pl)}` : "—"}</div>
+        <div class="s">${c.n ? `${c.n} · ${c.hit == null ? "none settled"
+            : `${(100 * c.hit).toFixed(0)}% hit`}${c.roi == null ? "" : ` · ${
+              c.roi > 0 ? "+" : ""}${c.roi.toFixed(0)}%`}` : "nothing played"}</div>
+        ${tot ? `<div class="sp"><i class="w" style="width:${(100 * c.won / tot).toFixed(1)}%"></i>
+          <i class="l" style="width:${(100 * c.lost / tot).toFixed(1)}%"></i></div>` : ""}</div>`;
+    }).join("");
+    $("#wksWrap").hidden = false;
+  }
+
   /* --------------------------------------------------- how good is HAWK
      Read from data/graded.json, which the build writes after every match —
      HAWK grades its chances on EVERY fixture, not just the ones you bet, so
@@ -573,6 +686,7 @@
     } catch { /* not published yet */ }
     S.G = G;     // kept, so switching week does not refetch 88KB
     weekly(G);   // the weekly report wants the graded file too, when there is one
+    weekStrip();
     if (!G || !G.bands || !G.bands.length) { $("#scWrap").hidden = true; return; }
 
     const pc = (x) => `${(100 * x).toFixed(1)}%`;

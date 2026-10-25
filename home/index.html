@@ -16,25 +16,37 @@
 <body>
 
 <!-- ============================ the moment ============================== -->
-<header class="hero tall">
+<header class="hero">
   <canvas aria-hidden="true"></canvas>
   <div class="wrap">
-    <span class="tag" id="tag"><span class="dot off"></span>Loading today</span>
+    <div class="hsplit">
+      <div>
+        <span class="tag" id="tag"><span class="dot off"></span>Loading today</span>
+        <h1 class="moment mid">Every bet,<span class="q">priced honestly</span></h1>
+        <p class="said" id="said">HAWK prices every leg from its own simulation and says where
+          Bet365 is ahead of it. <b>Most days nothing beats the price</b> — and it says so.</p>
+        <div class="acts">
+          <a class="btn gold" href="../scores/">Build a bet</a>
+          <a class="btn ghost" href="../today/">Your day</a>
+        </div>
+      </div>
 
-    <h1 class="moment">Every bet,<span class="q">priced honestly</span></h1>
-
-    <div class="fx" id="fx" hidden>
-      <div class="side h"><img class="crest" id="fxH" alt=""><h2 id="fxHN"></h2>
-        <div class="m" id="fxHM"></div></div>
-      <div class="mid"><div class="t" id="fxT"></div><div class="k" id="fxK"></div></div>
-      <div class="side a"><img class="crest" id="fxA" alt=""><h2 id="fxAN"></h2>
-        <div class="m" id="fxAM"></div></div>
+      <!-- the match you opened HAWK for, where the empty half used to be -->
+      <a class="hlead" id="lead" href="../today/" style="text-decoration:none;color:inherit" hidden>
+        <div class="top" id="leadTop"><span class="d"></span><span id="leadWhen">Biggest match in play</span></div>
+        <div class="fx2">
+          <div class="side"><img id="lH" alt="" onerror="this.style.visibility='hidden'"><h3 id="lHN"></h3></div>
+          <div><div class="sc" id="lSC"></div><div class="ck" id="lCK"></div></div>
+          <div class="side"><img id="lA" alt="" onerror="this.style.visibility='hidden'"><h3 id="lAN"></h3></div>
+        </div>
+        <div class="b3h" id="lBar" hidden></div>
+        <div class="b3hk" id="lBark" hidden></div>
+        <div class="foot2" id="lFoot"></div>
+      </a>
     </div>
 
-    <div class="acts">
-      <a class="btn gold" href="../scores/">Build a bet</a>
-      <a class="btn ghost" href="../today/">Your day</a>
-    </div>
+    <!-- and where you stand -->
+    <div class="hmoney" id="money" hidden></div>
   </div>
 </header>
 
@@ -86,6 +98,7 @@
 <script src="../assets/hawk-bg.js"></script>
 <script src="../assets/hawk-fold.js"></script>
 <script src="../assets/hawk-alerts.js"></script>
+<script src="../assets/hawk-table.js"></script>
 <script src="../assets/hawk-nav.js"></script>
 <script>
 /* ===========================================================================
@@ -103,6 +116,9 @@
   const hhmm = (iso) => { const t = Date.parse(iso); return Number.isFinite(t)
     ? new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""; };
   const money = (n) => `${n < 0 ? "−" : ""}€${Math.abs(+n || 0).toFixed(2)}`;
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : /(ch|sh|s|x|z)$/.test(w) ? "es" : "s"}`;
+  const vaultBets = () => { try { const b = JSON.parse(localStorage.getItem("hawk_bets") || "[]");
+    return Array.isArray(b) ? b : []; } catch { return []; } };
   const band = (g) => (g.status === 3 ? "live" : g.status === 4 ? "done" : "next");
 
   /* Eight cards for a day with eighty matches on it, so which eight is the
@@ -139,21 +155,95 @@
     return live[0] || next[0] || null;
   }
 
+  /* HAWK's saved read of a fixture, when the build wrote one before kick-off.
+     predictions.json is { updated, matches: { id: { probs, level, kickoff } } }. */
+  let PREDS = null;
+  const readOf = (id) => {
+    const m = PREDS && (PREDS.matches || PREDS.m);
+    const p = m && m[String(id)];
+    return p && p.probs ? p.probs : null;
+  };
+  // percentages that add to 100 — three independent roundings do not
+  const pc100 = (a) => {
+    const v = a.map((x) => 100 * (x || 0)), r = v.map(Math.round);
+    let d = 100 - r.reduce((x, y) => x + y, 0);
+    while (d) {
+      const i = v.map((x, k) => [Math.abs(x - r[k]), k]).sort((p, q) => q[0] - p[0])[0][1];
+      r[i] += d > 0 ? 1 : -1; d += d > 0 ? -1 : 1;
+    }
+    return r;
+  };
+
   function paintLead(g) {
     if (!g) return;
     const live = band(g) === "live";
-    $("#fxH").src = g.homeCrest || ""; $("#fxA").src = g.awayCrest || "";
-    $("#fxHN").textContent = g.home; $("#fxAN").textContent = g.away;
-    $("#fxHM").textContent = "Home"; $("#fxAM").textContent = "Away";
-    $("#fxT").textContent = live ? `${g.score[0]}–${g.score[1]}` : (hhmm(g.kickoff) || "TBC");
-    $("#fxK").textContent = live ? `${g.clock || "Live"} · ${g.league || ""}` : `Today · ${g.league || ""}`;
-    $("#fx").hidden = false;
+    const el = $("#lead");
+    el.href = `${live ? "../live/" : "../match/"}`
+      + `?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}`;
+    $("#leadTop").className = live ? "top" : "top q";
+    $("#leadWhen").textContent = live ? "Biggest match in play" : "Next up";
+    $("#lH").src = g.homeCrest || ""; $("#lA").src = g.awayCrest || "";
+    $("#lHN").textContent = g.home; $("#lAN").textContent = g.away;
+    $("#lSC").textContent = live ? `${g.score[0]}–${g.score[1]}` : (hhmm(g.kickoff) || "TBC");
+    $("#lCK").className = live ? "ck" : "ck q";
+    $("#lCK").textContent = live ? (g.clock || "Live") : "kick-off";
+
+    // HAWK's three-way read, only where it saved one — never a made-up bar
+    const p = readOf(g.id);
+    if (p) {
+      const v = pc100([p.home, p.draw, p.away]);
+      $("#lBar").innerHTML = `<i class="h" style="flex:${p.home || 0}"></i>`
+        + `<i class="d" style="flex:${p.draw || 0}"></i><i class="a" style="flex:${p.away || 0}"></i>`;
+      $("#lBark").innerHTML = `<b>${esc(g.home)} ${v[0]}%</b><b>Draw ${v[1]}%</b><b>${esc(g.away)} ${v[2]}%</b>`;
+      $("#lBar").hidden = false; $("#lBark").hidden = false;
+    } else { $("#lBar").hidden = true; $("#lBark").hidden = true; }
+
+    $("#lFoot").innerHTML = `<div><div class="k">Competition</div><div class="v">${esc(g.league || "—")}</div></div>`
+      + `<div><div class="k">Kick-off</div><div class="v">${esc(hhmm(g.kickoff) || "TBC")}</div></div>`
+      + (p ? `<div><div class="k">HAWK's pick</div><div class="v g">${
+          esc([g.home, "Draw", g.away][[p.home, p.draw, p.away].indexOf(Math.max(p.home, p.draw, p.away))])}</div></div>` : "");
+    el.hidden = false;
   }
 
+  /* Where you stand, across the foot of the hero. Pending stakes are "at
+     risk" — money already out of the bankroll and not yet decided — and the
+     day's figure counts only what settled today, so an open ticket is never
+     quietly booked as a win or a loss. */
+  function moneyStrip() {
+    const bets = vaultBets();
+    let bank = null;
+    try { const b = parseFloat(localStorage.getItem("hawk_bankroll")); if (Number.isFinite(b)) bank = b; } catch { /* none */ }
+    if (bank == null && !bets.length) { $("#money").hidden = true; return; }
+
+    const pending = bets.filter((b) => b.status === "PENDING");
+    const atRisk = pending.reduce((a, b) => a + (+b.stake || 0), 0);
+    const settled = bets.filter((b) => b.status && b.status !== "PENDING");
+    const net = settled.reduce((a, b) => a + betProfit(b), 0);
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    const todayBets = settled.filter((b) => Date.parse(b.settledAt || "") >= midnight.getTime());
+    const todayPl = todayBets.reduce((a, b) => a + betProfit(b), 0);
+    const cls = (n) => (n > 0 ? " up" : n < 0 ? " dn" : "");
+
+    $("#money").innerHTML =
+      `<div><div class="k">Bankroll</div><div class="v g">${bank == null ? "—" : money(bank)}</div>
+        <div class="s">${plural(bets.length, "ticket")} logged</div></div>`
+      + `<div><div class="k">At risk</div><div class="v${atRisk ? " live" : ""}">${money(atRisk)}</div>
+        <div class="s">${pending.length ? plural(pending.length, "ticket") + " running" : "nothing running"}</div></div>`
+      + `<div><div class="k">Today</div><div class="v${cls(todayPl)}">${
+        todayBets.length ? `${todayPl > 0 ? "+" : ""}${money(todayPl)}` : "—"}</div>
+        <div class="s">${todayBets.length ? plural(todayBets.length, "ticket") + " settled" : "nothing settled yet"}</div></div>`
+      + `<div><div class="k">All time</div><div class="v${cls(net)}">${
+        settled.length ? `${net > 0 ? "+" : ""}${money(net)}` : "—"}</div>
+        <div class="s">${settled.length ? `across ${plural(settled.length, "ticket")}` : "nothing settled"}</div></div>`;
+    $("#money").hidden = false;
+  }
+
+  let lastGames = [];        // kept, so a late predictions.json can repaint the lead
   async function card() {
     let games = [];
     try { games = await window.HAWK.scores(today()); } catch { games = []; }
     games = (games || []).filter((g) => g && g.home && g.away);
+    lastGames = games;
 
     const tag = $("#tag");
     if (!games.length) {
@@ -246,6 +336,15 @@
   }
 
   record();
+  moneyStrip();
+  // HAWK's saved pre-match reads, for the bar on the lead card. It is written
+  // by the build, so locally it 404s and the bar simply does not appear —
+  // which is the right outcome, not a fault.
+  fetch("../data/predictions.json", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((p) => { if (p) { PREDS = p; const g = lead(lastGames); if (g) paintLead(g); } })
+    .catch(() => { /* no saved reads */ });
+
   if (window.HAWK && window.HAWK.scores) card();
   else {
     $("#tag").innerHTML = `<span class="dot off"></span>HAWK`;

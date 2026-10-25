@@ -18,14 +18,27 @@
 <header class="hero">
   <canvas aria-hidden="true"></canvas>
   <div class="wrap">
-    <span class="tag" id="tag"><span class="dot off"></span>Reading the card</span>
-    <h1 class="moment mid" id="title">Today's<span class="q">card</span></h1>
-    <p class="said" id="said">Asking 365Scores what is on…</p>
-    <div class="days" id="days">
-      <button type="button" data-off="-1">Yesterday</button>
-      <button type="button" data-off="0" aria-pressed="true">Today</button>
-      <button type="button" data-off="1">Tomorrow</button>
-      <input type="date" id="pick" aria-label="Pick a date">
+    <div class="hsplit">
+      <div>
+        <span class="tag" id="tag"><span class="dot off"></span>Reading the card</span>
+        <h1 class="moment mid" id="title">Today's<span class="q">card</span></h1>
+        <p class="said" id="said">Asking 365Scores what is on…</p>
+        <div class="days" id="days">
+          <button type="button" data-off="-1">Yesterday</button>
+          <button type="button" data-off="0" aria-pressed="true">Today</button>
+          <button type="button" data-off="1">Tomorrow</button>
+          <input type="date" id="pick" aria-label="Pick a date">
+        </div>
+      </div>
+
+      <!-- the shape of the day: how it splits, and where the upsets are. A
+           ledger of eighty rows does not tell you that at a glance, and this
+           is the only question the hero can answer that the rows cannot. -->
+      <div class="hlead" id="shape" hidden>
+        <div class="top q" id="shapeTop"><span class="d"></span><span id="shapeWhen">The day</span></div>
+        <div class="dayshape" id="shapeBars"></div>
+        <div class="foot2" id="shapeFoot"></div>
+      </div>
     </div>
   </div>
 </header>
@@ -50,6 +63,7 @@
 <script src="../builder/engine.js"></script>
 <script src="../assets/hawk-bg.js"></script>
 <script src="../assets/hawk-alerts.js"></script>
+<script src="../assets/hawk-table.js"></script>
 <script src="../assets/hawk-nav.js"></script>
 <script>
 /* ===========================================================================
@@ -133,8 +147,8 @@
   const upsetFlag = (id) => {
     const p = predOf(id);
     const lv = p && Number.isFinite(p.level) ? p.level : null;
-    if (!(lv >= 2)) return `<span class="up"></span>`;
-    return `<span class="up lv${lv}" title="Upset radar · ${esc(UPSET_SAY[lv])}">⚡</span>`;
+    if (!(lv >= 2)) return `<span class="upf"></span>`;
+    return `<span class="upf lv${lv}" title="Upset radar · ${esc(UPSET_SAY[lv])}">⚡</span>`;
   };
 
   function row(g) {
@@ -148,29 +162,106 @@
     const href = `${b === "live" ? "../live/" : "../match/"}`
       + `?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}`;
 
-    const p = readOf(g.id);
-    const bar = p ? (() => {
+    /* HAWK's read: the bar for the shape, then one line naming who it
+       favours. Three figures on eighty rows is a wall of digits; a name and
+       a number is the same thing said the way you would say it. All three
+       are still on the bar's tooltip. */
+    const pr = predOf(g.id);
+    const p = pr && pr.probs ? pr.probs : null;
+    let read = `<span class="read3"><span class="sbar none"></span></span>`;
+    if (p) {
       const v = pc100([p.home, p.draw, p.away]);
-      return `<span class="sbar" title="HAWK before kick-off: ${esc(g.home)} ${v[0]}% · draw ${v[1]}% · ${esc(g.away)} ${v[2]}%">
-        <i class="h" style="flex:${p.home || 0}"></i><i class="d" style="flex:${p.draw || 0}"></i><i class="a" style="flex:${p.away || 0}"></i></span>`;
-    })() : `<span class="sbar none"></span>`;
+      const top = v.indexOf(Math.max(...v));
+      /* "Newcastle United 38%" is a thin thing to call a favourite, and it
+         read oddly next to "Crystal Palace 62% not to lose" on the same row.
+         Under 40%, or within 5 points of the other side, nobody is favourite
+         and the line says so instead of pretending. */
+      const spread = Math.abs(v[0] - v[2]);
+      const tossUp = v[top] < 40 || (top !== 1 && spread <= 5);
+      const favName = tossUp ? "Toss-up" : [g.home, "Draw", g.away][top];
+      const favCls = tossUp ? " q" : top === 0 ? " h" : top === 2 ? " a" : "";
+
+      /* The radar, in the same voice: which side is the underdog and how
+         often they come out of it without losing — their own win plus the
+         draw. Both figures come from this same saved read, so the line can
+         never disagree with the bar above it. */
+      const lv = Number.isFinite(pr.level) ? pr.level : null;
+      const dogIsHome = (p.home || 0) < (p.away || 0);
+      const dogName = dogIsHome ? g.home : g.away;
+      const notLose = Math.round(100 * ((dogIsHome ? p.home : p.away) + (p.draw || 0)));
+      const ups = lv >= 2
+        ? `<span class="ups" title="Upset radar · ${esc(UPSET_SAY[lv] || "")}">
+             <span class="${lv >= 3 ? "lv3" : ""}">⚡</span><span class="ar">${dogIsHome ? "◀" : "▶"}</span>
+             <span class="nm">${esc(dogName)}</span><b>${notLose}% not to lose</b></span>`
+        : "";
+
+      read = `<span class="read3" title="HAWK before kick-off: ${esc(g.home)} ${v[0]}% · draw ${v[1]}% · ${esc(g.away)} ${v[2]}%">
+        <span class="sbar"><i class="h" style="flex:${p.home || 0}"></i><i class="d" style="flex:${
+          p.draw || 0}"></i><i class="a" style="flex:${p.away || 0}"></i></span>
+        <span class="say${favCls}"><span class="mark">🦅</span>
+          <span class="nm">${esc(favName)}</span>${tossUp ? "" : `<b>${v[top]}%</b>`}</span>
+        ${ups}</span>`;
+    }
+
+    const crest = (u) => (u ? `<img src="${esc(u)}" alt="" onerror="this.remove()">` : "");
+    const followed = window.HAWKAlerts && window.HAWKAlerts.followState(g.id);
 
     return `<a class="lg-row is-${b}" href="${href}">
       <span class="t">${esc(hhmm(g.kickoff))}</span>
-      <span class="h${hc}">${esc(g.home)}</span>
+      <span class="h${hc}"><span>${esc(g.home)}</span>${crest(g.homeCrest)}</span>
       <span class="s">${mid}</span>
-      <span class="a${ac}">${esc(g.away)}</span>
-      ${upsetFlag(g.id)}
-      ${bar}
-      <span class="st">${state}</span></a>`;
+      <span class="a${ac}">${crest(g.awayCrest)}<span>${esc(g.away)}</span></span>
+      ${read}
+      <span class="st">${state}</span>
+      <button class="fol-b${followed && (followed.on || followed.bet) ? " on" : ""}" type="button"
+        data-bell="${esc(g.id)}" title="${followed && followed.bet
+          ? "You have a bet on this match — its alerts stay on"
+          : followed && followed.on ? "Alerts on. Click to turn off."
+          : "Goals and red cards on this match"}">🔔</button></a>`;
   }
 
   const chip = (attr, key, label, { icon = "", n = null, on = false, dead = false } = {}) =>
     `<button type="button" data-${attr}="${esc(key)}" aria-pressed="${String(on)}"${dead ? " disabled" : ""}>${
       icon}${esc(label)}${n == null ? "" : `<i>${n}</i>`}</button>`;
 
+  /* ------------------------------------------- the hero's right half
+     The shape of the day. The ledger below answers "what is the score";
+     this answers "what kind of day is it" — how it splits between in play,
+     about to start, later and done, and how many of them HAWK rates as
+     live upsets. Neither question is answerable from the other. */
+  function paintShape(all) {
+    if (!all.length) { $("#shape").hidden = true; return; }
+    const n = { live: 0, soon: 0, next: 0, done: 0 };
+    for (const g of all) n[band(g)]++;
+    const biggest = Math.max(1, ...Object.values(n));
+    const rows = [["live", "In play"], ["soon", "Next hour"], ["next", "Later"], ["done", "Finished"]];
+    $("#shapeWhen").textContent = S.day === dayFrom(0) ? "The day so far" : "The day";
+    $("#shapeBars").innerHTML = rows.map(([k, t]) => `<div class="row ${k}">
+      <span class="k">${t}</span>
+      <span class="t"><i style="width:${(100 * n[k] / biggest).toFixed(1)}%"></i></span>
+      <span class="n">${n[k]}</span></div>`).join("");
+
+    // upsets HAWK has flagged on this day's fixtures, from the same saved
+    // reads the ⚡ on each row uses — not a second opinion
+    let hot = 0, veryHot = 0;
+    for (const g of all) {
+      const p = predOf(g.id);
+      const lv = p && Number.isFinite(p.level) ? p.level : null;
+      if (lv === 2) hot++; else if (lv >= 3) veryHot++;
+    }
+    const comps = new Set(all.map((g) => g.league || "Other")).size;
+    $("#shapeFoot").innerHTML =
+      `<div><div class="k">Matches</div><div class="v">${all.length}</div></div>`
+      + `<div><div class="k">Competitions</div><div class="v">${comps}</div></div>`
+      + (hot + veryHot
+        ? `<div><div class="k">Upset radar</div><div class="v g">⚡ ${hot + veryHot}</div></div>`
+        : `<div><div class="k">Upset radar</div><div class="v">none flagged</div></div>`);
+    $("#shape").hidden = false;
+  }
+
   function paint() {
     const all = S.games;
+    paintShape(all);
 
     /* 1. the groups, counted over the whole day — so the row tells you where
        the day actually is before you press anything. A group with nothing on
@@ -227,7 +318,8 @@
       .sort((a, b) => rank(a.l) - rank(b.l));
 
     $("#board").innerHTML = groups.map((gr) => `<section class="lg-sec">
-      <div class="lg-h"><h3>${esc(gr.name)}</h3><span class="n">${gr.l.length}</span></div>
+      <div class="lg-h"><h3>${esc(gr.name)}</h3><span class="n">${gr.l.length}</span>
+        <button class="tbtn" type="button" data-table="${esc(gr.name)}">Table</button></div>
       ${gr.l.map(row).join("")}</section>`).join("");
   }
 
@@ -289,7 +381,18 @@
     S.band = "all"; S.comp = "all";
     load();
   });
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", async (e) => {
+    // the bell sits inside the row's link, so it has to claim the click
+    // before the row does, or turning alerts on also opens the match
+    const bell = e.target.closest("[data-bell]");
+    if (bell) {
+      e.preventDefault(); e.stopPropagation();
+      if (!window.HAWKAlerts) return;
+      const st = await window.HAWKAlerts.toggleFollow(bell.dataset.bell);
+      bell.classList.toggle("on", !!(st && (st.on || st.bet)));
+      return;
+    }
+
     // each row resets the rows beneath it — narrowing to Top 5 and keeping a
     // competition from World would leave an empty board and no reason for it
     const gr = e.target.closest("#groups button[data-group]");

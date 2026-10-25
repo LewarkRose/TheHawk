@@ -1,0 +1,10 @@
+# data/ is built on the runner by the GitHub Action and published to Pages.
+# It has never been tracked — `git ls-files data` is empty — so a copy pulled
+# down locally to look at a page with real numbers in it is working material,
+# not a change. This stops a stale copy of it being committed by accident.
+data/
+
+# scratch
+*.tmp
+_tmp_*
+_preview*.html

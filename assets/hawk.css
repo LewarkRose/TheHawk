@@ -76,23 +76,102 @@ img{display:block;max-width:100%}
 .nav .mark:hover .crest{transform:translateY(-2px);
   filter:drop-shadow(0 6px 14px rgba(212,169,78,.45))}
 .nav .mark:hover .crest .sh{fill:var(--gold-hi)}
-.nav .links{display:flex;gap:clamp(10px,1.8vw,24px);margin-left:clamp(8px,2vw,22px);min-width:0}
-.nav .links a{text-decoration:none;color:var(--faint);white-space:nowrap;
-  font:700 10px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;
-  padding:7px 0;border-bottom:1px solid transparent;transition:color .35s var(--film)}
-.nav .links a:hover{color:var(--text)}
+/* Bigger, and each one carries its own mark. A row of five identical
+   letterspaced words is read by position rather than by name; an icon in
+   front of each is the thing you actually aim at. */
+.nav .links{display:flex;gap:clamp(6px,1.4vw,16px);margin-left:clamp(8px,2vw,22px);min-width:0}
+.nav .links a{display:inline-flex;align-items:center;gap:8px;text-decoration:none;
+  color:var(--muted);white-space:nowrap;
+  font:700 12.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;
+  padding:10px 11px;border-bottom:2px solid transparent;
+  transition:color .35s var(--film),background .35s var(--film)}
+.nav .links a i{font-style:normal;font-size:14px;line-height:1;opacity:.72;
+  filter:saturate(.85);transition:opacity .35s var(--film),transform .35s var(--film)}
+.nav .links a:hover{color:var(--text);background:rgba(242,242,242,.04)}
+.nav .links a:hover i{opacity:1;transform:translateY(-1px)}
 .nav .links a[aria-current]{color:var(--gold-hi);border-bottom-color:var(--gold)}
+.nav .links a[aria-current] i{opacity:1}
+@media (max-width:980px){
+  .nav .links a{font-size:11px;letter-spacing:.1em;padding:9px 7px;gap:6px}
+  .nav .links a i{font-size:13px}
+}
 .nav .right{position:relative;margin-left:auto;display:flex;align-items:center;gap:12px;flex:none}
+/* ---------------------------------------------------------- the bets drawer
+   v1 opened My bets BESIDE the page rather than navigating to it, because you
+   check what is running while reading a match — and a page jump loses the
+   slip you were halfway through building. */
+.bdrawer{position:fixed;top:0;right:0;bottom:0;width:min(400px,100vw);z-index:420;
+  background:var(--raise);box-shadow:-1px 0 0 var(--rule-2),0 0 90px -20px #000;
+  transform:translate3d(100%,0,0);transition:transform .5s var(--film);
+  display:flex;flex-direction:column;overscroll-behavior:contain}
+.bdrawer.on{transform:none}
+.bdrawer .dhd{display:flex;align-items:center;gap:12px;padding:18px 20px;
+  border-bottom:1px solid var(--rule)}
+.bdrawer .dhd h4{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  font-size:19px;line-height:1;letter-spacing:.03em}
+.bdrawer .dhd .x{margin-left:auto;width:30px;height:30px;border:0;background:none;cursor:pointer;
+  color:var(--faint);font:400 14px/1 var(--sans);transition:color .3s var(--film)}
+.bdrawer .dhd .x:hover{color:var(--text)}
+.bdrawer .dsum{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule)}
+.bdrawer .dsum > div{background:var(--raise);padding:12px 10px;text-align:center}
+.bdrawer .dsum .k{display:block;font:700 8px/1 var(--mono);letter-spacing:.13em;
+  text-transform:uppercase;color:var(--faint)}
+.bdrawer .dsum .v{display:block;margin-top:6px;font-family:var(--disp);font-weight:700;
+  font-size:19px;line-height:1;font-variant-numeric:tabular-nums}
+.bdrawer .dsum .v.g{color:var(--gold-hi)}
+.bdrawer .dlist{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:14px}
+.bdrawer .dlist::-webkit-scrollbar{width:6px}
+.bdrawer .dlist::-webkit-scrollbar-thumb{background:rgba(242,242,242,.14)}
+.bdrawer .dbet{display:block;text-decoration:none;color:inherit;padding:13px 14px;margin-bottom:9px;
+  background:var(--ink);box-shadow:inset 0 0 0 1px var(--rule);
+  transition:box-shadow .3s var(--film)}
+.bdrawer .dbet:hover{box-shadow:inset 0 0 0 1px var(--rule-2)}
+.bdrawer .dbet .t{display:flex;align-items:baseline;gap:11px}
+.bdrawer .dbet .nm{flex:1;min-width:0;font-size:13px;line-height:1.35}
+.bdrawer .dbet .od{font:700 12px/1 var(--mono);color:var(--gold-hi);font-variant-numeric:tabular-nums}
+.bdrawer .dbet .dl{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px}
+.bdrawer .dbet .dl li{display:grid;grid-template-columns:13px minmax(0,1fr);gap:8px;
+  font:400 11px/1.5 var(--mono);color:var(--muted)}
+.bdrawer .dbet .dl i{font-style:normal;text-align:center}
+.bdrawer .dbet .dl i.w{color:var(--up)}
+.bdrawer .dbet .dl i.l{color:var(--down)}
+.bdrawer .dbet .dl i.o{color:var(--faint)}
+.bdrawer .dbet .f{display:flex;justify-content:space-between;gap:12px;margin-top:11px;
+  padding-top:9px;border-top:1px solid var(--rule);font:400 11px/1 var(--mono);color:var(--faint)}
+.bdrawer .dbet .f b{color:var(--gold-hi);font-weight:400}
+.bdrawer .dnone{margin:0;padding:26px 4px;font-size:12.5px;line-height:1.8;color:var(--faint)}
+.bdrawer .dft{padding:14px 20px;border-top:1px solid var(--rule)}
+.bdrawer .dft .btn{width:100%;justify-content:center}
+/* the alerts stack where the drawer now is, so they step aside for it */
+body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s var(--film)}
+@media (max-width:620px){ body.drawn .alerts{transform:none} }
+
 /* My bets: quiet with nothing on, lit with its count the moment there is */
-.nav .mine{display:inline-flex;align-items:center;gap:7px;text-decoration:none;
-  color:var(--faint);font:700 9px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;
-  padding:7px 10px;box-shadow:inset 0 0 0 1px transparent;
+.nav .mine{display:inline-flex;align-items:center;gap:8px;text-decoration:none;
+  appearance:none;border:0;background:none;cursor:pointer;
+  color:var(--muted);font:700 11.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;
+  padding:9px 11px;box-shadow:inset 0 0 0 1px transparent;
   transition:color .35s var(--film),box-shadow .35s var(--film)}
 .nav .mine:hover{color:var(--gold-hi)}
 .nav .mine.on{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
-.nav .mine i{display:grid;place-items:center;min-width:16px;height:16px;padding:0 4px;
-  font:700 9px/1 var(--mono);font-style:normal;background:var(--gold);color:var(--ink)}
+.nav .mine i.ic{font-style:normal;font-size:14px;line-height:1;opacity:.75;filter:saturate(.85)}
+.nav .mine.on i.ic{opacity:1}
+.nav .mine i.ct{display:grid;place-items:center;min-width:17px;height:17px;padding:0 4px;
+  font:700 9.5px/1 var(--mono);font-style:normal;background:var(--gold);color:var(--ink)}
+.nav .mine .tx{font-weight:inherit}
 @media (max-width:760px){ .nav .mine{letter-spacing:.1em;padding:7px 8px} }
+/* On a phone the bar held the crest, My bets, v1, the bell and Build a bet,
+   and the five page links are already hidden by then — it still ran ~100px
+   past the right edge and cut the gold button in half. The count is the part
+   of My bets worth keeping (it is the one number you want without looking
+   for it); the word is not, and v1 is a utility link that can wait until
+   there is room for it. */
+@media (max-width:620px){
+  .nav .mine .tx{display:none}
+  .nav .old{display:none}
+  /* and the last 14px, which were three 12px gaps between four things */
+  .nav .right{gap:6px}
+}
 .nav .old{text-decoration:none;color:var(--faint);
   font:700 9px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;
   transition:color .35s var(--film)}
@@ -809,6 +888,46 @@ img{display:block;max-width:100%}
 .built .vs{margin-left:auto;text-align:right;font:400 11.5px/1.7 var(--mono);color:var(--faint)}
 .built .vs b{color:var(--text)}
 .built ol{margin:20px 0 0;padding:0;list-style:none}
+/* ------------------------------------------------- why each leg is on it
+   The build used to list the legs and say nothing about any of them. Every
+   figure here was already on the leg — the chance, the book's price, where
+   it opened, what Early Payout adds — and none of it was ever said. */
+.built .verdict{margin-top:20px;padding:15px 17px;
+  box-shadow:inset 0 0 0 1px rgba(255,107,127,.35);background:rgba(255,107,127,.05)}
+.built .verdict.good{box-shadow:inset 0 0 0 1px rgba(79,212,134,.35);background:rgba(79,212,134,.05)}
+.built .verdict b{display:block;margin-bottom:7px;font-family:var(--disp);font-weight:700;
+  font-size:clamp(17px,2vw,21px);line-height:1.15;color:var(--down)}
+.built .verdict.good b{color:var(--up)}
+.built .verdict{font-size:12.5px;line-height:1.7;color:var(--muted)}
+.built .verdict .risk{display:block;margin-top:11px;padding-top:10px;
+  border-top:1px solid var(--rule);font-size:12px;color:var(--text)}
+
+.built ol.whys{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:10px}
+.built li.why{display:block;padding:14px 15px;border-bottom:0;
+  background:var(--raise);box-shadow:inset 0 0 0 1px var(--rule)}
+.built li.why .hd{display:flex;align-items:center;gap:11px}
+.built li.why .hd .i{display:grid;place-items:center;width:22px;height:22px;flex:none;
+  font:700 10px/1 var(--mono);color:var(--ink);background:var(--gold)}
+.built li.why .nm{min-width:0;font-size:14px;line-height:1.3}
+.built li.why .nm small{display:block;margin-top:4px;font:700 8.5px/1 var(--mono);
+  letter-spacing:.15em;text-transform:uppercase;color:var(--faint)}
+.built li.why .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:var(--rule);margin:12px 0 0}
+.built li.why .nums > div{background:var(--raise);padding:9px 10px}
+.built li.why .nums .k{font:700 8px/1 var(--mono);letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint)}
+.built li.why .nums .v{margin-top:6px;font-family:var(--disp);font-weight:700;
+  font-size:19px;line-height:1;font-variant-numeric:tabular-nums}
+.built li.why .nums .s{margin-top:4px;font:400 9.5px/1.3 var(--mono);color:var(--faint)}
+.built li.why ul.lines{list-style:none;margin:12px 0 0;padding:11px 0 0;
+  border-top:1px solid var(--rule);display:grid;gap:8px}
+.built li.why ul.lines li{display:grid;grid-template-columns:18px minmax(0,1fr);gap:10px;
+  align-items:start;padding:0;border:0;font:400 12px/1.65 var(--sans);color:var(--muted)}
+.built li.why ul.lines i{font-style:normal;font-size:11px;opacity:.75;line-height:1.6}
+.built li.why ul.lines b{color:var(--text);font-weight:600}
+.built li.why ul.lines b.up{color:var(--up)}
+@media (max-width:620px){ .built li.why .nums{grid-template-columns:1fr 1fr} }
+
 .built li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;align-items:center;
   padding:11px 0;border-bottom:1px solid var(--rule);font-size:13.5px}
 .built li .i{font:700 10px/1 var(--mono);color:var(--faint)}
@@ -1360,6 +1479,12 @@ img{display:block;max-width:100%}
   transition:color .3s var(--film),box-shadow .3s var(--film)}
 .lg-row .fol-b:hover{color:var(--text);box-shadow:inset 0 0 0 1px var(--rule-2)}
 .lg-row .fol-b.on{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+/* 🔔 is an emoji, and an emoji ignores `color` — so every bell on the page
+   rendered the same gold whether its alert was on or off, which is exactly
+   backwards: gold is supposed to MEAN on. Drain it instead. */
+.lg-row .fol-b{filter:grayscale(1) opacity(.55);transition:filter .3s var(--film)}
+.lg-row .fol-b:hover{filter:grayscale(1) opacity(.9)}
+.lg-row .fol-b.on{filter:none}
 
 /* a bar, not three numbers, at the top of the read */
 .sbar{display:flex;height:4px;gap:1px}
@@ -1963,6 +2088,11 @@ img{display:block;max-width:100%}
 .fol:hover{color:var(--text);box-shadow:inset 0 0 0 1px rgba(242,242,242,.3)}
 .fol.on{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
 .fol.bet{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold);cursor:default}
+/* Same as the per-row bell. The label is set with textContent, so there is no
+   inner element to hang this on — but the button's own text is already grey,
+   so draining the whole button only actually drains the emoji. */
+.fol{filter:grayscale(1);transition:color .3s var(--film),box-shadow .3s var(--film),filter .3s var(--film)}
+.fol.on,.fol.bet{filter:none}
 
 @media (max-width:560px){
   .alerts{right:8px;left:8px;bottom:auto;top:8px;width:auto}

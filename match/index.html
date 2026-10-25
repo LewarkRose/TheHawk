@@ -828,18 +828,94 @@
     markets();
     slip();
 
+    /* How often a ticket at this price has to land to be worth taking, and
+       whether this one does. "35% needed" is simply 1/price — the break-even
+       — and saying it next to the chance is the whole verdict in two numbers. */
+    const need = t.b365 > 1 ? 1 / t.b365 : null;
+    const worth = need != null && t.p >= need;
+    const band = t.p >= 0.6 ? ["Safe", `lands about ${Math.round(t.p * 10)} times in 10`]
+      : t.p >= 0.35 ? ["Even money-ish", `lands about ${Math.round(t.p * 10)} in 10, loses the rest`]
+      : t.p >= 0.15 ? ["Risky", `lands about ${Math.round(t.p * 10) || 1} in 10, loses the rest`]
+      : ["Long shot", `lands about 1 in ${Math.round(1 / Math.max(t.p, 0.001))}`];
+
     $("#abOut").innerHTML = `<div class="built">
       <div class="top"><span class="n">${odds(t.fair)}</span><span class="k">HAWK's fair price</span>
         <span class="vs">${pct(t.p, t.p < 0.1 ? 1 : 0)} it lands<br>
-          Bet365 would pay about <b>${odds(t.b365)}</b></span></div>
-      <ol>${legs.map((l, i) => `<li><span class="i">${i + 1}</span>
-        <span>${esc(l.label)}<small>${esc(l.market || "")}</small></span>
-        <b>${pct(l.p, l.p < 0.1 ? 1 : 0)}</b></li>`).join("")}</ol>
-      ${t.b365 < t.fair ? `<p class="note" style="margin-top:16px">At that estimate Bet365 pays
-        <b>${odds(t.b365)}</b> where HAWK makes it ${odds(t.fair)} — ${(100 * (t.b365 / t.fair - 1)).toFixed(1)}%.
-        That gap is the builder's margin and it is normal; the ticket is in your slip, so type their
-        real price there to settle it.</p>` : ""}</div>`;
+          ${esc(S.book)} would pay about <b>${odds(t.b365)}</b></span></div>
+
+      <!-- the verdict, before the legs: two percentages and which is bigger -->
+      <div class="verdict ${worth ? "good" : "bad"}">
+        <b>${pct(t.p, 0)} lands vs ${need != null ? pct(need, 0) : "—"} needed</b>
+        ${worth
+          ? `${esc(S.book)} should pay about ${odds(t.b365)} and it only needs
+             ${odds(need != null ? 1 / need : 0)} to be worth taking. This one clears it.`
+          : `${esc(S.book)} should pay about ${odds(t.b365)}, against the
+             ${odds(need != null ? 1 / t.p : 0)} it needs. ${
+             t.p > 0 ? `It would have to land ${pct(need, 0)} of the time and HAWK makes it ${pct(t.p, 0)}.` : ""}`}
+        <span class="risk">🎲 ${band[0]} — ${band[1]}</span>
+      </div>
+
+      <!-- …then WHY each leg is on it. Every figure below is already on the
+           leg; the build simply never said any of it out loud. -->
+      <ol class="whys">${legs.map((l, i) => abWhy(l, i, legs.length)).join("")}</ol>
+      ${t.b365 < t.fair ? `<p class="note" style="margin-top:16px">That ${odds(t.b365)} is HAWK's
+        <b>guess</b> at what ${esc(S.book)} would pay, not a price from the feed. The ticket is in
+        your slip — type their real one there and the verdict goes solid.</p>` : ""}</div>`;
     $("#abN").textContent = nth ? `option ${nth} of ${abOpts.length || 1}` : `${plural(legs.length, "leg")} at ${odds(t.fair)}`;
+  }
+
+  /* One leg, and the reasons it is on the ticket. Four lines at most, and
+     each one is left out when there is nothing true to say — a leg with no
+     bookmaker price gets no price line rather than a row of dashes. */
+  function abWhy(l, i, n) {
+    const fair = l.fair > 1 ? l.fair : (l.p > 0 ? 1 / l.p : 0);
+    const lines = [];
+
+    // 1. the chance, and what Early Payout adds to it
+    const epAdds = l.ep && l.pNoEp != null && l.p > l.pNoEp ? l.p - l.pNoEp : 0;
+    lines.push(`<li><i>📊</i><span>HAWK makes it <b>${pct(l.pNoEp != null && epAdds ? l.pNoEp : l.p, 0)}</b>${
+      epAdds ? `, plus ${pct(epAdds, 1)} from Early Payout (paid once that side goes two goals up)
+                = <b>${pct(l.p, 0)}</b>` : ""}.</span></li>`);
+
+    // 2. why it is in this position
+    lines.push(`<li><i>🔗</i><span>${i === 0
+      ? "The first leg — the others are picked to go with it."
+      : `Picked to sit with ${n === 2 ? "the other one" : "the legs above"}: HAWK prices them together,
+         not one after another.`}</span></li>`);
+
+    // 3. the price against what HAWK thinks it is worth
+    if (l.bookPrice > 1 && fair > 1) {
+      const off = 100 * (l.bookPrice / fair - 1);
+      lines.push(`<li><i>🔢</i><span>${esc(S.book)} <b>${odds(l.bookPrice)}</b> vs HAWK's fair
+        ${odds(fair)} — ${off >= 0 ? `<b class="up">${off.toFixed(0)}% more</b> than it is worth, which is rare`
+          : `${Math.abs(off).toFixed(0)}% less than it is worth, normal for a builder leg`}.</span></li>`);
+    } else {
+      lines.push(`<li><i>🔢</i><span>No ${esc(S.book)} price in the feed for this one, so HAWK's
+        ${odds(fair)} is doing the pricing and the ticket's total is partly a guess.</span></li>`);
+    }
+
+    // 4. which way the money has moved since the market opened
+    if (l.bookPrice > 1 && l.bookOpen > 1 && Math.abs(l.bookOpen - l.bookPrice) > 0.01) {
+      const shortened = l.bookPrice < l.bookOpen;
+      lines.push(`<li><i>${shortened ? "📉" : "📈"}</i><span>${esc(S.book)} moved it
+        ${odds(l.bookOpen)} → <b>${odds(l.bookPrice)}</b>: money has come
+        ${shortened ? "for it" : "against it"}.${
+        shortened && l.bookPrice < fair ? " HAWK thinks it has gone too far." : ""}</span></li>`);
+    }
+
+    return `<li class="why">
+      <div class="hd"><span class="i">${i + 1}</span>
+        <span class="nm">${esc(l.label)}<small>${esc(l.market || "")}</small></span></div>
+      <div class="nums">
+        <div><div class="k">Chance</div><div class="v">${pct(l.p, l.p < 0.1 ? 1 : 0)}</div>
+          <div class="s">on its own${l.ep ? " · EP" : ""}</div></div>
+        <div><div class="k">${esc(S.book)}</div><div class="v">${l.bookPrice > 1 ? odds(l.bookPrice) : "—"}</div>
+          <div class="s">${l.bookOpen > 1 && l.bookPrice > 1 && Math.abs(l.bookOpen - l.bookPrice) > 0.01
+            ? `${l.bookPrice < l.bookOpen ? "▼" : "▲"} from ${odds(l.bookOpen)}` : "their price"}</div></div>
+        <div><div class="k">Fair odds</div><div class="v">${odds(fair)}</div>
+          <div class="s">HAWK's price</div></div>
+      </div>
+      <ul class="lines">${lines.join("")}</ul></li>`;
   }
 
   let abOpts = [], abAt = 0;

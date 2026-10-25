@@ -37,6 +37,21 @@
         M34 27 L58 17 L51 26 L58 28 L48 34 L34 39 Z M28 42 L32 54 L36 42 L32 45 Z"/>
     </svg>`;
 
+  /* MY BETS — what you have running, with the count, on every page.
+     v1 carried this and the rebuild dropped it: running tickets were on
+     Today and behind a filter in the Vault, so nothing anywhere told you
+     two were on. It is the one number you want visible without looking
+     for it, so it lives in the bar. */
+  const running = () => {
+    try {
+      const b = JSON.parse(localStorage.getItem("hawk_bets") || "[]");
+      return Array.isArray(b) ? b.filter((x) => x && x.status === "PENDING").length : 0;
+    } catch { return 0; }
+  };
+  const myBets = (n) => `<a class="mine${n ? " on" : ""}" href="../vault/?mine=1"
+      title="${n ? `${n} ticket${n === 1 ? "" : "s"} running` : "Nothing running"}">My bets${
+      n ? `<i>${n}</i>` : ""}</a>`;
+
   const nav = document.createElement("nav");
   nav.className = "nav";
   nav.innerHTML = `<div class="in">
@@ -44,11 +59,18 @@
       <div class="links">${LINKS.map(([k, href, label]) =>
         `<a href="${href}"${k === here ? ' aria-current="page"' : ""}>${label}</a>`).join("")}</div>
       <div class="right">
+        <span id="navMine">${myBets(running())}</span>
         <a class="old" href="../builder/" title="The old builder, for what has not been rebuilt">v1</a>
         <a class="btn gold btn-sm" href="../scores/">Build a bet</a>
       </div>
     </div>`;
   document.body.insertBefore(nav, document.body.firstChild);
+
+  /* The count has to follow the Vault, not a page load: placing a bet here,
+     settling one in another tab, or a sync arriving all change it. */
+  const refresh = () => { const el = nav.querySelector("#navMine"); if (el) el.innerHTML = myBets(running()); };
+  addEventListener("storage", (e) => { if (e.key === "hawk_bets") refresh(); });
+  window.HAWKNav = { refresh };
 
   // The bell goes in the nav rather than on one page, because the alerts run on
   // every page: the switch has to be wherever you are when you want it off.

@@ -1559,6 +1559,10 @@
   });
 
   load();
+  // ?mine=1 — what "My bets" in the nav points at: straight to what is running
+  try {
+    if (new URLSearchParams(location.search).get("mine")) S.filter = "PENDING";
+  } catch { /* no search */ }
   draw();
   drawLog();
   $("#bkN").textContent = `${plural(S.bets.length, "ticket")} · ${money(S.bank)}`;

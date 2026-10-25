@@ -63,11 +63,17 @@
       <div class="b3" id="bar"></div>
       <div class="b3k" id="bark"></div>
       <p class="derby" id="derby" hidden></p>
-      <!-- set before kick-off: goals and red cards once it starts -->
-      <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <!-- The facts belong with the fixture, not under it: who is refereeing,
+           what shape they are in, when the prices were read — and the three
+           things you can do about it. The bell and the table button live in
+           here, which is why they are declared inside it. -->
+      <div class="meta" id="meta" hidden></div>
+      <div hidden>
+        <!-- set before kick-off: goals and red cards once it starts -->
         <button class="fol" id="fol" type="button" hidden></button>
         <!-- opens the table with these two teams lit and already expanded -->
-        <button class="tbtn" id="tblBtn" type="button" hidden>League table</button></div>
+        <button class="tbtn" id="tblBtn" type="button" hidden>League table</button>
+      </div>
     </div>
   </div>
 </header>
@@ -80,12 +86,6 @@
 <section class="calm">
   <div class="wrap two">
     <main>
-      <!-- The facts about the fixture that are not chances: who is refereeing
-           (his cards a game feeds every cards line, so it is the one here that
-           moves a price), what shape they are lining up in, when the prices
-           were last read — and the three things you can do about it. -->
-      <div class="meta" id="meta" hidden></div>
-
       <!-- What HAWK expects, OUT rather than folded. The bar in the hero says
            who wins; these four say what the game looks like, and every goals,
            corners and cards leg on the page is priced from them. Between them
@@ -255,8 +255,11 @@
   // value: the book pays 2%+ over HAWK's fair odds — the same bar the old
   // builder and the live page use
   const beats = (l) => l.bookPrice > 1 && l.fair > 1 && l.bookPrice > l.fair * 1.02;
+  const money = (n) => `${n < 0 ? "−" : ""}€${Math.abs(+n || 0).toFixed(2)}`;
 
-  const S = { league: "", id: "", m: null, slip: [], cat: "All", book: "Bet365", ask: "" };
+  const S = { league: "", id: "", m: null, slip: [], cat: "All", book: "Bet365", ask: "",
+              // remembered, because you stake roughly the same thing every time
+              stake: (() => { try { return localStorage.getItem("hawk.lastStake") || ""; } catch { return ""; } })() };
 
   /* ----------------------------------------------------------- the moment */
   function moment(m) {
@@ -430,10 +433,85 @@
       <div class="ask"><label for="ask">${esc(S.book)}'s price for this slip</label>
         <input id="ask" inputmode="decimal" placeholder="e.g. 4.80" value="${esc(S.ask)}"></div>
       ${say}${note}
-      <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn gold btn-sm" id="toAcca">${
+      <!-- A single-match builder is the commonest ticket there is, and until
+           now the only way to record one was: add to acca, open the acca,
+           send it from there. The stake sits next to the price because you
+           need both to log it and neither on its own. -->
+      <div class="ask" style="margin-top:14px"><label for="stk">Stake (€)</label>
+        <input id="stk" inputmode="decimal" placeholder="e.g. 3.00" value="${esc(S.stake)}"></div>
+      <p class="note" id="slipOut" style="margin-top:14px"></p>
+      <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn gold btn-sm" id="toVault">Send to the Vault</button>
+        <button class="btn ghost btn-sm" id="toAcca">${
           window.HAWKAcca && window.HAWKAcca.has(S.id) ? "Replace on your acca" : "Add to acca"}</button>
         <button class="btn ghost btn-sm" id="clear">Clear the slip</button></div>`);
+  }
+
+  /* ================================================ THIS SLIP INTO THE VAULT
+     A single-match builder, logged as one PENDING ticket. Same money rules
+     as the Acca's own send and the Vault's settle — the stake comes off the
+     bankroll now, and the return goes on when it lands — because a ticket
+     has to be worth the same whichever page put it there.
+
+     The PRICE is yours, not HAWK's: a builder's price is in no feed, and
+     logging HAWK's fair price as though Bet365 had offered it would quietly
+     poison every CLV and return figure in the Vault. */
+  function toVault() {
+    const m = S.m, A = window.HAWKAcca;
+    const out = $("#slipOut");
+    const say = (t) => { if (out) out.textContent = t; };
+    if (!m || !A) return;
+    const picked = S.slip.map((id) => (m.legs || []).find((l) => l.id === id)).filter(Boolean);
+    if (!picked.length) return say("Nothing on the slip.");
+
+    const price = parseFloat(String($("#ask").value || "").replace(",", "."));
+    const stake = parseFloat(String($("#stk").value || "").replace(",", "."));
+    if (!(price > 1)) return say(`Type ${S.book}'s price for this slip first — HAWK's fair price is not an offer.`);
+    if (!(stake > 0)) return say("Enter a stake.");
+
+    let bank, bets;
+    try {
+      bank = parseFloat(localStorage.getItem("hawk_bankroll"));
+      if (!Number.isFinite(bank)) bank = 1000;
+      bets = JSON.parse(localStorage.getItem("hawk_bets") || "[]");
+      if (!Array.isArray(bets)) bets = [];
+    } catch { return say("Couldn't open the Vault's storage in this browser."); }
+    if (bank < stake) return say(`Not enough in your Vault bankroll (${money(bank)}).`);
+
+    let p = null;
+    try { p = (window.HAWK.evaluate({ id: String(S.id), legs: S.slip }) || {}).p; } catch { /* no read */ }
+    if (stake / bank >= 0.1 && !confirm(
+      `${money(stake)} is ${Math.round(100 * stake / bank)}% of your ${money(bank)} bankroll.`
+      + (p > 0 ? `\n\nThis lands about 1 in ${Math.round(1 / p)}.` : "") + `\n\nLog it anyway?`)) return;
+
+    const ret = Math.round(stake * price * 100) / 100;
+    bets.unshift({
+      id: "bet_" + Date.now(),
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+      legs: [{
+        fixture: `${m.home} vs ${m.away}`,
+        selection: picked.map((l) => l.label).join(" & "),
+        angle: `HAWK: ${p > 0 ? pct(p, p < 0.1 ? 1 : 0) : "—"} · fair ${odds(p > 0 ? 1 / p : 0)}`,
+        odds: +price.toFixed(2), type: "builder", league: m.league || "",
+        subSelections: picked.map((l) => ({ label: l.label, odds: +((l.bookPrice || l.fair) || 1).toFixed(2) })),
+        // the same shape the acca stores, so the settler reads both alike
+        hawk: A.hawkPart(A.makePart(m, picked, p || 0)),
+      }],
+      stake: Math.round(stake * 100) / 100, odds: +price.toFixed(2),
+      potentialReturn: ret, status: "PENDING", source: "hawk", hawkP: p,
+    });
+    try {
+      localStorage.setItem("hawk_bankroll", (bank - stake).toFixed(2));
+      localStorage.setItem("hawk_bets", JSON.stringify(bets));
+      localStorage.setItem("hawk.lastStake", String(stake));
+    } catch { return say("Couldn't save to the Vault's storage."); }
+
+    S.stake = String(stake);
+    say(`Logged: ${money(stake)} at ${odds(price)}, returning ${money(ret)} if it lands. `
+      + `It settles itself when the match finishes.`);
+    if (window.HAWKAlerts) window.HAWKAlerts.notice({ icon: "🎟", word: "Vault", href: "../vault/",
+      text: `${money(stake)} @ ${odds(price)} on ${m.home} v ${m.away} — ${plural(picked.length, "leg")}.`, tone: "good" });
+    if (window.HAWKNav && window.HAWKNav.refresh) window.HAWKNav.refresh();
   }
 
   /* This slip onto the acca. One part per match, so adding this match again
@@ -1085,6 +1163,7 @@
     const optBtn = e.target.closest("#abOpts [data-opt]");
     if (optBtn) { abPick(+optBtn.dataset.opt); return; }
 
+    if (e.target.closest("#toVault")) { toVault(); return; }
     if (e.target.closest("#toAcca")) { toAcca(); return; }
 
     if (e.target.closest("#clear")) {
@@ -1123,7 +1202,10 @@
     abPlan();
   });
 
+  // the stake is not part of HAWK's read, so typing it must not redraw the
+  // slip — a redraw would take the focus out of the box mid-number
   document.addEventListener("input", (e) => {
+    if (e.target.id === "stk") { S.stake = e.target.value; return; }
     if (e.target.id !== "ask") return;
     const pos = e.target.selectionStart;
     S.ask = e.target.value;

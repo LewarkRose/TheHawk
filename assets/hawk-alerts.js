@@ -515,8 +515,13 @@
       try { f = await S.fetchMatchFacts(l.hawk.game); } catch { return null; }
       if (!f || !f.finished) return null;
       if (f.off) { check = `${l.fixture}: ${f.off}`; continue; }
+      /* Sub On Play On, the same way v1's Vault settles: a player leg follows
+         his replacement unless you switched the rule off, globally or on this
+         bet. Without it a leg Bet365 pays WON reads lost here, and this is
+         the function that can mark the whole bet LOST. */
+      const subOn = loadPref("hawk.subOn", true) && b.subOn !== false;
       for (const h of l.hawk.legs || []) {
-        const r = h.userDone ? "won" : S.legResult(h, f, { earlyPayout: true });
+        const r = h.userDone ? "won" : S.legResult(h, f, { earlyPayout: true, subOn });
         if (r === "lost") return { lost: h.label };
         if (r !== "won") check = `${h.label} — ${r === "void" ? "didn't play" : "no result data"}`;
       }

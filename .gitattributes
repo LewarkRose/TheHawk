@@ -1,0 +1,25 @@
+# Line endings, settled once.
+#
+# core.autocrlf is on at system level (GitHub Desktop sets it), so git has been
+# converting LF to CRLF on checkout. Every file in the repository is stored as
+# LF — `git ls-files --eol` says i/lf for all of them — but the working tree
+# drifted: engine/model.py sat at w/crlf and builder/index.html at w/mixed.
+#
+# That drift is not cosmetic. Twice in one day it turned a two-line fix into a
+# file git reported as wholly rewritten, and once it hid a real corruption
+# inside the noise. Pinning the working tree to LF makes what is on disk, what
+# is in a commit, and what GitHub Desktop shows in a diff the same thing.
+#
+# Nothing is rewritten by adding this: the stored content is already LF, so the
+# next checkout simply stops converting it. No `git add --renormalize` needed.
+* text=auto eol=lf
+
+# Binary, never touched.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.pdf   binary

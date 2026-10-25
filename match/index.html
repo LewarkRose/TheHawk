@@ -296,10 +296,31 @@
     const rank = (g) => { const i = ORDER.indexOf(g); return i < 0 ? 999 : i; };
     const names = Object.keys(by).sort((a, b) => rank(a) - rank(b));
 
+    /* How often he has actually done it. The engine already puts this on every
+       player leg — recent (the raw stat per game, newest first), threshold,
+       hits, games, basis — and the page simply was not reading it.
+
+       Counted from his STARTS where he has three or more, because a cameo
+       says almost nothing about a starter; `basis` says which it used. Under
+       three games it is not shown at all rather than shown as "1/1". */
+    const hitChip = (l) => {
+      if (!l.recent || !l.recent.length || !(l.games >= 3)) return "";
+      const r5 = l.recent.slice(0, 5);
+      const h5 = r5.filter((v) => v >= l.threshold).length;
+      const rate = l.hits / l.games;
+      const tone = rate >= 0.7 ? "g" : rate >= 0.4 ? "a" : "r";
+      const unit = l.basis === "starts" ? "starts" : "games";
+      const text = l.games > 5
+        ? `L5 ${h5}/${r5.length} · L${l.games} ${l.hits}/${l.games}`
+        : `L${l.games} ${l.hits}/${l.games}`;
+      return ` <span class="hr ${tone}" data-hist="${esc(l.id)}" role="button" tabindex="0"
+        title="Hit in ${l.hits} of his last ${l.games} ${unit}. Click for the games behind it.">${text}</span>`;
+    };
+
     const row = (l) => {
       const on = S.slip.includes(l.id), v = beats(l);
       return `<button type="button" class="leg${on ? " on" : ""}" data-leg="${esc(l.id)}">
-        <span class="nm">${esc(l.label)}${l.market ? `<i>${esc(l.market)}</i>` : ""}</span>
+        <span class="nm">${esc(l.label)}${hitChip(l)}${l.market ? `<i>${esc(l.market)}</i>` : ""}</span>
         <span class="v p">${pct(l.p, l.p < 0.1 ? 1 : 0)}</span>
         <span class="v">${odds(l.fair)}</span>
         <span class="v b${v ? " val" : ""}">${odds(l.bookPrice)}</span>
@@ -406,6 +427,81 @@
       text: `${m.home} v ${m.away} · ${plural(totals.parts, "match")}, ${plural(totals.legs, "leg")}, `
           + `fair ${odds(totals.fair)}.`,
     });
+  }
+
+  /* ================================================ a player's own record
+     The games behind the chip. One bar per game, oldest on the left, with
+     the leg's line drawn across it — so "4 of his last 5" becomes a shape
+     you can see the trend in, which a ratio cannot show you.
+
+     Then every other leg HAWK offers on the same player, each with its own
+     hit rate, because the question is rarely "is this leg good" and almost
+     always "which of his legs is the one to take". */
+  function playerCard(legId) {
+    const m = S.m;
+    if (!m) return;
+    const leg = (m.legs || []).find((l) => l.id === legId);
+    if (!leg || !leg.player) return;
+
+    const mine = (m.legs || []).filter((l) => l.player === leg.player);
+    const vals = (leg.recent || []).slice().reverse();          // oldest → newest
+    const peak = Math.max(leg.threshold, ...vals, 1);
+    const unit = leg.basis === "starts" ? "starts" : "games";
+    // the line sits at the threshold, measured against the same peak the bars are
+    const linePct = 100 * (leg.threshold / peak);
+
+    const bars = vals.map((v) => `<span class="b${v >= leg.threshold ? " hit" : ""}">
+        <i style="height:${Math.max(2, 100 * (v / peak)).toFixed(1)}%"></i></span>`).join("");
+    const xs = vals.map((v) => `<span>${v}</span>`).join("");
+
+    const chip = (l) => {
+      if (!l.recent || !l.recent.length || !(l.games >= 3)) return `<span class="hr low">no record</span>`;
+      const rate = l.hits / l.games;
+      const tone = rate >= 0.7 ? "g" : rate >= 0.4 ? "a" : "r";
+      return `<span class="hr ${tone}">${l.hits}/${l.games}</span>`;
+    };
+
+    const el = document.createElement("div");
+    el.className = "pcard";
+    el.innerHTML = `<div class="in" role="dialog" aria-label="${esc(leg.player)}">
+      <div class="hd">
+        ${leg.photo ? `<img src="${esc(leg.photo)}" alt="" onerror="this.remove()">` : ""}
+        <div><h3>${esc(leg.player)}</h3>
+          <div class="sub">${esc(leg.pos || "")}${leg.pos ? " · " : ""}${
+            esc(leg.side === "home" ? m.home : m.away)}${
+            leg.low_data ? " · thin record, HAWK is less sure" : ""}</div></div>
+        <button class="x" type="button" aria-label="Close">✕</button>
+      </div>
+
+      <div class="k">${esc(leg.label.replace(leg.player + ": ", ""))} — his last ${plural(vals.length, unit.replace(/s$/, ""))}</div>
+      ${vals.length ? `<div class="bars">${bars}
+          <span class="line" style="bottom:${linePct.toFixed(1)}%"><span>${leg.threshold}</span></span></div>
+        <div class="xs">${xs}</div>
+        <div class="ends"><span>oldest</span><span>newest</span></div>
+        <p class="note">Hit in <b>${leg.hits} of ${leg.games}</b> ${esc(unit)} —
+          HAWK makes it ${pct(leg.p, leg.p < 0.1 ? 1 : 0)}. The red line is the leg's
+          number; a bar reaching it is a game it would have landed.</p>`
+        : `<p class="none">No game-by-game record for this one. HAWK still prices it, from his
+           rate per 90 and the simulation, but there is nothing here to check it against.</p>`}
+
+      <div class="k">Every leg HAWK offers on him</div>
+      <ul class="pl">${mine.sort((a, b) => b.p - a.p).map((l) => `<li>
+        <span class="lb">${esc(l.label.replace(l.player + ": ", ""))}<small
+          style="display:block;margin-top:4px;font:400 10px/1.4 var(--mono);color:var(--faint)">${esc(l.market || "")}</small></span>
+        ${chip(l)}
+        <b class="p">${pct(l.p, l.p < 0.1 ? 1 : 0)}</b>
+        <b>${odds(l.fair)}</b></li>`).join("")}</ul>
+
+      <p class="note">Bet365 never publishes a price for these, so HAWK's number is an
+        estimate rather than a read of the market — which is why his own record is the
+        only hard evidence on the row.</p>
+    </div>`;
+
+    const shut = () => { el.remove(); document.removeEventListener("keydown", onKey); };
+    const onKey = (e) => { if (e.key === "Escape") shut(); };
+    el.addEventListener("click", (e) => { if (e.target === el || e.target.closest(".x")) shut(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(el);
   }
 
   /* ------------------------------------------------------------- loading */
@@ -735,9 +831,22 @@
   }
 
   /* -------------------------------------------------------------- events */
+  // the chip is reachable by keyboard too, since it is a control inside a control
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const hist = e.target.closest && e.target.closest("[data-hist]");
+    if (hist) { e.preventDefault(); e.stopPropagation(); playerCard(hist.dataset.hist); }
+  });
+
   document.addEventListener("click", (e) => {
     const c = e.target.closest("#cats button[data-cat]");
     if (c) { S.cat = c.dataset.cat; markets(); return; }
+
+    // The hit chip sits inside the leg button, so it has to claim the click
+    // before the leg does — otherwise opening his record also puts the leg on
+    // your slip, which is not what pressing a number means.
+    const hist = e.target.closest("[data-hist]");
+    if (hist) { e.preventDefault(); e.stopPropagation(); playerCard(hist.dataset.hist); return; }
 
     const leg = e.target.closest(".leg[data-leg]");
     if (leg) {

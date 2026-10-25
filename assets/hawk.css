@@ -319,6 +319,10 @@ img{display:block;max-width:100%}
 .fold > summary h3{transition:color .4s var(--film)}
 /* a fold that has a link of its own keeps it out of the summary's click area */
 .fold > summary .lede a{margin-left:0}
+/* what auto-settle did, in a line */
+.note.as{margin:-14px 0 20px;color:var(--muted)}
+.note.as b{color:var(--gold-hi);font-weight:600}
+.lede .tbtn{margin-left:auto;align-self:center}
 .skel{color:var(--faint);font:400 13px/1.8 var(--sans)}
 .note{margin:clamp(18px,2.4vw,26px) 0 0;max-width:70ch;font-size:12.5px;line-height:1.8;color:var(--faint)}
 .note b{color:var(--muted)}

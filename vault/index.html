@@ -40,7 +40,10 @@
 
 <section class="calm">
   <div class="wrap">
-    <div class="lede"><h3>Every bet</h3><span class="n" id="betsN"></span></div>
+    <div class="lede"><h3>Every bet</h3><span class="n" id="betsN"></span>
+      <button class="tbtn" id="asGo" type="button">Check results</button></div>
+    <!-- what the robot did, in a line, the way v1 reported it -->
+    <p class="note as" id="asOut" hidden></p>
     <div class="filt" id="filt"></div>
     <div id="bets"><div class="skel" style="padding:30px 0">Reading…</div></div>
   </div>
@@ -489,6 +492,147 @@
     stats(f); chart(f); leagues(f); betList();
   }
 
+  /* ======================================================== AUTO-SETTLE
+     Ported from v1's autoSettle(). A HAWK ticket settles itself once every
+     match on it has finished: the legs are read against the result, a leg
+     that lost settles the ticket LOST, all legs won settles it WON and pays
+     the return into the bankroll. Same money rules as settle() above, so a
+     ticket is worth the same however it was settled.
+
+     Three things it does besides settling, all of which v1 did and all of
+     which are lost for good if they are not taken at the time:
+       · closing prices on finished legs, which is the whole of the CLV
+         number on this page;
+       · a ✓ or ✗ on every leg of a ticket you settled BY HAND, so the
+         market tables are not blind to those tickets;
+       · needsCheck, for a leg the feed cannot answer — a player who did not
+         play, or a stat 365Scores does not name. Those are never settled
+         automatically; they are handed back to you.
+
+     105 minutes after kick-off is v1's rule for "this should be over". */
+  let settler = null, settling = false;
+  function hawkSettle() {
+    if (!settler) settler = new Promise((res) => {
+      const s = document.createElement("script");
+      s.src = "../builder/hawk-settle.js";
+      s.onload = () => res(window.HawkSettle || null);
+      s.onerror = () => res(null);
+      document.head.appendChild(s);
+    });
+    return settler;
+  }
+  const subOnPref = () => {
+    try { return JSON.parse(localStorage.getItem("hawk.subOn") ?? "true") !== false; }
+    catch { return true; }
+  };
+
+  async function autoSettle(loud) {
+    if (settling) return;
+    settling = true;
+    const out = $("#asOut");
+    try {
+      const S2 = await hawkSettle();
+      if (!S2) { if (loud) say(out, "The settler didn't load, so nothing was checked."); return; }
+      const { facts, fetchMatchFacts, legResult, closingPrice } = S2;
+
+      const due = (l) => l.hawk && l.hawk.game
+        && Date.now() > Date.parse(l.hawk.kickoff || 0) + 105 * 60000;
+      const FORTNIGHT = 14 * 86400000;
+      const recent = (l) => Date.now() - Date.parse(l.hawk.kickoff || 0) < FORTNIGHT;
+      const needsClose = (l) => due(l) && !l.hawk.closeChecked && recent(l)
+        && (l.hawk.legs || []).some((h) => h.bookPrice);
+      const needsMarks = (b, l) => b.status !== "PENDING" && due(l) && !l.hawk.marked && recent(l)
+        && (l.hawk.legs || []).some((h) => !h.result);
+
+      // 1. the slow part: read every match that might have finished
+      const games = [...new Set(S.bets.flatMap((b) => (b.legs || [])
+        .filter((l) => l && l.hawk && ((b.status === "PENDING" && due(l)) || needsClose(l) || needsMarks(b, l)))
+        .map((l) => String(l.hawk.game))))];
+      if (loud && games.length) say(out, `Reading ${plural(games.length, "match")}…`);
+      for (const g of games) {
+        try { await fetchMatchFacts(g); } catch { /* one match short is not a reason to stop */ }
+      }
+
+      // 2. apply it to the freshest copy of the log, in case another tab wrote
+      load();
+
+      // closing prices, for CLV
+      for (const b of S.bets) for (const l of b.legs || []) {
+        const f = l && l.hawk && due(l) ? facts[String(l.hawk.game)] : null;
+        if (!f || !f.finished || f.off || l.hawk.closeChecked) continue;
+        for (const h of l.hawk.legs || []) { const c = closingPrice(h, f); if (c) h.close = c; }
+        l.hawk.closeChecked = true;
+      }
+      // ticks and crosses on tickets you settled yourself
+      for (const b of S.bets) for (const l of b.legs || []) {
+        if (!l || !l.hawk || !needsMarks(b, l)) continue;
+        const f = facts[String(l.hawk.game)];
+        if (!f || !f.finished) continue;
+        if (!f.off) {
+          l.hawk.score = l.hawk.score || `${f.ft[0]}-${f.ft[1]}`;
+          const subOn = b.subOn !== false && subOnPref();
+          for (const h of l.hawk.legs || [])
+            if (!h.result) h.result = h.userDone ? "won" : legResult(h, f, { earlyPayout: true, subOn });
+        }
+        l.hawk.marked = true;
+      }
+
+      // 3. settle what can be settled
+      const done = [];
+      let waiting = 0, checks = 0;
+      for (const b of S.bets) {
+        if (b.status !== "PENDING" || !(b.legs || []).some((l) => l && l.hawk)) continue;
+        const subOn = b.subOn !== false && subOnPref();
+        let anyLost = false, allWon = b.legs.every((l) => l && l.hawk), allDone = true;
+        const issues = [];
+        for (const l of b.legs) {
+          if (!l || !l.hawk) continue;
+          const f = due(l) ? facts[String(l.hawk.game)] : null;
+          if (!f) { allDone = false; allWon = false; continue; }
+          if (f.off) { issues.push(`${l.fixture}: ${f.off}`); allWon = false; continue; }
+          l.hawk.score = `${f.ft[0]}-${f.ft[1]}`;
+          // a leg you ticked off yourself during the match counts as won
+          for (const h of l.hawk.legs)
+            h.result = h.userDone ? "won" : legResult(h, f, { earlyPayout: true, subOn });
+          const rs = l.hawk.legs.map((h) => h.result);
+          if (rs.includes("lost")) anyLost = true;
+          else if (!rs.every((r) => r === "won")) {
+            allWon = false;
+            for (const h of l.hawk.legs) {
+              if (h.result === "void") issues.push(`${h.label} — didn't play (Bet365 voids that leg)`);
+              else if (h.result === "unknown") issues.push(/Tackles/.test(h.label)
+                ? `${h.label} — his team made tackles 365Scores doesn't name; Bet365 counts those, check your slip`
+                : `${h.label} — no result data`);
+            }
+          }
+        }
+        if (anyLost || (allWon && allDone)) {
+          b.status = anyLost ? "LOST" : "WON";
+          b.settledAt = new Date().toISOString();
+          b.settledBy = "HAWK";
+          delete b.needsCheck;
+          if (b.status === "WON") S.bank += (+b.potentialReturn || 0);
+          done.push(b);
+        } else if (allDone && issues.length) { b.needsCheck = issues.join(" · "); checks++; }
+        else waiting++;
+      }
+
+      if (!save()) return;
+      draw();
+
+      const won = done.filter((b) => b.status === "WON");
+      const paid = won.reduce((s, b) => s + (+b.potentialReturn || 0), 0);
+      const at = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+      const bits = [];
+      if (done.length) bits.push(`<b>Settled ${done.length}</b> — ${won.length} won${
+        won.length ? ` (${money(paid)} in)` : ""}, ${done.length - won.length} lost.`);
+      if (checks) bits.push(`${plural(checks, "ticket")} need${checks === 1 ? "s" : ""} a look — the feed couldn't answer a leg.`);
+      if (waiting) bits.push(`${plural(waiting, "ticket")} still waiting on ${waiting === 1 ? "its match" : "their matches"}.`);
+      if (bits.length || loud) say(out, `Results checked at ${at}. ${bits.join(" ") || "Nothing to settle."}`);
+    } finally { settling = false; }
+  }
+  function say(el, html) { el.innerHTML = html; el.hidden = false; }
+
   /* -------------------------------------------------------- weekly report
      Which week a ticket belongs to is THE NIGHT IT WAS PLAYED, not when it
      settled. Exactly one ticket in the log falls in different weeks under the
@@ -929,6 +1073,11 @@
   drawLog();
   $("#bkN").textContent = `${plural(S.bets.length, "ticket")} · ${money(S.bank)}`;
   scorecard();
+
+  /* Checks once on open, and again on the button. Quiet when it has nothing
+     to say, so a page with no running tickets does not announce itself. */
+  $("#asGo").addEventListener("click", () => autoSettle(true));
+  if (S.bets.some((b) => b && b.status === "PENDING")) autoSettle(false);
 })();
 </script>
 </body>

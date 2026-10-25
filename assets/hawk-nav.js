@@ -35,6 +35,10 @@
     </div>`;
   document.body.insertBefore(nav, document.body.firstChild);
 
+  // The bell goes in the nav rather than on one page, because the alerts run on
+  // every page: the switch has to be wherever you are when you want it off.
+  if (window.HAWKAlerts) window.HAWKAlerts.mountBell(nav.querySelector(".right"));
+
   // transparent over the hero, lit once you have scrolled past it
   const hero = document.querySelector(".hero");
   const lit = () => nav.classList.toggle("lit", scrollY > (hero ? 60 : 10));

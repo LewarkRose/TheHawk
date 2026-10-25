@@ -20,7 +20,12 @@ self.addEventListener("notificationclick", (e) => {
   e.notification.close();
   const url = (e.notification.data && e.notification.data.url) || new URL("./builder/", self.registration.scope).href;
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-    const hawk = list.find((c) => c.url.includes("/builder/"));
+    // Any HAWK window will take itself to the match: the old builder listens
+    // for this message, and so does assets/hawk-alerts.js on the new pages.
+    // Without the second case a tap opened a THIRD tab while HAWK was already
+    // open in front of you.
+    const hawk = list.find((c) => c.url.includes("/builder/"))
+              || list.find((c) => c.url.startsWith(self.registration.scope));
     if (hawk) { hawk.postMessage({ open: url }); return hawk.focus(); }
     return self.clients.openWindow(url);
   }));

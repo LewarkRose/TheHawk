@@ -73,6 +73,8 @@
       <div class="b3" id="bar"></div>
       <div class="b3k" id="bark"></div>
       <p class="note" id="says"></p>
+      <!-- goals and red cards on this match, even after you leave this page -->
+      <div style="margin-top:20px"><button class="fol" id="fol" type="button" hidden></button></div>
     </div>
   </div>
 </header>
@@ -139,6 +141,7 @@
 <script src="../assets/hawk-bg.js"></script>
 <script src="../assets/hawk-lineups.js"></script>
 <script src="../assets/hawk-fold.js"></script>
+<script src="../assets/hawk-alerts.js"></script>
 <script src="../assets/hawk-nav.js"></script>
 <script>
 /* ===========================================================================
@@ -544,8 +547,13 @@
     for (const b of mine) {
       const here = (b.legs || []).filter((l) => l.hawk && String(l.hawk.game) === String(S.id))
         .flatMap((l) => l.hawk.legs || []);
+      // "Sub On Play On": the old builder's own setting, so a leg on a player
+      // who has been taken off is followed to his replacement here too
+      const subOn = (() => { try { const v = localStorage.getItem("hawk.subOn");
+        return v === null ? true : JSON.parse(v); } catch { return true; } })() && b.subOn !== false;
       let live = null;
-      try { live = await window.HAWK.ticketLive(String(S.id), here); } catch { /* skipped */ }
+      try { live = await window.HAWK.ticketLive(String(S.id), here.map((h) => ({ ...h, subOn }))); }
+      catch { /* skipped */ }
       if (!live) continue;
 
       // legs on other matches cannot be priced live; they are counted at the
@@ -636,6 +644,13 @@
       return;
     }
     S.d = d;
+    // the 🔔 for this match: on for three hours, and permanently on if you
+    // have a bet on it
+    if (window.HAWKAlerts && !$("#fol").dataset.on) {
+      $("#fol").dataset.on = "1";
+      $("#fol").hidden = false;
+      window.HAWKAlerts.followButton($("#fol"), S.id);
+    }
     document.title = `${d.home} ${d.score[0]}–${d.score[1]} ${d.away} · HAWK`;
     await render();
     clearTimeout(S.timer);

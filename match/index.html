@@ -61,6 +61,8 @@
       <div class="b3" id="bar"></div>
       <div class="b3k" id="bark"></div>
       <p class="derby" id="derby" hidden></p>
+      <!-- set before kick-off: goals and red cards once it starts -->
+      <div style="margin-top:20px"><button class="fol" id="fol" type="button" hidden></button></div>
     </div>
   </div>
 </header>
@@ -170,6 +172,7 @@
 <script src="../assets/hawk-bg.js"></script>
 <script src="../assets/hawk-lineups.js"></script>
 <script src="../assets/hawk-fold.js"></script>
+<script src="../assets/hawk-alerts.js"></script>
 <script src="../assets/hawk-nav.js"></script>
 <script>
 /* ===========================================================================
@@ -253,6 +256,12 @@
         ${(m.derbyFactor || 1.23).toFixed(2)}×, measured over 3,106 matches. It leaves goals and
         corners alone, which showed nothing.`;
       $("#derby").hidden = false;
+    }
+    // goals and red cards once this one kicks off, set before it does
+    if (window.HAWKAlerts && !$("#fol").dataset.on) {
+      $("#fol").dataset.on = "1";
+      $("#fol").hidden = false;
+      window.HAWKAlerts.followButton($("#fol"), S.id);
     }
     $("#read").hidden = false;
 

@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Board · HAWK</title>
+<meta name="description" content="Where HAWK has been right and where it has been wrong.">
+<link rel="icon" href="../favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="../assets/hawk.css">
+</head>
+<body>
+
+<header class="hero">
+  <canvas aria-hidden="true"></canvas>
+  <div class="wrap">
+    <span class="tag" id="tag"><span class="dot off"></span>Reading the board</span>
+    <h1 class="moment mid">Where HAWK<span class="q">is wrong</span></h1>
+    <p class="said" id="said">Loading the graded record…</p>
+  </div>
+</header>
+
+<section class="calm" id="recWrap" hidden>
+  <div class="wrap">
+    <div class="lede"><h3>The record</h3><span class="n" id="recN"></span></div>
+    <div class="bd-recs" id="recs"></div>
+  </div>
+</section>
+
+<div id="blocks"></div>
+
+<section class="calm" id="corrWrap" hidden>
+  <div class="wrap">
+    <div class="lede"><h3>Corrections in force</h3><span class="n" id="corrN"></span></div>
+    <div id="corr"></div>
+    <p class="note">Where the board says HAWK runs high or low, its chances are shifted by this much
+      <b>before you ever see them</b>. A gap above is therefore not money leaking — it is the
+      measurement the correction is made from.</p>
+  </div>
+</section>
+
+<section class="calm">
+  <div class="wrap">
+    <div class="bd-key">
+      <span><i class="p"></i>Real — more often than HAWK said</span>
+      <span><i class="m"></i>Real — less often than HAWK said</span>
+      <span><i></i>Too small to call, or down to chance</span>
+    </div>
+    <p class="note">A grey bar is not a pass or a fail. It means this much evidence cannot tell that
+      gap apart from luck, or the gap is under a point and you would never feel it. Full width is
+      2.5 points either way on the blocks graded on legs; the upset radar is graded on matches,
+      swings further, and says its own scale.</p>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap"><a href="../home/">home</a> · <a href="../scores/">scores</a> ·
+    <a href="../vault/">vault</a> · <a href="../builder/">v1</a> ·
+    built by the site every couple of hours</div>
+</footer>
+
+<script src="../builder/engine.js"></script>
+<script src="../assets/hawk-bg.js"></script>
+<script src="../assets/hawk-fold.js"></script>
+<script src="../assets/hawk-nav.js"></script>
+<script>
+/* ===========================================================================
+   HAWK's board.
+
+   Graded on EVERY match in HAWK's competitions, whether you bet or not — the
+   only record here with the volume to prove anything. Your own bets are the
+   smallest sample on the page and are read last.
+
+   The one idea that makes it honest: a bar is coloured only when the gap
+   survives a significance test, and grey otherwise. Legs inside one match are
+   not independent trials — the same lineup, referee and scoreline drive all
+   four hundred of them — so a row also has to span at least ten separate
+   matches before it can earn a colour. One Danish Superliga game once put 379
+   legs on the board and earned a confident red bar off a single afternoon.
+   =========================================================================== */
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : /(ch|sh|s|x|z)$/.test(w) ? "es" : "s"}`;
+  const money = (n) => `${n < 0 ? "−" : ""}€${Math.abs(+n || 0).toFixed(2)}`;
+
+  const BD_FULL = 2.5;        // the bar's half-width, in points
+  const BD_MIN_MATCHES = 10;  // below this a row stays grey however wide its bar
+
+  // said, landed, the gap, and how many standard deviations it is from chance
+  const stat = (n, p, won) => {
+    if (!n) return null;
+    const said = p / n, hit = won / n, sd = Math.sqrt(n * said * (1 - said));
+    return { n, said, hit, gap: hit - said, z: sd ? (won - p) / sd : 0 };
+  };
+
+  const bandName = (lo, hi) => {
+    const m = 50 * (lo + Math.min(1, hi));
+    return m < 20 ? "Long shots" : m < 35 ? "Outsiders" : m < 50 ? "Against the odds"
+      : m < 65 ? "Coin flips" : m < 80 ? "Likely" : m < 90 ? "Very likely" : "Near certainties";
+  };
+
+  function row(label, s, note, trusted = true, o = {}) {
+    if (!s) return "";
+    const unit = o.unit || "legs", full = o.full || BD_FULL;
+    const pts = 100 * s.gap, w = Math.min(50, Math.abs(pts) * (50 / full));
+    const sig = trusted && Math.abs(s.z) >= 1.96 && Math.abs(pts) >= 1;
+    const bar = Math.abs(pts) < 0.05 ? ""
+      : `<i class="${pts > 0 ? "p" : "m"}${sig ? " sig" : ""}" style="width:${w.toFixed(1)}%"></i>`;
+    // The sentence is worked out from the two figures printed beside it, not the
+    // raw gap: 42.1 -> 42.7 reading "0.5 more often" is the kind of thing that
+    // makes a reader distrust the whole page. The bar and the colour test stay
+    // on the exact value; only the words are rounded to agree with what you see.
+    const shown = +(+(100 * s.hit).toFixed(1) - +(100 * s.said).toFixed(1)).toFixed(1);
+    return `<div class="bd-row" title="HAWK said ${(100 * s.said).toFixed(1)}% across ${s.n.toLocaleString()} ${unit}; ${(100 * s.hit).toFixed(1)}% landed">
+      <span class="lbl"><b>${esc(label)}</b>
+        <em>said ${(100 * s.said).toFixed(1)} · landed ${(100 * s.hit).toFixed(1)}${note ? ` · ${esc(note)}` : ""}</em></span>
+      <span class="bd-bar">${bar}</span>
+      <span class="say">${!shown ? "spot on"
+        : `<b>${Math.abs(shown).toFixed(1)}</b> ${shown > 0 ? "more" : "less"} often`}</span>
+      <span class="nn">${s.n.toLocaleString()}</span></div>`;
+  }
+
+  const axis = () => `<div class="bd-axis">
+    <span>← claimed too much</span><span>bang on</span><span>too shy →</span></div>`;
+
+  let blockN = 0;
+  const block = (title, rows, hint, count) => {
+    if (!rows) return "";
+    blockN++;
+    return `<details class="calm fold" data-fold="bd${blockN}">
+      <summary><div class="wrap"><div class="lede"><h3>${esc(title)}</h3>
+        ${count ? `<span class="n">${esc(count)}</span>` : ""}<span class="mk-t"></span></div></div></summary>
+      <div class="wrap">${hint ? `<p class="note" style="margin:0 0 20px">${hint}</p>` : ""}
+        ${axis()}${rows}</div></details>`;
+  };
+
+  /* ----------------------------------------------------- the corrections
+     Not a stored file: the builder computes these from the graded record plus
+     your own settled legs, and shifts a chance by this much before you ever
+     see it. Replicated here with the same constants and the same logit shrink,
+     because a correction quoted differently on two pages is worse than one not
+     quoted at all. */
+  const LEARN_MIN = 30, LEARN_SHRINK = 60, LEARN_CAP = 0.6;
+  const lg = (p) => Math.log(p / (1 - p));
+  const ilg = (x) => 1 / (1 + Math.exp(-x));
+
+  function corrections(g, bets) {
+    if (!(window.HAWK && window.HAWK.learnKey)) return [];
+    const by = {};
+    for (const b of bets) {
+      for (const l of b.legs || []) {
+        for (const h of (l.hawk && l.hawk.legs) || []) {
+          const p = h.pRaw != null ? h.pRaw : h.p;
+          const key = window.HAWK.learnKey(h.id, h.market);
+          if ((h.result !== "won" && h.result !== "lost") || !(p > 0 && p < 1) || !key) continue;
+          const t = (by[key] ||= { n: 0, said: 0, won: 0 });
+          t.n++; t.said += p; if (h.result === "won") t.won++;
+        }
+      }
+    }
+    // plus HAWK's graded predictions on every match
+    for (const [key, v] of Object.entries(g.byKey || {})) {
+      const t = (by[key] ||= { n: 0, said: 0, won: 0 });
+      t.n += v.n; t.said += v.p; t.won += v.won;
+    }
+    const out = [];
+    for (const [market, t] of Object.entries(by)) {
+      if (t.n < LEARN_MIN) continue;
+      const said = t.said / t.n, got = Math.min(Math.max(t.won / t.n, 0.02), 0.98);
+      const shift = Math.max(-LEARN_CAP, Math.min(LEARN_CAP,
+        (t.n / (t.n + LEARN_SHRINK)) * (lg(got) - lg(said))));
+      if (Math.abs(shift) < 0.02) continue;
+      out.push({ market, n: t.n, pts: 100 * (ilg(lg(said) + shift) - said) });
+    }
+    return out.sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts));
+  }
+
+  /* -------------------------------------------------------------- render */
+  function render(g) {
+    const bands = g.bands || [];
+    const all = bands.length ? stat(bands.reduce((a, b) => a + b.n, 0),
+      bands.reduce((a, b) => a + b.p, 0), bands.reduce((a, b) => a + b.won, 0)) : null;
+    const worst = bands.reduce((a, b) => {
+      const s = stat(b.n, b.p, b.won);
+      return s && Math.abs(s.gap) > Math.abs(a) ? s.gap : a;
+    }, 0);
+
+    $("#tag").innerHTML = `<span class="dot q"></span>${g.matches.toLocaleString()} matches graded`;
+    $("#said").innerHTML = all
+      ? `Across <b>${all.n.toLocaleString()}</b> graded legs from <b>${g.matches.toLocaleString()}</b>
+         matches, HAWK said <b>${(100 * all.said).toFixed(1)}%</b> and
+         <b>${(100 * all.hit).toFixed(1)}%</b> landed. The widest any band has ever strayed is
+         <b>${Math.abs(100 * worst).toFixed(1)} points in a hundred</b>.`
+      : "Nothing graded yet.";
+
+    // the three records, biggest sample first and smallest last
+    let bets = [];
+    try { const b = JSON.parse(localStorage.getItem("hawk_bets") || "[]"); bets = Array.isArray(b) ? b : []; }
+    catch { bets = []; }
+    const settled = bets.filter((b) => b && b.status && b.status !== "PENDING");
+    const back = (b) => b.status === "WON" ? (+b.potentialReturn || 0)
+      : b.status === "CASHED_OUT" ? (+b.cashOutAmount || 0) : 0;
+    const pl = settled.reduce((a, b) => a + back(b) - (+b.stake || 0), 0);
+
+    const rec = (k, big, sub, ask, tone) => `<div><div class="k">${esc(k)}</div>
+      <div class="n${tone || ""}">${big}</div><div class="sub">${sub}</div>
+      <div class="ask">${ask}</div></div>`;
+    $("#recN").textContent = `${g.waiting || 0} waiting on results`;
+    $("#recs").innerHTML =
+      rec("Every match", all ? `${(100 * all.hit).toFixed(1)}%` : "—",
+        all ? `landed, against ${(100 * all.said).toFixed(1)}% said · ${all.n.toLocaleString()} legs` : "not built yet",
+        "Are its percentages honest? Graded on every match in HAWK's competitions whether you bet or not — the only record here with the volume to prove anything.")
+      + rec("Matches on the board", g.matches.toLocaleString(),
+        `${(g.recent || []).length} in the recent list`,
+        "How much evidence is behind the rows below. A market needs 200+ legs and ten separate matches before a bar is coloured.")
+      + rec("Your bets", String(bets.length),
+        settled.length ? `${settled.length} settled · ${pl >= 0 ? "+" : ""}${money(pl)}` : "nothing settled yet",
+        "Did you make money? The smallest sample on the page — read it last.",
+        settled.length ? (pl >= 0 ? " up" : " dn") : "");
+    $("#recWrap").hidden = false;
+
+    /* ------------------------------------------------------- the blocks */
+    const byRows = (obj, min) => Object.entries(obj || {})
+      .map(([k, v]) => [k, stat(v.n, v.p, v.won), v])
+      .filter(([, s]) => s && s.n >= min)
+      .sort((a, b) => b[1].n - a[1].n)
+      .map(([k, s, v]) => row(k, s, v.matches ? plural(v.matches, "match") : null,
+        !v.matches || v.matches >= BD_MIN_MATCHES)).join("");
+
+    let out = "";
+
+    out += block("Does 60% really mean 60%?",
+      bands.map((b) => row(bandName(b.lo, b.hi), stat(b.n, b.p, b.won),
+        `${Math.round(100 * b.lo)}–${Math.round(100 * Math.min(1, b.hi))}%`)).join(""),
+      `Each row takes every leg HAWK gave roughly the same chance, then checks how often they
+       actually came in. The misses are not random — read it top to bottom and it turns over
+       halfway down: <b>HAWK is shy about long shots and bold about near-certainties</b>.`,
+      `${plural(bands.length, "band")}`);
+
+    /* Markets come from byKey, NOT byMarket. byMarket keeps every leg ever
+       graded under a name, across every version of the model that priced it,
+       and never resets; byKey groups them the way the builder actually
+       corrects, and the build starts a group over when its model version
+       changes. On byMarket, Player Tackles once read 13.3 points out from a
+       model replaced two versions ago. */
+    const mkRows = byRows(g.byKey, 200);
+    out += block("Which markets is it off on?", mkRows,
+      `Only markets with 200+ graded legs, grouped the way the builder corrects — a group's record
+       starts over when its model version changes, so this describes the model running now and not
+       one it replaced. <b>Being accurate is not the same as being worth backing</b>: that depends
+       on the price Bet365 gives you.`,
+      `${Object.keys(g.byKey || {}).filter((k) => (g.byKey[k] || {}).n >= 200).length} markets`);
+
+    const lgRows = byRows(g.byLeague, 200);
+    out += block("Which competitions is it off on?", lgRows,
+      `Matches, not legs, decide whether a competition's number means anything — the four hundred
+       legs in one game all turn on the same lineup and the same scoreline. Under
+       ${BD_MIN_MATCHES} matches a row stays grey however long its bar.`,
+      `${Object.keys(g.byLeague || {}).filter((k) => (g.byLeague[k] || {}).n >= 200).length} competitions`);
+
+    if (g.result) {
+      const r = g.result;
+      out += block("Home, draw or away",
+        ["home", "draw", "away"].map((k) => r[k] && row(
+          k === "home" ? "Home win" : k === "draw" ? "Draw" : "Away win",
+          stat(r[k].n, r[k].p, r[k].hit), null, true, { unit: "matches", full: 4 })).filter(Boolean).join(""),
+        `The result market on its own, graded per match rather than per leg. Full width here is
+         4 points either way.`, `${(r.home || {}).n || 0} matches`);
+    }
+
+    /* The upset radar is graded on MATCHES, so the usual "legs inside one game
+       are not independent" caveat does not apply and the test is honest. It
+       answers two questions that do NOT agree, which is why both are printed:
+       it is good at spotting a favourite in trouble and bad at saying the
+       underdog will win instead. The difference is draws. */
+    if ((g.upsets || []).length) {
+      const u = g.upsets;
+      out += block("Does the underdog's double chance land?",
+        u.map((x) => row(`${x.label} risk`, stat(x.n, x.saidFail, x.failed),
+          plural(x.n, "match"), x.n >= 50, { unit: "matches", full: 9 })).join(""),
+        `The favourite failing to win — a draw or an upset. This is the half of the radar the
+         record supports, and it is the half the builder uses.`, `${plural(u.length, "level")}`);
+      out += block("And does the underdog actually win?",
+        u.map((x) => row(`${x.label} risk`, stat(x.n, x.saidDog, x.dogWon),
+          plural(x.n, "match"), x.n >= 50, { unit: "matches", full: 9 })).join(""),
+        `The same matches, asked a harder question. <b>These two do not agree, and that is the
+         point</b> — the radar spots a favourite in trouble far better than it picks the winner
+         instead. The difference is draws, which is why HAWK never claims the underdog will win.`,
+        `${plural(u.length, "level")}`);
+    }
+
+    if ((g.recent || []).length) {
+      out += block("Recently graded",
+        g.recent.slice(0, 20).map((r) => {
+          const s = { n: r.n, said: r.said, hit: r.got, gap: r.got - r.said, z: 0 };
+          return row(`${r.home} ${r.score || ""} ${r.away}`, s, r.league, false, { full: 12 });
+        }).join(""),
+        `The last matches to settle, each a whole card of legs rather than a bet. <b>One match is
+         far too small to judge HAWK by</b> — these show the board filling up, so no bar here is
+         coloured. Full width is 12 points either way.`,
+        `${Math.min(20, g.recent.length)} matches`);
+    }
+
+    $("#blocks").innerHTML = out;
+    if (window.HAWKFold) window.HAWKFold.restore();
+
+    // corrections already applied — computed, not stored, exactly as the old
+    // builder's computeLearning() does it
+    const ch = corrections(g, bets);
+    if (ch.length) {
+      $("#corrN").textContent = plural(ch.length, "market");
+      $("#corr").innerHTML = ch.map((c) => `<span class="bchip ${c.pts >= 0 ? "up" : "dn"}">${
+        esc(c.market)} <b>${c.pts >= 0 ? "+" : ""}${(+c.pts).toFixed(1)}</b></span>`).join("");
+      $("#corrWrap").hidden = false;
+    }
+  }
+
+  /* ---------------------------------------------------------------- load */
+  (async () => {
+    let g = null;
+    try { const r = await fetch("../data/graded.json", { cache: "no-store" }); if (r.ok) g = await r.json(); }
+    catch { /* not built yet */ }
+    if (!g || !g.bands) {
+      $("#tag").innerHTML = `<span class="dot off"></span>Board`;
+      $("#said").textContent = "HAWK's graded board hasn't loaded. The site builds it every couple of hours.";
+      return;
+    }
+    render(g);
+  })();
+})();
+</script>
+</body>
+</html>

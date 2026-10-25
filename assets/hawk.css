@@ -780,6 +780,65 @@ img{display:block;max-width:100%}
   transition:all .3s var(--film)}
 .quick button:hover{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
 
+/* ================================ BOARD =================================
+   Where HAWK has been right and where it has been wrong. The bar is the gap
+   either side of a centre rule, so the SHAPE reads down a block — which is
+   the thing worth seeing, and the thing a verdict word per row cannot carry.
+   A coloured bar means the gap survives a significance test; grey means this
+   much evidence cannot tell it from luck.
+   ======================================================================== */
+.bd-recs{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;background:var(--rule)}
+.bd-recs > div{background:var(--ink);padding:24px 20px}
+.bd-recs .k{font:700 8.5px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
+.bd-recs .n{margin-top:14px;font-family:var(--disp);font-weight:700;font-size:clamp(28px,3.4vw,40px);
+  line-height:1;font-variant-numeric:tabular-nums;color:var(--gold-hi)}
+.bd-recs .n.up{color:var(--up)}.bd-recs .n.dn{color:var(--down)}
+.bd-recs .sub{margin-top:11px;font-size:12px;color:var(--muted)}
+.bd-recs .ask{margin-top:12px;font-size:11.5px;line-height:1.65;color:var(--faint)}
+
+/* the axis, in words — a reader should never have to work out that a bar left
+   of the rule means HAWK claimed more than happened */
+.bd-axis{display:flex;justify-content:space-between;gap:12px;padding:0 0 10px;
+  font:700 8.5px/1.5 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.bd-row{display:grid;grid-template-columns:minmax(0,240px) minmax(0,1fr) 112px 54px;
+  gap:0 16px;align-items:center;padding:11px 2px;border-bottom:1px solid var(--rule)}
+.bd-row:hover{background:var(--raise)}
+.bd-row .lbl{min-width:0}
+.bd-row .lbl b{display:block;font-weight:600;font-size:13.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-row .lbl em{display:block;margin-top:4px;font-style:normal;font:400 10.5px/1.4 var(--mono);
+  color:var(--faint);font-variant-numeric:tabular-nums}
+.bd-bar{position:relative;height:13px}
+.bd-bar::before{content:"";position:absolute;left:50%;top:-1px;bottom:-1px;width:1px;
+  background:rgba(242,242,242,.22)}
+.bd-bar i{position:absolute;top:3px;height:7px;background:#43434f}
+.bd-bar i.p{left:50%}
+.bd-bar i.m{right:50%}
+.bd-bar i.p.sig{background:var(--up)}
+.bd-bar i.m.sig{background:var(--down)}
+.bd-row .say{font-size:11.5px;line-height:1.4;color:var(--muted)}
+.bd-row .say b{font-family:var(--mono);font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.bd-row .nn{text-align:right;font:400 10.5px/1 var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
+.bd-key{display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-top:26px;padding-top:20px;
+  border-top:1px solid var(--rule-2);font-size:11.5px;color:var(--muted)}
+.bd-key i{display:inline-block;width:20px;height:7px;background:#43434f;vertical-align:1px;margin-right:8px}
+.bd-key i.p{background:var(--up)}
+.bd-key i.m{background:var(--down)}
+.bchip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;margin:0 7px 7px 0;
+  font:400 12px/1 var(--mono);color:var(--muted);box-shadow:inset 0 0 0 1px var(--rule-2)}
+.bchip b{font-variant-numeric:tabular-nums}
+.bchip.up b{color:var(--up)}
+.bchip.dn b{color:var(--down)}
+
+@media (max-width:820px){
+  .bd-row{grid-template-columns:minmax(0,1fr) 92px;gap:0 10px}
+  .bd-row .lbl{grid-area:1/1}
+  .bd-row .nn{grid-area:1/2;align-self:start}
+  .bd-row .bd-bar{grid-area:2/1;margin-top:6px}
+  .bd-row .say{grid-area:2/2;margin-top:6px;text-align:right;font-size:10.5px}
+  .bd-axis{font-size:8px}
+}
+
 /* ================================ SCORES ================================
    A day is eighty-odd matches across twenty-odd competitions, so it is set as
    one ruled line each rather than as cards: twenty-five visible at once

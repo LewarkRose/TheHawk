@@ -301,6 +301,12 @@ img{display:block;max-width:100%}
 .lede{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:clamp(24px,3.6vw,38px)}
 .lede h3{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;
   font-size:clamp(22px,2.8vw,32px);line-height:1;letter-spacing:.02em}
+/* An emoji on a heading is drawn in full colour at the font's own size,
+   which next to Barlow Condensed caps makes it the loudest thing in the
+   row. Wrapped rather than left as a bare character, because ::first-letter
+   would have shrunk the first letter of every heading that has no emoji. */
+.emj{display:inline-block;margin-right:.44em;font-size:.58em;opacity:.8;
+  vertical-align:.16em;filter:saturate(.85)}
 .lede .n{font:700 9px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
 .lede a{margin-left:auto;text-decoration:none;color:var(--muted);
   font:700 9.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;

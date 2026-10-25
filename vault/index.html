@@ -33,14 +33,14 @@
 
 <section class="calm" id="statWrap" hidden>
   <div class="wrap">
-    <div class="lede"><h3>The record</h3><span class="n" id="statN"></span></div>
+    <div class="lede"><h3><span class="emj">📊</span>The record</h3><span class="n" id="statN"></span></div>
     <div class="grid m4 rec" id="stats"></div>
   </div>
 </section>
 
 <section class="calm">
   <div class="wrap">
-    <div class="lede"><h3>Every bet</h3><span class="n" id="betsN"></span>
+    <div class="lede"><h3><span class="emj">📋</span>Every bet</h3><span class="n" id="betsN"></span>
       <button class="tbtn" id="asGo" type="button">Check results</button></div>
     <!-- what the robot did, in a line, the way v1 reported it -->
     <p class="note as" id="asOut" hidden></p>
@@ -56,7 +56,7 @@
 </section>
 
 <details class="calm fold" id="logWrap" data-fold="vLog">
-  <summary><div class="wrap"><div class="lede"><h3>Log a ticket</h3>
+  <summary><div class="wrap"><div class="lede"><h3><span class="emj">📝</span>Log a ticket</h3>
     <span class="n" id="logN">for a bet placed outside HAWK</span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
     <div class="lgf">
@@ -107,13 +107,13 @@
      opened the page, so it waits to be asked for.
      ===================================================================== -->
 <details class="calm fold" id="anWrap" data-fold="vAnalysis" hidden>
-  <summary><div class="wrap"><div class="lede"><h3>Analysis</h3>
+  <summary><div class="wrap"><div class="lede"><h3><span class="emj">📈</span>Analysis</h3>
     <span class="n" id="anN">the week, the weeks, the chart, the competitions, and how good HAWK is</span>
     <span class="mk-t"></span></div></div></summary>
   <div class="subs">
 
 <details class="sub fold" id="wkWrap" data-fold="vWeek" hidden>
-  <summary><div class="wrap"><div class="lede"><h3>Weekly report</h3>
+  <summary><div class="wrap"><div class="lede"><h3><span class="emj">🗓️</span>Weekly report</h3>
     <span class="n" id="wkN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
     <div class="filt" id="wkTabs" style="margin-bottom:26px"></div>
@@ -122,7 +122,7 @@
 </details>
 
 <details class="sub fold" id="wksWrap" data-fold="vWeeks" hidden>
-  <summary><div class="wrap"><div class="lede"><h3>By week</h3>
+  <summary><div class="wrap"><div class="lede"><h3><span class="emj">📅</span>By week</h3>
     <span class="n" id="wksN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
     <div class="wks" id="wks"></div>
@@ -133,7 +133,7 @@
 </details>
 
 <details class="sub fold" id="chartWrap" data-fold="vChart" hidden>
-  <summary><div class="wrap"><div class="lede"><h3>Profit over time</h3>
+  <summary><div class="wrap"><div class="lede"><h3><span class="emj">📈</span>Profit over time</h3>
     <span class="n" id="chartN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
     <svg class="chart" id="chart" viewBox="0 0 720 200" preserveAspectRatio="none" role="img"></svg>
@@ -144,7 +144,7 @@
 </details>
 
 <details class="sub fold" id="lgWrap" data-fold="vLeagues" hidden>
-  <summary><div class="wrap"><div class="lede"><h3>By competition</h3>
+  <summary><div class="wrap"><div class="lede"><h3><span class="emj">🌍</span>By competition</h3>
     <span class="n" id="lgN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
     <table class="lgt" id="lgt"></table>
@@ -154,7 +154,7 @@
 </details>
 
 <details class="sub fold" id="scWrap" data-fold="vScore" hidden>
-  <summary><div class="wrap"><div class="lede"><h3>How good is HAWK</h3>
+  <summary><div class="wrap"><div class="lede"><h3><span class="emj">⚖️</span>How good is HAWK</h3>
     <span class="n" id="scN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
     <p class="said" id="scSaid" style="margin:0 0 30px;animation:none"></p>
@@ -179,7 +179,7 @@
      is the only audit trail of money that moved outside a bet.
      ===================================================================== -->
 <details class="calm fold" id="bankWrap" data-fold="vBank">
-  <summary><div class="wrap"><div class="lede"><h3>Bankroll</h3>
+  <summary><div class="wrap"><div class="lede"><h3><span class="emj">💰</span>Bankroll</h3>
     <span class="n" id="bankN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
     <div class="lgf" style="max-width:640px">
@@ -193,7 +193,7 @@
     <p class="note">Every change is written to the log below with what it was, what it became and
       why. A sync carries these across, which is how money you moved by hand on one device
       reaches the other — a ticket's own stake and return travel with the ticket.</p>
-    <div class="lede" style="margin:34px 0 14px"><h3 style="font-size:19px">Edit log</h3>
+    <div class="lede" style="margin:34px 0 14px"><h3 style="font-size:19px"><span class="emj">📜</span>Edit log</h3>
       <span class="n" id="bkLogN"></span></div>
     <div id="bkLog"></div>
   </div>
@@ -206,7 +206,7 @@
      browser. The protocol lives in assets/hawk-sync.js.
      ===================================================================== -->
 <details class="calm fold" id="syncWrap" data-fold="vSync">
-  <summary><div class="wrap"><div class="lede"><h3>Send to your other device</h3>
+  <summary><div class="wrap"><div class="lede"><h3><span class="emj">📲</span>Send to your other device</h3>
     <span class="n" id="syncN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
     <div class="sw" id="syncMode"></div>
@@ -217,7 +217,7 @@
     </div>
     <div id="syOut" style="margin-top:22px"></div>
 
-    <div class="lede" style="margin:36px 0 14px"><h3 style="font-size:19px">Bring one in</h3></div>
+    <div class="lede" style="margin:36px 0 14px"><h3 style="font-size:19px"><span class="emj">📥</span>Bring one in</h3></div>
     <div class="lgf" style="max-width:640px">
       <div style="grid-column:1/-1"><label for="syPaste">Paste a sync link</label>
         <input id="syPaste" placeholder="https://…#sync=… or the code itself"></div>
@@ -237,7 +237,7 @@
      paid. Both are checks on HAWK rather than reports from it.
      ===================================================================== -->
 <details class="calm fold" id="chkWrap" data-fold="vCheck">
-  <summary><div class="wrap"><div class="lede"><h3>Check against your bookmaker</h3>
+  <summary><div class="wrap"><div class="lede"><h3><span class="emj">⚖️</span>Check against your bookmaker</h3>
     <span class="n" id="chkN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
     <div class="lgf" style="max-width:520px">
@@ -246,14 +246,14 @@
       <div><button class="btn gold btn-sm" id="chkGo" type="button">Compare</button></div>
     </div>
     <div id="chkOut" style="margin-top:22px"></div>
-    <div class="lede" style="margin:36px 0 14px"><h3 style="font-size:19px">Did following HAWK pay?</h3>
+    <div class="lede" style="margin:36px 0 14px"><h3 style="font-size:19px"><span class="emj">⚖️</span>Did following HAWK pay?</h3>
       <span class="n" id="payN"></span></div>
     <div id="payOut"></div>
   </div>
 </details>
 
 <details class="calm fold" id="bkWrap" data-fold="vBackup">
-  <summary><div class="wrap"><div class="lede"><h3>Backup</h3>
+  <summary><div class="wrap"><div class="lede"><h3><span class="emj">💾</span>Backup</h3>
     <span class="n" id="bkN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
     <div style="display:flex;gap:12px;flex-wrap:wrap">

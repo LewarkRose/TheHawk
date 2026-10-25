@@ -102,7 +102,7 @@
   </div>
 </details>
 
-<details class="calm fold" id="luWrap" data-fold="lineups" hidden>
+<details class="calm fold" id="luWrap" data-fold="lineups" data-open-default hidden>
   <summary><div class="wrap"><div class="lede"><h3>Lineups</h3><span class="n" id="luN"></span><span class="mk-t"></span></div></div></summary>
 
   <div class="wrap">
@@ -134,9 +134,10 @@
   <summary><div class="wrap"><div class="lede"><h3>Auto-build</h3>
     <span class="n" id="abN">let HAWK pick the legs</span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
-    <div class="set" id="abSet"></div>
+    <div id="abSet"></div>
+    <p class="plan" id="abPlan"></p>
     <div class="btns" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:26px">
-      <button class="btn gold" id="abGo">Build a ticket</button>
+      <button class="btn gold" id="abGo">Build my bet builder</button>
       <button class="btn ghost" id="abAgain" hidden>Build a different one</button>
     </div>
     <div id="abOut"></div>
@@ -556,7 +557,7 @@
      old builder's, under the same names, and are remembered. */
   const AB_KEY = "hawk.autobuild";
   const AB_DEF = { target: 4, style: "Balanced", maxLegs: 5, focus: "Mix",
-                   picks: "likely", favourite: true, extras: false };
+                   picks: "likely", favourite: true, extras: false, priced: true };
   let AB = { ...AB_DEF };
   try { AB = { ...AB_DEF, ...JSON.parse(localStorage.getItem(AB_KEY) || "{}") }; } catch { /* defaults */ }
   const abSave = () => { try { localStorage.setItem(AB_KEY, JSON.stringify(AB)); } catch { /* private */ } };
@@ -566,21 +567,72 @@
       <select id="ab-${k}" data-ab="${k}">${opts.map(([v, t]) =>
         `<option value="${esc(v)}"${String(AB[k]) === String(v) ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
       ${hint ? `<div class="hint">${esc(hint)}</div>` : ""}</div>`;
-    $("#abSet").innerHTML = `
-      <div><label for="ab-target">Aiming for</label>
-        <input id="ab-target" data-ab="target" type="number" min="1.2" max="50" step="0.5" value="${AB.target}">
-        <div class="hint">the price you want the whole ticket at</div></div>
-      ${sel("style", [["Banker", "Banker — short and likely"], ["Balanced", "Balanced"],
-                      ["Punchy", "Punchy — longer, less likely"]])}
+    /* The target price, loud, with a slider and the usual rungs — the old
+       builder led with this and it was right to: every other setting here is
+       a refinement of "what do you want it to pay". The slider is logarithmic
+       because the useful range is 1.5 to 25 and a linear one spends half its
+       travel between 13 and 25, where nothing lives. */
+    const toSlider = (o) => 100 * Math.log(Math.max(1.5, o) / 1.5) / Math.log(25 / 1.5);
+    const PRESETS = [[0, "Any odds"], [2, "2.00+"], [3, "3.00+"], [5, "5.00+"], [10, "10.00+"]];
+    const t = +AB.target || 0;
+    const aim = `<div class="aim">
+      <div>
+        <div class="lab">At least · ${esc(S.book)} pays</div>
+        <div class="big">${t >= 1.2 ? `${t.toFixed(2)}<small>+</small>` : "Any odds"}</div>
+      </div>
+      <div class="says"><b>the likeliest build</b>${t >= 1.2 ? "that clears it" : "it can make"}</div>
+      <input class="sl" id="ab-slider" type="range" min="0" max="100" step="1"
+        value="${t >= 1.2 ? toSlider(t).toFixed(0) : 0}" aria-label="Target price">
+      <div class="pre">${PRESETS.map(([v, lab]) =>
+        `<button type="button" data-aim="${v}" aria-pressed="${String(
+          v === 0 ? t < 1.2 : Math.abs(t - v) < 0.01)}">${lab}</button>`).join("")}</div>
+    </div>`;
+
+    $("#abSet").innerHTML = aim + `<div class="set" style="margin-top:28px">
+      ${sel("style", [["Banker", "Safe legs — short and likely"], ["Balanced", "Mixed"],
+                      ["Punchy", "Bold legs — longer, less likely"]])}
       ${sel("maxLegs", [2, 3, 4, 5, 6, 7, 8, 10, 12].map((n) => [n, `${n} legs`]))}
-      ${sel("focus", [["Mix", "Mix"], ["Players", "Players"], ["Match", "Match markets"],
-                      ["Stats", "Stats — no result leg"]], "Stats bans the result market so goals, cards and corners carry it")}
-      ${sel("picks", [["likely", "Likeliest legs"], ["value", "Legs Bet365 overprices"]])}
-      <label class="chk"><input type="checkbox" data-ab="favourite"${AB.favourite ? " checked" : ""}>
-        <span>Start with the favourite</span></label>
-      <label class="chk"><input type="checkbox" data-ab="extras"${AB.extras ? " checked" : ""}>
-        <span>Allow fouls, tackles and offsides</span></label>`;
+      ${sel("focus", [["Mix", "Mix of markets"], ["Players", "Player props"], ["Match", "Match markets"],
+                      ["Stats", "No result leg"]], "No result leg bans the result market, so goals, cards and corners carry it")}
+      ${sel("picks", [["likely", "Most likely"], ["value", "Legs Bet365 overprices"]])}
+    </div>
+
+    <div class="sw">
+      <button type="button" data-sw="priced" aria-pressed="${String(!!AB.priced)}">
+        <b>${esc(S.book)}-priced · no props</b>
+        <span>Only legs with a real bookmaker price. Measured blind, these come in at
+          0.924 of fair against 0.741 with a prop in.</span></button>
+      <button type="button" data-sw="favourite" aria-pressed="${String(!!AB.favourite)}">
+        <b>Favourite first</b>
+        <span>Open every build with the favourite, or their double chance.</span></button>
+      <button type="button" data-sw="extras" aria-pressed="${String(!!AB.extras)}">
+        <b>Fouls, tackles, offsides</b>
+        <span>Counted from the player's own record alone, so HAWK is less sure of them.</span></button>
+      <button type="button" data-sw="ep" aria-pressed="${String(!!AB.ep)}">
+        <b>Early Payout</b>
+        <span>A result leg is paid once that side goes two goals ahead.</span></button>
+    </div>`;
+
+    abPlan();
     $("#abWrap").hidden = false;
+  }
+
+  /* What it is about to do, in a sentence. The old builder's best idea: six
+     dropdowns tell you the settings and none of them tells you the plan. */
+  function abPlan() {
+    const el = $("#abPlan");
+    if (!el) return;
+    const t = +AB.target || 0;
+    const band = { Banker: "72% and 95%", Balanced: "55% and 90%", Punchy: "35% and 78%" }[AB.style] || "55% and 90%";
+    const made = { Mix: "likeliest mix of markets", Players: "player props",
+                   Match: "match markets only", Stats: "no result leg" }[AB.focus] || "mix of markets";
+    el.innerHTML = `Stack legs ${t >= 1.2
+        ? `until ${esc(S.book)} pays <b>${t.toFixed(2)}+</b>`
+        : `for the <b>likeliest ticket</b> it can make`}, up to <i>${AB.maxLegs} legs</i>, picking
+      ${AB.picks === "value" ? "the legs <i>Bet365 overprices</i>" : `the <i>${esc(made)}</i>`} —
+      each one landing between <i>${band}</i>.${
+        AB.priced ? ` Only legs with a real ${esc(S.book)} price.` : " Player props are in, so the price is partly estimated."}${
+        AB.favourite ? "" : " It need not start with the favourite."}`;
   }
 
   function abShow(t, nth) {
@@ -615,9 +667,15 @@
   let abOpts = [], abAt = 0;
   function abBuild(again) {
     if (!S.m) return;
-    const body = { id: String(S.id), target: +AB.target || 3, style: AB.style,
+    // target 0 means "any odds": the engine wants a number, and 1.2 is the
+    // lowest it accepts, which is the same thing as asking for no floor.
+    const body = { id: String(S.id), target: (+AB.target >= 1.2 ? +AB.target : 1.2), style: AB.style,
                    maxLegs: +AB.maxLegs || 5, focus: AB.focus, picks: AB.picks,
-                   favourite: !!AB.favourite, extras: !!AB.extras };
+                   favourite: !!AB.favourite, extras: !!AB.extras,
+                   // never offered before, and it is the setting that matters most:
+                   // a build containing a prop comes in at 0.741 of fair, one
+                   // without at 0.924
+                   priced: !!AB.priced };
     try {
       if (!again) {
         abOpts = []; abAt = 0;
@@ -868,6 +926,31 @@
       return;
     }
 
+    // a preset rung on the target price
+    const aimBtn = e.target.closest("[data-aim]");
+    if (aimBtn) {
+      AB.target = +aimBtn.dataset.aim;          // 0 = "any odds": build the likeliest it can
+      abSave(); abOpts = []; abAt = 0; abControls();
+      return;
+    }
+    // an on/off switch
+    const sw = e.target.closest("[data-sw]");
+    if (sw) {
+      const k = sw.dataset.sw;
+      AB[k] = !AB[k];
+      sw.setAttribute("aria-pressed", String(!!AB[k]));
+      abSave(); abOpts = []; abAt = 0;
+      abPlan();
+      // Early Payout is an engine-wide setting, not a build parameter: it
+      // changes what every result leg on the page is worth, so the whole
+      // match has to be priced again.
+      if (k === "ep" && window.HAWK.setEarlyPayout) {
+        window.HAWK.setEarlyPayout(AB[k]);
+        load();
+      }
+      return;
+    }
+
     if (e.target.closest("#abGo")) { abBuild(false); return; }
     if (e.target.closest("#abAgain")) { abBuild(true); return; }
 
@@ -891,6 +974,22 @@
     AB[f.dataset.ab] = f.type === "checkbox" ? f.checked : f.value;
     abSave();
     abOpts = []; abAt = 0;
+    abPlan();
+  });
+
+  // the target slider: logarithmic, so the travel is spent where prices live
+  const fromSlider = (v) => 1.5 * Math.pow(25 / 1.5, v / 100);
+  document.addEventListener("input", (e) => {
+    if (e.target.id !== "ab-slider") return;
+    AB.target = Math.round(fromSlider(+e.target.value) * 20) / 20;   // to the nearest 0.05
+    abSave();
+    abOpts = []; abAt = 0;
+    // only the number and the sentence redraw, so the slider keeps the thumb
+    const big = $(".aim .big");
+    if (big) big.innerHTML = `${(+AB.target).toFixed(2)}<small>+</small>`;
+    document.querySelectorAll("[data-aim]").forEach((b) =>
+      b.setAttribute("aria-pressed", String(Math.abs(AB.target - +b.dataset.aim) < 0.01)));
+    abPlan();
   });
 
   document.addEventListener("input", (e) => {

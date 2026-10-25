@@ -117,10 +117,24 @@
     return S.preds;
   }
   // predictions.json is { updated, matches: { "<id>": { probs, level, kickoff } } }
-  const readOf = (id) => {
+  const predOf = (id) => {
     const m = S.preds && (S.preds.matches || S.preds.m);
-    const p = m && m[String(id)];
-    return p && p.probs ? p.probs : null;
+    return (m && m[String(id)]) || null;
+  };
+  const readOf = (id) => { const p = predOf(id); return p && p.probs ? p.probs : null; };
+
+  /* ⚡ The upset radar. `level` has been in predictions.json all along —
+     0 low, 1 medium, 2 high, 3 very high — and this page fetched it and
+     ignored it. Across a real day: 151 low, 63 medium, 49 high, 21 very
+     high, so a quarter of the card is 2+. Level 3 is the loud one and 2 is
+     a nudge, because a flag on a quarter of the rows is not a flag. */
+  const UPSET_SAY = ["", "", "High — the favourite is beatable here",
+                     "Very high — HAWK rates the underdog's chances well above the price"];
+  const upsetFlag = (id) => {
+    const p = predOf(id);
+    const lv = p && Number.isFinite(p.level) ? p.level : null;
+    if (!(lv >= 2)) return `<span class="up"></span>`;
+    return `<span class="up lv${lv}" title="Upset radar · ${esc(UPSET_SAY[lv])}">⚡</span>`;
   };
 
   function row(g) {
@@ -146,6 +160,7 @@
       <span class="h${hc}">${esc(g.home)}</span>
       <span class="s">${mid}</span>
       <span class="a${ac}">${esc(g.away)}</span>
+      ${upsetFlag(g.id)}
       ${bar}
       <span class="st">${state}</span></a>`;
   }

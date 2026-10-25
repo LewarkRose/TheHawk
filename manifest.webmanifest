@@ -1,21 +1,22 @@
 {
   "name": "HAWK — Bet Builder & Vault",
   "short_name": "HAWK",
-  "description": "HAWK's bet builder, upset radar, scores and your bet Vault.",
+  "description": "HAWK's bet builder, picks, scores and your bet Vault.",
   "id": "./builder/",
-  "start_url": "./builder/",
+  "start_url": "./home/",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0d1114",
-  "theme_color": "#0d1114",
+  "background_color": "#080809",
+  "theme_color": "#080809",
   "icons": [
     { "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Upset radar", "short_name": "Radar", "url": "./builder/?view=radar", "icons": [{ "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml" }] },
-    { "name": "Scores", "url": "./builder/?view=scores", "icons": [{ "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml" }] },
-    { "name": "Vault", "url": "./", "icons": [{ "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml" }] }
+    { "name": "Today", "url": "./today/", "icons": [{ "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml" }] },
+    { "name": "Scores", "url": "./scores/", "icons": [{ "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml" }] },
+    { "name": "Picks", "url": "./picks/", "icons": [{ "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml" }] },
+    { "name": "Vault", "url": "./vault/", "icons": [{ "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml" }] }
   ]
 }

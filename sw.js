@@ -2,9 +2,13 @@
 // Network first for everything of HAWK's own, so a new version (or new data)
 // shows straight away; the last copy is used only when there's no connection.
 // Requests to other sites (365Scores, Polymarket, …) are left alone.
-const CACHE = "hawk-v3";
+const CACHE = "hawk-v4";
 const SHELL = ["./", "./index.html", "./builder/", "./builder/index.html", "./builder/engine.js", "./builder/hawk-settle.js",
-               "./hawk-logo.svg", "./builder/hawk-logo.svg", "./icon.svg", "./favicon.svg", "./qr.js", "./manifest.webmanifest"];
+               "./hawk-logo.svg", "./builder/hawk-logo.svg", "./icon.svg", "./favicon.svg", "./qr.js", "./manifest.webmanifest",
+               // the rebuilt pages and the sheet and scripts they all share
+               "./home/", "./today/", "./scores/", "./match/", "./live/", "./picks/", "./acca/", "./board/", "./vault/",
+               "./assets/hawk.css", "./assets/hawk-nav.js", "./assets/hawk-bg.js", "./assets/hawk-fold.js",
+               "./assets/hawk-alerts.js", "./assets/hawk-acca.js", "./assets/hawk-lineups.js"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => { /* first visit offline: fine */ }));
@@ -37,5 +41,18 @@ self.addEventListener("fetch", (e) => {
     if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
     return res;
   }).catch(() => caches.match(req, { ignoreSearch: true })
-    .then((hit) => hit || (req.mode === "navigate" ? caches.match("./builder/index.html") : Response.error()))));
+    // Offline, and this page is not in the cache. Serving some OTHER page's
+    // HTML at this URL is worse than useless: every page here is one folder
+    // deep and references "../assets/…", so a page served at the wrong depth
+    // loads none of its own files. Redirect instead — the browser then asks
+    // for /home/, which IS cached, and its relative paths resolve.
+    .then((hit) => {
+      if (hit) return hit;
+      if (req.mode !== "navigate") return Response.error();
+      const home = new URL("./home/", self.registration.scope).href;
+      // Never redirect home to itself: offline on a first visit, with nothing
+      // cached, that is an infinite loop rather than an error page.
+      if (url.href.split("?")[0] === home) return Response.error();
+      return Response.redirect(home, 302);
+    })));
 });

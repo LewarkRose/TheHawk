@@ -40,6 +40,28 @@
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--ink);color:var(--text);
   font:400 15px/1.7 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+/* ------------------------------------------------------------- the room
+   Below the hero the page was flat #080809 for its whole length, so every
+   section after the first read as the same dead sheet and the only thing
+   giving the site depth was a canvas you had already scrolled past.
+
+   This is LIGHT, not a surface. The rule the rebuild runs on is that the
+   surfaces stay black and navy only ever arrives as something falling on
+   them — paint a panel navy and it becomes a different theme, lay a navy
+   glow across the black and it stays the same room, lit. So: two large
+   pools, one cool and one gold, at alphas low enough that a screenshot of
+   a card still reads as black.
+
+   FIXED, not scrolled: it is the light in the room rather than a pattern
+   on the page, so it stays put while the content moves through it — and
+   one layer lights a Vault whatever length it grows to. It sits at -1,
+   behind everything in the normal flow, and any panel with a background
+   of its own simply covers it, which is what gives them their edge. */
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(62% 48% at 14% 8%,rgba(107,143,224,.10),transparent 68%),
+    radial-gradient(54% 44% at 88% 34%,rgba(212,169,78,.055),transparent 66%),
+    radial-gradient(72% 52% at 50% 104%,rgba(107,143,224,.07),transparent 70%)}
 a{color:inherit}
 img{display:block;max-width:100%}
 .wrap{width:100%;max-width:var(--max);margin:0 auto}
@@ -620,6 +642,13 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* four quiet figures */
+/* Four across, not "as many as fit". The Vault's record is EIGHT tiles now
+   that the W-L-P line and the streak are back, and auto-fit put seven on a
+   wide screen and left the eighth alone on a row of its own looking like a
+   rendering fault. Four gives two full rows at any width that takes them. */
+.grid.m4.rec{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:900px){ .grid.m4.rec{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:460px){ .grid.m4.rec{grid-template-columns:1fr} }
 .rec > div{padding:26px 22px}
 .rec .n{font-family:var(--disp);font-weight:700;font-size:clamp(30px,3.6vw,44px);line-height:1;
   font-variant-numeric:tabular-nums}
@@ -1568,6 +1597,99 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
 .filt.sub button{padding:5px 10px;font-size:9px;letter-spacing:.11em;box-shadow:none;color:var(--faint)}
 .filt.sub button:hover{color:var(--text);box-shadow:none}
 .filt.sub button[aria-pressed="true"]{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--rule-2)}
+
+/* the mark on a record tile's caption. Grey by default like the bells: on a
+   tile the emoji is a signpost, not a status, and eight colour bursts in a
+   row would read as eight separate alerts. */
+.rec .k i{font-style:normal;font-size:11px;line-height:1;margin-right:6px;
+  filter:grayscale(1);opacity:.65}
+
+/* ------------------------------------------------ the Vault toolbar, from v1
+   Everything it reaches already lived on the page, folded shut, so the Vault
+   could do all of this and looked like it could do none of it. Quiet enough
+   to sit under the hero without competing with it: the bankroll is the only
+   part allowed any gold. */
+.vtools{padding-top:0}
+.vbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding-bottom:26px;border-bottom:1px solid var(--rule)}
+.vgroup{display:flex;align-items:center;gap:4px;flex-wrap:wrap;
+  padding:5px;background:var(--raise);box-shadow:inset 0 0 0 1px var(--rule)}
+.vgroup>button,.vgroup>label{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+  appearance:none;border:0;background:none;padding:8px 13px;color:var(--muted);
+  font:700 9.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;
+  transition:color .3s var(--film),background .3s var(--film)}
+.vgroup>button:hover,.vgroup>label:hover{color:var(--text);background:rgba(242,242,242,.05)}
+.vgroup i{font-style:normal;font-size:13px;line-height:1;filter:grayscale(1);opacity:.75;
+  transition:filter .3s var(--film),opacity .3s var(--film)}
+.vgroup>button:hover i,.vgroup>label:hover i{filter:none;opacity:1}
+.vgroup .ic{padding:8px 10px}
+/* the bankroll: the one number on the bar, so it is the one thing lit */
+.vbank{display:flex;align-items:center;gap:10px;margin-left:auto;
+  padding:7px 7px 7px 15px;background:var(--raise);
+  box-shadow:inset 0 0 0 1px rgba(212,169,78,.45)}
+.vbank>div{display:grid;gap:3px}
+.vbank .k{font:700 8.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+.vbank .v{font:700 19px/1 var(--disp);letter-spacing:.01em;color:var(--gold-hi);
+  font-variant-numeric:tabular-nums}
+.vbank .ic{appearance:none;border:0;cursor:pointer;padding:9px 11px;
+  background:var(--ink);box-shadow:inset 0 0 0 1px var(--rule);
+  transition:box-shadow .3s var(--film)}
+.vbank .ic:hover{box-shadow:inset 0 0 0 1px var(--gold)}
+.vbank .ic i{font-style:normal;font-size:13px;line-height:1;filter:grayscale(1);opacity:.8;
+  transition:filter .3s var(--film),opacity .3s var(--film)}
+.vbank .ic:hover i{filter:none;opacity:1}
+@media (max-width:620px){
+  .vbar{gap:10px}
+  .vgroup{width:100%;justify-content:space-between}
+  .vgroup>button,.vgroup>label{padding:8px 9px;letter-spacing:.1em;font-size:9px}
+  .vbank{margin-left:0;width:100%}
+}
+
+/* ------------------------------------------------- the quick chips, from v1
+   A key you press, not a box you tick: the icon leads, the label is plain
+   sentence case rather than the mono caps used everywhere else, because
+   these are the names Bet365 prints and changing their spelling here is
+   how a selection stops matching the one on your slip. */
+.qck{margin:0 0 30px;padding:20px;background:var(--raise);
+  box-shadow:inset 0 0 0 1px var(--rule)}
+.qck .qhd{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 14px}
+.qck .qhd h4{margin:0;font:700 13px/1 var(--disp);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--gold-hi);display:flex;align-items:center;gap:8px}
+.qck .qhd .n{font:400 10.5px/1.4 var(--mono);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--faint)}
+.qck .filt.sub{margin:0 0 14px}
+.qgrid{display:grid;gap:7px;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));
+  max-height:296px;overflow-y:auto;padding-right:4px}
+.qgrid::-webkit-scrollbar{width:6px}
+.qgrid::-webkit-scrollbar-thumb{background:rgba(242,242,242,.14)}
+.qk{display:flex;align-items:center;gap:9px;width:100%;text-align:left;
+  appearance:none;border:0;cursor:pointer;padding:10px 12px;
+  background:var(--ink);color:var(--muted);font:400 13px/1.3 var(--sans);
+  box-shadow:inset 0 0 0 1px var(--rule);
+  transition:color .25s var(--film),box-shadow .25s var(--film),background .25s var(--film)}
+.qk:hover{color:var(--text);box-shadow:inset 0 0 0 1px var(--rule-2)}
+.qk i{font-style:normal;font-size:14px;line-height:1;flex:none;opacity:.8}
+.qk.on{color:var(--gold-hi);background:rgba(212,169,78,.08);
+  box-shadow:inset 0 0 0 1px var(--gold)}
+.qk.on i{opacity:1}
+/* what the taps have built so far, which is ONE leg and should look like one */
+.qsel{display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+  margin-top:16px;padding-top:15px;border-top:1px solid var(--rule)}
+.qsel .k{width:100%;margin-bottom:3px;font:700 8.5px/1 var(--mono);
+  letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+.qsel .q{display:inline-flex;align-items:center;gap:7px;padding:5px 7px 5px 10px;
+  background:rgba(212,169,78,.09);color:var(--gold-hi);
+  font:400 12px/1.3 var(--sans);box-shadow:inset 0 0 0 1px rgba(212,169,78,.4)}
+.qsel .q button{appearance:none;border:0;background:none;cursor:pointer;padding:0 2px;
+  color:var(--gold-hi);font-size:11px;line-height:1;opacity:.7}
+.qsel .q button:hover{opacity:1;color:var(--red)}
+.qsel .clr{appearance:none;border:0;background:none;cursor:pointer;padding:5px 8px;
+  color:var(--faint);font:700 9px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+.qsel .clr:hover{color:var(--red)}
+@media (max-width:560px){
+  .qck{padding:15px}
+  .qgrid{grid-template-columns:1fr;max-height:248px}
+}
 
 /* a day of tickets, folded. The day is the unit you look for in a Vault, so
    the day is the row: what it cost or made, and how many landed, without

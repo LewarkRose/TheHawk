@@ -16,7 +16,7 @@
 <body>
 
 <header class="hero">
-  <canvas aria-hidden="true"></canvas>
+  <canvas aria-hidden="true" data-bg="ground"></canvas>
   <div class="wrap">
     <a class="back" href="../home/" style="display:inline-flex;align-items:center;gap:8px;
       text-decoration:none;font:700 9.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;
@@ -30,6 +30,42 @@
     </div>
   </div>
 </header>
+
+<!-- =====================================================================
+     THE TOOLBAR, back from v1.
+
+     Every one of these already existed on this page, each inside its own
+     fold, each shut — so the Vault could do all of it and looked like it
+     could do none of it. This is the row that says so. The buttons do not
+     reimplement anything: they open the fold that owns the job and take
+     you to it, which is why there is still exactly one copy of each.
+
+     Archive and the reset are the two that genuinely were not here.
+     ===================================================================== -->
+<section class="calm vtools">
+  <div class="wrap">
+    <div class="vbar">
+      <div class="vgroup">
+        <button type="button" data-vgo="syncWrap" title="Send your bets to your phone or PC"><i>📲</i>Sync</button>
+        <button type="button" data-vexport title="Download a backup of your Vault"><i>💾</i>Export</button>
+        <!-- No accept filter, and that is deliberate: v1 found that filtering
+             to .json routed Android's chooser through a document provider
+             whose handle neither FileReader nor File.text() could open, so
+             importing silently did nothing on a phone. importBackup checks
+             the contents, which is the check that actually matters. -->
+        <label title="Load a backup — it replaces what is here"><i>📂</i>Import<input
+          type="file" id="bkImport2" hidden></label>
+        <button type="button" data-varchive title="Back up, then clear settled tickets older than six months"><i>🗄️</i>Archive</button>
+        <button type="button" class="ic" data-vreset title="Empty the Vault — downloads a backup first"><i>⚙️</i></button>
+      </div>
+      <div class="vbank">
+        <div><span class="k">Bankroll</span><span class="v" id="vbAmt">—</span></div>
+        <button type="button" class="ic" data-vgo="chkWrap" title="Check this against your bookmaker's balance"><i>⚖️</i></button>
+        <button type="button" class="ic" data-vgo="bankWrap" title="Edit the bankroll"><i>✏️</i></button>
+      </div>
+    </div>
+  </div>
+</section>
 
 <section class="calm" id="statWrap" hidden>
   <div class="wrap">
@@ -65,6 +101,20 @@
   <summary><div class="wrap"><div class="lede"><h3><span class="emj">📝</span>Log a ticket</h3>
     <span class="n" id="logN">for a bet placed outside HAWK</span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
+    <!-- QUICK CHIPS, back from v1.
+         Typing "Over 4.5 Match Cards" by hand is how a Vault ends up with
+         "over 4.5 cards", "Over 4.5 cards" and "O4.5 cards" as three
+         different selections that no total can ever add up. Tapping a chip
+         spells it the same way every time, and several chips combine into
+         ONE leg with " & " — which is what a bet builder leg actually is. -->
+    <div class="qck">
+      <div class="qhd"><h4 id="qckTitle"><span class="emj">⚽</span>Goals</h4>
+        <span class="n">Tap to build a leg · tap again to drop it</span></div>
+      <div class="filt sub" id="qckCats"></div>
+      <div class="qgrid" id="qckList"></div>
+      <div id="qckSel"></div>
+    </div>
+
     <div class="lgf">
       <div><label for="lgFix">Match</label>
         <input id="lgFix" placeholder="Barcelona vs Real Madrid"></div>
@@ -112,13 +162,22 @@
      it did. All of this is true and worth having and none of it is why you
      opened the page, so it waits to be asked for.
      ===================================================================== -->
-<details class="calm fold" id="anWrap" data-fold="vAnalysis" hidden>
+<!-- OPEN by default. Every fold on this page defaulted shut, so a first visit
+     showed the record, the bets, and then a column of closed headings — and
+     the v1 Vault's weekly report, profit curve and league table looked like
+     they had not been rebuilt at all. Open, this is five sub-headings: a
+     contents page, not four thousand pixels. The five inside stay shut, which
+     is the whole reason this wrapper exists. -->
+<details class="calm fold" id="anWrap" data-fold="vAnalysis" data-open-default hidden>
   <summary><div class="wrap"><div class="lede"><h3><span class="emj">📈</span>Analysis</h3>
     <span class="n" id="anN">the week, the weeks, the chart, the competitions, and how good HAWK is</span>
     <span class="mk-t"></span></div></div></summary>
   <div class="subs">
 
-<details class="sub fold" id="wkWrap" data-fold="vWeek" hidden>
+<!-- open with Analysis: it is the one of the five that answers "how did this
+     week go", which is the question you open the Vault with. The other four
+     are things you go looking for. -->
+<details class="sub fold" id="wkWrap" data-fold="vWeek" data-open-default hidden>
   <summary><div class="wrap"><div class="lede"><h3><span class="emj">🗓️</span>Weekly report</h3>
     <span class="n" id="wkN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
@@ -149,7 +208,9 @@
   </div>
 </details>
 
-<details class="sub fold" id="lgWrap" data-fold="vLeagues" hidden>
+<!-- open with Analysis: where you are actually hitting, which is the other
+     question worth answering without being asked for it -->
+<details class="sub fold" id="lgWrap" data-fold="vLeagues" data-open-default hidden>
   <summary><div class="wrap"><div class="lede"><h3><span class="emj">🌍</span>By competition</h3>
     <span class="n" id="lgN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
@@ -184,7 +245,9 @@
      Without this a mis-settled ticket can never be put right, and the log
      is the only audit trail of money that moved outside a bet.
      ===================================================================== -->
-<details class="calm fold" id="bankWrap" data-fold="vBank">
+<!-- and this one, because it is your money and it is four lines. Shut, the
+     Vault could tell you what your bets did but not what you have. -->
+<details class="calm fold" id="bankWrap" data-fold="vBank" data-open-default>
   <summary><div class="wrap"><div class="lede"><h3><span class="emj">💰</span>Bankroll</h3>
     <span class="n" id="bankN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
@@ -265,7 +328,11 @@
     <div style="display:flex;gap:12px;flex-wrap:wrap">
       <button class="btn gold" id="bkExport">Download a backup</button>
       <label class="btn ghost" style="cursor:pointer">Restore from a file
-        <input type="file" id="bkImport" accept="application/json,.json" hidden></label>
+        <!-- no accept filter, deliberately: v1 found that filtering to .json
+             routed Android's chooser through a document provider whose handle
+             neither FileReader nor File.text() could open, so Import silently
+             did nothing on a phone. importBackup checks the contents. -->
+        <input type="file" id="bkImport" hidden></label>
     </div>
     <p class="note">The backup is a plain JSON file holding every bet and your bankroll — the same
       format the old site writes, so either can read the other's. <b>Restoring replaces everything
@@ -379,6 +446,7 @@
     const atRisk = S.bets.filter((b) => b.status === "PENDING").reduce((a, b) => a + (+b.stake || 0), 0);
 
     $("#bank").innerHTML = `${money(S.bank).replace("€", "€")}<span class="q">in the vault</span>`;
+    $("#vbAmt").textContent = money(S.bank);
     $("#tag").innerHTML = pending
       ? `<span class="dot"></span>${plural(pending, "ticket")} running`
       : `<span class="dot q"></span>All settled`;
@@ -404,21 +472,45 @@
     let run = 0, peak = 0, dd = 0;
     for (const b of order) { run += profit(b); peak = Math.max(peak, run); dd = Math.max(dd, peak - run); }
 
+    /* The run you are on. Counted by what a ticket DID, not by its status —
+       a cash-out above the stake is a win and below it is a loss, and a
+       ticket that came back level breaks a streak without starting one.
+       Reading it off status alone would call every cash-out a win. */
+    const kindOf = (b) => { const p = profit(b); return p > 0 ? "W" : p < 0 ? "L" : "P"; };
+    let streak = 0, streakKind = "";
+    for (let i = order.length - 1; i >= 0; i--) {
+      const k = kindOf(order[i]);
+      if (!streakKind) { streakKind = k; streak = 1; }
+      else if (k === streakKind) streak++;
+      else break;
+    }
+
     const cls = (n) => (n > 0 ? " up" : n < 0 ? " dn" : "");
     $("#statN").textContent = `${plural(f.s.length, "bet")}${f.pending ? ` · ${f.pending} open` : ""}`;
+    // each label gets its mark, the way v1's "Your numbers" had them — eight
+    // mono captions in a row are read by position, and an icon is what you aim at
     $("#stats").innerHTML = `
       <div><div class="n${cls(f.net)}">${f.net > 0 ? "+" : ""}${money(f.net)}</div>
-        <div class="k">Net</div><div class="s">on ${money(f.staked)} staked</div></div>
+        <div class="k"><i>💰</i>Net</div><div class="s">on ${money(f.staked)} staked</div></div>
       <div><div class="n${cls(f.roi)}">${f.roi > 0 ? "+" : ""}${f.roi.toFixed(2)}%</div>
-        <div class="k">Return</div><div class="s">per euro through the book</div></div>
+        <div class="k"><i>📊</i>Return</div><div class="s">per euro through the book</div></div>
       <div><div class="n">${(100 * won / f.s.length).toFixed(0)}%</div>
-        <div class="k">Strike rate</div><div class="s">${won}W · ${lost}L${cashed ? ` · ${cashed} cashed` : ""}</div></div>
+        <div class="k"><i>🎯</i>Strike rate</div><div class="s">${won}W · ${lost}L${cashed ? ` · ${cashed} cashed` : ""}</div></div>
+      <!-- v1's two: the W-L-P line and the run you are on. Won and lost were
+           buried in the strike rate's sub-line and the streak was nowhere. -->
+      <div><div class="n">${won} <span class="q">-</span> ${lost} <span class="q">-</span> ${f.pending}</div>
+        <div class="k"><i>📋</i>Record</div><div class="s">won · lost · running</div></div>
+      <div><div class="n${streakKind === "W" ? " up" : streakKind === "L" ? " dn" : ""}">${
+        streak ? `${streak}${streakKind}` : "—"}</div>
+        <div class="k"><i>🔥</i>Current streak</div><div class="s">${
+          !streak ? "nothing settled" : streakKind === "W" ? "on the bounce"
+          : streakKind === "L" ? "in a row" : "level"}</div></div>
       <div><div class="n dn">${money(dd)}</div>
-        <div class="k">Worst drawdown</div><div class="s">peak to trough</div></div>
+        <div class="k"><i>📉</i>Worst drawdown</div><div class="s">peak to trough</div></div>
       <div><div class="n g">${avgOdds.toFixed(2)}</div>
-        <div class="k">Average price</div><div class="s">across settled bets</div></div>
+        <div class="k"><i>🏷️</i>Average price</div><div class="s">across settled bets</div></div>
       <div><div class="n${f.atRisk ? "" : " "}">${money(f.atRisk)}</div>
-        <div class="k">At risk</div><div class="s">${f.pending ? plural(f.pending, "ticket") + " running" : "nothing running"}</div></div>`;
+        <div class="k"><i>🎟️</i>At risk</div><div class="s">${f.pending ? plural(f.pending, "ticket") + " running" : "nothing running"}</div></div>`;
     $("#statWrap").hidden = false;
   }
 
@@ -1382,6 +1474,107 @@
      same shape saveToVault() does, so it settles and reads identically. */
   let legs = [];
 
+  /* ---------------------------------------------------- the quick chips
+     v1's, carried over whole, including the market names. The point is not
+     that tapping is faster than typing — it is that a tap spells it the
+     SAME WAY every time. Typed by hand, one Vault ends up holding "over 2.5
+     goals", "Over 2.5 Goals" and "O2.5" as three different selections, and
+     no count of how a market has done for you can ever add them up.
+
+     Several chips make ONE leg, joined with " & ", because that is what a
+     bet builder leg is: Over 2.5 AND both teams to score, at one price.
+     They survive a change of market, so a goals chip and a cards chip
+     combine — which is the whole reason the market is a filter here and
+     not a mode. */
+  const CHIPS = {
+    "Result": ["⚖️", [
+      ["🏠", "Home Win"], ["✈️", "Away Win"], ["🤝", "Draw"],
+      ["🤝", "Draw No Bet: Home"], ["🤝", "Draw No Bet: Away"],
+      ["⚖️", "Double Chance: Home/Draw"], ["⚖️", "Double Chance: Away/Draw"],
+      ["⚖️", "Double Chance: Home/Away"],
+      ["🏠", "Home Win & Over 1.5"], ["✈️", "Away Win & Over 1.5"],
+      ["⚖️", "Double Chance Home/Draw & Under 3.5"],
+      ["⚽", "Both Teams to Score & Over 2.5"]]],
+    "Goals": ["⚽", [
+      ["⚽", "Over 0.5 Goals"], ["⚽", "Over 1.5 Goals"], ["⚽", "Over 2.5 Goals"],
+      ["⚽", "Over 3.5 Goals"], ["⚽", "Under 1.5 Goals"], ["⚽", "Under 2.5 Goals"],
+      ["⚽", "Under 3.5 Goals"],
+      ["🥅", "Both Teams to Score - YES"], ["🥅", "Both Teams to Score - NO"],
+      ["🏠", "Home Team Over 1.5 Goals"], ["✈️", "Away Team Over 1.5 Goals"],
+      ["⚽", "First Goal: Home Team"], ["⚽", "First Goal: Away Team"]]],
+    "Players": ["👤", [
+      ["👤", "Player to Score Anytime", 1], ["👤", "Player to Score First", 1],
+      ["👤", "Player to Score 2+", 1],
+      ["🎯", "Player Over 0.5 Shots on Target", 1], ["🎯", "Player Over 1.5 Shots on Target", 1],
+      ["🎯", "Player Over 2.5 Shots (Total)", 1], ["🅰️", "Player Over 0.5 Assists", 1],
+      ["🥊", "Player Over 1.5 Fouls Committed", 1], ["🟨", "Player to be Booked", 1],
+      ["🛡️", "Player Over 2.5 Tackles Won", 1]]],
+    "Cards": ["🟨", [
+      ["🟨", "Over 2.5 Match Cards"], ["🟨", "Over 3.5 Match Cards"],
+      ["🟨", "Over 4.5 Match Cards"], ["🟨", "Over 5.5 Match Cards"],
+      ["🟨", "Under 3.5 Match Cards"], ["🟨", "Under 4.5 Match Cards"],
+      ["🟨", "First Card in Match"], ["🟥", "Red Card in Match"],
+      ["🟨", "Home Team Over 1.5 Cards"], ["🟨", "Away Team Over 1.5 Cards"]]],
+    "Corners": ["🚩", [
+      ["🚩", "Over 8.5 Match Corners"], ["🚩", "Over 9.5 Match Corners"],
+      ["🚩", "Over 10.5 Match Corners"], ["🚩", "Under 9.5 Match Corners"],
+      ["🚩", "Home Team Most Corners"]]],
+    "Handicap": ["📐", [
+      ["📐", "Home -0.5"], ["📐", "Home -1.0"], ["📐", "Home -1.5"],
+      ["📐", "Away +0.5"], ["📐", "Away -0.5"], ["📐", "Away -1.0"]]],
+    "HT/FT": ["⏱️", [
+      ["⏱️", "HT/FT: Home/Home"], ["⏱️", "HT/FT: Away/Away"], ["⏱️", "HT/FT: Draw/Home"],
+      ["⏱️", "HT/FT: Draw/Away"], ["⏱️", "HT/FT: Draw/Draw"], ["⏱️", "Half-Time Draw"]]],
+    "Correct score": ["🔢", [
+      ["🔢", "Correct Score: 1-0"], ["🔢", "Correct Score: 2-0"], ["🔢", "Correct Score: 2-1"],
+      ["🔢", "Correct Score: 1-1"], ["🔢", "Correct Score: 0-0"], ["🔢", "Correct Score: 0-1"],
+      ["🔢", "Correct Score: 0-2"], ["🔢", "Correct Score: 1-2"]]],
+    "Specials": ["🛡️", [
+      ["🛡️", "Home Team Clean Sheet"], ["🛡️", "Away Team Clean Sheet"],
+      ["🛡️", "Home Win to Nil"], ["🛡️", "Away Win to Nil"],
+      ["⏳", "Either Team Scores in Both Halves"], ["⏳", "Win Either Half"]]],
+  };
+  let qCat = "Goals", qPicked = [];
+
+  const qJoin = () => { $("#lgSel").value = qPicked.map((c) => c.label).join(" & "); };
+
+  function drawChips() {
+    const [icon, list] = CHIPS[qCat] || CHIPS.Goals;
+    $("#qckTitle").innerHTML = `<span class="emj">${icon}</span>${esc(qCat)}`;
+    $("#qckCats").innerHTML = Object.keys(CHIPS).map((k) =>
+      `<button type="button" data-qcat="${esc(k)}" aria-pressed="${String(k === qCat)}">${
+        CHIPS[k][0]} ${esc(k)}</button>`).join("");
+    $("#qckList").innerHTML = list.map(([ic, label, custom], i) => {
+      const on = !custom && qPicked.some((c) => c.label === label);
+      return `<button type="button" class="qk${on ? " on" : ""}" data-qk="${i}"
+        aria-pressed="${String(on)}"><i>${on ? "✓" : ic}</i>${esc(label)}</button>`;
+    }).join("");
+    $("#qckSel").innerHTML = qPicked.length
+      ? `<div class="qsel"><span class="k">One leg, from ${plural(qPicked.length, "chip")}</span>
+          ${qPicked.map((c, i) => `<span class="q">${esc(c.label)}<button type="button"
+            data-qdrop="${i}" title="Drop this one">✕</button></span>`).join("")}
+          <button type="button" class="clr" data-qclear>Clear</button></div>`
+      : "";
+  }
+
+  function tapChip(i) {
+    const [, list] = CHIPS[qCat] || CHIPS.Goals;
+    const [, label, custom] = list[i] || [];
+    if (!label) return;
+    if (custom) {
+      /* "Player Over 1.5 Shots on Target" is not one leg, it is one leg PER
+         PLAYER — so it asks who, and the same chip can go on twice for two
+         different names instead of colliding into a single entry. */
+      const who = prompt(`Which player — "${label.replace(/^Player\s*/, "")}"?`, "");
+      if (!who || !who.trim()) return;
+      qPicked.push({ label: label.replace(/^Player/, who.trim()) });
+    } else {
+      const at = qPicked.findIndex((c) => c.label === label);
+      if (at === -1) qPicked.push({ label }); else qPicked.splice(at, 1);
+    }
+    qJoin(); drawChips();
+  }
+
   function drawLog() {
     $("#logN").textContent = legs.length
       ? `${plural(legs.length, "leg")}` : "for a bet placed outside HAWK";
@@ -1516,6 +1709,14 @@
     const wk = e.target.closest("#wkTabs button[data-wk]");
     if (wk) { wkTab = wk.dataset.wk; weekly(S.G); return; }
 
+    const qc = e.target.closest("#qckCats [data-qcat]");
+    if (qc) { qCat = qc.dataset.qcat; drawChips(); return; }
+    const qk = e.target.closest("#qckList [data-qk]");
+    if (qk) { tapChip(+qk.dataset.qk); return; }
+    const qd = e.target.closest("#qckSel [data-qdrop]");
+    if (qd) { qPicked.splice(+qd.dataset.qdrop, 1); qJoin(); drawChips(); return; }
+    if (e.target.closest("#qckSel [data-qclear]")) { qPicked = []; qJoin(); drawChips(); return; }
+
     if (e.target.closest("#lgAdd")) {
       const sel = $("#lgSel").value.trim();
       const od = parseFloat(String($("#lgOdds").value || "").replace(",", "."));
@@ -1523,6 +1724,9 @@
       if (!(od > 1)) { $("#lgOut").textContent = "That price doesn't look right."; return; }
       legs.push({ fixture: $("#lgFix").value.trim(), selection: sel, odds: od });
       $("#lgSel").value = ""; $("#lgOdds").value = "";
+      // the chips built that selection; it is on the ticket now, so let go of
+      // them, or the next leg starts half-written with the last one's picks
+      qPicked = []; drawChips();
       $("#lgOut").textContent = "";
       drawLog();
       $("#lgSel").focus();
@@ -1536,7 +1740,76 @@
     if (e.target.closest("#lgClear")) {
       legs = []; $("#lgFix").value = ""; $("#lgSel").value = "";
       $("#lgOdds").value = ""; $("#lgReal").value = ""; $("#lgStake").value = "";
+      qPicked = []; drawChips();
       $("#lgOut").textContent = ""; drawLog(); return;
+    }
+
+    /* ------------------------------------------------- the toolbar
+       Open the fold that owns the job, then go to it. Nothing here does
+       the job itself — one copy of each, and the toolbar is a way in. */
+    const vgo = e.target.closest("[data-vgo]");
+    if (vgo) {
+      const d = $("#" + vgo.dataset.vgo);
+      if (!d) return;
+      d.hidden = false;
+      // a parent fold has to open too, or opening Analysis's child scrolls
+      // you to a closed heading and looks like the button did nothing
+      for (let p = d; p; p = p.parentElement.closest("details")) p.open = true;
+      /* Instant, not smooth. `body` is the scrolling box here (it carries
+         overflow:hidden auto for the horizontal clamp), and with the scroller
+         on body rather than the document element a smooth scrollIntoView —
+         and a smooth window.scrollTo — do nothing at all: measured, the page
+         stayed at 0 while the instant call moved it 6,186px. A button that
+         silently does nothing is worse than one that jumps. */
+      d.scrollIntoView({ block: "start" });
+      return;
+    }
+    if (e.target.closest("[data-vexport]")) { exportBackup(); return; }
+
+    /* ARCHIVE — v1's, and the one thing on this bar that was not rebuilt.
+       A Vault is localStorage, localStorage is finite, and a few hundred
+       settled tickets with their legs is real weight. It backs up FIRST,
+       every time and without asking, because the alternative is a button
+       that deletes your history if you misread the dialog. */
+    if (e.target.closest("[data-varchive]")) {
+      const cut = new Date(); cut.setMonth(cut.getMonth() - 6);
+      const old = S.bets.filter((b) => b && b.status && b.status !== "PENDING"
+        && whenOf(b) && whenOf(b) < cut.getTime());
+      if (!old.length) {
+        $("#lgOut").textContent = "";
+        alert("Nothing to archive — no settled tickets older than six months.");
+        return;
+      }
+      const kb = Math.round(JSON.stringify(old).length / 1024);
+      exportBackup();
+      if (!confirm(`A backup has just downloaded.\n\nArchive ${plural(old.length, "settled ticket")}`
+        + ` older than six months — about ${kb} KB?\n\n`
+        + `${S.bets.length - old.length} would be left in the Vault. Your bankroll does not change:`
+        + ` these are settled, so their money is already in it.`)) return;
+      const gone = new Set(old.map((b) => b.id));
+      S.bets = S.bets.filter((b) => !gone.has(b.id));
+      // a sync must not hand them back — the same list that carries a deletion
+      if (SY() && SY().removedBets) { try { SY().removedBets(old.map((b) => b.id)); } catch { /* older sync */ } }
+      save(); draw(); drawLog();
+      alert(`Archived ${plural(old.length, "ticket")}. ${plural(S.bets.length, "ticket")} left.\n\n`
+        + "Keep the backup that just downloaded — it is the only copy of the archived ones.");
+      return;
+    }
+
+    /* The reset. Backs up first like the archive, then asks you to type the
+       word — a Vault is hundreds of settled bets and a bankroll, and a
+       single OK is not enough standing between you and losing it. */
+    if (e.target.closest("[data-vreset]")) {
+      if (!S.bets.length && !S.bank) { alert("The Vault is already empty."); return; }
+      exportBackup();
+      const typed = prompt(`A backup has just downloaded.\n\nThis empties the Vault:`
+        + ` ${plural(S.bets.length, "ticket")} and a bankroll of ${money(S.bank)}.\n\n`
+        + `Type EMPTY to go ahead.`, "");
+      if (!typed || typed.trim().toUpperCase() !== "EMPTY") return;
+      S.bets = []; S.bank = 0;
+      save(); draw(); drawLog();
+      alert("The Vault is empty. The backup that just downloaded has everything that was in it.");
+      return;
     }
 
     if (e.target.closest("#bkExport")) { exportBackup(); return; }
@@ -1555,7 +1828,7 @@
   });
 
   document.addEventListener("change", (e) => {
-    if (e.target.id !== "bkImport") return;
+    if (e.target.id !== "bkImport" && e.target.id !== "bkImport2") return;
     const f = e.target.files && e.target.files[0];
     if (f) importBackup(f);
     e.target.value = "";
@@ -1580,6 +1853,7 @@
   } catch { /* no search */ }
   draw();
   drawLog();
+  drawChips();
   $("#bkN").textContent = `${plural(S.bets.length, "ticket")} · ${money(S.bank)}`;
   scorecard();
 

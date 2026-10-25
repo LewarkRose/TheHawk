@@ -32,10 +32,20 @@
        and most of them were left open — which would make opening Analysis
        unfold four thousand pixels at once, the exact thing it exists to
        stop. Cleared once; from here each remembers your choice again. */
-    if (v !== "3") {
+    if (v !== "3" && v !== "4") {
       for (const k of ["vWeek", "vWeeks", "vChart", "vLeagues", "vScore"])
         localStorage.removeItem(`hawk.fold.${k}`);
-      localStorage.setItem("hawk.fold.v", "3");
+    }
+    /* v4: Analysis and Bankroll now default OPEN. Every fold on the Vault
+       defaulted shut, so the page opened on a column of closed headings and
+       the v1 features inside them — the weekly report, the profit curve, the
+       league table, the bankroll itself — read as never rebuilt. A stored
+       false from before today would outlive the new default and the change
+       would do nothing on the one machine that matters. */
+    if (v !== "4") {
+      for (const k of ["vAnalysis", "vBank", "vWeek", "vLeagues"])
+        localStorage.removeItem(`hawk.fold.${k}`);
+      localStorage.setItem("hawk.fold.v", "4");
     }
   } catch { /* private window: the defaults below apply anyway */ }
   const read = (k, dflt) => {

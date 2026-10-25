@@ -3,14 +3,16 @@
 
    TWO drawings, chosen by the canvas itself:
 
-     <canvas>                    the drifting points — the default, everywhere
-     <canvas data-bg="ground">   the Bernabéu from overhead — Home only
+     <canvas>                    the drifting points — the default
+     <canvas data-bg="ground">   the Bernabéu from overhead — every page
 
-   Home gets the ground and no other page does, on purpose. The rule the
-   rebuild keeps proving is ONE loud moment and then quiet: the same stadium
-   behind the Vault, the Board, Today and Scores is not eight times as good,
-   it is wallpaper, and by the third page you have stopped seeing it. Any page
-   can have it by adding the attribute, and that is the only change needed.
+   It started on Home alone, on the rule that one loud moment beats eight,
+   and Lewzu asked for it everywhere. Which is the right call to be his: it
+   is HIS ground behind HIS numbers, and the thing that would make it
+   wallpaper is being loud, not being repeated. So it is held well back —
+   see the alpha and the vignette in ground() — and the inner pages' heroes
+   are shorter than Home's, which crops it to a band rather than a picture.
+   One page goes back to the points by dropping the attribute.
 
    Both are drawn rather than faked with CSS gradients, which is the one thing
    a stylesheet genuinely cannot do and the reason three earlier attempts read

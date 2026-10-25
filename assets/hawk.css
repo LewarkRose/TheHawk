@@ -213,16 +213,22 @@ img{display:block;max-width:100%}
 .note{margin:clamp(18px,2.4vw,26px) 0 0;max-width:70ch;font-size:12.5px;line-height:1.8;color:var(--faint)}
 .note b{color:var(--muted)}
 
-/* a grid whose cells are separated by the background showing through, so
-   there are no borders to draw and no boxes to look at */
-.grid{display:grid;gap:1px;background:var(--rule)}
+/* a grid whose cells are separated by hairlines, so there are no boxes to
+   look at.
+
+   The lines are drawn BY the cells, not by a lighter backdrop showing through
+   the gaps. Eight cards in a three-column grid leave a ninth cell empty, and
+   with the backdrop technique that empty cell was a solid rule-coloured
+   rectangle sitting there looking like a card that had failed to load. A
+   1px spread shadow on each cell meets its neighbour's in the gap and draws
+   the same continuous line, and a cell that does not exist draws nothing. */
+.grid{display:grid;gap:1px;background:var(--ink)}
 .grid.m3{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
 .grid.m4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
 .grid.w4{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
-.grid > *{background:var(--ink)}
-/* An empty state is one cell in a grid sized for several, which leaves the
-   grid's own background showing as a stray lighter block beside it. It spans
-   the row instead. */
+.grid > *{background:var(--ink);box-shadow:0 0 0 1px var(--rule)}
+/* clip the outermost line so the block does not sit in a full box */
+.grid{clip-path:inset(0)}
 .grid > .wide{grid-column:1/-1}
 
 /* a match, quietly */
@@ -996,6 +1002,140 @@ img{display:block;max-width:100%}
   .bt{grid-template-columns:minmax(0,1fr) 80px 86px;gap:10px}
   .bt .st{display:none}
   .lgt th:nth-child(3),.lgt td:nth-child(3){display:none}
+}
+
+/* ================================= ACCA =================================
+   A departure board. The parts are in kick-off order and the column that
+   does not exist anywhere else is the running one: what the WHOLE acca is
+   worth once that match is on it. An acca's real question is which leg is
+   costing me, and watching 16% become 3.2% become 0.64% down the page
+   answers it without arithmetic — with the ✕ on the same row.
+   ======================================================================== */
+.dbh,.dbr{display:grid;grid-template-columns:54px minmax(0,1fr) 58px 90px 28px;
+  gap:14px;align-items:center}
+.dbh{padding:0 2px 11px;border-bottom:1px solid var(--rule)}
+.dbh span{text-align:right;font:700 8.5px/1 var(--mono);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint)}
+.dbh span:nth-child(1),.dbh span:nth-child(2){text-align:left}
+.ap{border-bottom:1px solid var(--rule)}
+.ap > summary{list-style:none;cursor:pointer;padding:14px 2px;
+  transition:background .4s var(--film),padding .4s var(--film)}
+.ap > summary::-webkit-details-marker{display:none}
+.ap > summary:hover,.ap[open] > summary{background:var(--raise);
+  padding-left:10px;padding-right:10px}
+.ap.weak > summary{box-shadow:inset 2px 0 0 var(--down)}
+.dbr .t{font:400 11px/1 var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
+.dbr .mu{min-width:0}
+.dbr .mu .nm{display:flex;align-items:center;gap:9px;min-width:0}
+.dbr .mu img{width:17px;height:17px;object-fit:contain;flex:none}
+.dbr .mu .nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.dbr .mu .nm i{font-style:normal;color:var(--faint);font-size:14px;margin:0 2px}
+.dbr .mu small{display:block;margin-top:5px;font:400 10.5px/1.5 var(--mono);color:var(--faint);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dbr .one{text-align:right;font:400 12.5px/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--muted)}
+/* the running chance, with a bar against the first match alone */
+.dbr .run{text-align:right;font:400 12.5px/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--text);position:relative;padding-bottom:7px}
+.dbr .run::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;
+  background:rgba(242,242,242,.07)}
+.dbr .run i{position:absolute;bottom:0;left:auto;right:0;height:2px;width:var(--w,0%);
+  background:var(--gold)}
+.dbr .rm{justify-self:end;width:24px;height:24px;display:grid;place-items:center;border:0;
+  background:none;cursor:pointer;color:var(--faint);font:400 14px/1 var(--mono);
+  box-shadow:inset 0 0 0 1px var(--rule-2);transition:all .35s var(--film)}
+.dbr .rm:hover{color:var(--down);box-shadow:inset 0 0 0 1px rgba(255,107,127,.6)}
+.apbody{padding:4px 2px 20px}
+.apbody .legs{margin:0;padding:0;list-style:none}
+.apbody .legs li{display:grid;grid-template-columns:20px minmax(0,1fr) 56px 56px;gap:12px;
+  align-items:center;padding:11px 0;border-bottom:1px solid var(--rule);font-size:13.5px}
+.apbody .legs li .i{font:700 10px/1 var(--mono);color:var(--faint)}
+.apbody .legs li small{display:block;margin-top:4px;font:400 10px/1.4 var(--mono);color:var(--faint)}
+.apbody .legs li b{text-align:right;font:400 12px/1 var(--mono);font-weight:400;
+  font-variant-numeric:tabular-nums;color:var(--muted)}
+.apbody .legs li b.b{color:var(--text)}
+
+/* the acca's own numbers — the one loud thing on the page, because an acca
+   IS its combined price */
+.actot{display:flex;gap:clamp(22px,4vw,54px);flex-wrap:wrap;margin-top:clamp(24px,3.4vw,38px)}
+.actot div .k{font:700 9px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;
+  color:var(--faint)}
+.actot div .v{margin-top:11px;font-family:var(--disp);font-weight:700;line-height:1;
+  font-size:clamp(28px,3.6vw,44px);font-variant-numeric:tabular-nums}
+.actot div .v.g{color:var(--gold-hi)}
+.actot div .v.up{color:var(--up)}
+.actot div .v.dn{color:var(--down)}
+.actot div .s{margin-top:9px;font:400 10.5px/1 var(--mono);color:var(--faint)}
+
+/* ================================ PICKS =================================
+   A scan over every fixture, as a ledger. The column that matters is the
+   last one — what a euro on it comes back as — and it is the only one that
+   gets colour, because on most days every row is under 1.00 and the page
+   has to be able to say so without shouting.
+   ======================================================================== */
+.pk-run{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:22px}
+.pk-run .btn{flex:none}
+.pk-bar{flex:1;min-width:160px;height:2px;background:rgba(242,242,242,.08);position:relative}
+.pk-bar i{position:absolute;inset:0 auto 0 0;background:var(--gold);
+  transition:width .6s var(--film)}
+.pk-run .pr{font:400 11px/1 var(--mono);color:var(--faint);white-space:nowrap}
+
+.pkh,.pkr{display:grid;grid-template-columns:54px minmax(0,1fr) 40px 62px 62px 92px;
+  gap:14px;align-items:center}
+.pkh{padding:0 2px 11px;border-bottom:1px solid var(--rule)}
+.pkh span{text-align:right;font:700 8.5px/1 var(--mono);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint)}
+.pkh span:nth-child(1),.pkh span:nth-child(2){text-align:left}
+.pk{border-bottom:1px solid var(--rule)}
+.pk > summary{list-style:none;cursor:pointer;padding:13px 2px;
+  transition:background .4s var(--film),padding .4s var(--film)}
+.pk > summary::-webkit-details-marker{display:none}
+.pk > summary:hover{background:var(--raise);padding-left:10px;padding-right:10px}
+.pk[open] > summary{background:var(--raise);padding-left:10px;padding-right:10px}
+.pkr .t{font:400 11px/1 var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
+.pkr .mu{min-width:0;display:flex;align-items:center;gap:9px}
+.pkr .mu img{width:17px;height:17px;object-fit:contain;flex:none}
+.pkr .mu span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.pkr .mu i{font-style:normal;color:var(--faint);font-size:14px;margin:0 2px}
+.pkr .v{text-align:right;font:400 12.5px/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--muted)}
+.pkr .v.p{color:var(--text)}
+.pkr .w{text-align:right;font:400 12.5px/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--muted);position:relative;padding-bottom:7px}
+.pkr .w b{font-weight:400}
+.pkr .w.good b{color:var(--up)}
+/* the bar runs from 0.80 to 1.10 — the range every real builder lands in.
+   A bar from zero would put every row at the same place on the line. */
+.pkr .w::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;
+  background:rgba(242,242,242,.07)}
+.pkr .w i{position:absolute;bottom:0;height:2px;background:var(--muted);
+  left:0;width:var(--w,0%);z-index:1}
+.pkr .w.good i{background:var(--up)}
+.pkr .w .br{position:absolute;bottom:-2px;width:1px;height:6px;background:var(--rule-2);
+  left:66.6%}
+
+.pkbody{padding:4px 2px 22px}
+.pkbody .legs{margin:0;padding:0;list-style:none}
+.pkbody .legs li{display:grid;grid-template-columns:20px minmax(0,1fr) 56px 56px;gap:12px;
+  align-items:center;padding:11px 0;border-bottom:1px solid var(--rule);font-size:13.5px}
+.pkbody .legs li .i{font:700 10px/1 var(--mono);color:var(--faint)}
+.pkbody .legs li small{display:block;margin-top:4px;font:400 10px/1.4 var(--mono);color:var(--faint)}
+.pkbody .legs li b{text-align:right;font:400 12px/1 var(--mono);
+  font-variant-numeric:tabular-nums;color:var(--muted);font-weight:400}
+.pkbody .legs li b.b{color:var(--text)}
+.pkbody .sums{display:flex;gap:28px;flex-wrap:wrap;margin-top:20px}
+.pkbody .sums div .k{font:700 8.5px/1 var(--mono);letter-spacing:.17em;
+  text-transform:uppercase;color:var(--faint)}
+.pkbody .sums div .v{margin-top:9px;font:400 16px/1 var(--mono);font-variant-numeric:tabular-nums}
+.pkbody .sums div .v.g{color:var(--gold-hi)}
+.pkbody .acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.pkbody .alt{margin-top:18px;padding-top:16px;border-top:1px solid var(--rule)}
+.pkbody .alt .k{font:700 8.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;
+  color:var(--faint);margin-bottom:12px}
+
+@media (max-width:760px){
+  .pkh span:nth-child(4),.pkr .v.p{display:none}
+  .pkh,.pkr{grid-template-columns:46px minmax(0,1fr) 34px 56px 84px;gap:10px}
 }
 
 /* ================================ ALERTS ================================

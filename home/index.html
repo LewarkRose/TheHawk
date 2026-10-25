@@ -60,11 +60,15 @@
     <div class="grid w4 ways">
       <a href="../today/"><div class="i">01</div><h4>Today</h4>
         <p>What is running, what is at risk, and what is still to come.</p></a>
-      <a href="../scores/"><div class="i">02</div><h4>Builder</h4>
-        <p>Pick a fixture and build a slip. HAWK prices every leg and says where Bet365 is ahead.</p></a>
-      <a href="../vault/"><div class="i">03</div><h4>Vault</h4>
+      <a href="../picks/"><div class="i">02</div><h4>Picks</h4>
+        <p>HAWK's best builder for every fixture, and whether any of them beats the price.
+          Most days none of them does, and the page says so.</p></a>
+      <a href="../acca/"><div class="i">03</div><h4>Acca</h4>
+        <p>Several matches on one ticket, in kick-off order, with the chance falling away
+          down the page so you can see which leg is costing you.</p></a>
+      <a href="../vault/"><div class="i">04</div><h4>Vault</h4>
         <p>Every bet you have placed, what it returned, and the bankroll that follows from it.</p></a>
-      <a href="../board/"><div class="i">04</div><h4>Board</h4>
+      <a href="../board/"><div class="i">05</div><h4>Board</h4>
         <p>Where HAWK has been right and where it has been wrong, market by market.</p></a>
     </div>
   </div>
@@ -98,12 +102,37 @@
   const money = (n) => `${n < 0 ? "−" : ""}€${Math.abs(+n || 0).toFixed(2)}`;
   const band = (g) => (g.status === 3 ? "live" : g.status === 4 ? "done" : "next");
 
+  /* Eight cards for a day with eighty matches on it, so which eight is the
+     whole question. In play first, then about to start — and within that, the
+     big leagues ahead of the small ones, in the engine's own order, so the
+     Premier League never sits behind the Scottish Premiership.
+
+     It is a sort, not a filter. On a Tuesday with no Top 5 football the grid
+     still fills, rather than telling you nothing is on.
+
+     Ranked league by league, not group by group: inside the top five the
+     groups are all equal, and that left Genoa v Venezia leading a page with
+     Liverpool on it. The engine lists them Premier League, La Liga, Serie A,
+     Bundesliga, Ligue 1 — that order is the answer and it already exists. */
+  const GROUPS = (window.HAWK && window.HAWK.LEAGUE_GROUPS) || [];
+  const GROUP_RANK = (() => {
+    const m = {};
+    let i = 0;
+    GROUPS.forEach((gr) => (gr.leagues || []).forEach((l) => (m[l] = i++)));
+    return (league) => (league in m ? m[league] : i);
+  })();
+  const TOP5 = new Set(((GROUPS.find((g) => g.key === "top5") || {}).leagues) || []);
+
   /* the fixture that leads the page: whatever is most worth looking at now —
      something in play, else the next to kick off */
+  /* The fixture that leads the page. Among the matches in play it is the
+     biggest one, not the first one the feed happened to list — a 0–0 in the
+     Allsvenskan is not the match you opened HAWK to see. */
   function lead(games) {
-    const live = games.filter((g) => band(g) === "live");
-    const next = games.filter((g) => band(g) === "next")
-      .sort((a, b) => (Date.parse(a.kickoff || 0) || 0) - (Date.parse(b.kickoff || 0) || 0));
+    const byRank = (a, b) => GROUP_RANK(a.league) - GROUP_RANK(b.league)
+      || (Date.parse(a.kickoff || 0) || 0) - (Date.parse(b.kickoff || 0) || 0);
+    const live = games.filter((g) => band(g) === "live").sort(byRank);
+    const next = games.filter((g) => band(g) === "next").sort(byRank);
     return live[0] || next[0] || null;
   }
 
@@ -140,10 +169,13 @@
     const order = { live: 0, next: 1, done: 2 };
     const ko = (g) => Date.parse(g.kickoff || 0) || 0;
     const shown = games.slice()
-      .sort((a, b) => order[band(a)] - order[band(b)] || ko(a) - ko(b)).slice(0, 8);
+      .sort((a, b) => order[band(a)] - order[band(b)]
+                   || GROUP_RANK(a.league) - GROUP_RANK(b.league)
+                   || ko(a) - ko(b)).slice(0, 8);
 
-    $("#todayN").textContent = live ? `${live} in play · ${games.length} on the card`
-                                    : `${games.length} on the card`;
+    const big = games.filter((g) => TOP5.has(g.league)).length;
+    $("#todayN").textContent = `${live ? `${live} in play · ` : ""}${games.length} on the card`
+      + (big && games.length > shown.length ? ` · ${big} in the top five` : "");
 
     $("#today").innerHTML = shown.map((g) => {
       const b = band(g), [sh, sa] = g.score || [];

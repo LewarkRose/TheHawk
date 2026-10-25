@@ -3,9 +3,9 @@
    old builder ended up with three styling systems is that its furniture was
    pasted into each page and then edited in only some of them.
 
-   It lists what EXISTS in the new language and nothing else. Acca and Scan are
-   still only on the old site, so they are reached through the one "v1" link
-   rather than being listed as if they were here.
+   It lists what EXISTS in the new language and nothing else. The old site is
+   reached through the one "v1" link, which is now there for the scans and
+   tools that have not been rebuilt rather than for anything in this list.
    =========================================================================== */
 (() => {
   "use strict";
@@ -13,7 +13,9 @@
   // every page is one folder deep, so "../" reaches the site root
   const LINKS = [
     ["today", "../today/", "Today"],
+    ["picks", "../picks/", "Picks"],
     ["scores", "../scores/", "Scores"],
+    ["acca", "../acca/", "Acca"],
     ["board", "../board/", "Board"],
     ["vault", "../vault/", "Vault"],
   ];
@@ -28,8 +30,7 @@
       <div class="links">${LINKS.map(([k, href, label]) =>
         `<a href="${href}"${k === here ? ' aria-current="page"' : ""}>${label}</a>`).join("")}</div>
       <div class="right">
-        <a class="old" href="../builder/" title="Acca and Scan are still on the old site">v1 ·
-          acca, scan</a>
+        <a class="old" href="../builder/" title="The old builder, for what has not been rebuilt">v1</a>
         <a class="btn gold btn-sm" href="../scores/">Build a bet</a>
       </div>
     </div>`;

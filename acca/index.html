@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Acca · HAWK</title>
+<meta name="description" content="Several matches on one ticket, priced honestly.">
+<link rel="icon" href="../favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="../assets/hawk.css">
+</head>
+<body>
+
+<header class="hero">
+  <canvas aria-hidden="true"></canvas>
+  <div class="wrap">
+    <span class="tag" id="tag"><span class="dot off"></span>Nothing on it yet</span>
+    <h1 class="moment mid" id="moment">One ticket,<span class="q">many matches</span></h1>
+    <p class="said" id="said">Add a builder from any match, or from Picks, and it lands here.
+      Different matches are independent, so an acca's chance really is its parts multiplied —
+      which is exactly why it falls away so fast.</p>
+
+    <div class="actot" id="tot" hidden>
+      <div><div class="k">Lands</div><div class="v g" id="tP">—</div><div class="s" id="tPs"></div></div>
+      <div><div class="k">Fair odds</div><div class="v" id="tF">—</div><div class="s">HAWK's price</div></div>
+      <div><div class="k">Bet365</div><div class="v" id="tB">—</div><div class="s" id="tBs"></div></div>
+      <div><div class="k">Keeps per €1</div><div class="v" id="tK">—</div><div class="s">at that price</div></div>
+    </div>
+  </div>
+</header>
+
+<section class="calm" id="boardSec">
+  <div class="wrap">
+    <div class="lede"><h3>Your acca</h3><span class="n" id="boardN"></span>
+      <a href="../picks/">Find one →</a></div>
+    <div id="board"></div>
+    <p class="note" id="weak" hidden></p>
+  </div>
+</section>
+
+<section class="calm" id="checkSec" hidden>
+  <div class="wrap">
+    <div class="lede"><h3>Is it worth it</h3><span class="n" id="checkN"></span></div>
+    <div class="two">
+      <div>
+        <div class="set" style="max-width:560px">
+          <div><label for="price">Bet365's acca price</label>
+            <input id="price" inputmode="decimal" placeholder="e.g. 25.00">
+            <div class="hint" id="priceHint"></div></div>
+          <div><label for="boost">Acca boost (%)</label>
+            <input id="boost" type="number" min="0" max="200" step="1" placeholder="0">
+            <div class="hint">Bet365 boosts the winnings, not the stake.</div></div>
+          <div><label for="stake">Stake (€)</label>
+            <input id="stake" inputmode="decimal" value="5">
+            <div class="hint">What you would put on it.</div></div>
+        </div>
+        <div id="verdict" style="margin-top:26px"></div>
+      </div>
+      <div class="rail">
+        <div class="slip">
+          <div class="hd"><h4>Log it</h4><span class="n" id="logN"></span></div>
+          <p class="note" style="margin-top:14px">It goes into the Vault as one PENDING bet and
+            settles itself as the matches finish.</p>
+          <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn gold btn-sm" id="toVault" type="button">Send to the Vault</button>
+            <button class="btn ghost btn-sm" id="copy" type="button">Copy</button>
+            <button class="btn ghost btn-sm" id="clear" type="button">Clear</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<details class="calm fold" data-fold="monster">
+  <summary><div class="wrap"><div class="lede"><h3>Build me one</h3>
+    <span class="n" id="monN"></span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <p class="note" style="margin-top:0">HAWK checks every fixture in the window and takes the best
+      single leg from each match — legs Bet365 publishes a price for, picking the ones where it pays
+      closest to (or over) HAWK's fair odds. So the acca's Bet365 price is a real multiplication of
+      real prices, not an estimate.</p>
+
+    <div class="set" style="margin-top:26px">
+      <div><label for="mLegs">Legs</label>
+        <select id="mLegs"></select>
+        <div class="hint">How many matches to put on it.</div></div>
+      <div><label for="mHrs">Kick-off</label><select id="mHrs"></select>
+        <div class="hint">How far ahead to look.</div></div>
+      <div><label for="mStyle">Legs like</label><select id="mStyle"></select>
+        <div class="hint" id="mStyleHint"></div></div>
+    </div>
+
+    <details class="fold" data-fold="monLeagues" style="margin-top:26px">
+      <summary><div class="lede"><h3 style="font-size:17px">Competitions</h3>
+        <span class="n" id="mLgN"></span><span class="mk-t"></span></div></summary>
+      <div class="lgs" id="mLgs"></div>
+    </details>
+
+    <div class="pk-run">
+      <button class="btn gold" id="mGo" type="button">Build</button>
+      <div class="pk-bar" id="mBar" hidden><i style="width:0"></i></div>
+      <span class="pr" id="mPr"></span>
+    </div>
+
+    <div id="mRes" style="margin-top:26px"></div>
+  </div>
+</details>
+
+<footer class="foot">
+  <div class="wrap"><a href="../home/">home</a> · <a href="../picks/">picks</a> ·
+    <a href="../scores/">scores</a> · <a href="../vault/">vault</a> ·
+    one part per match, in kick-off order</div>
+</footer>
+
+<script src="../builder/engine.js"></script>
+<script src="../assets/hawk-bg.js"></script>
+<script src="../assets/hawk-acca.js"></script>
+<script src="../assets/hawk-fold.js"></script>
+<script src="../assets/hawk-alerts.js"></script>
+<script src="../assets/hawk-nav.js"></script>
+<style>
+.lgs{margin-top:4px}
+.lgs .gr{padding:14px 0;border-bottom:1px solid var(--rule)}
+.lgs .gr:last-child{border-bottom:0}
+.lgs .gr > .hd{display:flex;align-items:center;gap:10px;cursor:pointer}
+.lgs .gr > .hd b{font:700 9.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.lgs .gr > .hd i{font-style:normal;font:400 10px/1 var(--mono);color:var(--faint);margin-left:auto}
+.lgs .ls{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.lgs label{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;cursor:pointer;
+  font:400 11.5px/1 var(--sans);color:var(--faint);
+  box-shadow:inset 0 0 0 1px var(--rule);transition:color .3s var(--film),box-shadow .3s var(--film)}
+.lgs label:hover{color:var(--text)}
+.lgs label.on{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+.lgs input{position:absolute;opacity:0;pointer-events:none}
+</style>
+<script>
+/* ===========================================================================
+   ACCA — several matches on one ticket.
+
+   The page's whole argument is in the running column. Each part's own chance
+   is quiet; what is printed loud beside it is the chance of the WHOLE acca
+   once that match is on it. Add a fifth leg and watch 16% become 3.2%, and
+   the question "which leg is costing me" has answered itself before you have
+   done any arithmetic.
+
+   One part per match, because Bet365 prices a same-match builder as a unit
+   and there is no honest way to divide a builder's price back into legs.
+   That is also why the Bet365 column goes blank the moment one part is a
+   builder: HAWK knows its own fair price for it and does not know Bet365's.
+   =========================================================================== */
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const odds = (x) => (x > 0 && Number.isFinite(x) ? (+x).toFixed(2) : "—");
+  const pct = (p, dp = 0) => (Number.isFinite(p) ? `${(100 * p).toFixed(dp)}%` : "—");
+  const money = (n) => `€${(+n || 0).toFixed(2)}`;
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : /(ch|sh|s|x|z)$/.test(w) ? "es" : "s"}`;
+  const num = (s) => parseFloat(String(s == null ? "" : s).replace(",", "."));
+  const load = (k, f) => { try { const v = localStorage.getItem(k); return v === null ? f : JSON.parse(v); } catch { return f; } };
+  const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* full */ } };
+  const E = window.HAWK, A = window.HAWKAcca;
+
+  const hhmm = (iso) => { const t = Date.parse(iso); return Number.isFinite(t)
+    ? new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""; };
+  const dayName = (iso) => { const t = Date.parse(iso); if (!Number.isFinite(t)) return "";
+    const d = new Date(t);
+    return d.toDateString() === new Date().toDateString() ? ""
+      : d.toLocaleDateString(undefined, { weekday: "short" }); };
+  const started = (pt) => !!(pt.kickoff && Date.parse(pt.kickoff) < Date.now());
+
+  const C = { price: "", boost: "", stake: load("hawk.accaStake", "5") };
+
+  /* ======================================================= the departure board */
+  function paint() {
+    const parts = A.list(), t = A.totals(parts);
+    $("#boardN").textContent = parts.length
+      ? `${plural(parts.length, "match")} · ${plural(t.legs, "leg")}` : "";
+
+    if (!parts.length) {
+      $("#tag").innerHTML = `<span class="dot off"></span>Nothing on it yet`;
+      $("#moment").innerHTML = `One ticket,<span class="q">many matches</span>`;
+      $("#tot").hidden = true;
+      $("#checkSec").hidden = true;
+      $("#board").innerHTML = `<p class="note" style="margin:0">Empty. Add a builder from a match
+        page, or take one from <a href="../picks/" style="color:var(--gold-hi)">Picks</a>.
+        HAWK keeps one part per match and sorts them by kick-off.</p>`;
+      $("#weak").hidden = true;
+      return;
+    }
+
+    /* The running chance, compounded in kick-off order. The bar is against the
+       first match alone, so the first part is always full and every one after
+       it shows what it took off. */
+    let run = 1;
+    const runs = parts.map((pt) => (run *= pt.p || 0));
+    const first = runs[0] || 1;
+
+    // The part least likely to land: the one to drop if you want it to come in.
+    const weak = parts.length > 1
+      ? parts.reduce((w, pt) => (!w || (pt.p || 1) < (w.p || 1) ? pt : w), null) : null;
+
+    $("#tag").innerHTML = `<span class="dot q"></span>${plural(parts.length, "match")} on it`;
+    $("#moment").innerHTML = `${plural(t.legs, "leg")},<span class="q">${pct(t.p, t.p < 0.1 ? 2 : 1)}</span>`;
+    $("#said").innerHTML = `About 1 in ${Math.round(1 / t.p).toLocaleString()}. HAWK's fair price is
+      <b>${odds(t.fair)}</b>${t.known ? ` and the legs multiply to <b>${odds(t.known)}</b> at Bet365`
+        : ` — Bet365's price is its own to set, because ${
+          parts.filter((p) => p.legs.length > 1).length === 1 ? "one part is a same-match builder"
+            : `${parts.filter((p) => p.legs.length > 1).length} parts are same-match builders`}`}.`;
+
+    $("#tot").hidden = false;
+    $("#tP").textContent = pct(t.p, t.p < 0.1 ? 2 : 1);
+    $("#tPs").textContent = `1 in ${Math.round(1 / t.p).toLocaleString()}`;
+    $("#tF").textContent = odds(t.fair);
+    $("#tB").textContent = t.known ? odds(t.known) : "—";
+    $("#tBs").textContent = t.known ? `${plural(parts.length, "single")} multiplied` : "builders — type it below";
+    const keeps = t.known ? t.p * t.known : null;
+    $("#tK").textContent = keeps == null ? "—" : money(keeps);
+    $("#tK").className = `v${keeps == null ? "" : keeps >= 1 ? " up" : " dn"}`;
+
+    $("#board").innerHTML = `<div class="dbh"><span>Kick-off</span><span>Match</span>
+        <span>This one</span><span>Acca so far</span><span></span></div>`
+      + parts.map((pt, i) => partRow(pt, i, runs[i], first, pt === weak)).join("");
+
+    // What dropping the weakest buys back — only quotable as a price when
+    // every part is a single, for the same reason the column above goes blank.
+    if (weak && parts.length > 1) {
+      const without = weak.p > 0 ? t.p / weak.p : null;
+      const wPrice = t.known && A.partPrice(weak) ? t.known / A.partPrice(weak) : null;
+      $("#weak").innerHTML = `Drop <b>${esc(weak.home)} v ${esc(weak.away)}</b> and the acca goes back
+        to <b>${pct(without, without < 0.1 ? 2 : 1)}</b>${wPrice ? ` at about <b>${odds(wPrice)}</b>` : ""}.
+        Each bar is the acca's chance once that match is on it, against the first match alone.`;
+      $("#weak").hidden = false;
+    } else $("#weak").hidden = true;
+
+    $("#checkSec").hidden = false;
+    $("#checkN").textContent = plural(parts.length, "match");
+    $("#logN").textContent = plural(t.legs, "leg");
+    $("#price").placeholder = t.known ? odds(t.known) : "e.g. 25.00";
+    verdict();
+  }
+
+  function partRow(pt, i, runP, first, weak) {
+    const d = dayName(pt.kickoff);
+    const w = first > 0 ? Math.max(2, Math.min(100, 100 * (runP / first))) : 0;
+    return `<details class="ap ${weak ? "weak" : ""}" data-i="${i}">
+      <summary><div class="dbr">
+        <span class="t">${esc(d ? `${d} ${hhmm(pt.kickoff)}` : hhmm(pt.kickoff) || "TBC")}</span>
+        <span class="mu"><span class="nm">${pt.homeCrest
+            ? `<img src="${esc(pt.homeCrest)}" alt="" onerror="this.remove()">` : ""}
+          <span>${esc(pt.home)}</span><i>v</i><span>${esc(pt.away)}</span></span>
+          <small>${esc(pt.legs.map((l) => l.label).join(" & "))}${
+            started(pt) ? " · started" : ""}</small></span>
+        <span class="one">${pct(pt.p, pt.p < 0.1 ? 1 : 0)}</span>
+        <span class="run" style="--w:${w.toFixed(1)}%">${pct(runP, runP < 0.1 ? 2 : 1)}<i></i></span>
+        <button class="rm" data-rm="${esc(pt.id)}" type="button" title="Take this match off">×</button>
+      </div></summary>
+      <div class="apbody">
+        <ul class="legs">${pt.legs.map((l, j) => `<li>
+          <span class="i">${j + 1}</span>
+          <span>${esc(l.label)}<small>${esc(l.market || "")}${l.player ? ` · ${esc(l.player)}` : ""}</small></span>
+          <b>${pct(l.p)}</b>
+          <b class="${l.bookPrice > 1 ? "b" : ""}">${l.bookPrice > 1 ? odds(l.bookPrice) : "—"}</b></li>`).join("")}</ul>
+        <p class="note">${pt.legs.length > 1
+          ? `A same-match builder: HAWK prices these ${pt.legs.length} legs together, so the
+             correlation between them is already in the ${pct(pt.p, pt.p < 0.1 ? 1 : 0)}.
+             Bet365 prices it as a unit too, which is why this part has no price of its own here.`
+          : `One leg at Bet365's own price — nothing to estimate.`}</p>
+        <div class="acts" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
+          <a class="btn ghost btn-sm" href="../match/?league=${encodeURIComponent(pt.league || "")}&id=${encodeURIComponent(pt.id)}">Open the match</a>
+        </div>
+      </div></details>`;
+  }
+
+  /* ================================================================= worth it */
+  function inputs() {
+    const t = A.totals();
+    const typed = num(C.price), price = typed > 1 ? typed : t.known || NaN;
+    const boost = Math.max(0, num(C.boost) || 0), stake = num(C.stake) || 0;
+    return { ...t, price, typed: typed > 1, boost, stake, eff: A.effective(price, boost) };
+  }
+  function verdict() {
+    const out = $("#verdict"), a = inputs();
+    $("#priceHint").textContent = a.known
+      ? `The singles multiply to ${odds(a.known)}. Type Bet365's own number if it differs.`
+      : "A builder's price is in no feed, so this one has to be typed.";
+    if (!(a.price > 1) || !a.p) {
+      out.innerHTML = `<div class="say"><b>Type the price</b>Break-even on HAWK's read is
+        <b style="display:inline;color:var(--text)">${odds(a.fair)}</b>. Anything under that and the
+        acca loses money over time however often it happens to come in.</div>`;
+      return;
+    }
+    const ev = a.p * a.eff - 1, good = ev > 0;
+    // The boost that would make this price fair — Bet365 runs acca boosts on 3+ legs.
+    const need = a.fair > a.price ? 100 * ((a.fair - 1) / (a.price - 1) - 1) : 0;
+    out.innerHTML = `<div class="say ${good ? "good" : "bad"}">
+      <b>${good ? "Worth backing" : "Don't back it"}</b>
+      It lands ${pct(a.p, a.p < 0.1 ? 1 : 0)} where ${odds(a.eff)} needs
+      ${pct(1 / a.eff, a.p < 0.1 ? 1 : 0)} — ${ev >= 0 ? "+" : ""}${(100 * ev).toFixed(1)}%.
+      ${!a.typed ? `<br>Using the singles multiplied: ${odds(a.price)}.` : ""}
+      ${a.boost ? `<br>With your ${a.boost}% boost, ${odds(a.price)} pays like <b style="display:inline;color:var(--text)">${odds(a.eff)}</b>.` : ""}
+      <br>About 1 in ${Math.round(1 / a.p).toLocaleString()}. Pays ${money(a.eff * a.stake)} on ${money(a.stake)}.
+      <br>${good
+        ? `Expected profit ≈ ${money(ev * a.stake)} per ${money(a.stake)} over many accas like this one.
+           Most of them will still lose — that is what a 1-in-${Math.round(1 / a.p)} shot is.`
+        : `Bet365's margin compounds over ${plural(a.parts, "selection")} — a same-match builder is
+           one selection with one margin, not several: you would lose ≈
+           ${money(-ev * a.stake)} per ${money(a.stake)} on average.${
+             need && !a.boost ? ` An acca boost of ${Math.ceil(need)}%+ would make it fair.` : ""}`}
+      </div>`;
+  }
+
+  /* ============================================================== the Vault */
+  function toVault() {
+    const parts = A.list(), a = inputs();
+    if (!parts.length) return;
+    if (!(a.price > 1)) return note("Type the acca's price first.");
+    if (!(a.stake > 0)) return note("Enter a stake.");
+    let bank, bets;
+    try {
+      bank = parseFloat(localStorage.getItem("hawk_bankroll"));
+      if (!Number.isFinite(bank)) bank = 1000;
+      bets = JSON.parse(localStorage.getItem("hawk_bets") || "[]");
+      if (!Array.isArray(bets)) bets = [];
+    } catch { return note("Couldn't open the Vault's storage in this browser."); }
+    if (bank < a.stake) return note(`Not enough in your Vault bankroll (${money(bank)}).`);
+    if (a.stake / bank >= 0.1 && !confirm(
+      `${money(a.stake)} is ${Math.round(100 * a.stake / bank)}% of your ${money(bank)} bankroll.\n\n`
+      + `This acca lands about 1 in ${Math.round(1 / a.p)}. Log it anyway?`)) return;
+
+    const price = Math.round(a.eff * 100) / 100;
+    bets.unshift({
+      id: "bet_" + Date.now(),
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+      legs: parts.map((pt) => ({
+        fixture: `${pt.home} vs ${pt.away}`,
+        selection: pt.legs.map((l) => l.label).join(" & "),
+        angle: `HAWK: ${pct(pt.p, 1)} · fair ${odds(pt.fair)}`,
+        odds: +((A.partPrice(pt) || pt.fair) || 1).toFixed(2),
+        type: "acca", league: pt.league || "",
+        subSelections: pt.legs.map((l) => ({ label: l.label, odds: +((l.bookPrice || l.fair) || 1).toFixed(2) })),
+        hawk: A.hawkPart(pt),
+      })),
+      stake: a.stake, odds: price, potentialReturn: a.stake * price, status: "PENDING",
+      source: "hawk", hawkP: a.p,
+    });
+    try {
+      localStorage.setItem("hawk_bankroll", (bank - a.stake).toFixed(2));
+      localStorage.setItem("hawk_bets", JSON.stringify(bets));
+    } catch { return note("Couldn't save to the Vault's storage."); }
+
+    note(`Logged: ${money(a.stake)} @ ${odds(price)} across ${plural(parts.length, "match")}`
+       + `${a.boost ? ` (boosted from ${odds(a.price)})` : ""}. It settles itself as they finish.`, "good");
+  }
+  const note = (text, tone = "info") => {
+    if (window.HAWKAlerts) window.HAWKAlerts.notice({ icon: "🦅", word: "Vault", text, tone, href: "../vault/" });
+    else alert(text);
+  };
+
+  function copy() {
+    const parts = A.list(), t = A.totals(parts);
+    const text = [`ACCA — ${plural(t.legs, "leg")}, ${plural(parts.length, "match")}`,
+      ...parts.map((pt) => `${pt.home} v ${pt.away}: ${pt.legs.map((l) => l.label).join(" & ")}`),
+      `Chance ${pct(t.p, 2)} · fair ${odds(t.fair)}${t.known ? ` · Bet365 ${odds(t.known)}` : ""}`].join("\n");
+    navigator.clipboard.writeText(text).then(() => note("Acca copied."), () => note("Couldn't copy."));
+  }
+
+  /* ========================================================= build me one
+     The Monster: one Bet365-priced leg per match across the window, so the
+     acca's price is real prices multiplied rather than anything estimated. */
+  const WINDOWS = [["today", "Today"], [24, "Within 24 hours"], [48, "Within 48 hours"],
+                   [72, "Within 3 days"], [168, "Within 7 days"]];
+  const STYLES = [["Banker", "Safe legs", "Each leg 72–95%. It takes more of them to reach a price."],
+                  ["Balanced", "Mixed", "Each leg 55–90%."],
+                  ["Punchy", "Bold legs", "Each leg 35–78%. Fewer legs, bigger price, lands far less."]];
+  const GROUPS = (E && E.LEAGUE_GROUPS) || [];
+  const ALL = (E && E.LEAGUES) || [];
+  const DEFAULT_LEAGUES = [
+    ...((GROUPS.find((g) => g.key === "top5") || {}).leagues || []),
+    ...((GROUPS.find((g) => g.key === "europe") || {}).leagues || []),
+  ];
+  const M = {
+    leagues: new Set((load("hawk.monsterLeagues", DEFAULT_LEAGUES) || []).filter((l) => ALL.includes(l))),
+    hours: load("hawk.monsterHours", 48),
+    legs: load("hawk.monsterLegs", 10),
+    style: load("hawk.monsterStyle", "Banker"),
+    data: null, timer: 0,
+  };
+  const hoursFor = (w) => {
+    if (w !== "today") return +w;
+    const mid = new Date(); mid.setHours(24, 0, 0, 0);
+    return (mid.getTime() - Date.now()) / 3600e3;
+  };
+
+  function monSetup() {
+    $("#mLegs").innerHTML = [4, 6, 8, 10, 12, 15, 20].map((n) =>
+      `<option value="${n}" ${n === M.legs ? "selected" : ""}>${n}</option>`).join("");
+    $("#mHrs").innerHTML = WINDOWS.map(([v, t]) =>
+      `<option value="${v}" ${String(v) === String(M.hours) ? "selected" : ""}>${t}</option>`).join("");
+    $("#mStyle").innerHTML = STYLES.map(([v, t]) =>
+      `<option value="${v}" ${v === M.style ? "selected" : ""}>${t}</option>`).join("");
+    monHints();
+    monLeagues();
+  }
+  function monHints() {
+    $("#mStyleHint").textContent = (STYLES.find(([v]) => v === M.style) || [, , ""])[2];
+    const when = (WINDOWS.find(([v]) => String(v) === String(M.hours)) || [, "48 hours"])[1];
+    $("#monN").textContent = `${M.legs} legs · ${String(when).toLowerCase()} · ${plural(M.leagues.size, "competition")}`;
+    $("#mLgN").textContent = M.leagues.size ? plural(M.leagues.size, "competition") : "none picked";
+  }
+  function monLeagues() {
+    $("#mLgs").innerHTML = GROUPS.map((gr) => {
+      const ls = (gr.leagues || []).filter((l) => ALL.includes(l));
+      if (!ls.length) return "";
+      const on = ls.filter((l) => M.leagues.has(l)).length;
+      return `<div class="gr"><div class="hd" data-grp="${esc(gr.key)}">
+        <b>${esc(gr.icon)} ${esc(gr.name)}</b><i>${on} of ${ls.length} · ${on === ls.length ? "none" : "all"}</i></div>
+        <div class="ls">${ls.map((l) => `<label class="${M.leagues.has(l) ? "on" : ""}">
+          <input type="checkbox" value="${esc(l)}" ${M.leagues.has(l) ? "checked" : ""}>${esc(l)}</label>`).join("")}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function monToggle() {
+    if (!E || !E.startMonster) return;
+    if (M.data && M.data.running) { try { M.data = E.stopMonster(); } catch { /* stopping */ } monPaint(); return; }
+    if (!M.leagues.size) { $("#mPr").textContent = "Pick at least one competition."; return; }
+    try {
+      M.data = E.startMonster({ leagues: [...M.leagues], hours: hoursFor(M.hours),
+                                perMatch: 1, style: M.style, focus: "Mix", extras: false });
+    } catch (err) { $("#mPr").textContent = (err && err.message) || "It wouldn't start."; return; }
+    monPaint(); monPoll();
+  }
+  function monPoll() {
+    clearTimeout(M.timer);
+    M.timer = setTimeout(() => {
+      try { M.data = E.monsterStatus(); } catch { return; }
+      monPaint();
+      if (M.data && M.data.running) monPoll();
+    }, 700);
+  }
+
+  /* The best M.legs of whatever it found. A Monster result carries the
+     engine's own `ratio` — Bet365's price times the chance, with the chance
+     capped just above what Bet365's own price implies. The cap is the point:
+     ranked on HAWK's raw chance, the legs that always win are the ones HAWK
+     disagrees with the bookmakers about most (cards, mostly), which are
+     exactly the ones HAWK is least sure of. Ranking on `ratio` is the engine's
+     answer to that and this page does not get to invent a second one.
+
+     Note the field is `bookPrice`, not `b365` as a Picks result uses — a
+     Monster leg is a single, so it carries the book's price directly. */
+  const monPicked = () => {
+    const rs = ((M.data && M.data.results) || [])
+      .filter((r) => r && r.legs && r.legs.length && r.bookPrice > 1);
+    return rs.slice()
+      .sort((a, b) => (b.ratio || 0) - (a.ratio || 0))
+      .slice(0, M.legs)
+      .sort((a, b) => String(a.kickoff || "").localeCompare(String(b.kickoff || "")));
+  };
+
+  function monPaint() {
+    const running = !!(M.data && M.data.running);
+    const done = (M.data && M.data.done) || 0, total = (M.data && M.data.total) || 0;
+    $("#mGo").textContent = running ? "Stop" : (M.data ? "Build again" : "Build");
+    $("#mBar").hidden = !running && !total;
+    if (total) $("#mBar").firstElementChild.style.width = `${(100 * done / total).toFixed(1)}%`;
+    $("#mPr").textContent = running ? `${done} of ${total} matches` : total ? `${plural(total, "match")} checked` : "";
+
+    const picked = monPicked();
+    if (!picked.length) {
+      $("#mRes").innerHTML = running ? `<p class="note" style="margin:0">Looking…</p>`
+        : total ? `<p class="note" style="margin:0">Nothing in range. The style decides how likely each
+            leg has to be — "Bold legs" finds more of them than "Safe legs" does.</p>` : "";
+      return;
+    }
+    const p = picked.reduce((s, r) => s * r.p, 1);
+    const price = picked.reduce((s, r) => s * (r.bookPrice || 1), 1);
+    const keeps = price * p;
+    $("#mRes").innerHTML = `
+      <div class="actot" style="margin-top:0">
+        <div><div class="k">Lands</div><div class="v g">${pct(p, p < 0.01 ? 3 : 2)}</div>
+          <div class="s">1 in ${Math.round(1 / p).toLocaleString()}</div></div>
+        <div><div class="k">Bet365</div><div class="v">${odds(price)}</div>
+          <div class="s">${plural(picked.length, "single")} multiplied</div></div>
+        <div><div class="k">Keeps per €1</div><div class="v ${keeps >= 1 ? "up" : "dn"}">${money(keeps)}</div>
+          <div class="s">at that price</div></div>
+      </div>
+      <ul class="legs" style="margin:26px 0 0;padding:0;list-style:none">${picked.map((r, i) => `<li
+        style="display:grid;grid-template-columns:20px minmax(0,1fr) 56px 56px;gap:12px;align-items:center;
+               padding:12px 0;border-bottom:1px solid var(--rule);font-size:13.5px">
+        <span style="font:700 10px/1 var(--mono);color:var(--faint)">${i + 1}</span>
+        <span>${esc(r.legs[0].label)}<small style="display:block;margin-top:4px;font:400 10px/1.4 var(--mono);color:var(--faint)">${
+          esc(r.home)} v ${esc(r.away)} · ${esc(r.league || "")}</small></span>
+        <b style="text-align:right;font:400 12px/1 var(--mono);color:var(--muted)">${pct(r.p)}</b>
+        <b style="text-align:right;font:400 12px/1 var(--mono)">${odds(r.bookPrice)}</b></li>`).join("")}</ul>
+      <p class="note">Every leg here has a Bet365 price of its own, so ${odds(price)} is those prices
+        multiplied — not an estimate. ${keeps >= 1
+          ? `At ${money(keeps)} back per euro it is on the right side of fair, which is rare over
+             ${picked.length} legs.`
+          : `At ${money(keeps)} back per euro the margin has compounded ${picked.length} times.
+             That is what an acca this long costs, and no selection fixes it.`}</p>
+      <div style="margin-top:22px"><button class="btn gold btn-sm" id="mUse" type="button">Use as my acca</button></div>`;
+  }
+
+  function monUse() {
+    const picked = monPicked();
+    if (!picked.length) return;
+    if (A.list().length && !confirm(`Replace your acca with these ${picked.length} legs?`)) return;
+    A.clear();
+    for (const r of picked) A.add(r, r.legs.slice(0, 1), r.p);
+    C.price = "";
+    paint();
+    $("#boardSec").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* ================================================================ events */
+  $("#board").addEventListener("click", (e) => {
+    const rm = e.target.closest("[data-rm]");
+    if (!rm) return;
+    e.preventDefault(); e.stopPropagation();
+    A.remove(rm.dataset.rm);
+    C.price = "";
+    $("#price").value = "";
+    paint();
+  });
+
+  for (const [id, key, pref] of [["price", "price", null], ["boost", "boost", null],
+                                 ["stake", "stake", "hawk.accaStake"]])
+    $("#" + id).addEventListener("input", (e) => {
+      C[key] = e.target.value;
+      if (pref) save(pref, C[key]);
+      verdict();
+    });
+  $("#stake").value = C.stake;
+
+  $("#toVault").onclick = toVault;
+  $("#copy").onclick = copy;
+  $("#clear").onclick = () => {
+    if (!A.list().length) return;
+    if (!confirm("Clear your acca?")) return;
+    A.clear(); C.price = ""; $("#price").value = ""; paint();
+  };
+
+  $("#mGo").onclick = monToggle;
+  $("#mLegs").onchange = (e) => { M.legs = +e.target.value; save("hawk.monsterLegs", M.legs); monHints(); monPaint(); };
+  $("#mHrs").onchange = (e) => { M.hours = e.target.value === "today" ? "today" : +e.target.value;
+    save("hawk.monsterHours", M.hours); monHints(); };
+  $("#mStyle").onchange = (e) => { M.style = e.target.value; save("hawk.monsterStyle", M.style); monHints(); };
+  $("#mLgs").addEventListener("click", (e) => {
+    const hd = e.target.closest("[data-grp]");
+    if (!hd) return;
+    const gr = GROUPS.find((g) => g.key === hd.dataset.grp);
+    const ls = ((gr && gr.leagues) || []).filter((l) => ALL.includes(l));
+    const all = ls.every((l) => M.leagues.has(l));
+    for (const l of ls) all ? M.leagues.delete(l) : M.leagues.add(l);
+    save("hawk.monsterLeagues", [...M.leagues]);
+    monLeagues(); monHints();
+  });
+  $("#mLgs").addEventListener("change", (e) => {
+    const box = e.target.closest("input[type=checkbox]");
+    if (!box) return;
+    box.checked ? M.leagues.add(box.value) : M.leagues.delete(box.value);
+    box.closest("label").classList.toggle("on", box.checked);
+    save("hawk.monsterLeagues", [...M.leagues]);
+    monHints();
+  });
+  $("#mRes").addEventListener("click", (e) => { if (e.target.closest("#mUse")) monUse(); });
+
+  // the acca changed in another tab (or on the match page in this one)
+  document.addEventListener("hawk:acca", paint);
+  addEventListener("storage", (e) => { if (e.key === A.KEY) paint(); });
+
+  /* ================================================================== boot */
+  paint();
+  if (E && E.startMonster) monSetup();
+  else $("#monN").textContent = "the model didn't load";
+})();
+</script>
+</body>
+</html>

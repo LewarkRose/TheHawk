@@ -171,6 +171,7 @@
 <script src="../builder/engine.js"></script>
 <script src="../assets/hawk-bg.js"></script>
 <script src="../assets/hawk-lineups.js"></script>
+<script src="../assets/hawk-acca.js"></script>
 <script src="../assets/hawk-fold.js"></script>
 <script src="../assets/hawk-alerts.js"></script>
 <script src="../assets/hawk-nav.js"></script>
@@ -371,7 +372,38 @@
       <div class="ask"><label for="ask">${esc(S.book)}'s price for this slip</label>
         <input id="ask" inputmode="decimal" placeholder="e.g. 4.80" value="${esc(S.ask)}"></div>
       ${say}${note}
-      <div style="margin-top:20px"><button class="btn ghost sm" id="clear">Clear the slip</button></div>`);
+      <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn gold btn-sm" id="toAcca">${
+          window.HAWKAcca && window.HAWKAcca.has(S.id) ? "Replace on your acca" : "Add to acca"}</button>
+        <button class="btn ghost btn-sm" id="clear">Clear the slip</button></div>`);
+  }
+
+  /* This slip onto the acca. One part per match, so adding this match again
+     replaces it — and the acca is v1's own, so a ticket started in the old
+     builder is finished here and the other way round. */
+  function toAcca() {
+    const m = S.m, A = window.HAWKAcca;
+    if (!A || !m) return;
+    const tell = (text) => {
+      if (window.HAWKAlerts) window.HAWKAlerts.notice({ icon: "🧩", word: "Not yet", text, tone: "warn" });
+    };
+    if (!S.slip.length) return tell("Pick some selections first.");
+    const byId = new Map((m.legs || []).map((l) => [l.id, l]));
+    const legs = S.slip.map((id) => byId.get(id)).filter(Boolean);
+    let out = null;
+    try { out = window.HAWK.evaluate({ id: String(S.id), legs: S.slip }); } catch { /* reported below */ }
+    // A slip that cannot land — two results on the same match, say — prices at
+    // zero. It used to be refused silently, which reads as a broken button.
+    if (!out || !(out.p > 0)) return tell(
+      `These ${plural(S.slip.length, "leg")} can't all land, so there is nothing to put on an acca. `
+      + `HAWK simulates them together, which is how it knows.`);
+    const { replaced, totals } = A.add({ ...m, id: S.id, league: S.league || m.league }, legs, out.p);
+    slip();
+    if (window.HAWKAlerts) window.HAWKAlerts.notice({
+      icon: "🧩", word: replaced ? "Acca updated" : "Added to your acca", tone: "good", href: "../acca/",
+      text: `${m.home} v ${m.away} · ${plural(totals.parts, "match")}, ${plural(totals.legs, "leg")}, `
+          + `fair ${odds(totals.fair)}.`,
+    });
   }
 
   /* ------------------------------------------------------------- loading */
@@ -727,6 +759,8 @@
 
     if (e.target.closest("#abGo")) { abBuild(false); return; }
     if (e.target.closest("#abAgain")) { abBuild(true); return; }
+
+    if (e.target.closest("#toAcca")) { toAcca(); return; }
 
     if (e.target.closest("#clear")) {
       S.slip = [];

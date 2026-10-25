@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Picks · HAWK</title>
+<meta name="description" content="HAWK's best builder for every fixture, and whether any of them beats the price.">
+<link rel="icon" href="../favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="../assets/hawk.css">
+<style>
+/* page-local: the league picker is the only control big enough to need its own
+   shape, and it is a list of checkboxes, not a grid of buttons */
+.lgs{margin-top:4px}
+.lgs .gr{padding:14px 0;border-bottom:1px solid var(--rule)}
+.lgs .gr:last-child{border-bottom:0}
+.lgs .gr > .hd{display:flex;align-items:center;gap:10px;cursor:pointer}
+.lgs .gr > .hd b{font:700 9.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted)}
+.lgs .gr > .hd i{font-style:normal;font:400 10px/1 var(--mono);color:var(--faint);margin-left:auto}
+.lgs .ls{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.lgs label{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;cursor:pointer;
+  font:400 11.5px/1 var(--sans);color:var(--faint);
+  box-shadow:inset 0 0 0 1px var(--rule);transition:color .3s var(--film),box-shadow .3s var(--film)}
+.lgs label:hover{color:var(--text)}
+.lgs label.on{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+.lgs input{position:absolute;opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <canvas aria-hidden="true"></canvas>
+  <div class="wrap">
+    <span class="tag" id="tag"><span class="dot off"></span>Nothing scanned yet</span>
+    <h1 class="moment mid" id="moment">Where the price<span class="q">is wrong</span></h1>
+    <p class="said" id="said">HAWK builds its best ticket for every fixture in the window and
+      compares it with what Bet365 would pay. Most days nothing beats the price — and the
+      page will say so.</p>
+
+    <div class="read" id="read" hidden>
+      <div class="pkh" style="border-bottom:0;padding-bottom:0"></div>
+    </div>
+
+    <div class="pk-run">
+      <button class="btn gold" id="go" type="button">Scan</button>
+      <div class="pk-bar" id="bar" hidden><i style="width:0"></i></div>
+      <span class="pr" id="pr"></span>
+    </div>
+  </div>
+</header>
+
+<details class="calm fold" data-fold="pkSet">
+  <summary><div class="wrap"><div class="lede"><h3>What to scan</h3>
+    <span class="n" id="setN"></span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div class="set">
+      <div><label for="hrs">Kick-off</label>
+        <select id="hrs"></select>
+        <div class="hint">How far ahead to look.</div></div>
+      <div><label for="focus">Made of</label>
+        <select id="focus">
+          <option value="Mix">Mix</option>
+          <option value="Match">Match stats only</option>
+          <option value="Stats">No result leg</option>
+          <option value="Players">Player props</option>
+        </select>
+        <div class="hint" id="focusHint"></div></div>
+      <div><label for="style">Legs like</label>
+        <select id="style"></select>
+        <div class="hint" id="styleHint"></div></div>
+      <div><label for="legs">Legs</label>
+        <select id="legs">
+          <option value="0">However many it takes</option>
+          <option value="2">Exactly 2</option>
+          <option value="3">Exactly 3</option>
+          <option value="4">Exactly 4</option>
+          <option value="5">Exactly 5</option>
+          <option value="6">Exactly 6</option>
+        </select>
+        <div class="hint">Ask for a number and HAWK stacks until it has that many.</div></div>
+      <div><label for="minOdds">Pays at least</label>
+        <input id="minOdds" type="number" min="0" max="20" step="0.5" placeholder="any">
+        <div class="hint">Leave empty and HAWK builds whatever lands most often.</div></div>
+      <div><label for="opts">Options per match</label>
+        <select id="opts">
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+        </select>
+        <div class="hint">Keeps the runners-up, so there is something to choose between.</div></div>
+      <div><label for="sort">Sort by</label>
+        <select id="sort">
+          <option value="worth">What it pays back</option>
+          <option value="lands">Most likely to land</option>
+          <option value="legs">Fewest legs</option>
+          <option value="kickoff">Kick-off</option>
+        </select>
+        <div class="hint">The ledger's order.</div></div>
+      <label class="chk" for="priced"><input type="checkbox" id="priced">
+        <span>Bet365-priced legs only</span></label>
+      <label class="chk" for="worthOnly"><input type="checkbox" id="worthOnly">
+        <span>Only ones worth backing</span></label>
+      <label class="chk" for="singles"><input type="checkbox" id="singles">
+        <span>Show the single legs too</span></label>
+    </div>
+
+    <p class="note" id="pricedNote"></p>
+
+    <details class="fold" data-fold="pkLeagues" style="margin-top:26px">
+      <summary><div class="lede"><h3 style="font-size:17px">Competitions</h3>
+        <span class="n" id="lgN"></span><span class="mk-t"></span></div></summary>
+      <div class="lgs" id="lgs"></div>
+    </details>
+  </div>
+</details>
+
+<section class="calm">
+  <div class="wrap">
+    <div class="lede"><h3>Every match</h3><span class="n" id="resN"></span>
+      <a href="../acca/">Your acca →</a></div>
+    <div id="res"><p class="note" style="margin:0">Press Scan.</p></div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap"><a href="../home/">home</a> · <a href="../scores/">scores</a> ·
+    <a href="../acca/">acca</a> · <a href="../vault/">vault</a> ·
+    a scan simulates each match fewer times than opening it does</div>
+</footer>
+
+<script src="../builder/engine.js"></script>
+<script src="../assets/hawk-bg.js"></script>
+<script src="../assets/hawk-acca.js"></script>
+<script src="../assets/hawk-fold.js"></script>
+<script src="../assets/hawk-alerts.js"></script>
+<script src="../assets/hawk-nav.js"></script>
+<script>
+/* ===========================================================================
+   PICKS — HAWK's best builder for every fixture in a window.
+
+   The moment this page opens with is deliberately an answer, not a promise.
+   On most days nothing HAWK builds beats what Bet365 would pay for it, and
+   a page that only ever shows you winners is lying by arrangement. So the
+   headline is whatever the scan actually found: a builder paying over the
+   odds when there is one, and "nothing beats the price today" when there
+   isn't — which, on this app's own record, is most of the time.
+
+   `worth` is the whole ledger: what a euro on that builder comes back as,
+   on average, at the price HAWK expects Bet365 to show. 1.00 is break-even.
+   Everything else on the row is there to explain that number.
+   =========================================================================== */
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const odds = (x) => (x > 0 && Number.isFinite(x) ? (+x).toFixed(2) : "—");
+  const pct = (p, dp = 0) => (Number.isFinite(p) ? `${(100 * p).toFixed(dp)}%` : "—");
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : /(ch|sh|s|x|z)$/.test(w) ? "es" : "s"}`;
+  const load = (k, f) => { try { const v = localStorage.getItem(k); return v === null ? f : JSON.parse(v); } catch { return f; } };
+  const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* full */ } };
+  const E = window.HAWK;
+
+  const hhmm = (iso) => { const t = Date.parse(iso); return Number.isFinite(t)
+    ? new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""; };
+  const dayName = (iso) => { const t = Date.parse(iso); if (!Number.isFinite(t)) return "";
+    const d = new Date(t), now = new Date();
+    const same = d.toDateString() === now.toDateString();
+    return same ? "" : d.toLocaleDateString(undefined, { weekday: "short" }); };
+
+  const WINDOWS = [["today", "Today"], [24, "Within 24 hours"], [48, "Within 48 hours"],
+                   [72, "Within 3 days"], [168, "Within 7 days"]];
+  const STYLES = [["Banker", "Safe legs", "Lots of very likely legs (72–95% each) — it takes more of them to reach a price."],
+                  ["Balanced", "Mixed", "Legs between 55% and 90%. A bit of both."],
+                  ["Punchy", "Bold legs", "Fewer, bolder legs (35–78%). Fewer legs usually means a smaller margin."]];
+  const FOCUS_HINT = {
+    Mix: "Player legs stay in.",
+    Match: "Goals, corners, cards and shots on target only — no player legs.",
+    Stats: "No result leg at all.",
+    Players: "Player props only.",
+  };
+  // "today" means until midnight, your time — not a fixed 24 hours
+  const hoursFor = (w) => {
+    if (w !== "today") return +w;
+    const mid = new Date(); mid.setHours(24, 0, 0, 0);
+    return (mid.getTime() - Date.now()) / 3600e3;
+  };
+
+  const GROUPS = (E && E.LEAGUE_GROUPS) || [];
+  const ALL = (E && E.LEAGUES) || [];
+
+  /* Settings. The league list shares v1's key and v1's shape, so a scan set up
+     in the old builder arrives here already configured, and the other way
+     round. The defaults are v1's too: the top five plus the European cups. */
+  const DEFAULT_LEAGUES = [
+    ...((GROUPS.find((g) => g.key === "top5") || {}).leagues || []),
+    ...((GROUPS.find((g) => g.key === "europe") || {}).leagues || []),
+  ];
+  const S = {
+    leagues: new Set((load("hawk.scanLeagues", DEFAULT_LEAGUES) || []).filter((l) => ALL.includes(l))),
+    hours: load("hawk.scanHours", 24),
+    focus: load("hawk.scanFocus", "Mix"),
+    style: load("hawk.scanStyle", "Balanced"),
+    exactLegs: load("hawk.scanExactLegs", 0),
+    minOdds: load("hawk.scanMinOdds", 0),
+    options: load("hawk.scanOptions", 2),
+    sort: load("hawk.scanSort", "worth"),
+    priced: load("hawk.scanPriced", true),
+    onlyWorth: load("hawk.onlyWorth", false),
+    singles: load("hawk.showSingles", false),
+    data: null, timer: 0, open: new Set(),
+  };
+
+  /* ====================================================== the settings panel */
+  function fillSelects() {
+    $("#hrs").innerHTML = WINDOWS.map(([v, t]) =>
+      `<option value="${v}" ${String(v) === String(S.hours) ? "selected" : ""}>${t}</option>`).join("");
+    $("#style").innerHTML = STYLES.map(([v, t]) =>
+      `<option value="${v}" ${v === S.style ? "selected" : ""}>${t}</option>`).join("");
+    $("#focus").value = S.focus;
+    $("#legs").value = String(S.exactLegs);
+    $("#opts").value = String(S.options);
+    $("#sort").value = S.sort;
+    $("#minOdds").value = S.minOdds > 1 ? S.minOdds : "";
+    $("#priced").checked = S.priced;
+    $("#worthOnly").checked = S.onlyWorth;
+    $("#singles").checked = S.singles;
+    hints();
+  }
+  function hints() {
+    $("#focusHint").textContent = FOCUS_HINT[S.focus] || "";
+    $("#styleHint").textContent = (STYLES.find(([v]) => v === S.style) || [, , ""])[2];
+    // Measured blind on twelve builders: a Bet365-priced build comes in at
+    // 0.924 of fair, one containing a player prop at 0.741. The prop costs
+    // about a fifth of the ticket, every time.
+    $("#pricedNote").innerHTML = S.priced
+      ? `Only legs Bet365 publishes a price for: result, double chance, goals, cards, corners,
+         shots on target. Measured blind over twelve builders, these come in at <b>0.924</b> of fair
+         — a build containing a player prop comes in at <b>0.741</b>.`
+      : `Player props are in. HAWK has no Bet365 price for them, so their price is an estimate and
+         the ticket's "pays back" is an estimate with it. Measured blind, a build containing one
+         comes in at <b>0.741</b> of fair against <b>0.924</b> without.`;
+    $("#setN").textContent = summary();
+    $("#lgN").textContent = S.leagues.size ? plural(S.leagues.size, "competition") : "none picked";
+  }
+  const summary = () => {
+    const when = (WINDOWS.find(([v]) => String(v) === String(S.hours)) || [, "24 hours"])[1];
+    return [String(when).toLowerCase(),
+            S.exactLegs ? `${S.exactLegs} legs` : S.minOdds > 1 ? `${(+S.minOdds).toFixed(2)}+` : "any price",
+            plural(S.leagues.size, "competition"),
+            S.priced ? "no player props" : "props in",
+            S.onlyWorth ? "worth backing only" : null].filter(Boolean).join(" · ");
+  };
+
+  function leaguePicker() {
+    $("#lgs").innerHTML = GROUPS.map((gr) => {
+      const ls = (gr.leagues || []).filter((l) => ALL.includes(l));
+      if (!ls.length) return "";
+      const on = ls.filter((l) => S.leagues.has(l)).length;
+      return `<div class="gr">
+        <div class="hd" data-grp="${esc(gr.key)}"><b>${esc(gr.icon)} ${esc(gr.name)}</b>
+          <i>${on} of ${ls.length} · ${on === ls.length ? "none" : "all"}</i></div>
+        <div class="ls">${ls.map((l) => `<label class="${S.leagues.has(l) ? "on" : ""}">
+          <input type="checkbox" value="${esc(l)}" ${S.leagues.has(l) ? "checked" : ""}>${esc(l)}</label>`).join("")}</div>
+      </div>`;
+    }).join("");
+  }
+
+  /* ============================================================== the scan */
+  function params() {
+    return {
+      leagues: [...S.leagues], hours: hoursFor(S.hours),
+      target: 3, auto: !(S.minOdds > 1) && !S.exactLegs,
+      style: S.style, focus: S.focus, maxLegs: 10, extras: false, picks: "likely",
+      priced: S.priced, minOdds: S.minOdds > 1 ? +S.minOdds : 0,
+      onlyWorth: S.onlyWorth, exactLegs: +S.exactLegs || 0, options: +S.options || 1,
+    };
+  }
+
+  async function toggleScan() {
+    if (!E || !E.startScan) { say("The model didn't load, so nothing can be scanned."); return; }
+    const d = S.data;
+    if (d && d.running) { try { S.data = E.stopScan(); } catch { /* already stopping */ } paint(); return; }
+    if (!S.leagues.size) { say("Pick at least one competition first."); return; }
+    S.open = new Set();
+    try { S.data = E.startScan(params()); }
+    catch (err) { say(err && err.message ? err.message : "The scan wouldn't start."); return; }
+    paint();
+    poll();
+  }
+  function poll() {
+    clearTimeout(S.timer);
+    S.timer = setTimeout(() => {
+      try { S.data = E.scanStatus(); } catch { return; }
+      paint();
+      if (S.data && S.data.running) poll();
+    }, 700);
+  }
+  const say = (t) => { $("#said").textContent = t; };
+
+  /* ============================================================== the rows */
+  // "12345" is a match's best builder, "12345#2" the second way HAWK found to
+  // build it — the same key v1 uses, so an option can be named across both.
+  const keyOf = (r, i) => (i ? `${r.id}#${i + 1}` : String(r.id));
+  const optionsOf = (r) => [{ ...r, legs: r.legs, p: r.p, fair: r.fair, b365: r.b365, worth: r.worth, guessed: r.guessed, agree: r.agree },
+                            ...(r.alts || []).map((a) => ({ ...r, ...a }))];
+
+  function rows() {
+    const list = ((S.data && S.data.results) || []).slice();
+    const ko = (r) => Date.parse(r.kickoff || 0) || 0;
+    const by = {
+      worth: (a, b) => (b.worth || 0) - (a.worth || 0),
+      lands: (a, b) => (b.p || 0) - (a.p || 0),
+      legs: (a, b) => (a.legs || []).length - (b.legs || []).length || (b.p || 0) - (a.p || 0),
+      kickoff: (a, b) => ko(a) - ko(b),
+    };
+    return list.sort(by[S.sort] || by.worth);
+  }
+
+  // The bar runs 0.80 → 1.10, with break-even marked. A bar from zero would
+  // put 0.92 and 1.02 within a hair of each other, which is the only
+  // distinction on this page that matters.
+  const worthBar = (w) => Math.max(0, Math.min(100, 100 * ((w - 0.8) / 0.3)));
+
+  function row(r) {
+    const n = (r.legs || []).length;
+    const good = r.worth >= 1;
+    const d = dayName(r.kickoff);
+    return `<details class="pk" data-k="${esc(r.id)}" ${S.open.has(String(r.id)) ? "open" : ""}>
+      <summary><div class="pkr">
+        <span class="t">${esc(d ? `${d} ${hhmm(r.kickoff)}` : hhmm(r.kickoff))}</span>
+        <span class="mu">${r.homeCrest ? `<img src="${esc(r.homeCrest)}" alt="" onerror="this.remove()">` : ""}
+          <span>${esc(r.home)}</span><i>v</i><span>${esc(r.away)}</span></span>
+        <span class="v">${n}</span>
+        <span class="v p">${pct(r.p, r.p < 0.1 ? 1 : 0)}</span>
+        <span class="v">${odds(r.b365)}</span>
+        <span class="w ${good ? "good" : ""}" style="--w:${worthBar(r.worth).toFixed(1)}%">
+          <b>${r.worth == null ? "—" : r.worth.toFixed(3)}</b><i></i><span class="br"></span></span>
+      </div></summary>
+      <div class="pkbody" data-body="${esc(r.id)}"></div></details>`;
+  }
+
+  function body(r, i = 0) {
+    const o = optionsOf(r)[i] || r;
+    const n = (o.legs || []).length;
+    const good = o.worth >= 1;
+    const k = keyOf(r, i);
+    const inAcca = window.HAWKAcca && window.HAWKAcca.has(r.id);
+    // The correlation factor: how much the legs move together. It is the one
+    // quantity a 12,000-match simulation reads better than a bookmaker's
+    // parametric rule, and so the only place a builder can be mispriced your way.
+    const agree = o.agree;
+    return `
+      <ul class="legs">${(o.legs || []).map((l, j) => `<li>
+        <span class="i">${j + 1}</span>
+        <span>${esc(l.label)}<small>${esc(l.market || "")}${l.player ? ` · ${esc(l.player)}` : ""}</small></span>
+        <b>${pct(l.p)}</b>
+        <b class="${l.bookPrice > 1 ? "b" : ""}">${l.bookPrice > 1 ? odds(l.bookPrice) : "—"}</b></li>`).join("")}</ul>
+      <div class="sums">
+        <div><div class="k">Lands</div><div class="v g">${pct(o.p, o.p < 0.1 ? 1 : 0)}</div></div>
+        <div><div class="k">Fair odds</div><div class="v">${odds(o.fair)}</div></div>
+        <div><div class="k">Bet365</div><div class="v">${odds(o.b365)}</div></div>
+        <div><div class="k">Pays back</div><div class="v" style="color:${good ? "var(--up)" : "var(--muted)"}">${
+          o.worth == null ? "—" : `€${o.worth.toFixed(3)}`}</div></div>
+      </div>
+      <p class="note" style="margin-top:18px">
+        ${good
+          ? `At <b>${odds(o.b365)}</b> this ticket returns <b>€${o.worth.toFixed(3)}</b> per euro on average.
+             That is the rare one — and it is HAWK's expected Bet365 price, not a quote. Build it on
+             Bet365 and check the real number before you back it.`
+          : `At <b>${odds(o.b365)}</b> this ticket returns <b>€${(o.worth || 0).toFixed(3)}</b> per euro on
+             average, so it is ${((1 - (o.worth || 0)) * 100).toFixed(1)}% under fair. That is normal:
+             the margin is the bookmaker's and HAWK does not often find a way round it.`}
+        ${o.guessed ? ` ${plural(o.guessed, "leg")} had no Bet365 price, so that price is partly estimated.` : ""}
+        ${agree ? ` These legs move together by a factor of <b>${agree.toFixed(2)}</b> — above 1.00 means
+           the ticket lands more often than multiplying the legs would suggest.` : ""}</p>
+      <div class="acts">
+        <button class="btn gold btn-sm" data-add="${esc(k)}" type="button">${
+          inAcca ? "Replace on your acca" : "Add to acca"}</button>
+        <a class="btn ghost btn-sm" href="../match/?league=${encodeURIComponent(r.league || "")}&id=${encodeURIComponent(r.id)}">Open the match</a>
+      </div>
+      ${(r.alts || []).length ? `<div class="alt"><div class="k">Other ways to build it</div>
+        ${(r.alts || []).map((a, j) => `<button class="btn ghost btn-sm" data-opt="${esc(r.id)}|${j + 1}"
+          style="margin:0 8px 8px 0" type="button">${plural((a.legs || []).length, "leg")} ·
+          ${pct(a.p, a.p < 0.1 ? 1 : 0)} · €${(a.worth || 0).toFixed(3)}</button>`).join("")}
+        ${i ? `<button class="btn ghost btn-sm" data-opt="${esc(r.id)}|0" style="margin:0 8px 8px 0" type="button">Back to the best one</button>` : ""}
+        </div>` : ""}
+      ${S.singles && (r.value || []).length ? `<div class="alt"><div class="k">Single legs beating the price</div>
+        <ul class="legs">${r.value.map((v) => `<li><span class="i">·</span>
+          <span>${esc(v.label)}</span><b>${odds(v.price)}</b>
+          <b class="b">+${(100 * v.edge).toFixed(1)}%</b></li>`).join("")}</ul>
+        <p class="note">A single leg's edge is the one thing this app's own record says does not
+          predict a winner — 254 settled bets, −2.6%. Shown because you asked for it.</p></div>` : ""}`;
+  }
+
+  /* ============================================================== painting */
+  function paint() {
+    const d = S.data, running = !!(d && d.running);
+    const list = rows();
+    const done = (d && d.done) || 0, total = (d && d.total) || 0;
+
+    $("#go").textContent = running ? "Stop" : list.length ? "Scan again" : "Scan";
+    $("#bar").hidden = !running && !total;
+    if (total) $("#bar").firstElementChild.style.width = `${(100 * done / total).toFixed(1)}%`;
+    $("#pr").textContent = running ? `${done} of ${total} matches`
+      : total ? `${plural(total, "match")} checked${d && d.errors ? ` · ${d.errors} wouldn't open` : ""}` : "";
+
+    const best = list.length ? list.reduce((b, r) => (!b || (r.worth || 0) > (b.worth || 0) ? r : b), null) : null;
+    const tag = $("#tag");
+    if (running) {
+      tag.innerHTML = `<span class="dot"></span>Scanning`;
+    } else if (!list.length) {
+      tag.innerHTML = `<span class="dot off"></span>${total ? "Nothing built" : "Nothing scanned yet"}`;
+    } else if (best && best.worth >= 1) {
+      tag.innerHTML = `<span class="dot q"></span>One pays over the odds`;
+      $("#moment").innerHTML = `${esc(best.home)}<span class="q">beats the price</span>`;
+      say(`${best.home} v ${best.away} — ${plural((best.legs || []).length, "leg")}, lands `
+        + `${pct(best.p, best.p < 0.1 ? 1 : 0)}, and at HAWK's expected Bet365 price of `
+        + `${odds(best.b365)} it returns €${best.worth.toFixed(3)} per euro. It is the only kind of `
+        + `row worth the trouble, and there is rarely one.`);
+    } else if (best) {
+      tag.innerHTML = `<span class="dot off"></span>Nothing beats the price`;
+      $("#moment").innerHTML = `Nothing beats<span class="q">the price</span>`;
+      say(`${plural(list.length, "match")} built. The closest is ${best.home} v ${best.away} at `
+        + `€${(best.worth || 0).toFixed(3)} per euro — still `
+        + `${((1 - (best.worth || 0)) * 100).toFixed(1)}% under fair. That is the normal answer, and `
+        + `the reason this page exists is so you can see it rather than guess at it.`);
+    }
+
+    $("#read").hidden = !list.length;
+    $("#resN").textContent = list.length
+      ? `${plural(list.length, "match")}${running ? " so far" : ""}`
+      : running ? "scanning…" : "";
+
+    if (!list.length) {
+      $("#res").innerHTML = running
+        ? `<p class="note" style="margin:0">Building…</p>`
+        : total ? `<p class="note" style="margin:0">HAWK couldn't build a ticket it would stand behind
+             for any of these ${total} matches. Loosen a setting — the price floor and
+             "only ones worth backing" are the two that empty a scan.</p>`
+          : `<p class="note" style="margin:0">Press Scan.</p>`;
+      return;
+    }
+    $("#res").innerHTML = `<div class="pkh"><span>Kick-off</span><span>Match</span><span>Legs</span>
+        <span>Lands</span><span>Bet365</span><span>Pays back</span></div>`
+      + list.map(row).join("");
+    // reopen whatever was open before the repaint
+    for (const el of document.querySelectorAll(".pk[open]")) fill(el);
+  }
+
+  function fill(el, i = 0) {
+    const id = el.dataset.k;
+    const r = ((S.data && S.data.results) || []).find((x) => String(x.id) === String(id));
+    const box = $(`[data-body="${CSS.escape(id)}"]`, el);
+    if (r && box) box.innerHTML = body(r, i);
+  }
+
+  /* =============================================================== events */
+  $("#go").onclick = toggleScan;
+
+  const changed = (key, pref, cast = (v) => v) => (e) => {
+    S[key] = cast(e.target.value);
+    save(pref, S[key]);
+    hints();
+  };
+  $("#hrs").onchange = (e) => { S.hours = e.target.value === "today" ? "today" : +e.target.value;
+    save("hawk.scanHours", S.hours); hints(); };
+  $("#focus").onchange = changed("focus", "hawk.scanFocus");
+  $("#style").onchange = changed("style", "hawk.scanStyle");
+  $("#legs").onchange = changed("exactLegs", "hawk.scanExactLegs", Number);
+  $("#opts").onchange = changed("options", "hawk.scanOptions", Number);
+  $("#minOdds").oninput = (e) => { S.minOdds = parseFloat(e.target.value) || 0;
+    save("hawk.scanMinOdds", S.minOdds); hints(); };
+  // Sorting is the one setting that does not need the scan run again.
+  $("#sort").onchange = (e) => { S.sort = e.target.value; save("hawk.scanSort", S.sort); paint(); };
+  for (const [id, key, pref] of [["priced", "priced", "hawk.scanPriced"],
+                                 ["worthOnly", "onlyWorth", "hawk.onlyWorth"],
+                                 ["singles", "singles", "hawk.showSingles"]])
+    $("#" + id).onchange = (e) => { S[key] = e.target.checked; save(pref, S[key]);
+      hints(); if (key === "singles") paint(); };
+
+  $("#lgs").addEventListener("click", (e) => {
+    // the group header is all-or-nothing for that group
+    const hd = e.target.closest("[data-grp]");
+    if (hd) {
+      const gr = GROUPS.find((g) => g.key === hd.dataset.grp);
+      const ls = ((gr && gr.leagues) || []).filter((l) => ALL.includes(l));
+      const all = ls.every((l) => S.leagues.has(l));
+      for (const l of ls) all ? S.leagues.delete(l) : S.leagues.add(l);
+      save("hawk.scanLeagues", [...S.leagues]);
+      leaguePicker(); hints();
+    }
+  });
+  $("#lgs").addEventListener("change", (e) => {
+    const box = e.target.closest("input[type=checkbox]");
+    if (!box) return;
+    box.checked ? S.leagues.add(box.value) : S.leagues.delete(box.value);
+    box.closest("label").classList.toggle("on", box.checked);
+    save("hawk.scanLeagues", [...S.leagues]);
+    // only the counts in the headers, so the checkbox you just pressed keeps focus
+    for (const hd of document.querySelectorAll("[data-grp]")) {
+      const gr = GROUPS.find((g) => g.key === hd.dataset.grp);
+      const ls = ((gr && gr.leagues) || []).filter((l) => ALL.includes(l));
+      const on = ls.filter((l) => S.leagues.has(l)).length;
+      hd.querySelector("i").textContent = `${on} of ${ls.length} · ${on === ls.length ? "none" : "all"}`;
+    }
+    hints();
+  });
+
+  $("#res").addEventListener("toggle", (e) => {
+    const el = e.target.closest(".pk");
+    if (!el) return;
+    if (el.open) { S.open.add(el.dataset.k); fill(el); } else S.open.delete(el.dataset.k);
+  }, true);
+
+  $("#res").addEventListener("click", (e) => {
+    const opt = e.target.closest("[data-opt]");
+    if (opt) {
+      const [id, i] = opt.dataset.opt.split("|");
+      fill(document.querySelector(`.pk[data-k="${CSS.escape(id)}"]`), +i);
+      return;
+    }
+    const add = e.target.closest("[data-add]");
+    if (!add || !window.HAWKAcca) return;
+    const [id, nth] = add.dataset.add.split("#");
+    const r = ((S.data && S.data.results) || []).find((x) => String(x.id) === String(id));
+    if (!r) return;
+    const o = optionsOf(r)[nth ? +nth - 1 : 0];
+    const { replaced, totals } = window.HAWKAcca.add(r, o.legs, o.p);
+    add.textContent = "Replace on your acca";
+    if (window.HAWKAlerts) window.HAWKAlerts.notice({
+      icon: "🧩", word: replaced ? "Acca updated" : "Added to your acca", tone: "good",
+      href: "../acca/",
+      text: `${r.home} v ${r.away} · ${plural(totals.parts, "match")}, ${plural(totals.legs, "leg")}, `
+          + `fair ${odds(totals.fair)}.`,
+    });
+  });
+
+  /* ================================================================= boot */
+  if (!E || !E.startScan) {
+    say("The model didn't load, so nothing can be scanned.");
+    $("#go").disabled = true;
+  } else {
+    fillSelects();
+    leaguePicker();
+    // a scan left running by another HAWK tab is still running in this one's
+    // engine? no — the engine is per page. But a scan this page started and
+    // you navigated away from is gone, and saying "Scan" is the honest state.
+    paint();
+  }
+})();
+</script>
+</body>
+</html>

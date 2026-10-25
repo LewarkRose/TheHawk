@@ -379,19 +379,46 @@
       return;
     }
 
-    // newest first — the array is built that way by both sites
-    let out = "", day = null;
-    for (const b of list.slice(0, 200)) {
+    /* A day at a time, and each day folds.
+       It was a flat run of every ticket with a heading between days, and a
+       200 cap that silently swallowed the rest. On a real Vault that is
+       hundreds of rows you scroll past to reach anything: the day is the
+       unit you actually look for, so the day is the row — its count, its
+       won/lost, and what it did to the bankroll — with the tickets inside
+       it. Today and yesterday open; the rest wait to be asked for. */
+    const days = [];
+    for (const b of list) {
       const d = dayOf(b);
-      if (d !== day) {
-        day = d;
-        const same = list.filter((x) => dayOf(x) === d);
-        const pl = same.reduce((a, x) => a + profit(x), 0);
-        const anySettled = same.some((x) => x.status && x.status !== "PENDING");
-        out += `<div class="day"><h4>${esc(d)}</h4><span class="n">${plural(same.length, "bet")}</span>
+      const last = days[days.length - 1];
+      if (last && last.d === d) last.bets.push(b); else days.push({ d, bets: [b] });
+    }
+
+    let out = "";
+    for (const [di, grp] of days.entries()) {
+      const pl = grp.bets.reduce((a, x) => a + profit(x), 0);
+      const won = grp.bets.filter((x) => x.status === "WON").length;
+      const lost = grp.bets.filter((x) => x.status === "LOST").length;
+      const openN = grp.bets.filter((x) => x.status === "PENDING").length;
+      const anySettled = grp.bets.some((x) => x.status && x.status !== "PENDING");
+      out += `<details class="dayg"${di < 2 || openN ? " open" : ""}>
+        <summary><div class="day"><h4>${esc(grp.d)}</h4>
+          <span class="n">${plural(grp.bets.length, "ticket")}</span>
+          <span class="wl">${won ? `<b class="w">✓ ${won}</b>` : ""}${
+            lost ? `<b class="l">✗ ${lost}</b>` : ""}${
+            openN ? `<b class="o">● ${openN}</b>` : ""}</span>
           ${anySettled ? `<span class="pl ${pl > 0 ? "up" : pl < 0 ? "dn" : ""}">${
-            pl > 0 ? "+" : ""}${money(pl)}</span>` : ""}</div>`;
-      }
+            pl > 0 ? "+" : ""}${money(pl)}</span>` : `<span class="pl q">—</span>`}</div></summary>
+        <div class="dayb">`;
+      for (const b of grp.bets) out += betRow(b);
+      out += `</div></details>`;
+    }
+    $("#bets").innerHTML = out;
+    return;
+  }
+
+  function betRow(b) {
+    let out = "";
+    {
       const [cls, word] = STATE[b.status] || ["", b.status || "—"];
       const pl = profit(b), pending = b.status === "PENDING";
       const sel = (b.legs || []).map((l) => l.selection).filter(Boolean).join(" + ") || "—";
@@ -414,10 +441,7 @@
             : `<button class="c" data-cash="${esc(b.id)}">Cash out</button>`}
         </span>` : ""}</div>`;
     }
-    if (list.length > 200) {
-      out += `<p class="note">Showing the most recent 200 of ${list.length}.</p>`;
-    }
-    $("#bets").innerHTML = out;
+    return out;
   }
 
   /* ------------------------------------------------------------ settling */

@@ -1114,6 +1114,25 @@ img{display:block;max-width:100%}
 .filt.sub button:hover{color:var(--text);box-shadow:none}
 .filt.sub button[aria-pressed="true"]{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--rule-2)}
 
+/* a day of tickets, folded. The day is the unit you look for in a Vault, so
+   the day is the row: what it cost or made, and how many landed, without
+   opening it. Today and yesterday open; anything with a bet still running
+   opens too, because that is the one you came back to settle. */
+.dayg > summary{list-style:none;cursor:pointer}
+.dayg > summary::-webkit-details-marker{display:none}
+.dayg > summary .day{transition:background .35s var(--film)}
+.dayg > summary:hover .day{background:rgba(242,242,242,.04)}
+.dayg > summary h4::before{content:"▸";display:inline-block;margin-right:10px;
+  color:var(--faint);font-size:11px;transition:transform .35s var(--film)}
+.dayg[open] > summary h4::before{transform:rotate(90deg)}
+.dayg[open] > summary h4{color:var(--gold-hi)}
+.dayg .dayb{padding-bottom:10px}
+.day .wl{display:flex;gap:12px;font:400 11px/1 var(--mono);font-variant-numeric:tabular-nums}
+.day .wl b{font-weight:400}
+.day .wl b.w{color:var(--up)}
+.day .wl b.l{color:var(--down)}
+.day .wl b.o{color:var(--gold)}
+
 .day{display:flex;align-items:baseline;gap:14px;padding:26px 2px 12px;
   border-bottom:1px solid var(--rule-2)}
 .day h4{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;font-size:17px;

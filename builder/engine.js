@@ -3330,7 +3330,14 @@
       if (h.userDone) {
         // You ticked it: Bet365 shows it done (e.g. a tackle 365Scores doesn't name).
         row.state = "won"; row.p = 1; row.userDone = true; row.note = "you marked it done — Bet365 shows it";
-      } else if ((m = /^res:(home|away)$/.exec(id2)) && twoUp[m[1]]) {
+        // Early Payout is the bookmaker's offer, not a law of the game, so it
+        // is only applied when it is switched on — or when the leg itself was
+        // built with it, which is how a bet placed under it still settles
+        // under it after the setting is turned off. Without this the branch
+        // fired for everyone and the setting changed nothing live.
+        // Switched off, the leg falls through to goalTest's res: rule and gets
+        // its real chance of actually winning from here.
+      } else if ((m = /^res:(home|away)$/.exec(id2)) && twoUp[m[1]] && (earlyPayout || h.ep)) {
         row.state = "won"; row.p = 1; row.ep = true;
         row.note = `score ${sh}-${sa} · Early Payout: ${m[1] === "home" ? hc.name : ac.name} went 2 goals ahead, so Bet365 pays this leg as won (if your slip shows EP)`;
       } else if ((t = goalTest(id2))) {

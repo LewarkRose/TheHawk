@@ -86,6 +86,9 @@
     <div class="lede"><h3>Your bet</h3><span class="n" id="yoursN"></span>
       <a href="../vault/">Open the Vault →</a></div>
     <div id="tickets"></div>
+    <!-- the two rules that change how a live leg is read, where they apply -->
+    <div class="sw" id="rules"></div>
+    <p class="note" id="rulesNote"></p>
   </div>
 </section>
 
@@ -533,6 +536,38 @@
     $("#htWrap").hidden = false;
   }
 
+  /* ============================= how a live leg is read
+     Two bookmaker rules, not model settings — which is why they live beside
+     your bet rather than in a settings panel somewhere. Both are v1's keys,
+     so the old builder, this page and the Vault's settler agree.
+
+     Early Payout: Bet365 pays a Full Time Result leg once that side has been
+     two goals ahead, whether or not they hold on. Sub On Play On: a player
+     leg follows the man who replaces him when he is taken off (not for a red
+     card). Both are on by default because Bet365 applies both by default. */
+  const RULES = [
+    ["ep", "Early Payout", true,
+     "A result leg is paid once that side goes two goals ahead, even if they are pegged back."],
+    ["subOn", "Sub On Play On", true,
+     "A player leg moves to his replacement when he is substituted. Only the sub's own numbers count."],
+  ];
+  const rule = (k) => {
+    const d = (RULES.find((r) => r[0] === k) || [, , true])[2];
+    try { const v = localStorage.getItem(`hawk.${k}`); return v === null ? d : !!JSON.parse(v); }
+    catch { return d; }
+  };
+  function paintRules() {
+    const box = $("#rules");
+    if (!box) return;
+    box.innerHTML = RULES.map(([k, name, , why]) =>
+      `<button type="button" data-rule="${k}" aria-pressed="${String(rule(k))}">
+        <b>${esc(name)}</b><span>${esc(why)}</span></button>`).join("");
+    $("#rulesNote").innerHTML = `Both are Bet365's rules rather than HAWK's reading of the match, and
+      both are on by default because Bet365 applies them by default. Turn one off and the legs it
+      touches are read as if it did not exist${rule("ep")
+        ? "" : " — a result leg two goals up now shows its real chance of actually winning"}.`;
+  }
+
   /* -------------------------------------------------------- your tickets */
   async function tickets(d) {
     let bets = [];
@@ -549,10 +584,10 @@
     for (const b of mine) {
       const here = (b.legs || []).filter((l) => l.hawk && String(l.hawk.game) === String(S.id))
         .flatMap((l) => l.hawk.legs || []);
-      // "Sub On Play On": the old builder's own setting, so a leg on a player
-      // who has been taken off is followed to his replacement here too
-      const subOn = (() => { try { const v = localStorage.getItem("hawk.subOn");
-        return v === null ? true : JSON.parse(v); } catch { return true; } })() && b.subOn !== false;
+      // "Sub On Play On": v1's own setting under v1's own key, so the switch
+      // below, the old builder and the Vault's settler all mean one thing.
+      // A bet may also have been logged with it off, and that wins.
+      const subOn = rule("subOn") && b.subOn !== false;
       let live = null;
       try { live = await window.HAWK.ticketLive(String(S.id), here.map((h) => ({ ...h, subOn }))); }
       catch { /* skipped */ }
@@ -600,6 +635,7 @@
     }
 
     if (!out.length) { $("#yours").hidden = true; return null; }
+    paintRules();
     $("#yoursN").textContent = plural(out.length, "ticket");
     $("#tickets").innerHTML = out.join("");
     $("#yours").hidden = false;
@@ -673,6 +709,20 @@
       const box = $("#lvStake"); if (box) box.focus();
       return;
     }
+    // Early Payout / Sub On Play On. Both change how legs are READ, so the
+    // match is re-read rather than just redrawn: Early Payout also changes
+    // what the engine builds, and it clears its own cache when it flips.
+    const rl = e.target.closest("[data-rule]");
+    if (rl) {
+      const k = rl.dataset.rule, now = !rule(k);
+      try { localStorage.setItem(`hawk.${k}`, JSON.stringify(now)); } catch { /* private */ }
+      rl.setAttribute("aria-pressed", String(now));
+      if (k === "ep" && window.HAWK.setEarlyPayout) window.HAWK.setEarlyPayout(now);
+      paintRules();
+      await tickets(S.d);
+      return;
+    }
+
     const log = e.target.closest("[data-log]");
     if (log) {
       const r = (S.d.rows || []).find((x) => x.label === log.dataset.log);
@@ -727,6 +777,8 @@
   /* ----------------------------------------------------------------- boot */
   const q = new URLSearchParams(location.search);
   S.id = q.get("id") || ""; S.league = q.get("league") || "";
+  // the engine starts with Early Payout off; the saved setting is the truth
+  if (window.HAWK && window.HAWK.setEarlyPayout) window.HAWK.setEarlyPayout(rule("ep"));
   if (window.HAWK && window.HAWK.liveMatch) load();
   else $("#said").textContent = "The model didn't load, so nothing can be read.";
 })();

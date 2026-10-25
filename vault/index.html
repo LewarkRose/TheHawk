@@ -44,14 +44,20 @@
       <button class="tbtn" id="asGo" type="button">Check results</button></div>
     <!-- what the robot did, in a line, the way v1 reported it -->
     <p class="note as" id="asOut" hidden></p>
-    <!-- The two Bet365 rules that decide how a leg settles. They used to live
-         only on the live page, inside a section that stays hidden unless you
-         have a bet on the match you are watching — a setting that decides
-         whether a ticket is WON or LOST cannot be that hard to find. -->
-    <div class="sw" id="rules"></div>
-    <p class="note" id="rulesNote"></p>
+    <!-- The chips sit against the list they filter, the way v1 had them.
+         They were UNDER the two Bet365 rules and their explainer, which is
+         some 400px of reference text — so the control you reach for was
+         separated from the thing it controls by the one block on the page
+         you read once and never again. -->
     <div class="filt" id="filt"></div>
     <div id="bets"><div class="skel" style="padding:30px 0">Reading…</div></div>
+    <!-- …and the rules follow the list rather than leading it. They used to
+         live only on the live page, inside a section that stays hidden unless
+         you have a bet on the match you are watching — a setting that decides
+         whether a ticket is WON or LOST cannot be that hard to find, and it
+         still isn't: same page, same section, just not in front of the bets. -->
+    <div class="sw" id="rules" style="margin-top:34px"></div>
+    <p class="note" id="rulesNote"></p>
   </div>
 </section>
 
@@ -611,7 +617,16 @@
       ? hawkLegs.map((h) => [h.label || "—", h.result || null])
       : (b.legs || []).map((l) => [l.selection || "—", null]);
 
-    const when = b.date || (b.settledAt ? new Date(b.settledAt).toLocaleString() : "");
+    /* Parse it, THEN print it. `date` is v1's own display string on tickets
+       that came from there ("Oct 15, 08:58 PM") and an ISO timestamp on
+       anything logged since — and preferring it raw put
+       "2026-10-25T17:09:38.133Z" across the top of the receipt. whenOf reads
+       either; the raw string is only used when it is not a date at all. */
+    const whenMs = whenOf(b);
+    const when = whenMs
+      ? new Date(whenMs).toLocaleString(undefined,
+          { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+      : (b.date || "");
     const n = items.length;
 
     return `<div class="rcpt ${cls}">

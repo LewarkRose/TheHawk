@@ -383,15 +383,23 @@
      Falling means bad, rising means good, and the VAR take-back is the goal
      played backwards, because that is what it is. */
   const VOICES = {
-    goal:    [[659, 0, 0.18], [880, 0.14, 0.18], [1319, 0.28, 0.34]],
-    goalOff: [[1319, 0, 0.16], [880, 0.14, 0.16], [659, 0.28, 0.30]],
-    won:     [[880, 0, 0.16], [1175, 0.14, 0.16], [1568, 0.28, 0.42]],
-    landed:  [[988, 0, 0.14], [1319, 0.12, 0.22]],
-    lost:    [[330, 0, 0.26, "triangle"], [247, 0.2, 0.46, "triangle"]],
-    red:     [[150, 0, 0.5, "sawtooth", 0.26]],
-    urgent:  [[988, 0, 0.11], [988, 0.17, 0.11], [1319, 0.34, 0.2]],
-    tick:    [[1319, 0, 0.09, "sine", 0.14]],
-    warn:    [[587, 0, 0.18, "triangle"], [494, 0.16, 0.3, "triangle"]],
+    goal:    [[523, 0, 0.5, "triangle", 0.22], [784, 0.1, 0.7, "triangle", 0.18],
+              [1047, 0.2, 0.9, "triangle", 0.12]],
+    goalOff: [[1047, 0, 0.5, "triangle", 0.18], [784, 0.12, 0.6, "triangle", 0.16],
+              [523, 0.24, 0.85, "triangle", 0.2]],
+    won:     [[523, 0, 0.4, "triangle", 0.2], [659, 0.1, 0.45, "triangle", 0.2],
+              [784, 0.2, 0.5, "triangle", 0.2], [1047, 0.3, 0.9, "triangle", 0.18]],
+    landed:  [[784, 0, 0.4, "triangle", 0.2], [1047, 0.09, 0.55, "triangle", 0.16]],
+    lost:    [[392, 0, 0.5, "triangle", 0.2], [294, 0.18, 0.8, "triangle", 0.18]],
+    red:     [[196, 0, 0.9, "triangle", 0.24], [131, 0.05, 1.1, "triangle", 0.18]],
+    urgent:  [[880, 0, 0.3, "triangle", 0.2], [880, 0.22, 0.3, "triangle", 0.2],
+              [1047, 0.44, 0.6, "triangle", 0.2]],
+    warn:    [[587, 0, 0.4, "triangle", 0.2], [494, 0.22, 0.7, "triangle", 0.18]],
+    /* The lineups one is the odd job: the only alert that is not news. Three
+       taps on one note — a knock at the door rather than an announcement, and
+       on one note it cannot be mistaken for a goal, which rises. */
+    tick:    [[587, 0, 0.16, "triangle", 0.14], [587, 0.17, 0.16, "triangle", 0.14],
+              [587, 0.34, 0.3, "triangle", 0.14]],
   };
   /* Which voice an alert gets, by the word on its card — the cards already
      name themselves and the names are stable, so nothing else has to change

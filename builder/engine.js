@@ -2577,8 +2577,26 @@
     // Option 1 is the one you'd actually want: of the builders that Bet365 pays
     // for, the likeliest. Ranking on chance alone used to hand you a ticket that
     // underpaid just because it landed one point more often.
-    return [...found.values()].sort((a, b) => tier(b) - tier(a) || (min ? b.p - a.p
-      : (worthOf(b) + 0.5 * b.p) - (worthOf(a) + 0.5 * a.p))).slice(0, count);
+    const ranked = [...found.values()].sort((a, b) => tier(b) - tier(a) || (min ? b.p - a.p
+      : (worthOf(b) + 0.5 * b.p) - (worthOf(a) + 0.5 * a.p)));
+
+    /* …and then the no-arguing rule, which this path never had.
+       The note on argues() says there are TWO selection paths and that fixing
+       one while the other contradicted is how it survived the first time.
+       There are THREE: searchOptions, autoTop, and this. Only the first two
+       were guarded, so 🎯 Auto went on offering pairs like "Under 3.5 Goals"
+       and "Over 2.5 Goals" as alternatives — both landing only on exactly
+       three. Sassuolo v Lazio, 25 Oct, is what the deploy's safety test caught.
+
+       Same discipline as searchOptions: an awkward pair beats an empty list,
+       so the rule is dropped rather than return nothing. */
+    const chosen = [];
+    for (const t of ranked) {
+      if (chosen.length >= count) break;
+      if (chosen.some((c) => argues(t, c))) continue;
+      chosen.push(t);
+    }
+    return chosen.length ? chosen : ranked.slice(0, count);
   }
   // "Only legs Bet365 prices": leave out every leg whose price HAWK has to guess
   // (player props — no free feed has Bet365's). What's left are legs 365Scores

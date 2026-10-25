@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scores · HAWK</title>
+<meta name="description" content="Every match in HAWK's competitions, live and finished.">
+<link rel="icon" href="../favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="../assets/hawk.css">
+</head>
+<body>
+
+<header class="hero">
+  <canvas aria-hidden="true"></canvas>
+  <div class="wrap">
+    <span class="tag" id="tag"><span class="dot off"></span>Reading the card</span>
+    <h1 class="moment mid" id="title">Today's<span class="q">card</span></h1>
+    <p class="said" id="said">Asking 365Scores what is on…</p>
+    <div class="days" id="days">
+      <button type="button" data-off="-1">Yesterday</button>
+      <button type="button" data-off="0" aria-pressed="true">Today</button>
+      <button type="button" data-off="1">Tomorrow</button>
+      <input type="date" id="pick" aria-label="Pick a date">
+    </div>
+  </div>
+</header>
+
+<section class="calm">
+  <div class="wrap">
+    <div class="filt" id="bands"></div>
+    <div class="filt" id="comps" style="margin-top:14px;border-bottom:0"></div>
+    <div id="board" style="margin-top:26px"><div class="skel">Reading…</div></div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap"><a href="../home/">home</a> · <a href="../today/">today</a> ·
+    <a href="../vault/">vault</a> · <a href="../builder/">v1</a> ·
+    live scores refresh every 60 seconds</div>
+</footer>
+
+<script src="../builder/engine.js"></script>
+<script src="../assets/hawk-bg.js"></script>
+<script src="../assets/hawk-nav.js"></script>
+<script>
+/* ===========================================================================
+   Scores — every match in HAWK's competitions for a day.
+
+   A ledger, not a grid: eighty-odd matches across twenty-odd competitions, one
+   ruled line each, every score on the same vertical line. That alignment is
+   why it reads faster than cards, and it is the shape chosen for this page.
+
+   HAWK's own read sits on each row as a three-way bar, but only for matches it
+   has a saved prediction for — predictions.json is written before kick-off by
+   the build, so a fixture it never saw simply has no bar rather than a made-up
+   one.
+   =========================================================================== */
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const pad = (n) => String(n).padStart(2, "0");
+  const localDay = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const dayFrom = (o) => { const d = new Date(); d.setDate(d.getDate() + o); return localDay(d); };
+  const hhmm = (iso) => { const t = Date.parse(iso); return Number.isFinite(t)
+    ? new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""; };
+  // "match" pluralises to "matches", not "matchs"
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : /(ch|sh|s|x|z)$/.test(w) ? "es" : "s"}`;
+  const pc100 = (a) => {
+    const v = a.map((x) => 100 * (x || 0)), r = v.map(Math.round);
+    let d = 100 - r.reduce((x, y) => x + y, 0);
+    while (d) { const i = v.map((x, k) => [Math.abs(x - r[k]), k]).sort((p, q) => q[0] - p[0])[0][1];
+      r[i] += d > 0 ? 1 : -1; d += d > 0 ? -1 : 1; }
+    return r;
+  };
+
+  /* 365Scores' statusGroup: 2 not started, 3 in play, 4 finished. The bands
+     are the ones you actually sort a day by. */
+  const band = (g) => {
+    if (g.status === 3) return "live";
+    if (g.status === 4) return "done";
+    const t = Date.parse(g.kickoff || 0) || 0;
+    return t && t - Date.now() <= 3600e3 ? "soon" : "next";
+  };
+  const BANDS = [["all", "All"], ["live", "Live"], ["soon", "Next hour"],
+                 ["next", "Later"], ["done", "Finished"]];
+
+  const S = { day: dayFrom(0), games: [], preds: null, band: "all", comp: "all", timer: 0 };
+
+  /* HAWK's pre-match read, when the build saved one for this fixture */
+  async function predictions() {
+    if (S.preds) return S.preds;
+    try {
+      const r = await fetch("../data/predictions.json", { cache: "no-store" });
+      S.preds = r.ok ? await r.json() : {};
+    } catch { S.preds = {}; }
+    return S.preds;
+  }
+  // predictions.json is { updated, matches: { "<id>": { probs, level, kickoff } } }
+  const readOf = (id) => {
+    const m = S.preds && (S.preds.matches || S.preds.m);
+    const p = m && m[String(id)];
+    return p && p.probs ? p.probs : null;
+  };
+
+  function row(g) {
+    const b = band(g), [sh, sa] = g.score || [];
+    const have = Number.isFinite(sh) && Number.isFinite(sa);
+    const hc = have && sh < sa ? " lost" : "", ac = have && sa < sh ? " lost" : "";
+    const mid = have ? `${sh}<em>–</em>${sa}` : b === "done" ? "–<em>–</em>–" : "v";
+    const state = b === "live" ? esc(g.clock || "Live")
+      : b === "done" ? "FT"
+      : esc(hhmm(g.kickoff) || "TBC");
+    const href = `${b === "live" ? "../live/" : "../match/"}`
+      + `?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}`;
+
+    const p = readOf(g.id);
+    const bar = p ? (() => {
+      const v = pc100([p.home, p.draw, p.away]);
+      return `<span class="sbar" title="HAWK before kick-off: ${esc(g.home)} ${v[0]}% · draw ${v[1]}% · ${esc(g.away)} ${v[2]}%">
+        <i class="h" style="flex:${p.home || 0}"></i><i class="d" style="flex:${p.draw || 0}"></i><i class="a" style="flex:${p.away || 0}"></i></span>`;
+    })() : `<span class="sbar none"></span>`;
+
+    return `<a class="lg-row is-${b}" href="${href}">
+      <span class="t">${esc(hhmm(g.kickoff))}</span>
+      <span class="h${hc}">${esc(g.home)}</span>
+      <span class="s">${mid}</span>
+      <span class="a${ac}">${esc(g.away)}</span>
+      ${bar}
+      <span class="st">${state}</span></a>`;
+  }
+
+  function paint() {
+    const all = S.games;
+    const counts = { all: all.length };
+    for (const g of all) { const b = band(g); counts[b] = (counts[b] || 0) + 1; }
+    $("#bands").innerHTML = BANDS.filter(([k]) => k === "all" || counts[k])
+      .map(([k, t]) => `<button type="button" data-band="${k}" aria-pressed="${String(S.band === k)}">${t}<i>${counts[k] || 0}</i></button>`).join("");
+
+    const byBand = all.filter((g) => S.band === "all" || band(g) === S.band);
+    const comps = [...new Set(byBand.map((g) => g.league || "Other"))].sort();
+    $("#comps").innerHTML = comps.length > 1
+      ? [["all", `All ${comps.length}`]].concat(comps.map((c) => [c, c]))
+          .map(([k, t]) => `<button type="button" data-comp="${esc(k)}" aria-pressed="${String(S.comp === k)}">${esc(t)}</button>`).join("")
+      : "";
+
+    const list = byBand.filter((g) => S.comp === "all" || (g.league || "Other") === S.comp);
+    if (!list.length) {
+      $("#board").innerHTML = `<p class="note" style="margin:0">Nothing here.</p>`;
+      return;
+    }
+    const ko = (g) => Date.parse(g.kickoff || 0) || 0;
+    const order = { live: 0, soon: 1, next: 2, done: 3 };
+
+    // grouped by competition, each ordered by kick-off; competitions ordered by
+    // whichever has something happening soonest
+    const by = new Map();
+    for (const g of list) {
+      const k = g.league || "Other";
+      if (!by.has(k)) by.set(k, []);
+      by.get(k).push(g);
+    }
+    const rank = (l) => Math.min(...l.map((g) => order[band(g)] * 1e13 + (ko(g) || 1e12)));
+    const groups = [...by.entries()].map(([name, l]) => ({ name, l: l.sort((a, b) => ko(a) - ko(b)) }))
+      .sort((a, b) => rank(a.l) - rank(b.l));
+
+    $("#board").innerHTML = groups.map((gr) => `<section class="lg-sec">
+      <div class="lg-h"><h3>${esc(gr.name)}</h3><span class="n">${gr.l.length}</span></div>
+      ${gr.l.map(row).join("")}</section>`).join("");
+  }
+
+  function headline() {
+    const g = S.games;
+    const live = g.filter((x) => band(x) === "live").length;
+    const soon = g.filter((x) => band(x) === "soon").length;
+    const done = g.filter((x) => band(x) === "done").length;
+    const comps = new Set(g.map((x) => x.league || "Other")).size;
+
+    const d = new Date(S.day + "T12:00:00");
+    const off = Math.round((d - new Date(localDay(new Date()) + "T12:00:00")) / 86400e3);
+    const word = off === 0 ? "Today's" : off === -1 ? "Yesterday's" : off === 1 ? "Tomorrow's"
+      : `${d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}`;
+    $("#title").innerHTML = `${esc(word)}<span class="q">card</span>`;
+
+    $("#tag").innerHTML = live
+      ? `<span class="dot"></span>${live} in play`
+      : `<span class="dot q"></span>${plural(g.length, "match")}`;
+    $("#said").innerHTML = !g.length
+      ? "No matches in HAWK's competitions on this day."
+      : `<b>${plural(g.length, "match")}</b> across <b>${plural(comps, "competition")}</b>`
+        + (live ? ` · <b class="live">${live} in play</b>` : "")
+        + (soon ? ` · ${soon} within the hour` : "")
+        + (done ? ` · ${done} finished` : "") + ".";
+  }
+
+  async function load() {
+    if (!(window.HAWK && window.HAWK.scores)) {
+      $("#said").textContent = "The model didn't load, so the card can't be read.";
+      return;
+    }
+    await predictions();
+    let g;
+    try { g = await window.HAWK.scores(S.day); }
+    catch { $("#said").textContent = "365Scores didn't answer just now. Try again in a moment."; return; }
+    S.games = (g || []).filter((x) => x && x.home && x.away);
+    headline();
+    paint();
+    clearTimeout(S.timer);
+    if (S.games.some((x) => band(x) === "live")) S.timer = setTimeout(load, 60000);
+  }
+
+  /* -------------------------------------------------------------- events */
+  $("#days").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-off]");
+    if (!b) return;
+    S.day = dayFrom(+b.dataset.off);
+    $("#pick").value = S.day;
+    for (const x of document.querySelectorAll("#days button")) x.setAttribute("aria-pressed", String(x === b));
+    S.band = "all"; S.comp = "all";
+    $("#board").innerHTML = `<div class="skel">Reading…</div>`;
+    load();
+  });
+  $("#pick").addEventListener("change", (e) => {
+    if (!e.target.value) return;
+    S.day = e.target.value;
+    for (const x of document.querySelectorAll("#days button")) x.setAttribute("aria-pressed", "false");
+    S.band = "all"; S.comp = "all";
+    load();
+  });
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("#bands button[data-band]");
+    if (b) { S.band = b.dataset.band; S.comp = "all"; paint(); return; }
+    const c = e.target.closest("#comps button[data-comp]");
+    if (c) { S.comp = c.dataset.comp; paint(); }
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) clearTimeout(S.timer); else load();
+  });
+
+  $("#pick").value = S.day;
+  load();
+})();
+</script>
+</body>
+</html>

@@ -43,7 +43,7 @@
     <span class="n" id="cardN">reading…</span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
     <div class="grid m3" id="card"><div class="m wide"><div class="skel">Reading today's card…</div></div></div>
-    <p class="note"><a href="../builder/?view=scores" style="color:var(--gold-hi)">All scores →</a></p>
+    <p class="note"><a href="../scores/" style="color:var(--gold-hi)">All scores →</a></p>
   </div>
 </details>
 
@@ -66,6 +66,7 @@
 <script src="../builder/engine.js"></script>
 <script src="../assets/hawk-bg.js"></script>
 <script src="../assets/hawk-fold.js"></script>
+<script src="../assets/hawk-nav.js"></script>
 <script>
 /* ===========================================================================
    Today — what is running, what is at risk, what is left.
@@ -88,7 +89,8 @@
   const money = (n) => `${n < 0 ? "−" : ""}€${Math.abs(+n || 0).toFixed(2)}`;
   const pct = (p) => (Number.isFinite(p) ? `${Math.round(100 * p)}%` : "—");
   const band = (g) => (g.status === 3 ? "live" : g.status === 4 ? "done" : "next");
-  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  // "match" pluralises to "matches", not "matchs"
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : /(ch|sh|s|x|z)$/.test(w) ? "es" : "s"}`;
 
   const S = { games: [], live: new Map(), timer: 0 };
 

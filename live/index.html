@@ -139,6 +139,7 @@
 <script src="../assets/hawk-bg.js"></script>
 <script src="../assets/hawk-lineups.js"></script>
 <script src="../assets/hawk-fold.js"></script>
+<script src="../assets/hawk-nav.js"></script>
 <script>
 /* ===========================================================================
    The in-play page.
@@ -158,7 +159,8 @@
   const odds = (x) => (x > 0 && Number.isFinite(x) ? x.toFixed(2) : "—");
   const pct = (p, dp = 0) => (Number.isFinite(p) ? `${(100 * p).toFixed(dp)}%` : "—");
   const money = (n) => `€${(+n || 0).toFixed(2)}`;
-  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  // "match" pluralises to "matches", not "matchs"
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : /(ch|sh|s|x|z)$/.test(w) ? "es" : "s"}`;
   const pc100 = (a) => {
     const v = a.map((x) => 100 * (x || 0)), r = v.map(Math.round);
     let d = 100 - r.reduce((x, y) => x + y, 0);

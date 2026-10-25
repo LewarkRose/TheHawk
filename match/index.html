@@ -170,6 +170,7 @@
 <script src="../assets/hawk-bg.js"></script>
 <script src="../assets/hawk-lineups.js"></script>
 <script src="../assets/hawk-fold.js"></script>
+<script src="../assets/hawk-nav.js"></script>
 <script>
 /* ===========================================================================
    The match page.
@@ -193,7 +194,8 @@
   const pct = (p, dp = 0) => (Number.isFinite(p) ? `${(100 * p).toFixed(dp)}%` : "—");
   const hhmm = (iso) => { const t = Date.parse(iso); return Number.isFinite(t)
     ? new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""; };
-  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  // "match" pluralises to "matches", not "matchs"
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : /(ch|sh|s|x|z)$/.test(w) ? "es" : "s"}`;
   // three chances that must read as 100 together
   const pc100 = (a) => {
     const v = a.map((x) => 100 * (x || 0)), r = v.map(Math.round);

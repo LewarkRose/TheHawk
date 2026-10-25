@@ -83,6 +83,51 @@
   </div>
 </details>
 
+<details class="calm fold" id="logWrap" data-fold="vLog">
+  <summary><div class="wrap"><div class="lede"><h3>Log a ticket</h3>
+    <span class="n" id="logN">for a bet placed outside HAWK</span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div class="lgf">
+      <div><label for="lgFix">Match</label>
+        <input id="lgFix" placeholder="Barcelona vs Real Madrid"></div>
+      <div><label for="lgSel">Selection</label>
+        <input id="lgSel" placeholder="Over 4.5 cards"></div>
+      <div><label for="lgOdds">Price</label>
+        <input id="lgOdds" class="num" inputmode="decimal" placeholder="1.80"></div>
+      <div><button class="btn ghost" id="lgAdd">Add this leg</button></div>
+    </div>
+
+    <div id="lgLegs" style="margin-top:26px"></div>
+
+    <div class="lgtot">
+      <div><div class="n" id="lgPrice">—</div><div class="k">Combined price</div></div>
+      <div style="min-width:150px"><label for="lgReal" style="display:block;margin-bottom:9px;
+        font:700 8.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint)">What it actually paid</label>
+        <input id="lgReal" class="num" inputmode="decimal" placeholder="override"
+          style="width:150px;padding:11px 12px;border:0;background:var(--raise);color:var(--text);
+          font:400 14px/1 var(--mono);box-shadow:inset 0 0 0 1px var(--rule-2)"></div>
+      <div style="min-width:140px"><label for="lgStake" style="display:block;margin-bottom:9px;
+        font:700 8.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint)">Stake</label>
+        <input id="lgStake" class="num" inputmode="decimal" placeholder="5.00"
+          style="width:140px;padding:11px 12px;border:0;background:var(--raise);color:var(--text);
+          font:400 14px/1 var(--mono);box-shadow:inset 0 0 0 1px var(--rule-2)">
+        <div class="quick" id="lgQuick"></div></div>
+      <div style="margin-left:auto;text-align:right"><div class="n" id="lgRet">—</div>
+        <div class="k">Returns if it lands</div></div>
+    </div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:26px">
+      <button class="btn gold" id="lgSave">Log it in the Vault</button>
+      <button class="btn ghost" id="lgClear">Clear</button>
+    </div>
+    <p class="note" id="lgOut"></p>
+    <p class="note"><b>The combined price is the legs multiplied, which is not what a bet builder
+      pays.</b> Legs on one match move together and the book takes its margin, so the real price is
+      always shorter — put what you were actually quoted in the override box. The stake comes off
+      your bankroll as soon as you log it, exactly as it does in the builder.</p>
+  </div>
+</details>
+
 <details class="calm fold" id="bkWrap" data-fold="vBackup">
   <summary><div class="wrap"><div class="lede"><h3>Backup</h3>
     <span class="n" id="bkN"></span><span class="mk-t"></span></div></div></summary>
@@ -338,7 +383,8 @@
       const [cls, word] = STATE[b.status] || ["", b.status || "—"];
       const pl = profit(b), pending = b.status === "PENDING";
       const sel = (b.legs || []).map((l) => l.selection).filter(Boolean).join(" + ") || "—";
-      const where = (b.legs || []).map((l) => l.fixture).filter(Boolean).join(" · ");
+      // several legs on one match name it once, not once each
+      const where = [...new Set((b.legs || []).map((l) => l.fixture).filter(Boolean))].join(" · ");
       out += `<div class="bt">
         <span class="w"><b>${esc(sel)}</b><i>${esc(where)}${
           (b.legs || []).length > 1 ? ` · ${plural(b.legs.length, "leg")}` : ""}</i></span>
@@ -556,6 +602,64 @@
     $("#scWrap").hidden = false;
   }
 
+  /* ------------------------------------------------------- log a ticket
+     For a bet placed outside HAWK, or one it could not build. Writes the
+     same shape saveToVault() does, so it settles and reads identically. */
+  let legs = [];
+
+  function drawLog() {
+    $("#logN").textContent = legs.length
+      ? `${plural(legs.length, "leg")}` : "for a bet placed outside HAWK";
+    $("#lgLegs").innerHTML = legs.length
+      ? legs.map((l, i) => `<div class="slipleg"><span class="i">${i + 1}</span>
+          <span>${esc(l.selection)}<small>${esc(l.fixture || "no match named")}</small></span>
+          <b>${(+l.odds).toFixed(2)}</b><span class="x" data-drop="${i}" title="Remove">×</span></div>`).join("")
+      : `<p class="note" style="margin:0">No legs yet. Add one above — a single is fine.</p>`;
+
+    const product = legs.reduce((a, l) => a * (+l.odds || 1), 1);
+    const real = parseFloat(String($("#lgReal").value || "").replace(",", "."));
+    const price = real > 1 ? real : (legs.length ? product : 0);
+    const stake = parseFloat(String($("#lgStake").value || "").replace(",", "."));
+
+    $("#lgPrice").textContent = legs.length ? product.toFixed(2) : "—";
+    $("#lgRet").textContent = price > 1 && stake > 0 ? money(stake * price) : "—";
+    // what quick stakes make sense depends on what is actually in the bankroll
+    const steps = [1, 2, 5, 10].filter((v) => v <= Math.max(1, S.bank));
+    $("#lgQuick").innerHTML = steps.map((v) => `<button type="button" data-stake="${v}">€${v}</button>`).join("")
+      + (S.bank > 0 ? `<button type="button" data-stake="${round2(S.bank * 0.02)}">2%</button>` : "");
+  }
+
+  function saveLog() {
+    const product = legs.reduce((a, l) => a * (+l.odds || 1), 1);
+    const real = parseFloat(String($("#lgReal").value || "").replace(",", "."));
+    const price = real > 1 ? real : product;
+    const stake = round2(parseFloat(String($("#lgStake").value || "").replace(",", ".")));
+
+    if (!legs.length) { $("#lgOut").textContent = "Add at least one leg first."; return; }
+    if (!(price > 1)) { $("#lgOut").textContent = "That price doesn't look right."; return; }
+    if (!(stake > 0)) { $("#lgOut").textContent = "Enter a stake."; return; }
+    if (stake > S.bank) { $("#lgOut").textContent = `Not enough in the bankroll (${money(S.bank)}).`; return; }
+    if (stake / S.bank >= 0.1 && !confirm(
+      `${money(stake)} is ${Math.round(100 * stake / S.bank)}% of your ${money(S.bank)} bankroll.\n\nLog it anyway?`)) return;
+
+    S.bets.unshift({
+      id: "bet_" + Date.now(),
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+      legs: legs.map((l) => ({ fixture: l.fixture || "", selection: l.selection,
+                               odds: +(+l.odds).toFixed(2), type: "manual", league: "",
+                               subSelections: [{ label: l.selection, odds: +(+l.odds).toFixed(2) }] })),
+      stake, odds: +price.toFixed(2), potentialReturn: round2(stake * price),
+      status: "PENDING", source: "manual",
+    });
+    S.bank = round2(S.bank - stake);
+    if (!save()) return;
+    legs = [];
+    $("#lgReal").value = ""; $("#lgStake").value = "";
+    $("#lgOut").textContent = `Logged ${money(stake)} at ${price.toFixed(2)}. It is running now — settle it below when it finishes.`;
+    draw();
+    drawLog();
+  }
+
   /* ------------------------------------------------------------- backup */
   function stamp() {
     const d = new Date(), p = (n) => String(n).padStart(2, "0");
@@ -613,6 +717,29 @@
     const wk = e.target.closest("#wkTabs button[data-wk]");
     if (wk) { wkTab = wk.dataset.wk; weekly(S.G); return; }
 
+    if (e.target.closest("#lgAdd")) {
+      const sel = $("#lgSel").value.trim();
+      const od = parseFloat(String($("#lgOdds").value || "").replace(",", "."));
+      if (!sel) { $("#lgOut").textContent = "Name the selection first."; return; }
+      if (!(od > 1)) { $("#lgOut").textContent = "That price doesn't look right."; return; }
+      legs.push({ fixture: $("#lgFix").value.trim(), selection: sel, odds: od });
+      $("#lgSel").value = ""; $("#lgOdds").value = "";
+      $("#lgOut").textContent = "";
+      drawLog();
+      $("#lgSel").focus();
+      return;
+    }
+    const drop = e.target.closest("#lgLegs [data-drop]");
+    if (drop) { legs.splice(+drop.dataset.drop, 1); drawLog(); return; }
+    const qs = e.target.closest("#lgQuick [data-stake]");
+    if (qs) { $("#lgStake").value = (+qs.dataset.stake).toFixed(2); drawLog(); return; }
+    if (e.target.closest("#lgSave")) { saveLog(); return; }
+    if (e.target.closest("#lgClear")) {
+      legs = []; $("#lgFix").value = ""; $("#lgSel").value = "";
+      $("#lgOdds").value = ""; $("#lgReal").value = ""; $("#lgStake").value = "";
+      $("#lgOut").textContent = ""; drawLog(); return;
+    }
+
     if (e.target.closest("#bkExport")) { exportBackup(); return; }
 
     const go = e.target.closest("[data-docash]");
@@ -635,8 +762,21 @@
     e.target.value = "";
   });
 
+  document.addEventListener("input", (e) => {
+    if (["lgReal", "lgStake"].includes(e.target.id)) drawLog();
+  });
+  // Enter in the price box adds the leg, so a slip can be typed without reaching
+  // for the mouse between every one
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && ["lgSel", "lgOdds", "lgFix"].includes(e.target.id)) {
+      e.preventDefault();
+      $("#lgAdd").click();
+    }
+  });
+
   load();
   draw();
+  drawLog();
   $("#bkN").textContent = `${plural(S.bets.length, "ticket")} · ${money(S.bank)}`;
   scorecard();
 })();

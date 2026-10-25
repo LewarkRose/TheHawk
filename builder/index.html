@@ -1678,16 +1678,29 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .bd-sheet{max-width:1040px;margin:0 auto}
 .bd-mast{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;padding:16px 16px 13px;
   border-bottom:2px solid rgba(232, 224, 207,.22)}
-.bd-mast h3{margin:0;font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
-  font-size:25px;font-weight:700;letter-spacing:.01em}
+/* The masthead. Serif italic rather than condensed sans: this page is a
+   published record, and a masthead over a heavy rule is how a published record
+   has always announced itself. Barlow Condensed stays nowhere on this page —
+   two display faces in one sheet read as two sheets. */
+/* text-transform, letter-spacing and colour are all set explicitly because the
+   board sits inside .section, and `.section h3` uppercases, letterspaces and
+   mutes every h3 under it. Overriding only the font left a grey, letterspaced
+   "HAWK'S BOARD" that read as a section label shouting, not a masthead — and it
+   looked deliberate enough that a computed-style check would never have caught
+   it. Sentence case, tight, full ink. */
+.bd-mast h3{margin:0;font:italic 400 clamp(26px,4vw,36px)/1 Georgia,"Iowan Old Style","Times New Roman",serif;
+  letter-spacing:-.01em;text-transform:none;color:var(--text)}
 .bd-recs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:1px solid rgba(232, 224, 207,.16)}
-.bd-recs > div{padding:13px 16px;min-width:0}
+.bd-recs > div{padding:18px 18px 19px;min-width:0}
 .bd-recs > div + div{border-left:1px solid rgba(232, 224, 207,.13)}
-.bd-recs .k{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-.bd-recs .n{font-family:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
-  font-size:28px;line-height:1;font-weight:700;font-variant-numeric:tabular-nums;margin-top:5px}
-.bd-recs .sub{font-size:11.5px;color:var(--muted);margin-top:3px}
-.bd-recs .ask{font-size:10.5px;color:var(--muted);margin-top:7px;line-height:1.45}
+.bd-recs .k{font-size:8.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
+/* The three figures share the masthead's face. tabular-nums stays: these sit in a
+   row and a proportional 1 would make the three columns disagree about their
+   own left edge. */
+.bd-recs .n{font:italic 400 30px/1 Georgia,"Iowan Old Style","Times New Roman",serif;
+  font-variant-numeric:tabular-nums;margin-top:12px}
+.bd-recs .sub{font-size:11.5px;color:var(--muted);margin-top:8px}
+.bd-recs .ask{font-size:10.5px;color:var(--faint);margin-top:9px;line-height:1.55}
 /* Four columns: what it is · the gap as a bar · the gap read out in words · the count.
    The said and landed figures moved into the label's second line. They were two of
    five columns and almost nobody reads a pair of percentages and subtracts them —

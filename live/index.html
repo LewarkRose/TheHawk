@@ -35,6 +35,24 @@
   font:700 9.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--faint);
   transition:color .4s var(--film);animation:rise .8s .05s var(--film) both}
 .back:hover{color:var(--gold-hi)}
+/* what's on, when you arrive without a match */
+.on-h{display:flex;align-items:baseline;gap:9px;margin:26px 0 11px;
+  font:700 9.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+.on-h:first-child{margin-top:0}
+.on-h b{color:var(--gold-hi);font-weight:400}
+.on-l{display:grid;gap:1px;background:var(--rule)}
+.on-r{display:flex;align-items:center;gap:12px;background:var(--ink);padding:13px 14px;
+  text-decoration:none;color:inherit;transition:background .3s var(--film)}
+.on-r:hover{background:#101014}
+.on-r .st{width:50px;flex:none;font:400 11px/1 var(--mono);color:var(--faint);
+  font-variant-numeric:tabular-nums}
+.on-r.lv .st{color:var(--live)}
+.on-r .nm{flex:1;min-width:0;font-size:13.5px}
+.on-r .nm small{display:block;color:var(--faint);font:400 10px/1.6 var(--mono);
+  letter-spacing:.1em;text-transform:uppercase}
+.on-r .sc{flex:none;font-family:var(--disp);font-weight:700;font-size:19px;line-height:1;
+  font-variant-numeric:tabular-nums}
+.on-r .sc em{font-style:normal;color:var(--faint);margin:0 3px}
 </style>
 </head>
 <body>
@@ -80,6 +98,11 @@
     </div>
   </div>
 </header>
+
+<!-- no match chosen: what is on, rather than a dead end -->
+<section class="calm" id="onnow" hidden>
+  <div class="wrap"><div id="onBody"></div></div>
+</section>
 
 <section class="calm" id="yours" hidden>
   <div class="wrap">
@@ -657,12 +680,57 @@
     }
   }
 
+  /* Arriving at Live without a match used to be a dead end that sent you to
+     Today. It shows what is on instead: in play now, then the next hour —
+     the same band rule Scores uses, not-started with a kick-off under an
+     hour away. */
+  async function onNow() {
+    $("#tag").innerHTML = `<span class="dot off"></span>Nothing chosen`;
+    $("#fail").innerHTML = `What's <span class="q">on</span>`;
+    $("#fail").hidden = false;
+    const pad = (n) => String(n).padStart(2, "0");
+    const d = new Date();
+    let games = [];
+    try { games = await window.HAWK.scores(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`); }
+    catch { /* the list is the whole page, so say so below */ }
+
+    const live = games.filter((g) => g.status === 3);
+    const soon = games.filter((g) => {
+      if (g.status !== 2) return false;
+      const t = Date.parse(g.kickoff || 0) || 0;
+      return t && t - Date.now() <= 3600e3;
+    }).sort((a, b) => Date.parse(a.kickoff || 0) - Date.parse(b.kickoff || 0));
+
+    $("#said").textContent = live.length
+      ? `${live.length} in play${soon.length ? `, ${soon.length} kicking off within the hour` : ""}. Pick one.`
+      : soon.length ? `Nothing in play. ${soon.length} kicking off within the hour.`
+      : "Nothing in play, and nothing kicking off within the hour.";
+
+    const time = (g) => {
+      const t = new Date(g.kickoff);
+      return isNaN(t) ? "" : `${pad(t.getHours())}:${pad(t.getMinutes())}`;
+    };
+    const row = (g, isLive) => `<a class="on-r${isLive ? " lv" : ""}"
+      href="./?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}">
+      <span class="st">${isLive ? esc(g.clock || "Live") : time(g)}</span>
+      <span class="nm">${esc(g.home)} v ${esc(g.away)}<small>${esc(g.league || "")}</small></span>
+      ${isLive ? `<span class="sc">${g.score[0]}<em>–</em>${g.score[1]}</span>` : ""}</a>`;
+    const list = (title, l, isLive) => l.length
+      ? `<div class="on-h">${title}<b>${l.length}</b></div>
+         <div class="on-l">${l.map((g) => row(g, isLive)).join("")}</div>` : "";
+
+    $("#onBody").innerHTML = live.length || soon.length
+      ? list("In play", live, true) + list("Next hour", soon, false)
+      : `<p class="note" style="margin:0">Nothing to read right now.
+         <a href="../scores/" style="color:var(--gold-hi)">The day's scores</a> or
+         <a href="../today/" style="color:var(--gold-hi)">what's coming</a>.</p>`;
+    $("#onnow").hidden = false;
+    clearTimeout(S.timer);
+    if (live.length) S.timer = setTimeout(onNow, 60000);
+  }
+
   async function load() {
-    if (!S.id) {
-      $("#said").innerHTML = `No match chosen. Pick one in play from
-        <a href="../today/" style="color:var(--gold-hi)">Today</a>.`;
-      return;
-    }
+    if (!S.id) { await onNow(); return; }
     let d;
     try { d = await window.HAWK.liveMatch(String(S.id)); }
     catch (err) {

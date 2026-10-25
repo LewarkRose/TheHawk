@@ -138,8 +138,10 @@
     <p class="plan" id="abPlan"></p>
     <div class="btns" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:26px">
       <button class="btn gold" id="abGo">Build my bet builder</button>
-      <button class="btn ghost" id="abAgain" hidden>Build a different one</button>
     </div>
+    <!-- every build these settings make, side by side — picking beats pressing
+         "build a different one" until something good turns up -->
+    <div class="opts" id="abOpts" hidden></div>
     <div id="abOut"></div>
     <p class="note">HAWK picks legs that fit the price you asked for, then checks the whole ticket
       together. <b>The Bet365 figure is an estimate</b> of what their builder would pay, not a price
@@ -557,13 +559,15 @@
      old builder's, under the same names, and are remembered. */
   const AB_KEY = "hawk.autobuild";
   const AB_DEF = { target: 4, style: "Balanced", maxLegs: 5, focus: "Mix",
-                   picks: "likely", favourite: true, extras: false, priced: true };
+                   picks: "likely", favourite: true, extras: false, priced: true, options: 5 };
   let AB = { ...AB_DEF };
   try { AB = { ...AB_DEF, ...JSON.parse(localStorage.getItem(AB_KEY) || "{}") }; } catch { /* defaults */ }
   const abSave = () => { try { localStorage.setItem(AB_KEY, JSON.stringify(AB)); } catch { /* private */ } };
 
   function abControls() {
-    const sel = (k, opts, hint) => `<div><label for="ab-${k}">${esc(k === "maxLegs" ? "Most legs" : k)}</label>
+    const LABEL = { maxLegs: "Most legs", options: "Options", style: "Legs like",
+                    focus: "Made of", picks: "Picks" };
+    const sel = (k, opts, hint) => `<div><label for="ab-${k}">${esc(LABEL[k] || k)}</label>
       <select id="ab-${k}" data-ab="${k}">${opts.map(([v, t]) =>
         `<option value="${esc(v)}"${String(AB[k]) === String(v) ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
       ${hint ? `<div class="hint">${esc(hint)}</div>` : ""}</div>`;
@@ -595,6 +599,8 @@
       ${sel("focus", [["Mix", "Mix of markets"], ["Players", "Player props"], ["Match", "Match markets"],
                       ["Stats", "No result leg"]], "No result leg bans the result market, so goals, cards and corners carry it")}
       ${sel("picks", [["likely", "Most likely"], ["value", "Legs Bet365 overprices"]])}
+      ${sel("options", [2, 3, 4, 5, 6, 8].map((n) => [n, `${n} to choose from`]),
+            "How many different builds to offer for these settings")}
     </div>
 
     <div class="sw">
@@ -639,7 +645,7 @@
     if (!t || !t.legs || !t.legs.length) {
       $("#abOut").innerHTML = `<p class="note" style="margin:22px 0 0">HAWK couldn't make a ticket at
         that price with those settings. Try a longer price, more legs, or a different focus.</p>`;
-      $("#abAgain").hidden = true;
+      $("#abOpts").hidden = true;
       return;
     }
     const byId = new Map((S.m.legs || []).map((l) => [l.id, l]));
@@ -660,12 +666,11 @@
         <b>${odds(t.b365)}</b> where HAWK makes it ${odds(t.fair)} — ${(100 * (t.b365 / t.fair - 1)).toFixed(1)}%.
         That gap is the builder's margin and it is normal; the ticket is in your slip, so type their
         real price there to settle it.</p>` : ""}</div>`;
-    $("#abN").textContent = nth ? `option ${nth}` : `${plural(legs.length, "leg")} at ${odds(t.fair)}`;
-    $("#abAgain").hidden = false;
+    $("#abN").textContent = nth ? `option ${nth} of ${abOpts.length || 1}` : `${plural(legs.length, "leg")} at ${odds(t.fair)}`;
   }
 
   let abOpts = [], abAt = 0;
-  function abBuild(again) {
+  function abBuild() {
     if (!S.m) return;
     // target 0 means "any odds": the engine wants a number, and 1.2 is the
     // lowest it accepts, which is the same thing as asking for no floor.
@@ -677,35 +682,52 @@
                    // without at 0.924
                    priced: !!AB.priced };
     try {
-      if (!again) {
-        abOpts = []; abAt = 0;
-        abShow(window.HAWK.build(body));
-        return;
-      }
-      if (!abOpts.length) {
-        const r = window.HAWK.buildOptions({ ...body, options: 4 }, 4);
-        abOpts = (r && r.options) || [];
-      }
-      if (!abOpts.length) { abShow(null); return; }
-      // buildOptions repeats the normal build as its first entry, so cycling
-      // blindly hands you the same ticket back. Skip anything whose legs match
-      // what is already in the slip.
-      const sig = (t) => (t.legs || []).map((l) => l.id).sort().join("|");
-      const now = [...S.slip].sort().join("|");
-      let tried = 0;
-      do { abAt = (abAt + 1) % abOpts.length; tried++; }
-      while (tried <= abOpts.length && sig(abOpts[abAt]) === now);
-      if (sig(abOpts[abAt]) === now) {
-        $("#abOut").insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:16px">That is the
-          only ticket these settings make at ${odds(+AB.target)}. Change the price, the legs or the
-          focus for a different one.</p>`);
-        return;
-      }
-      abShow(abOpts[abAt], abAt + 1);
+      const n = Math.max(2, Math.min(8, +AB.options || 5));
+      const r = window.HAWK.buildOptions({ ...body, options: n }, n);
+      abOpts = (r && r.options) || [];
+      // Nothing at all: fall back to the single build, which gives the honest
+      // "couldn't make one at that price" rather than an empty row.
+      if (!abOpts.length) { abShow(window.HAWK.build(body)); abRow(); return; }
+      abAt = 0;
+      abShow(abOpts[0], 1);
+      abRow();
+      return;
     } catch (err) {
       $("#abOut").innerHTML = `<p class="note" style="margin:22px 0 0">Couldn't build it
         (${esc(err.message || "")}).</p>`;
+      $("#abOpts").hidden = true;
     }
+  }
+
+  /* What a ticket returns per euro at the price HAWK expects Bet365 to show.
+     The engine's own rule: chance × price, with the chance counted as at most
+     a little over what the price itself implies, so "worth it" never rests on
+     HAWK simply out-guessing the market. */
+  const abWorth = (t) => {
+    const x = (t && (t.b365 || t.price)) || 0;
+    return x && t.p ? t.p * x * (t.check || 1) : 0;
+  };
+
+  function abRow() {
+    const box = $("#abOpts");
+    if (!abOpts.length || abOpts.length < 2) { box.hidden = true; return; }
+    box.innerHTML = `<span class="lab">Options</span>` + abOpts.map((t, i) => {
+      const w = abWorth(t), good = w >= 1;
+      return `<button type="button" data-opt="${i}" aria-pressed="${String(i === abAt)}"
+        title="${plural((t.legs || []).length, "leg")} · HAWK makes it ${pct(t.p, t.p < 0.1 ? 1 : 0)} · ${
+          good ? `returns about €${w.toFixed(2)} per euro at that price`
+               : `returns about €${w.toFixed(2)} per euro — under fair`}">
+        <b>${i + 1}</b><span>${(t.legs || []).length} legs · ${odds(t.b365)}${
+          good ? ` <i class="ok">✓</i>` : ""}</span></button>`;
+    }).join("");
+    box.hidden = false;
+  }
+
+  function abPick(i) {
+    if (!abOpts[i]) return;
+    abAt = i;
+    abShow(abOpts[i], i + 1);
+    abRow();
   }
 
   /* ------------------------------------------------------- match numbers
@@ -951,8 +973,9 @@
       return;
     }
 
-    if (e.target.closest("#abGo")) { abBuild(false); return; }
-    if (e.target.closest("#abAgain")) { abBuild(true); return; }
+    if (e.target.closest("#abGo")) { abBuild(); return; }
+    const optBtn = e.target.closest("#abOpts [data-opt]");
+    if (optBtn) { abPick(+optBtn.dataset.opt); return; }
 
     if (e.target.closest("#toAcca")) { toAcca(); return; }
 

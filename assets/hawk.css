@@ -483,6 +483,25 @@ img{display:block;max-width:100%}
 .sw button[aria-pressed="true"]{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
 .sw button[aria-pressed="true"] span{color:var(--muted)}
 
+/* every build these settings make, side by side.
+   "Build a different one" handed you tickets one at a time with no way to
+   see what was on offer or go back to the second one. Each chip carries the
+   two things that decide it — how many legs and what Bet365 would pay —
+   and a ✓ when the ticket returns more than a euro per euro at that price. */
+.opts{display:flex;gap:9px;flex-wrap:wrap;align-items:stretch;margin-top:22px}
+.opts .lab{display:flex;align-items:center;font:700 8.5px/1 var(--mono);letter-spacing:.18em;
+  text-transform:uppercase;color:var(--faint);padding-right:4px}
+.opts button{appearance:none;border:0;background:none;cursor:pointer;text-align:left;
+  padding:10px 14px;color:var(--muted);
+  box-shadow:inset 0 0 0 1px var(--rule);transition:color .3s var(--film),box-shadow .3s var(--film)}
+.opts button b{display:block;font-family:var(--disp);font-weight:700;font-size:17px;line-height:1}
+.opts button span{display:block;margin-top:6px;font:400 10px/1 var(--mono);letter-spacing:.04em;
+  color:var(--faint);white-space:nowrap}
+.opts button:hover{color:var(--text);box-shadow:inset 0 0 0 1px var(--rule-2)}
+.opts button[aria-pressed="true"]{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+.opts button[aria-pressed="true"] span{color:var(--muted)}
+.opts button .ok{color:var(--up)}
+
 /* ------------------------------------------------------------ auto-build --
    The settings HAWK builds from. Quiet controls: a page that already asks you
    to read numbers should not also shout its form furniture at you. */

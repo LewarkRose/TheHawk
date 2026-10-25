@@ -38,6 +38,59 @@
   </div>
 </section>
 
+<section class="calm">
+  <div class="wrap">
+    <div class="lede"><h3>Every bet</h3><span class="n" id="betsN"></span></div>
+    <div class="filt" id="filt"></div>
+    <div id="bets"><div class="skel" style="padding:30px 0">Reading…</div></div>
+  </div>
+</section>
+
+<details class="calm fold" id="logWrap" data-fold="vLog">
+  <summary><div class="wrap"><div class="lede"><h3>Log a ticket</h3>
+    <span class="n" id="logN">for a bet placed outside HAWK</span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div class="lgf">
+      <div><label for="lgFix">Match</label>
+        <input id="lgFix" placeholder="Barcelona vs Real Madrid"></div>
+      <div><label for="lgSel">Selection</label>
+        <input id="lgSel" placeholder="Over 4.5 cards"></div>
+      <div><label for="lgOdds">Price</label>
+        <input id="lgOdds" class="num" inputmode="decimal" placeholder="1.80"></div>
+      <div><button class="btn ghost" id="lgAdd">Add this leg</button></div>
+    </div>
+
+    <div id="lgLegs" style="margin-top:26px"></div>
+
+    <div class="lgtot">
+      <div><div class="n" id="lgPrice">—</div><div class="k">Combined price</div></div>
+      <div style="min-width:150px"><label for="lgReal" style="display:block;margin-bottom:9px;
+        font:700 8.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint)">What it actually paid</label>
+        <input id="lgReal" class="num" inputmode="decimal" placeholder="override"
+          style="width:150px;padding:11px 12px;border:0;background:var(--raise);color:var(--text);
+          font:400 14px/1 var(--mono);box-shadow:inset 0 0 0 1px var(--rule-2)"></div>
+      <div style="min-width:140px"><label for="lgStake" style="display:block;margin-bottom:9px;
+        font:700 8.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint)">Stake</label>
+        <input id="lgStake" class="num" inputmode="decimal" placeholder="5.00"
+          style="width:140px;padding:11px 12px;border:0;background:var(--raise);color:var(--text);
+          font:400 14px/1 var(--mono);box-shadow:inset 0 0 0 1px var(--rule-2)">
+        <div class="quick" id="lgQuick"></div></div>
+      <div style="margin-left:auto;text-align:right"><div class="n" id="lgRet">—</div>
+        <div class="k">Returns if it lands</div></div>
+    </div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:26px">
+      <button class="btn gold" id="lgSave">Log it in the Vault</button>
+      <button class="btn ghost" id="lgClear">Clear</button>
+    </div>
+    <p class="note" id="lgOut"></p>
+    <p class="note"><b>The combined price is the legs multiplied, which is not what a bet builder
+      pays.</b> Legs on one match move together and the book takes its margin, so the real price is
+      always shorter — put what you were actually quoted in the override box. The stake comes off
+      your bankroll as soon as you log it, exactly as it does in the builder.</p>
+  </div>
+</details>
+
 <details class="calm fold" id="wkWrap" data-fold="vWeek" hidden>
   <summary><div class="wrap"><div class="lede"><h3>Weekly report</h3>
     <span class="n" id="wkN"></span><span class="mk-t"></span></div></div></summary>
@@ -85,51 +138,6 @@
   </div>
 </details>
 
-<details class="calm fold" id="logWrap" data-fold="vLog">
-  <summary><div class="wrap"><div class="lede"><h3>Log a ticket</h3>
-    <span class="n" id="logN">for a bet placed outside HAWK</span><span class="mk-t"></span></div></div></summary>
-  <div class="wrap">
-    <div class="lgf">
-      <div><label for="lgFix">Match</label>
-        <input id="lgFix" placeholder="Barcelona vs Real Madrid"></div>
-      <div><label for="lgSel">Selection</label>
-        <input id="lgSel" placeholder="Over 4.5 cards"></div>
-      <div><label for="lgOdds">Price</label>
-        <input id="lgOdds" class="num" inputmode="decimal" placeholder="1.80"></div>
-      <div><button class="btn ghost" id="lgAdd">Add this leg</button></div>
-    </div>
-
-    <div id="lgLegs" style="margin-top:26px"></div>
-
-    <div class="lgtot">
-      <div><div class="n" id="lgPrice">—</div><div class="k">Combined price</div></div>
-      <div style="min-width:150px"><label for="lgReal" style="display:block;margin-bottom:9px;
-        font:700 8.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint)">What it actually paid</label>
-        <input id="lgReal" class="num" inputmode="decimal" placeholder="override"
-          style="width:150px;padding:11px 12px;border:0;background:var(--raise);color:var(--text);
-          font:400 14px/1 var(--mono);box-shadow:inset 0 0 0 1px var(--rule-2)"></div>
-      <div style="min-width:140px"><label for="lgStake" style="display:block;margin-bottom:9px;
-        font:700 8.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint)">Stake</label>
-        <input id="lgStake" class="num" inputmode="decimal" placeholder="5.00"
-          style="width:140px;padding:11px 12px;border:0;background:var(--raise);color:var(--text);
-          font:400 14px/1 var(--mono);box-shadow:inset 0 0 0 1px var(--rule-2)">
-        <div class="quick" id="lgQuick"></div></div>
-      <div style="margin-left:auto;text-align:right"><div class="n" id="lgRet">—</div>
-        <div class="k">Returns if it lands</div></div>
-    </div>
-
-    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:26px">
-      <button class="btn gold" id="lgSave">Log it in the Vault</button>
-      <button class="btn ghost" id="lgClear">Clear</button>
-    </div>
-    <p class="note" id="lgOut"></p>
-    <p class="note"><b>The combined price is the legs multiplied, which is not what a bet builder
-      pays.</b> Legs on one match move together and the book takes its margin, so the real price is
-      always shorter — put what you were actually quoted in the override box. The stake comes off
-      your bankroll as soon as you log it, exactly as it does in the builder.</p>
-  </div>
-</details>
-
 <details class="calm fold" id="bkWrap" data-fold="vBackup">
   <summary><div class="wrap"><div class="lede"><h3>Backup</h3>
     <span class="n" id="bkN"></span><span class="mk-t"></span></div></div></summary>
@@ -145,14 +153,6 @@
     <p class="note" id="bkOut"></p>
   </div>
 </details>
-
-<section class="calm">
-  <div class="wrap">
-    <div class="lede"><h3>Every bet</h3><span class="n" id="betsN"></span></div>
-    <div class="filt" id="filt"></div>
-    <div id="bets"><div class="skel" style="padding:30px 0">Reading…</div></div>
-  </div>
-</section>
 
 <footer class="foot">
   <div class="wrap"><a href="../home/">home</a> · <a href="../today/">today</a> ·

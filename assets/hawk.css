@@ -65,9 +65,17 @@ img{display:block;max-width:100%}
   box-shadow:0 1px 0 rgba(242,242,242,.08)}
 .nav .in{max-width:var(--max);margin:0 auto;padding:14px var(--gut);
   display:flex;align-items:center;gap:clamp(12px,2.4vw,30px)}
-.nav .mark{display:flex;align-items:center;gap:10px;text-decoration:none;flex:none;
+.nav .mark{display:flex;align-items:center;gap:11px;text-decoration:none;flex:none;
   font-family:var(--disp);font-weight:700;font-size:21px;letter-spacing:.17em;text-transform:uppercase}
-.nav .mark i{width:9px;height:9px;background:var(--gold);transform:rotate(45deg);flex:none}
+/* the crest: the shield takes the accent, the hawk is knocked out of it in the
+   page's own black, so the mark is two colours and neither is imported */
+.nav .mark .crest{width:22px;height:22px;flex:none;display:block;
+  transition:transform .5s var(--film),filter .5s var(--film)}
+.nav .mark .crest .sh{fill:var(--gold)}
+.nav .mark .crest .bd{fill:var(--ink)}
+.nav .mark:hover .crest{transform:translateY(-2px);
+  filter:drop-shadow(0 6px 14px rgba(212,169,78,.45))}
+.nav .mark:hover .crest .sh{fill:var(--gold-hi)}
 .nav .links{display:flex;gap:clamp(10px,1.8vw,24px);margin-left:clamp(8px,2vw,22px);min-width:0}
 .nav .links a{text-decoration:none;color:var(--faint);white-space:nowrap;
   font:700 10px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;

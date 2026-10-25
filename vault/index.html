@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Vault · HAWK</title>
 <meta name="description" content="Every bet, what it returned, and the bankroll that follows.">
-<link rel="icon" href="../favicon.svg">
+<link rel="icon" href="../assets/hawk-mark.svg">
 <link rel="manifest" href="../manifest.webmanifest?v=6">
 <meta name="theme-color" content="#080809">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -356,16 +356,22 @@
   const STATE = { WON: ["won", "Won"], LOST: ["lost", "Lost"], PENDING: ["pend", "Running"],
                   CASHED_OUT: ["cash", "Cashed out"], VOID: ["void", "Void"] };
 
+  /* A ticket across more than one match. It is not a status — a ticket can be
+     an acca AND running AND won — so it sits beside the status chips rather
+     than among them, and picking it clears whichever status was on. */
+  const isAcca = (b) => (b.legs || []).length > 1;
+
   function betList() {
-    const counts = { ALL: S.bets.length };
+    const counts = { ALL: S.bets.length, ACCA: S.bets.filter(isAcca).length };
     for (const b of S.bets) counts[b.status] = (counts[b.status] || 0) + 1;
     const tabs = [["ALL", "All"], ["PENDING", "Running"], ["WON", "Won"],
-                  ["LOST", "Lost"], ["CASHED_OUT", "Cashed out"]]
+                  ["LOST", "Lost"], ["CASHED_OUT", "Cashed out"], ["ACCA", "Accas"]]
       .filter(([k]) => k === "ALL" || counts[k]);
     $("#filt").innerHTML = tabs.map(([k, t]) => `<button type="button" data-f="${k}"
       aria-pressed="${String(S.filter === k)}">${esc(t)}<i>${counts[k] || 0}</i></button>`).join("");
 
-    const list = S.bets.filter((b) => S.filter === "ALL" || b.status === S.filter);
+    const list = S.bets.filter((b) => S.filter === "ALL" ? true
+      : S.filter === "ACCA" ? isAcca(b) : b.status === S.filter);
     $("#betsN").textContent = `${plural(list.length, "ticket")}`;
     if (!list.length) {
       $("#bets").innerHTML = `<p class="note" style="margin:22px 0 0">Nothing here.</p>`;

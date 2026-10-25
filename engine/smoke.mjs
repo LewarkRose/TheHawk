@@ -147,18 +147,30 @@ const check = (ok, what) => { if (!ok) failures.push(what); return ok; };
 // This is a source check rather than a behaviour one, because the Vault's page
 // script is not loaded here. Crude, and it still catches the regression: the day
 // someone reaches for settleTime inside renderWeekly again, the deploy stops.
+// Both Vaults, because there are two now: vault-v1.html is the original (it
+// was index.html until the site switched over to the rebuild, which is why
+// this check used to read index.html and would otherwise be reading a
+// thirty-line redirect), and vault/index.html is the one in use. The rule is
+// the same in both and a page that breaks it is wrong wherever it lives.
 {
-  const src = await readFile(path.join(ROOT, "index.html"), "utf8");
-  const start = src.indexOf("function renderWeekly");
-  const body = start < 0 ? "" : src.slice(start, start + 4000);
-  check(start >= 0, "index.html: renderWeekly has gone — the week-attribution check cannot run");
-  if (start >= 0) {
+  const VAULTS = [
+    ["vault-v1.html", "function renderWeekly"],
+    ["vault/index.html", "function weekly"],
+  ];
+  for (const [file, marker] of VAULTS) {
+    let src = "";
+    try { src = await readFile(path.join(ROOT, file), "utf8"); }
+    catch { check(false, `${file}: missing — the week-attribution check cannot run`); continue; }
+    const start = src.indexOf(marker);
+    const body = start < 0 ? "" : src.slice(start, start + 4000);
+    check(start >= 0, `${file}: ${marker} has gone — the week-attribution check cannot run`);
+    if (start < 0) continue;
     check(!/inWeek\(\s*settleTime/.test(body),
-      "index.html: the Weekly Report is bucketing by settleTime again. The history rows and the "
+      `${file}: the Weekly Report is bucketing by settleTime again. The history rows and the `
       + "week strip use betTime (the night it was played), and two rules for the same week put two "
       + "different totals on one page.");
     check(/inWeek\(\s*betTime/.test(body),
-      "index.html: the Weekly Report no longer buckets by betTime — it must share the rule the "
+      `${file}: the Weekly Report no longer buckets by betTime — it must share the rule the `
       + "history rows and the week strip use.");
   }
 }

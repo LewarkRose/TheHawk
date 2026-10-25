@@ -23,10 +23,21 @@
   // which page we are on, from the folder name
   const here = (location.pathname.replace(/\/+$/, "").split("/").pop() || "home").toLowerCase();
 
+  /* The crest, inline rather than an <img>, so it takes the page's own colour
+     variables and can lift on hover. Same two paths as assets/hawk-mark.svg
+     and favicon.svg — one shape, three places, no second drawing of it. The
+     gold diamond that used to sit here was a placeholder that outstayed its
+     welcome: HAWK has a mark and the site was not using it. */
+  const CREST = `<svg class="crest" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+      <path class="sh" d="M32 1 L62 10 V36 C62 50 48 60 32 63 C16 60 2 50 2 36 V10 Z"/>
+      <path class="bd" d="M32 15 L36 21 L32 25 L28 21 Z M30 27 L6 17 L13 26 L6 28 L16 34 L30 39 Z
+        M34 27 L58 17 L51 26 L58 28 L48 34 L34 39 Z M28 42 L32 54 L36 42 L32 45 Z"/>
+    </svg>`;
+
   const nav = document.createElement("nav");
   nav.className = "nav";
   nav.innerHTML = `<div class="in">
-      <a class="mark" href="../home/"><i></i>Hawk</a>
+      <a class="mark" href="../home/">${CREST}Hawk</a>
       <div class="links">${LINKS.map(([k, href, label]) =>
         `<a href="${href}"${k === here ? ' aria-current="page"' : ""}>${label}</a>`).join("")}</div>
       <div class="right">

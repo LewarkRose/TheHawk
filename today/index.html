@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Today · HAWK</title>
 <meta name="description" content="What is running, what is at risk, and what is left to do.">
-<link rel="icon" href="../favicon.svg">
+<link rel="icon" href="../assets/hawk-mark.svg">
 <link rel="manifest" href="../manifest.webmanifest?v=6">
 <meta name="theme-color" content="#080809">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -92,6 +92,23 @@
   const money = (n) => `${n < 0 ? "−" : ""}€${Math.abs(+n || 0).toFixed(2)}`;
   const pct = (p) => (Number.isFinite(p) ? `${Math.round(100 * p)}%` : "—");
   const band = (g) => (g.status === 3 ? "live" : g.status === 4 ? "done" : "next");
+
+  /* Six cards for a day with eighty matches on it, so which six is the whole
+     question — the same one the home page answers, and with the same answer:
+     in play first, then the big leagues, then kick-off. Ranked league by
+     league in the engine's own order (Premier League, La Liga, Serie A,
+     Bundesliga, Ligue 1, …) rather than by group, because inside the top five
+     every group rank is equal and that is how the Allsvenskan ends up above
+     Liverpool. A sort, not a filter: a day with no big football still fills. */
+  const GROUPS = (window.HAWK && window.HAWK.LEAGUE_GROUPS) || [];
+  const GROUP_RANK = (() => {
+    const m = {};
+    let i = 0;
+    GROUPS.forEach((gr) => (gr.leagues || []).forEach((l) => (m[l] = i++)));
+    return (league) => (league in m ? m[league] : i);
+  })();
+  const TOP5 = new Set(((GROUPS.find((g) => g.key === "top5") || {}).leagues) || []);
+
   // "match" pluralises to "matches", not "matchs"
   const plural = (n, w) => `${n} ${w}${n === 1 ? "" : /(ch|sh|s|x|z)$/.test(w) ? "es" : "s"}`;
 
@@ -137,11 +154,15 @@
     }
     const live = g.filter((x) => band(x) === "live").length;
     const next = g.filter((x) => band(x) === "next").length;
-    $("#cardN").textContent = live ? `${live} in play · ${next} to come` : `${plural(g.length, "match")}`;
-
     const order = { live: 0, next: 1, done: 2 };
     const ko = (x) => Date.parse(x.kickoff || 0) || 0;
-    const shown = g.slice().sort((a, b) => order[band(a)] - order[band(b)] || ko(a) - ko(b)).slice(0, 6);
+    const shown = g.slice().sort((a, b) => order[band(a)] - order[band(b)]
+                                        || GROUP_RANK(a.league) - GROUP_RANK(b.league)
+                                        || ko(a) - ko(b)).slice(0, 6);
+
+    const big = g.filter((x) => TOP5.has(x.league)).length;
+    $("#cardN").textContent = (live ? `${live} in play · ${next} to come` : plural(g.length, "match"))
+      + (big && g.length > shown.length ? ` · ${big} in the top five` : "");
 
     $("#card").innerHTML = shown.map((x) => {
       const b = band(x), [sh, sa] = x.score || [];

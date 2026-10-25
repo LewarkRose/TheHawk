@@ -337,6 +337,27 @@ img{display:block;max-width:100%}
 .achip.val{box-shadow:inset 0 0 0 1px rgba(79,212,134,.5)}
 .achip.val .r{color:var(--up)}
 
+/* THE BUILDER IN THE RAIL, v1's shape.
+   The rail is 340px, so the settings grid stacks instead of sitting in a
+   row — which is what v1 does at the same width. The build button leads,
+   because it is the thing you came to press. */
+.rbuild{background:var(--raise);padding:clamp(14px,1.8vw,18px);margin-bottom:16px;
+  box-shadow:inset 0 0 0 1px var(--rule-2)}
+.rbuild .btn.wide{width:100%;justify-content:center;margin-bottom:14px}
+.rbuild .fold.bare{border-bottom:0;padding-bottom:0}
+.rbuild .fold > summary .lede{margin-bottom:0}
+.rbuild .fold[open] > summary .lede{margin-bottom:clamp(14px,1.8vw,20px)}
+.rbuild .lede h3{font-size:clamp(14px,1.4vw,16px)}
+.rbuild .set{grid-template-columns:1fr;gap:16px}
+.rbuild .sw button{min-width:0;width:100%}
+.rbuild .opts button{flex:1 1 42%}
+.rbuild .note{font-size:11.5px}
+.rbuild .built li{grid-template-columns:18px minmax(0,1fr);row-gap:4px}
+.rbuild .built li b{grid-column:2;text-align:left}
+@media (max-width:920px){
+  .rbuild .set{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+}
+
 /* A fold that lives INSIDE a column rather than being a band across the
    page: no section padding of its own, and a rule under it to separate it
    from the markets below. */
@@ -457,7 +478,10 @@ img{display:block;max-width:100%}
    ======================================================================== */
 .two{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:clamp(24px,3vw,44px);
   align-items:start}
-.two .rail{position:sticky;top:26px}
+/* 26px put it UNDER the nav, which is fixed, 71px tall and sits at z-index 80
+   — so the slip stuck itself behind the bar and the right-hand side read as
+   empty. It has to clear the bar, not hide behind it. */
+.two .rail{position:sticky;top:88px}
 @media (max-width:920px){
   .two{grid-template-columns:1fr}
   .two .rail{position:static}
@@ -676,7 +700,15 @@ img{display:block;max-width:100%}
 .built li b{font:400 12px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
 
 /* the slip. The one bright thing below the fold, because the combined price
-   is what the whole page is for. */
+   is what the whole page is for.
+
+   It used to be bare text in the right-hand column: no edge, no surface. On
+   a black page an EMPTY slip is then invisible, so the whole right side read
+   as waste. V1's Bet Slip was a panel with a gold edge that was always
+   there, whether or not anything was on it — you could see where the ticket
+   was going to appear. Same here. */
+.slip{background:var(--raise);padding:clamp(16px,2vw,22px);
+  box-shadow:inset 0 0 0 1px rgba(212,169,78,.34),0 26px 60px -34px #000}
 .slip .hd{display:flex;align-items:baseline;gap:12px;padding-bottom:16px;
   border-bottom:1px solid var(--rule)}
 .slip .hd h4{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;

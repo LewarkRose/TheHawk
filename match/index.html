@@ -72,38 +72,42 @@
   </div>
 </header>
 
-<!-- Scores -> a match -> build, with the price beside you while you do it.
-     The builder and the markets share one column and the slip rails down
-     the other, so a ticket and what it is worth are never on different
-     screens. The builder used to be the eighth block down, under six folds. -->
+<!-- V1's shape: the MATCH is the left column and the BUILDER is the right
+     one — "Build my bet builder" at the top of the rail, its settings under
+     it, then the slip. Reading a match and building on it are two different
+     jobs, and in v1 they had a column each rather than taking turns down one.
+     The builder used to be the eighth block down, under six folds. -->
 <section class="calm">
   <div class="wrap two">
     <main>
-      <details class="fold bare" id="abWrap" data-fold="autobuild" data-open-default hidden>
-        <summary><div class="lede"><h3>Auto-build</h3>
-          <span class="n" id="abN">let HAWK pick the legs</span><span class="mk-t"></span></div></summary>
-        <div>
-          <div id="abSet"></div>
-          <p class="plan" id="abPlan"></p>
-          <div class="btns" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:26px">
-            <button class="btn gold" id="abGo">Build my bet builder</button>
-          </div>
-          <!-- every build these settings make, side by side — picking beats
-               pressing "build a different one" until something turns up -->
-          <div class="opts" id="abOpts" hidden></div>
-          <div id="abOut"></div>
-          <p class="note">HAWK picks legs that fit the price you asked for, then checks the whole
-            ticket together. <b>The Bet365 figure is an estimate</b> of what their builder would
-            pay, not a price from the feed — type their real one in the slip for a verdict.</p>
-        </div>
-      </details>
-
-      <div class="lede selh"><h3>Selections</h3><span class="n" id="selN"></span></div>
+      <div class="lede"><h3>Selections</h3><span class="n" id="selN"></span></div>
       <div class="cats" id="cats"></div>
       <div id="markets"><div class="skel" style="padding:30px 0">Reading…</div></div>
     </main>
 
     <aside class="rail">
+      <!-- The button leads, the way v1 leads with it. It sits OUTSIDE the
+           fold: <summary> has to be the first child of <details>, so a
+           button above it would be hoisted or ignored. -->
+      <div class="rbuild" id="abWrap" hidden>
+        <button class="btn gold wide" id="abGo">Build my bet builder</button>
+        <details class="fold bare" id="abFold" data-fold="autobuild" data-open-default>
+          <summary><div class="lede"><h3>Build settings</h3>
+            <span class="n" id="abN">let HAWK pick the legs</span><span class="mk-t"></span></div></summary>
+          <div>
+            <div id="abSet"></div>
+            <p class="plan" id="abPlan"></p>
+            <!-- every build these settings make, side by side — picking beats
+                 pressing "build a different one" until something turns up -->
+            <div class="opts" id="abOpts" hidden></div>
+            <div id="abOut"></div>
+            <p class="note">HAWK picks legs that fit the price you asked for, then checks the whole
+              ticket together. <b>The Bet365 figure is an estimate</b> of what their builder would
+              pay, not a price from the feed — type their real one in the slip for a verdict.</p>
+          </div>
+        </details>
+      </div>
+
       <div class="slip" id="slip">
         <div class="hd"><h4>Your slip</h4><span class="n" id="slipN">0 legs</span></div>
         <div class="empty">Tap a selection to add it. HAWK prices the whole slip together, so legs

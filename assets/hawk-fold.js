@@ -22,10 +22,20 @@
      and make "open by default" do nothing on the only machine that matters.
      Cleared once; from here their own choice is remembered again as normal. */
   try {
-    if (localStorage.getItem("hawk.fold.v") !== "2") {
+    const v = localStorage.getItem("hawk.fold.v");
+    if (v !== "2" && v !== "3") {
       localStorage.removeItem("hawk.fold.lineups");
       localStorage.removeItem("hawk.fold.ipLineups");
-      localStorage.setItem("hawk.fold.v", "2");
+    }
+    /* v3: the Vault's five analysis sections moved INSIDE one "Analysis"
+       fold. Their stored state is from when each was a band across the page
+       and most of them were left open — which would make opening Analysis
+       unfold four thousand pixels at once, the exact thing it exists to
+       stop. Cleared once; from here each remembers your choice again. */
+    if (v !== "3") {
+      for (const k of ["vWeek", "vWeeks", "vChart", "vLeagues", "vScore"])
+        localStorage.removeItem(`hawk.fold.${k}`);
+      localStorage.setItem("hawk.fold.v", "3");
     }
   } catch { /* private window: the defaults below apply anyway */ }
   const read = (k, dflt) => {

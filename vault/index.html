@@ -100,7 +100,19 @@
   </div>
 </details>
 
-<details class="calm fold" id="wkWrap" data-fold="vWeek" hidden>
+<!-- =====================================================================
+     Five blocks and four thousand pixels of reading, behind one line. The
+     Vault is a page about your money: what you have, what is running, what
+     it did. All of this is true and worth having and none of it is why you
+     opened the page, so it waits to be asked for.
+     ===================================================================== -->
+<details class="calm fold" id="anWrap" data-fold="vAnalysis" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Analysis</h3>
+    <span class="n" id="anN">the week, the weeks, the chart, the competitions, and how good HAWK is</span>
+    <span class="mk-t"></span></div></div></summary>
+  <div class="subs">
+
+<details class="sub fold" id="wkWrap" data-fold="vWeek" hidden>
   <summary><div class="wrap"><div class="lede"><h3>Weekly report</h3>
     <span class="n" id="wkN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
@@ -109,7 +121,7 @@
   </div>
 </details>
 
-<details class="calm fold" id="wksWrap" data-fold="vWeeks" hidden>
+<details class="sub fold" id="wksWrap" data-fold="vWeeks" hidden>
   <summary><div class="wrap"><div class="lede"><h3>By week</h3>
     <span class="n" id="wksN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
@@ -120,7 +132,7 @@
   </div>
 </details>
 
-<details class="calm fold" id="chartWrap" data-fold="vChart" hidden>
+<details class="sub fold" id="chartWrap" data-fold="vChart" hidden>
   <summary><div class="wrap"><div class="lede"><h3>Profit over time</h3>
     <span class="n" id="chartN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
@@ -131,7 +143,7 @@
   </div>
 </details>
 
-<details class="calm fold" id="lgWrap" data-fold="vLeagues" hidden>
+<details class="sub fold" id="lgWrap" data-fold="vLeagues" hidden>
   <summary><div class="wrap"><div class="lede"><h3>By competition</h3>
     <span class="n" id="lgN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
@@ -141,7 +153,7 @@
   </div>
 </details>
 
-<details class="calm fold" id="scWrap" data-fold="vScore" hidden>
+<details class="sub fold" id="scWrap" data-fold="vScore" hidden>
   <summary><div class="wrap"><div class="lede"><h3>How good is HAWK</h3>
     <span class="n" id="scN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
@@ -155,6 +167,9 @@
       <span class="n">200+ legs on the live model</span></div>
     <table class="lgt" id="scMarkets"></table>
     <p class="note" id="scNote"></p>
+  </div>
+</details>
+
   </div>
 </details>
 
@@ -1179,6 +1194,19 @@
 
   /* Checks once on open, and again on the button. Quiet when it has nothing
      to say, so a page with no running tickets does not announce itself. */
+  /* The Analysis fold shows itself once any block inside it has data, so the
+     five places that reveal a block did not each have to learn about it. */
+  (() => {
+    const parent = $("#anWrap");
+    if (!parent) return;
+    const sync = () => {
+      parent.hidden = ![...parent.querySelectorAll(".sub.fold")].some((d) => !d.hidden);
+    };
+    new MutationObserver(sync).observe(parent,
+      { attributes: true, attributeFilter: ["hidden"], subtree: true });
+    sync();
+  })();
+
   paintRules();
   $("#asGo").addEventListener("click", () => autoSettle(true));
   /* Turning a rule off changes what a finished leg counts as, so the bets

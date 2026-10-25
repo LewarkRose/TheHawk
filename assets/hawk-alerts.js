@@ -358,7 +358,7 @@
       ? `${g.home} ${g.score && g.score[0] != null ? `${g.score[0]}-${g.score[1]}` : "v"} ${g.away} · ${flat.textContent}`
       : flat.textContent);
     add(el);
-    if (tone !== "info") beep();
+    if (tone !== "info") beep(VOICE_OF[word] || TONE_VOICE[tone] || "won");
     flashTitle(`${icon} ${word}`);
     if (document.hidden || !document.hasFocus())
       systemNotify(`${icon} ${word}${g ? ` · ${g.home} ${g.score && g.score[0] != null ? `${g.score[0]}–${g.score[1]}` : "v"} ${g.away}` : ""}`,
@@ -372,19 +372,60 @@
     return card({ tone, icon, word, body: esc(text), href });
   }
 
-  /* ============================================================ the noises */
-  function beep() {
+  /* ============================================================ the noises
+     Every alert used to play the same rising arpeggio, so a goal against you
+     and a goal for you sounded identical — and the one you most want to tell
+     apart without looking is exactly that pair. Each alert now has its own
+     voice. Synthesised rather than shipped as files: six tones that cost
+     nothing to download and nothing for the service worker to carry.
+
+     A note is [frequency, startSeconds, lengthSeconds, waveform, loudness].
+     Falling means bad, rising means good, and the VAR take-back is the goal
+     played backwards, because that is what it is. */
+  const VOICES = {
+    goal:    [[659, 0, 0.18], [880, 0.14, 0.18], [1319, 0.28, 0.34]],
+    goalOff: [[1319, 0, 0.16], [880, 0.14, 0.16], [659, 0.28, 0.30]],
+    won:     [[880, 0, 0.16], [1175, 0.14, 0.16], [1568, 0.28, 0.42]],
+    landed:  [[988, 0, 0.14], [1319, 0.12, 0.22]],
+    lost:    [[330, 0, 0.26, "triangle"], [247, 0.2, 0.46, "triangle"]],
+    red:     [[150, 0, 0.5, "sawtooth", 0.26]],
+    urgent:  [[988, 0, 0.11], [988, 0.17, 0.11], [1319, 0.34, 0.2]],
+    tick:    [[1319, 0, 0.09, "sine", 0.14]],
+    warn:    [[587, 0, 0.18, "triangle"], [494, 0.16, 0.3, "triangle"]],
+  };
+  /* Which voice an alert gets, by the word on its card — the cards already
+     name themselves and the names are stable, so nothing else has to change
+     when a new alert is added: it simply falls back to its tone. */
+  const VOICE_OF = {
+    "GOAL": "goal", "GOAL OFF": "goalOff", "RED CARD": "red",
+    "BET WON": "won", "BET LOST": "lost", "LEG LOST": "lost",
+    "LEG LANDED": "landed", "ONE LEG TO GO": "urgent",
+    "LINEUPS IN": "tick", "CHECK YOUR BET": "warn",
+  };
+  const TONE_VOICE = { goal: "goal", good: "won", bad: "lost", warn: "warn" };
+
+  function beep(voice = "won") {
     if (!loadPref("hawk.alertSound", true)) return;
+    const notes = VOICES[voice] || VOICES.won;
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      [[880, 0], [1175, 0.2], [1568, 0.4]].forEach(([freq, t]) => {
+      // A tab the user has never clicked cannot play anything; the card and
+      // the system notification still do their job, so this stays quiet
+      // rather than throwing.
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      for (const [freq, at, len, type = "sine", peak = 0.3] of notes) {
         const o = ctx.createOscillator(), gn = ctx.createGain();
-        o.frequency.value = freq; o.connect(gn); gn.connect(ctx.destination);
-        gn.gain.setValueAtTime(0.0001, ctx.currentTime + t);
-        gn.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + t + 0.02);
-        gn.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.18);
-        o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.2);
-      });
+        o.type = type;
+        o.frequency.value = freq;
+        o.connect(gn); gn.connect(ctx.destination);
+        gn.gain.setValueAtTime(0.0001, ctx.currentTime + at);
+        gn.gain.exponentialRampToValueAtTime(peak, ctx.currentTime + at + 0.02);
+        gn.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + len);
+        o.start(ctx.currentTime + at); o.stop(ctx.currentTime + at + len + 0.02);
+      }
+      // let the context go once the longest note has finished
+      const end = Math.max(...notes.map(([, at, len]) => at + len)) + 0.1;
+      setTimeout(() => { try { ctx.close(); } catch { /* already gone */ } }, end * 1000 + 200);
     } catch { /* no audio: the card is still there */ }
   }
   let flashing = null;
@@ -812,6 +853,7 @@
     const n = followedGames().size;
     const perm = "Notification" in window ? Notification.permission : "none";
     const xi = watchList().length;
+    const snd = loadPref("hawk.alertSound", true);
     pop.innerHTML = `<h5>Alerts</h5>
       <p>${G.on
         ? `Lineups confirmed, goals, red cards, and every leg of your bet — for
@@ -822,7 +864,18 @@
       <div class="row">
         <button data-al="toggle">${G.on ? "Turn off" : "Turn on"}</button>
         ${G.on ? `<button data-al="test">${perm === "granted" ? "Test" : perm === "denied" ? "Blocked" : "On my phone too"}</button>` : ""}
+        <button data-al="sound" aria-pressed="${String(snd)}">${snd ? "Sound on" : "Sound off"}</button>
       </div>
+      ${G.on && snd ? `<div class="hear">
+        <span class="k">Hear them</span>
+        ${[["goal", "⚽ Goal"], ["goalOff", "❌ Goal off"], ["red", "🟥 Red"],
+           ["landed", "✅ Leg landed"], ["lost", "❌ Lost"], ["urgent", "🔥 One to go"],
+           ["tick", "🔔 Lineups"]].map(([v, t]) =>
+          `<button data-hear="${v}">${t}</button>`).join("")}
+        <p>A goal for you rises, a goal against falls, and the VAR take-back is the goal
+          played backwards. Your browser will not play any of them until you have clicked
+          the page once — the card and the phone notification do not need that.</p>
+      </div>` : ""}
       ${perm === "denied" && G.on ? `<p>This browser is blocking HAWK's notifications, so alerts only show
         while a HAWK tab is open. Allow them in the padlock menu beside the address bar.</p>` : ""}
       ${log.length ? log.map((a) => `<div class="lg"><span class="i">${a.icon || "🔔"}</span>
@@ -846,8 +899,19 @@
       into.appendChild(pop);
       pop.onclick = async (ev) => {
         ev.stopPropagation();
+        // the test buttons: a click is also the gesture that lets a browser
+        // play anything at all, so pressing one always makes a noise
+        const h = ev.target.closest("[data-hear]");
+        if (h) { beep(h.dataset.hear); return; }
         const b = ev.target.closest("[data-al]");
         if (!b) return;
+        if (b.dataset.al === "sound") {
+          const now = !loadPref("hawk.alertSound", true);
+          savePref("hawk.alertSound", now);
+          paintPop();
+          if (now) beep("landed");
+          return;
+        }
         if (b.dataset.al === "toggle") {
           G.on = !G.on; savePref("hawk.goalAlerts", G.on);
           if (G.on) { await askPermission(); check(); }

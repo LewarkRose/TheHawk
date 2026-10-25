@@ -346,6 +346,18 @@ img{display:block;max-width:100%}
 .fold.bare[open] > summary .lede{margin-bottom:clamp(20px,2.6vw,30px)}
 .two .selh{margin-top:clamp(30px,3.6vw,46px)}
 
+/* A fold inside a fold. Five reference blocks were five full bands across
+   the page and five screens of air before you reached anything; nested they
+   are five lines under one heading. */
+.subs{padding-top:4px}
+.sub.fold{border-top:1px solid var(--rule);padding:0}
+.sub.fold:not([open]){padding-block:clamp(15px,2vw,22px)}
+.sub.fold[open]{padding-block:clamp(15px,2vw,22px) clamp(30px,4.4vw,58px)}
+.sub.fold > summary .lede{margin-bottom:0}
+.sub.fold[open] > summary .lede{margin-bottom:clamp(18px,2.4vw,26px)}
+.sub.fold .lede h3{font-size:clamp(16px,1.7vw,20px)}
+.sub.fold > summary .mk-t{font-size:8.5px}
+
 /* what auto-settle did, in a line */
 .note.as{margin:-14px 0 20px;color:var(--muted)}
 .note.as b{color:var(--gold-hi);font-weight:600}
@@ -1771,6 +1783,19 @@ img{display:block;max-width:100%}
   font:400 11.5px/1 var(--sans);cursor:pointer;box-shadow:inset 0 0 0 1px var(--rule-2);
   transition:box-shadow .2s,color .2s}
 .bellpop .row button:hover{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+/* the sound switch is a state, so it reads as one rather than as an action */
+.bellpop .row button[aria-pressed="true"]{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+.bellpop .row button[aria-pressed="false"]{color:var(--faint)}
+/* hear each one before a goal goes in */
+.bellpop .hear{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;
+  padding:11px 0 0;border-top:1px solid var(--rule)}
+.bellpop .hear .k{width:100%;font:700 8.5px/1 var(--mono);letter-spacing:.17em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:3px}
+.bellpop .hear button{border:0;cursor:pointer;background:var(--ink);color:var(--muted);
+  padding:6px 9px;font:400 11px/1 var(--sans);
+  box-shadow:inset 0 0 0 1px var(--rule);transition:color .2s,box-shadow .2s}
+.bellpop .hear button:hover{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+.bellpop .hear p{width:100%;margin:8px 0 0;font-size:10.5px;color:var(--faint)}
 .bellpop .lg{display:flex;gap:9px;padding:9px 0;border-top:1px solid var(--rule);
   font:400 11.5px/1.5 var(--sans)}
 .bellpop .lg .i{flex:none}

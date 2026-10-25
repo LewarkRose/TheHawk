@@ -337,13 +337,49 @@ img{display:block;max-width:100%}
 .achip.val{box-shadow:inset 0 0 0 1px rgba(79,212,134,.5)}
 .achip.val .r{color:var(--up)}
 
-/* THE BUILDER IN THE RAIL, v1's shape.
-   The rail is 340px, so the settings grid stacks instead of sitting in a
-   row — which is what v1 does at the same width. The build button leads,
-   because it is the thing you came to press. */
+/* THE BUILDER IN THE RAIL — v1's own treatment, blue button and all.
+   The blue is the one colour in HAWK that is not gold. It is here on
+   purpose: it belongs to the one control that DOES something rather than
+   describing something, and Lewzu picked it off v1 on 25 Oct.
+   The rail is 340px, so the settings stack instead of sitting in a row —
+   which is what v1 does at the same width. */
 .rbuild{background:var(--raise);padding:clamp(14px,1.8vw,18px);margin-bottom:16px;
   box-shadow:inset 0 0 0 1px var(--rule-2)}
-.rbuild .btn.wide{width:100%;justify-content:center;margin-bottom:14px}
+/* v1's build button: blue, rounded, and the only one on the site. */
+.rbuild .btn.wide{display:flex;width:100%;align-items:center;justify-content:center;gap:9px;
+  margin-bottom:10px;border:0;border-radius:12px;cursor:pointer;padding:15px;
+  background:linear-gradient(180deg,#9db0ee,#7b90dd);color:#0c1026;
+  font:800 13.5px/1 var(--sans);letter-spacing:.02em;text-transform:none;box-shadow:none}
+.rbuild .btn.wide:hover{background:linear-gradient(180deg,#aebbf2,#8ca0e6)}
+.rbuild .btn.wide::before{content:"⚡"}
+/* the settings bar under it, and the fold it opens */
+.rbuild .fold > summary{border-radius:11px;padding:10px 12px;
+  box-shadow:inset 0 0 0 1px rgba(141,162,232,.4)}
+.rbuild .fold > summary:hover{box-shadow:inset 0 0 0 1px rgba(141,162,232,.7)}
+.rbuild .fold .lede h3{font:700 10.5px/1 var(--sans);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--navy-hi)}
+.rbuild .fold > summary .mk-t{color:var(--navy-hi)}
+.rbuild .fold > summary .mk-t::after{content:"OPEN"}
+.rbuild .fold[open] > summary .mk-t::after{content:"CLOSE"}
+.rbuild .fold .lede .n{display:none}
+/* boxed settings, v1's rounded fields with a tiny label above the value */
+.rbuild .set{gap:9px}
+.rbuild .set label{margin-bottom:0}
+.rbuild .set select,.rbuild .set input[type=number]{border-radius:11px;background:none;
+  box-shadow:inset 0 0 0 1px var(--rule-2);padding:9px 11px;font-size:13px}
+.rbuild .set .hint{display:none}
+.rbuild .set .chk{padding-top:0}
+/* the two rule cards at the foot, with their switches */
+.rbuild .sw{gap:8px;margin-top:10px}
+.rbuild .sw button{border-radius:11px;padding:10px 11px;min-width:0;width:100%;
+  box-shadow:inset 0 0 0 1px var(--rule-2)}
+.rbuild .sw button b{font:600 11.5px/1.3 var(--sans);letter-spacing:0;
+  text-transform:none;color:var(--navy-hi)}
+.rbuild .sw button span{margin-top:4px;font-size:10px;line-height:1.45}
+.rbuild .sw button[aria-pressed="true"]{box-shadow:inset 0 0 0 1px rgba(141,162,232,.6)}
+.rbuild .sw button[aria-pressed="true"] b{color:#c3cdf7}
+/* the preset prices as pills */
+.rbuild .opts button,.rbuild .aim{border-radius:999px}
 .rbuild .fold.bare{border-bottom:0;padding-bottom:0}
 .rbuild .fold > summary .lede{margin-bottom:0}
 .rbuild .fold[open] > summary .lede{margin-bottom:clamp(14px,1.8vw,20px)}
@@ -383,6 +419,39 @@ img{display:block;max-width:100%}
 .note.as{margin:-14px 0 20px;color:var(--muted)}
 .note.as b{color:var(--gold-hi);font-weight:600}
 .lede .tbtn{margin-left:auto;align-self:center}
+/* ------------------------------------------------------- the meta strip
+   What is true about the fixture and what you can do about it, on one line
+   under the hero. The referee carries a gold edge because his cards a game
+   multiplies every cards line — the rest is context and is drawn as such. */
+.meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:12px 0;margin-bottom:clamp(18px,2.4vw,28px);
+  border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.meta .bit{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;
+  font:400 11px/1 var(--mono);color:var(--muted);box-shadow:inset 0 0 0 1px var(--rule)}
+.meta .bit i{font-style:normal;opacity:.85}
+.meta .bit b{color:var(--text);font-weight:400}
+.meta .bit.q{color:var(--faint)}
+.meta .bit.warn{color:var(--gold-hi);box-shadow:inset 0 0 0 1px rgba(212,169,78,.35)}
+.meta .sp{flex:1}
+/* the bell and the table button move in here, so they take the row's shape */
+.meta button.bit,.meta .fol,.meta .tbtn{appearance:none;border:0;background:none;cursor:pointer;
+  height:auto;width:auto;padding:7px 11px;font:400 11px/1 var(--mono);letter-spacing:0;
+  text-transform:none;color:var(--muted);box-shadow:inset 0 0 0 1px var(--rule);
+  transition:color .3s var(--film),box-shadow .3s var(--film)}
+.meta button.bit:hover,.meta .fol:hover,.meta .tbtn:hover{
+  color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+.meta .fol.on{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+@media (max-width:620px){ .meta .sp{display:none} }
+
+/* The four expected numbers, out rather than folded: the bar says who wins,
+   these say what the game looks like. */
+.two > main > #numWrap{margin-bottom:clamp(18px,2.4vw,28px)}
+
+/* Correct score inside the left column: the grid it used expected a full
+   page width, and a fixed aside in a column that is already narrow leaves
+   it nowhere to go. Two columns only once there is room for two. */
+.csplit{display:grid;grid-template-columns:1fr;gap:clamp(20px,2.6vw,32px);align-items:start}
+@media (min-width:1240px){.csplit{grid-template-columns:minmax(0,1fr) 250px}}
 .skel{color:var(--faint);font:400 13px/1.8 var(--sans)}
 .note{margin:clamp(18px,2.4vw,26px) 0 0;max-width:70ch;font-size:12.5px;line-height:1.8;color:var(--faint)}
 .note b{color:var(--muted)}
@@ -1383,7 +1452,7 @@ img{display:block;max-width:100%}
    rather than the page's own black, or a slip on a dark page is a rectangle
    you cannot see the edge of.
    ======================================================================= */
-.rcpt{--z:10px;position:relative;background:#000;
+.rcpt{--z:10px;position:relative;background:#101014;
   padding:clamp(16px,2vw,22px) clamp(14px,1.8vw,20px);margin:0 0 14px;
   -webkit-mask:
     conic-gradient(from 135deg at top,#0000,#000 1deg 89deg,#0000 90deg) top/var(--z) var(--z) repeat-x,
@@ -1397,20 +1466,20 @@ img{display:block;max-width:100%}
      drop-shadow follows the MASK's alpha rather than the box, so it traces
      the teeth — a hairline to draw them and a soft one to lift the slip off
      the page. A border could not do this: there is no border left to draw. */
-  filter:drop-shadow(0 0 .6px rgba(242,242,242,.34))
-         drop-shadow(0 8px 22px rgba(0,0,0,.85));}
+  filter:drop-shadow(0 0 .6px rgba(242,242,242,.5))
+         drop-shadow(0 10px 26px rgba(0,0,0,.9));}
 .rcpt .rhd{text-align:center;padding-bottom:12px;margin-bottom:12px;
   border-bottom:1px dashed var(--rule-2)}
 .rcpt .rhd h4{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;
   font-size:17px;line-height:1.2;letter-spacing:.05em;color:var(--text)}
 .rcpt .rwhen{font:400 10px/1.6 var(--mono);color:var(--faint);margin-top:5px;letter-spacing:.07em}
-.rcpt .rlegs{margin:0;padding:0;list-style:none;font:400 12px/1.6 var(--mono);color:var(--muted)}
+.rcpt .rlegs{margin:0;padding:0;list-style:none;font:400 12px/1.6 var(--mono);color:#c6c6cf}
 .rcpt .rlegs li{display:flex;gap:10px;padding:5px 0;align-items:flex-start}
-.rcpt .rlegs .tk{flex:none;width:11px;text-align:center}
-.rcpt .rlegs .tk.w{color:var(--up)}
-.rcpt .rlegs .tk.l{color:var(--down)}
-.rcpt .rlegs .tk.v,.rcpt .rlegs .tk.u{color:var(--gold)}
-.rcpt .rlegs .tk.o{color:var(--faint)}
+.rcpt .rlegs .rtk{flex:none;width:11px;text-align:center;line-height:1.6}
+.rcpt .rlegs .rtk.w{color:var(--up)}
+.rcpt .rlegs .rtk.l{color:var(--down)}
+.rcpt .rlegs .rtk.v,.rcpt .rlegs .rtk.u{color:var(--gold)}
+.rcpt .rlegs .rtk.o{color:var(--faint)}
 .rcpt .rlegs .lb{flex:1;min-width:0}
 .rcpt .rsum{margin-top:12px;padding-top:11px;border-top:1px dashed var(--rule-2);
   font:400 12px/1.9 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}

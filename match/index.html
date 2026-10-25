@@ -80,11 +80,84 @@
 <section class="calm">
   <div class="wrap two">
     <main>
-      <div class="lede"><h3>Selections</h3><span class="n" id="selN"></span></div>
+      <!-- The facts about the fixture that are not chances: who is refereeing
+           (his cards a game feeds every cards line, so it is the one here that
+           moves a price), what shape they are lining up in, when the prices
+           were last read — and the three things you can do about it. -->
+      <div class="meta" id="meta" hidden></div>
+
+      <!-- What HAWK expects, OUT rather than folded. The bar in the hero says
+           who wins; these four say what the game looks like, and every goals,
+           corners and cards leg on the page is priced from them. Between them
+           they are the two things always worth seeing without asking. -->
+      <div id="numWrap" hidden>
+        <div class="mtot" id="mtot"></div>
+        <p class="note" id="numNote">Across 12,000 simulations — the numbers every goals, corners
+          and cards leg on this page is priced from.</p>
+      </div>
+
+<details class="sub fold" id="upWrap" data-fold="upset" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Upset radar</h3><span class="n" id="upN"></span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap">
+    <div id="upset"></div>
+  </div>
+</details>
+
+<details class="sub fold" id="csWrap" data-fold="score" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Correct score</h3><span class="n" id="csN"></span><span class="mk-t"></span></div></div></summary>
+
+  <!-- divs, not main/aside: this block now lives INSIDE the page's own
+       <main>, and a document may only have one of those. And csplit rather
+       than two, because a 340px rail inside a column that is already narrow
+       leaves the grid nowhere to go. -->
+  <div class="wrap csplit">
+    <div>
+      <div class="cs" id="cs"></div>
+      <div class="cs-ax" id="csAx"></div>
+    </div>
+    <div>
+      <div class="lede"><h3>Value check</h3></div>
+      <div id="value"></div>
+    </div>
+  </div>
+</details>
+
+<details class="sub fold" id="luWrap" data-fold="lineups" data-open-default hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Lineups</h3><span class="n" id="luN"></span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap">
+    <div id="lineups"></div>
+  </div>
+</details>
+
+<details class="sub fold" id="l5Wrap" data-fold="last5" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Last 5 games</h3><span class="n">each side, with corners, cards and shots</span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap">
+    <div id="last5"><div class="skel">Reading each side's last five…</div></div>
+    <p class="note">Averages are per game counting both teams, the way a corners or cards line settles.
+      Friendlies are left out. <b>HAWK's chances do not use these five</b> — measured over 2,237 matches
+      the short window predicts a match's cards at r +0.12 against the season rate's +0.23.</p>
+  </div>
+</details>
+
+<details class="sub fold" id="h2hWrap" data-fold="h2h" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Head to head</h3><span class="n" id="h2hN"></span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap">
+    <div id="h2h"><div class="skel">Reading their last meetings…</div></div>
+    <p class="note" id="h2hNote"></p>
+  </div>
+</details>
+
+      <!-- …and the markets last. The left column reads top to bottom as
+           "here is the match"; building happens in the rail, which is beside
+           all of it rather than after it. -->
+      <div class="lede selh"><h3>Selections</h3><span class="n" id="selN"></span></div>
       <div class="cats" id="cats"></div>
       <div id="markets"><div class="skel" style="padding:30px 0">Reading…</div></div>
     </main>
-
     <aside class="rail">
       <!-- The button leads, the way v1 leads with it. It sits OUTSIDE the
            fold: <summary> has to be the first child of <details>, so a
@@ -117,66 +190,6 @@
   </div>
 </section>
 
-<details class="calm fold" id="numWrap" data-fold="numbers" hidden>
-  <summary><div class="wrap"><div class="lede"><h3>Match numbers</h3><span class="n" id="numN"></span><span class="mk-t"></span></div></div></summary>
-
-  <div class="wrap">
-    <div class="mtot" id="mtot"></div>
-    <p class="note">What HAWK expects across 12,000 simulations — the numbers every goals, corners
-      and cards leg on this page is priced from.</p>
-  </div>
-</details>
-
-<details class="calm fold" id="upWrap" data-fold="upset" hidden>
-  <summary><div class="wrap"><div class="lede"><h3>Upset radar</h3><span class="n" id="upN"></span><span class="mk-t"></span></div></div></summary>
-
-  <div class="wrap">
-    <div id="upset"></div>
-  </div>
-</details>
-
-<details class="calm fold" id="csWrap" data-fold="score" hidden>
-  <summary><div class="wrap"><div class="lede"><h3>Correct score</h3><span class="n" id="csN"></span><span class="mk-t"></span></div></div></summary>
-
-  <div class="wrap two">
-    <main>
-      <div class="cs" id="cs"></div>
-      <div class="cs-ax" id="csAx"></div>
-    </main>
-    <aside>
-      <div class="lede"><h3>Value check</h3></div>
-      <div id="value"></div>
-    </aside>
-  </div>
-</details>
-
-<details class="calm fold" id="luWrap" data-fold="lineups" data-open-default hidden>
-  <summary><div class="wrap"><div class="lede"><h3>Lineups</h3><span class="n" id="luN"></span><span class="mk-t"></span></div></div></summary>
-
-  <div class="wrap">
-    <div id="lineups"></div>
-  </div>
-</details>
-
-<details class="calm fold" id="l5Wrap" data-fold="last5" hidden>
-  <summary><div class="wrap"><div class="lede"><h3>Last 5 games</h3><span class="n">each side, with corners, cards and shots</span><span class="mk-t"></span></div></div></summary>
-
-  <div class="wrap">
-    <div id="last5"><div class="skel">Reading each side's last five…</div></div>
-    <p class="note">Averages are per game counting both teams, the way a corners or cards line settles.
-      Friendlies are left out. <b>HAWK's chances do not use these five</b> — measured over 2,237 matches
-      the short window predicts a match's cards at r +0.12 against the season rate's +0.23.</p>
-  </div>
-</details>
-
-<details class="calm fold" id="h2hWrap" data-fold="h2h" hidden>
-  <summary><div class="wrap"><div class="lede"><h3>Head to head</h3><span class="n" id="h2hN"></span><span class="mk-t"></span></div></div></summary>
-
-  <div class="wrap">
-    <div id="h2h"><div class="skel">Reading their last meetings…</div></div>
-    <p class="note" id="h2hNote"></p>
-  </div>
-</details>
 
 <footer class="foot">
   <div class="wrap"><a href="../home/">home</a> · <a href="../scores/">scores</a> ·
@@ -553,6 +566,7 @@
     upset(m);
     scoreGrid(m);
     lineups(m);
+    meta(m);          // after lineups: it moves the bell and the table button in
     markets();
     slip();
     // after the page, not before it — each costs a request per match
@@ -571,6 +585,68 @@
     $("#luN").textContent = confirmed ? "confirmed"
       : (lu.home.guess || lu.away.guess) ? "HAWK's guess" : "predicted";
     $("#luWrap").hidden = false;
+  }
+
+  /* ------------------------------------------------------- the meta strip
+     The facts about this fixture that are not chances, and the three things
+     you can do about it. The referee is the one that is not decoration: his
+     cards a game multiplies every cards line, so he gets the gold edge and
+     the others do not.
+
+     Each fact is left out entirely when HAWK does not have it, rather than
+     shown empty — hours before kick-off the referee usually is not named,
+     and a row of blanks reads as broken rather than as "not yet". */
+  function meta(m) {
+    const box = $("#meta");
+    if (!box) return;
+    const lu = m.lineups || { home: {}, away: {} };
+    const shapes = [lu.home && lu.home.formation, lu.away && lu.away.formation].filter(Boolean);
+    const confirmed = lu.home.status === "Confirmed" && lu.away.status === "Confirmed";
+    const ref = m.referee || {};
+    const bits = [];
+
+    if (shapes.length === 2)
+      bits.push(`<span class="bit"><i>👕</i>${confirmed ? "Confirmed" : "Predicted"} ·
+        <b>${esc(shapes[0])}</b> v <b>${esc(shapes[1])}</b></span>`);
+    // the one fact here that changes a price
+    if (ref.name) {
+      const per = Number.isFinite(ref.avg) ? ref.avg : null;
+      bits.push(`<span class="bit${per ? " warn" : ""}"><i>🧑‍⚖️</i>${esc(ref.name)}${
+        per ? ` · <b>${per.toFixed(2)}</b> cards a game` : ""}</span>`);
+    } else {
+      bits.push(`<span class="bit q"><i>🧑‍⚖️</i>Referee not named yet</span>`);
+    }
+    if (m.derby) bits.push(`<span class="bit warn"><i>⚔️</i>${esc(m.derby)} · cards <b>${
+      (m.derbyFactor || 1).toFixed(2)}×</b></span>`);
+    bits.push(`<span class="bit"><i>💷</i>${esc(S.book)} read <b>${
+      new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</b></span>`);
+
+    /* The facts are rebuilt on every read; the BUTTONS are not. Refresh
+       calls this again, and writing innerHTML over the whole strip destroyed
+       the bell and the table button it had moved in — they came back once
+       and then disappeared the first time you pressed ↻. */
+    if (!$("#metaFacts")) {
+      box.innerHTML = `<span id="metaFacts" style="display:contents"></span>`
+        + `<span class="sp"></span>`
+        + `<span id="metaActs" style="display:flex;gap:8px;flex-wrap:wrap"></span>`;
+    }
+    $("#metaFacts").innerHTML = bits.join("");
+
+    /* The bell and the table button were in the hero. They belong with the
+       other things you can do to this match, so they move here rather than
+       being drawn twice. Moved once, then left alone. */
+    const acts = $("#metaActs");
+    for (const id of ["fol", "tblBtn"]) {
+      const el = $("#" + id);
+      if (el && !el.hidden && el.parentElement !== acts) { el.classList.add("bit"); acts.appendChild(el); }
+    }
+    if (!$("#metaAgain")) {
+      const again = document.createElement("button");
+      again.type = "button"; again.className = "bit"; again.id = "metaAgain";
+      again.textContent = "↻ Refresh";
+      acts.appendChild(again);
+    }
+    box.hidden = false;
   }
 
   /* ---------------------------------------------------------- auto-build
@@ -757,7 +833,8 @@
     if (!e) return;
     const tile = (k, v, s) => `<div><div class="k">${esc(k)}</div><div class="v">${v}</div>
       <div class="s">${esc(s)}</div></div>`;
-    $("#numN").textContent = "12,000 simulations";
+    // #numN was the count in the fold's summary; the numbers are not folded
+    // any more, so the note underneath says it instead.
     $("#mtot").innerHTML =
       tile("Goals", (e.goals[0] + e.goals[1]).toFixed(2), `${e.goals[0].toFixed(2)} – ${e.goals[1].toFixed(2)}`)
       + tile("On target", (e.sot[0] + e.sot[1]).toFixed(1), `${e.sot[0].toFixed(1)} – ${e.sot[1].toFixed(1)}`)
@@ -938,6 +1015,18 @@
   });
 
   document.addEventListener("click", (e) => {
+    /* Re-read the match without losing the page. The slip is kept on
+       purpose: a refresh is for newer prices and a confirmed XI, not for
+       throwing away the ticket you were in the middle of building. */
+    const again = e.target.closest("#metaAgain");
+    if (again) {
+      if (again.dataset.busy) return;
+      again.dataset.busy = "1";
+      const was = again.textContent;
+      again.textContent = "↻ Reading…";
+      load().finally(() => { delete again.dataset.busy; const b = $("#metaAgain"); if (b) b.textContent = was; });
+      return;
+    }
     const c = e.target.closest("#cats button[data-cat]");
     if (c) { S.cat = c.dataset.cat; markets(); return; }
 

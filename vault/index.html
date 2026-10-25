@@ -533,9 +533,11 @@
         <h4>${esc(where || "Ticket")}</h4>
         <div class="rwhen">${esc(when)}${n > 1 ? ` · ${plural(n, "leg")}` : ""}</div>
       </div>
+      <!-- rtk, not tk: .tk is already the ticket CARD on Today, and a leg mark
+           that inherits its 14px padding is 40px wide and 73px tall. -->
       <ul class="rlegs">${items.map(([label, res]) => {
         const [mc, mk] = LEGMARK[res] || ["o", "·"];
-        return `<li><span class="tk ${mc}">${mk}</span><span class="lb">${esc(label)}</span></li>`;
+        return `<li><span class="rtk ${mc}">${mk}</span><span class="lb">${esc(label)}</span></li>`;
       }).join("")}</ul>
       <div class="rsum">
         <div><span>Stake</span><span>${money(b.stake)}</span></div>

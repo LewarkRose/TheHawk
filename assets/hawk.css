@@ -1,0 +1,806 @@
+/* ===========================================================================
+   HAWK — the shared sheet for the new pages.
+
+   One rule runs through all of it, learned after three redesigns that all
+   failed the same way: a page needs CONTRAST OF INTENSITY, not more effect.
+   One loud moment, then quiet. Every earlier attempt lit every panel, ruled
+   every row and glowed every figure, which reads flat however much light is
+   poured on it.
+
+   So: `.hero` is allowed to shout. `.calm` is not, and is deliberately
+   quieter than the old site rather than louder.
+
+   The old pages (index.html, builder/) keep their own styles. Nothing here
+   reaches them.
+   =========================================================================== */
+:root{
+  --ink:#080809;            /* fighterready.com sits at rgb(8,8,8); so do we */
+  --raise:#0e0f13;
+  --text:#f2f2f2;
+  --muted:#8b8b95;
+  --faint:#55555f;
+  --rule:rgba(242,242,242,.08);
+  --rule-2:rgba(242,242,242,.16);
+  --navy:#6b8fe0;
+  --navy-hi:#a8c0f3;
+  --gold:#d4a94e;
+  --gold-hi:#f2dba4;
+  --up:#4fd486;
+  --down:#ff6b7f;
+  --live:#e5384f;
+  --disp:"Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  /* Film timing. UI's 150-250ms reads as clicked; this reads as shot. */
+  --film:cubic-bezier(.16,1,.3,1);
+  --gut:clamp(20px,5vw,64px);
+  --max:1180px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--ink);color:var(--text);
+  font:400 15px/1.7 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}
+img{display:block;max-width:100%}
+.wrap{width:100%;max-width:var(--max);margin:0 auto}
+.tn{font-variant-numeric:tabular-nums}
+
+/* ---------------------------------------------------------------- motion -- */
+@keyframes rise{from{opacity:0;transform:translate3d(0,30px,0)}to{opacity:1;transform:none}}
+@keyframes inL{from{opacity:0;transform:translate3d(-44px,0,0)}to{opacity:1;transform:none}}
+@keyframes inR{from{opacity:0;transform:translate3d(44px,0,0)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:none}}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(229,56,79,.55)}
+  70%{box-shadow:0 0 0 10px rgba(229,56,79,0)}100%{box-shadow:0 0 0 0 rgba(229,56,79,0)}}
+
+/* ============================== THE MOMENT ==============================
+   The only loud thing on a page. Everything else gets out of its way.
+   ======================================================================== */
+.hero{position:relative;display:grid;align-content:center;overflow:hidden;isolation:isolate;
+  padding:clamp(72px,11vh,130px) var(--gut) clamp(46px,7vh,84px)}
+.hero.tall{min-height:min(92vh,880px)}
+/* the canvas carries the depth: drawn, not gradients faking it. The
+   gradients below are a finished picture on their own, so if it never runs
+   nothing is missing. */
+.hero canvas{position:absolute;inset:0;z-index:-2;width:100%;height:100%;display:block;
+  opacity:0;transition:opacity 1.6s var(--film)}
+.hero canvas.on{opacity:1}
+.hero::before{content:"";position:absolute;inset:-10%;z-index:-3;
+  background:
+    radial-gradient(42% 46% at 24% 20%,rgba(107,143,224,.3),transparent 64%),
+    radial-gradient(38% 44% at 80% 28%,rgba(212,169,78,.17),transparent 64%),
+    radial-gradient(70% 38% at 50% 106%,rgba(107,143,224,.12),transparent 72%)}
+.hero::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  box-shadow:inset 0 0 200px 70px rgba(4,4,6,.9)}
+
+.tag{display:inline-flex;align-items:center;gap:10px;padding:8px 15px;
+  border:1px solid rgba(212,169,78,.35);
+  font:700 9.5px/1 var(--mono);letter-spacing:.24em;text-transform:uppercase;color:var(--gold-hi);
+  animation:rise .9s .1s var(--film) both}
+.tag .dot{width:6px;height:6px;border-radius:50%;background:var(--live);
+  animation:ping 2.8s ease-out infinite}
+.tag .dot.q{background:var(--gold);animation:none}
+.tag .dot.off{background:var(--faint);animation:none}
+
+/* 120px+ is the point. fighterready runs its h1 at 123.5 and that single
+   fact is most of why it has a moment and the earlier attempts did not. */
+.moment{margin:clamp(22px,3.4vw,38px) 0 0;
+  font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  font-size:clamp(54px,11.5vw,146px);line-height:.86;letter-spacing:-.015em;
+  animation:rise 1.2s .25s var(--film) both}
+.moment.mid{font-size:clamp(44px,8.4vw,104px)}
+.moment .q{display:block;color:transparent;
+  background:linear-gradient(176deg,#fff 10%,#f2dba4 54%,#b1862f 100%);
+  -webkit-background-clip:text;background-clip:text;
+  filter:drop-shadow(0 0 60px rgba(212,169,78,.4))}
+/* one sentence under the moment, in plain words */
+.said{margin:clamp(22px,3vw,34px) 0 0;max-width:46ch;font-size:clamp(15px,1.5vw,18px);
+  line-height:1.75;color:var(--muted);animation:rise 1s .45s var(--film) both}
+.said b{color:var(--text);font-weight:600}
+.said b.up{color:var(--up)}.said b.dn{color:var(--down)}
+.said b.live{color:var(--live)}
+
+.acts{display:flex;gap:12px;flex-wrap:wrap;margin-top:clamp(30px,4.4vw,48px);
+  animation:rise 1s 1.1s var(--film) both}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:16px 30px;
+  border:0;cursor:pointer;text-decoration:none;position:relative;overflow:hidden;
+  font:700 10.5px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;
+  transition:transform .5s var(--film),box-shadow .5s var(--film),color .4s var(--film)}
+.btn.gold{background:linear-gradient(170deg,var(--gold-hi),var(--gold));color:#231a06;
+  box-shadow:0 16px 40px -18px rgba(212,169,78,.9)}
+.btn.ghost{background:transparent;color:var(--text);box-shadow:inset 0 0 0 1px rgba(242,242,242,.2)}
+.btn:hover{transform:translateY(-3px)}
+.btn.gold:hover{box-shadow:0 26px 54px -20px rgba(212,169,78,1)}
+.btn.ghost:hover{box-shadow:inset 0 0 0 1px var(--gold-hi);color:var(--gold-hi)}
+.btn.gold::after{content:"";position:absolute;top:0;bottom:0;width:38%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);
+  transform:translateX(-210%) skewX(-18deg);transition:transform .9s var(--film)}
+.btn.gold:hover::after{transform:translateX(330%) skewX(-18deg)}
+.btn.sm{padding:12px 20px;font-size:9.5px}
+
+/* the fixture, when one leads the page */
+.fx{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:clamp(14px,3vw,38px);
+  margin-top:clamp(32px,5vw,56px);text-align:center}
+.fx .side{min-width:0}
+.fx .side.h{animation:inL 1.1s .55s var(--film) both}
+.fx .side.a{animation:inR 1.1s .55s var(--film) both}
+.fx .crest{width:clamp(52px,6.4vw,80px);aspect-ratio:1;margin:0 auto 14px;border-radius:50%;
+  object-fit:contain;background:#14151a;
+  box-shadow:0 0 0 1px rgba(255,255,255,.14),0 18px 40px -14px #000,0 0 54px -14px rgba(255,255,255,.3);
+  transition:transform .8s var(--film)}
+.fx .side:hover .crest{transform:translateY(-6px) scale(1.04)}
+.fx .side h2{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  font-size:clamp(15px,2.2vw,26px);line-height:1.1;letter-spacing:.02em}
+.fx .side .m{margin-top:9px;font:700 9px/1 var(--mono);letter-spacing:.2em;
+  text-transform:uppercase;color:var(--faint)}
+.fx .mid{animation:pop 1.2s .95s var(--film) both}
+.fx .mid .t{font-family:var(--disp);font-weight:700;font-size:clamp(30px,5.2vw,64px);line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--gold-hi);
+  filter:drop-shadow(0 0 34px rgba(212,169,78,.45))}
+.fx .mid .k{margin-top:11px;font:700 9px/1 var(--mono);letter-spacing:.2em;
+  text-transform:uppercase;color:var(--muted)}
+
+/* ================================ QUIET =================================
+   Calmer than the old site, not louder. Space instead of borders, no glow
+   on data, hairlines sparingly, one accent at a time.
+   ======================================================================== */
+.calm{padding:clamp(56px,8.5vw,112px) var(--gut);border-top:1px solid var(--rule)}
+.lede{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:clamp(24px,3.6vw,38px)}
+.lede h3{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  font-size:clamp(22px,2.8vw,32px);line-height:1;letter-spacing:.02em}
+.lede .n{font:700 9px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
+.lede a{margin-left:auto;text-decoration:none;color:var(--muted);
+  font:700 9.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;
+  transition:color .4s var(--film)}
+.lede a:hover{color:var(--gold-hi)}
+
+/* ------------------------------------------------------------- folding --
+   A match page carries eight sections and most visits want two of them, so
+   each one folds and remembers whether you left it open. The summary keeps
+   the heading and its hint, and the marker is a word rather than a chevron:
+   on a page with no other furniture, a stray triangle reads as decoration. */
+/* a shut fold is a line, not a section: it keeps the rule above it and loses
+   most of the breathing room, or six shut folds become six screens of air */
+.fold:not([open]){padding-block:clamp(22px,3vw,34px)}
+.fold > summary{list-style:none;cursor:pointer}
+.fold > summary::-webkit-details-marker{display:none}
+.fold > summary .lede{margin-bottom:0}
+.fold[open] > summary .lede{margin-bottom:clamp(24px,3.6vw,38px)}
+.fold > summary .mk-t{margin-left:auto;flex:none;
+  font:700 9.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--faint);
+  transition:color .4s var(--film)}
+.fold > summary .mk-t::after{content:"Open +"}
+.fold[open] > summary .mk-t::after{content:"Hide −"}
+.fold > summary:hover .mk-t,.fold[open] > summary .mk-t{color:var(--gold-hi)}
+.fold > summary:hover h3{color:var(--gold-hi)}
+.fold > summary h3{transition:color .4s var(--film)}
+/* a fold that has a link of its own keeps it out of the summary's click area */
+.fold > summary .lede a{margin-left:0}
+.skel{color:var(--faint);font:400 13px/1.8 var(--sans)}
+.note{margin:clamp(18px,2.4vw,26px) 0 0;max-width:70ch;font-size:12.5px;line-height:1.8;color:var(--faint)}
+.note b{color:var(--muted)}
+
+/* a grid whose cells are separated by the background showing through, so
+   there are no borders to draw and no boxes to look at */
+.grid{display:grid;gap:1px;background:var(--rule)}
+.grid.m3{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.grid.m4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.grid.w4{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.grid > *{background:var(--ink)}
+/* An empty state is one cell in a grid sized for several, which leaves the
+   grid's own background showing as a stray lighter block beside it. It spans
+   the row instead. */
+.grid > .wide{grid-column:1/-1}
+
+/* a match, quietly */
+.m{display:block;padding:22px 20px;text-decoration:none;color:inherit;
+  transition:background .45s var(--film)}
+.m:hover{background:var(--raise)}
+.m .st{display:flex;align-items:center;gap:8px;
+  font:700 9px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+.m .st .d{width:5px;height:5px;border-radius:50%;background:var(--faint)}
+.m.live .st{color:var(--live)}
+.m.live .st .d{background:var(--live);animation:ping 2.8s ease-out infinite}
+.m .c{margin-top:16px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+.m .teams{min-width:0}
+.m .teams div{font-size:14.5px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m .teams div.lost{color:var(--muted)}
+.m .sc{text-align:right;font-family:var(--disp);font-weight:700;font-size:26px;line-height:1.15;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.m .sc small{display:block;margin-top:4px;font:400 10px/1 var(--mono);letter-spacing:.1em;color:var(--faint)}
+.m .lg{margin-top:16px;font:400 10px/1 var(--mono);letter-spacing:.08em;color:var(--faint);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* four quiet figures */
+.rec > div{padding:26px 22px}
+.rec .n{font-family:var(--disp);font-weight:700;font-size:clamp(30px,3.6vw,44px);line-height:1;
+  font-variant-numeric:tabular-nums}
+.rec .n.up{color:var(--up)}.rec .n.dn{color:var(--down)}.rec .n.g{color:var(--gold-hi)}
+.rec .k{margin-top:14px;font:700 9px/1 var(--mono);letter-spacing:.2em;
+  text-transform:uppercase;color:var(--faint)}
+.rec .s{margin-top:10px;font-size:12px;color:var(--muted)}
+
+/* ways in */
+.ways a{padding:28px 24px 32px;text-decoration:none;color:inherit;
+  transition:background .45s var(--film)}
+.ways a:hover{background:var(--raise)}
+.ways .i{font:700 9px/1 var(--mono);letter-spacing:.2em;color:var(--faint)}
+.ways h4{margin:16px 0 10px;font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  font-size:24px;line-height:1;letter-spacing:.02em;transition:color .4s var(--film)}
+.ways p{margin:0;font-size:13px;line-height:1.75;color:var(--muted)}
+.ways a:hover h4{color:var(--gold-hi)}
+
+/* ------------------------------------------------------------- a ticket --
+   A bet you have running. Used on Today; the live chance only appears when
+   the match is actually being played, because that is the only time it is
+   real rather than the pre-match number wearing a live badge. */
+.tk{padding:22px 20px;display:block;text-decoration:none;color:inherit;
+  transition:background .45s var(--film)}
+.tk:hover{background:var(--raise)}
+.tk .top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.tk .top .s{font:400 12px/1.5 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+.tk .top .s b{color:var(--text)}
+.tk .top .p{margin-left:auto;font-family:var(--disp);font-weight:700;font-size:30px;line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--gold-hi)}
+.tk .top .p.q{color:var(--faint)}
+.tk .sel{margin-top:14px;font-size:14px;line-height:1.6}
+.tk .where{margin-top:9px;font:400 10.5px/1.5 var(--mono);letter-spacing:.06em;color:var(--faint)}
+.tk .when{display:inline-flex;align-items:center;gap:7px;margin-top:14px;
+  font:700 9px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--faint)}
+.tk .when .d{width:5px;height:5px;border-radius:50%;background:var(--faint)}
+.tk.live .when{color:var(--live)}
+.tk.live .when .d{background:var(--live);animation:ping 2.8s ease-out infinite}
+/* the chance bar under a running ticket — it grows, because a bar drawn at
+   its final width states a number and a bar that fills tells you something */
+.tk .bar{margin-top:14px;height:3px;background:rgba(242,242,242,.07);overflow:hidden}
+.tk .bar i{display:block;height:100%;transform-origin:left;
+  background:linear-gradient(90deg,var(--gold),var(--gold-hi));
+  animation:grow 1.2s .3s var(--film) both}
+
+/* ============================ THE MATCH PAGE ============================
+   The fixture is the loud moment; everything under it is deliberately quiet.
+   No boxes round the markets, no glow on a price, no rule on every row —
+   space does the separating, and the only bright thing below the fold is the
+   slip's own price, which is the one number you came down here for.
+   ======================================================================== */
+.two{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:clamp(24px,3vw,44px);
+  align-items:start}
+.two .rail{position:sticky;top:26px}
+@media (max-width:920px){
+  .two{grid-template-columns:1fr}
+  .two .rail{position:static}
+}
+
+/* the category filter: text, not buttons. A row of filled pills over a quiet
+   page is six small loud things competing with each other. */
+.cats{display:flex;gap:clamp(12px,2vw,24px);flex-wrap:wrap;align-items:baseline;
+  padding-bottom:18px;border-bottom:1px solid var(--rule)}
+.cats button{appearance:none;border:0;background:none;cursor:pointer;padding:0;
+  font:700 10px/1.6 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint);
+  transition:color .4s var(--film)}
+.cats button:hover{color:var(--muted)}
+.cats button[aria-pressed="true"]{color:var(--gold-hi)}
+.cats button i{font-style:normal;opacity:.55;margin-left:6px}
+
+/* a market: a quiet disclosure, no border, no chevron furniture */
+.mk{border-bottom:1px solid var(--rule)}
+.mk > summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:14px;
+  padding:20px 2px;transition:color .4s var(--film)}
+.mk > summary::-webkit-details-marker{display:none}
+.mk > summary h4{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  font-size:19px;line-height:1;letter-spacing:.02em}
+.mk > summary .n{font:400 10.5px/1 var(--mono);letter-spacing:.08em;color:var(--faint)}
+.mk > summary .v{margin-left:auto;font:700 9px/1 var(--mono);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--gold-hi)}
+.mk > summary:hover h4{color:var(--gold-hi)}
+.mk[open] > summary h4{color:var(--gold-hi)}
+.mk .legs{padding-bottom:14px}
+
+/* a leg. Space instead of rules; the only colour is the price when it is
+   worth something, and the tick when you have taken it. */
+.leg,.legh{display:grid;grid-template-columns:minmax(0,1fr) 56px 56px 62px 30px;
+  gap:14px;align-items:center}
+.legh{padding:0 2px 10px}
+.legh span{text-align:right;font:700 8.5px/1 var(--mono);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint)}
+.legh span:first-child{text-align:left}
+.leg{width:100%;padding:13px 2px;border:0;background:none;color:inherit;font:inherit;
+  text-align:left;cursor:pointer;appearance:none;
+  transition:background .4s var(--film),padding .4s var(--film)}
+.leg:hover{background:var(--raise);padding-left:10px;padding-right:10px}
+.leg .nm{font-size:14px;line-height:1.45;min-width:0}
+.leg .nm i{display:block;margin-top:4px;font-style:normal;
+  font:400 10px/1.4 var(--mono);letter-spacing:.06em;color:var(--faint)}
+.leg .v{text-align:right;font:400 12.5px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+.leg .v.p{color:var(--text)}
+.leg .v.b{color:var(--text)}
+.leg .v.b.val{color:var(--gold-hi)}
+.leg .add{justify-self:end;width:24px;height:24px;display:grid;place-items:center;
+  font:400 14px/1 var(--mono);color:var(--faint);
+  box-shadow:inset 0 0 0 1px var(--rule-2);transition:all .4s var(--film)}
+.leg:hover .add{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+.leg.on{background:var(--raise);padding-left:10px;padding-right:10px;
+  box-shadow:inset 2px 0 0 var(--gold)}
+.leg.on .nm{color:var(--text)}
+.leg.on .add{color:#231a06;background:var(--gold);box-shadow:none}
+
+/* ------------------------------------------------------------ auto-build --
+   The settings HAWK builds from. Quiet controls: a page that already asks you
+   to read numbers should not also shout its form furniture at you. */
+.set{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:22px 26px}
+.set label{display:block;margin-bottom:10px;font:700 8.5px/1 var(--mono);
+  letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+.set select,.set input[type=number]{width:100%;padding:11px 12px;border:0;background:var(--raise);
+  color:var(--text);font:400 14px/1 var(--sans);box-shadow:inset 0 0 0 1px var(--rule-2);
+  transition:box-shadow .4s var(--film);appearance:none}
+.set select:focus,.set input:focus{outline:0;box-shadow:inset 0 0 0 1px var(--gold)}
+.set .hint{margin-top:9px;font:400 10.5px/1.6 var(--mono);color:var(--faint)}
+.set .chk{display:flex;align-items:center;gap:10px;cursor:pointer;padding-top:26px}
+.set .chk input{width:16px;height:16px;accent-color:var(--gold);cursor:pointer}
+.set .chk span{font-size:13px;color:var(--muted)}
+.built{margin-top:26px;padding-top:24px;border-top:1px solid var(--rule-2)}
+.built .top{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.built .n{font-family:var(--disp);font-weight:700;font-size:clamp(34px,4.4vw,48px);line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--gold-hi)}
+.built .k{font:700 9px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+.built .vs{margin-left:auto;text-align:right;font:400 11.5px/1.7 var(--mono);color:var(--faint)}
+.built .vs b{color:var(--text)}
+.built ol{margin:20px 0 0;padding:0;list-style:none}
+.built li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;align-items:center;
+  padding:11px 0;border-bottom:1px solid var(--rule);font-size:13.5px}
+.built li .i{font:700 10px/1 var(--mono);color:var(--faint)}
+.built li small{display:block;margin-top:4px;font:400 10px/1.4 var(--mono);color:var(--faint)}
+.built li b{font:400 12px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+
+/* the slip. The one bright thing below the fold, because the combined price
+   is what the whole page is for. */
+.slip .hd{display:flex;align-items:baseline;gap:12px;padding-bottom:16px;
+  border-bottom:1px solid var(--rule)}
+.slip .hd h4{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  font-size:19px;line-height:1;letter-spacing:.02em}
+.slip .hd .n{margin-left:auto;font:700 9px/1 var(--mono);letter-spacing:.17em;color:var(--faint)}
+.slip .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;
+  padding:14px 0;border-bottom:1px solid var(--rule);font-size:13.5px;line-height:1.5}
+.slip .row small{display:block;margin-top:4px;font:400 10px/1.4 var(--mono);color:var(--faint)}
+.slip .row b{font:400 12px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+.slip .row .x{margin-left:10px;cursor:pointer;color:var(--faint);font-size:15px;
+  transition:color .3s var(--film)}
+.slip .row .x:hover{color:var(--down)}
+.slip .big{padding:22px 0 0}
+.slip .big .n{font-family:var(--disp);font-weight:700;font-size:clamp(40px,5vw,56px);line-height:.95;
+  font-variant-numeric:tabular-nums;color:var(--gold-hi);
+  filter:drop-shadow(0 0 34px rgba(212,169,78,.35))}
+.slip .big .k{margin-top:10px;font:700 9px/1 var(--mono);letter-spacing:.18em;
+  text-transform:uppercase;color:var(--faint)}
+.slip .pair{display:flex;gap:26px;flex-wrap:wrap;margin-top:18px}
+.slip .pair .k{font:700 8.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--faint)}
+.slip .pair .v{margin-top:8px;font:400 15px/1 var(--mono);font-variant-numeric:tabular-nums}
+.slip .ask{margin-top:22px}
+.slip .ask label{display:block;margin-bottom:9px;font:700 8.5px/1 var(--mono);
+  letter-spacing:.17em;text-transform:uppercase;color:var(--faint)}
+.slip .ask input{width:100%;padding:13px 14px;border:0;background:var(--raise);color:var(--text);
+  font:400 17px/1 var(--mono);font-variant-numeric:tabular-nums;
+  box-shadow:inset 0 0 0 1px var(--rule-2);transition:box-shadow .4s var(--film)}
+.slip .ask input:focus{outline:0;box-shadow:inset 0 0 0 1px var(--gold)}
+.slip .say{margin-top:20px;font-size:13px;line-height:1.7;color:var(--muted)}
+.slip .say b{display:block;margin-bottom:8px;font:700 10px/1 var(--mono);
+  letter-spacing:.17em;text-transform:uppercase;color:var(--muted)}
+.slip .say.good b{color:var(--up)}
+.slip .say.bad b{color:var(--down)}
+.slip .empty{padding:24px 0;color:var(--faint);font-size:13px;line-height:1.8}
+
+/* ============================== IN PLAY =================================
+   The score is the moment on the open, and then it becomes a bug: a small
+   bar that takes over once the hero has scrolled past, the way a broadcast
+   drops its full-screen card for a corner one. A live score you have to
+   scroll back to is a score you stop checking.
+   ======================================================================== */
+.bug{position:fixed;left:0;right:0;top:0;z-index:70;
+  border-bottom:1px solid rgba(242,242,242,.1);
+  background:rgba(8,8,9,.92);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  transform:translate3d(0,-110%,0);transition:transform .6s var(--film)}
+.bug.on{transform:none}
+.bug .in{max-width:var(--max);margin:0 auto;padding:10px var(--gut);
+  display:flex;align-items:center;gap:clamp(9px,1.8vw,18px)}
+.bug img{width:26px;height:26px;border-radius:50%;flex:none;object-fit:contain;background:#14151a}
+.bug .nm{min-width:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  font-size:15px;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bug .nm.r{text-align:right}
+.bug .sc{flex:none;font-family:var(--disp);font-weight:700;font-size:27px;line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--gold-hi);white-space:nowrap}
+.bug .ck{flex:none;display:flex;align-items:center;gap:7px;
+  font:700 9px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--live)}
+.bug .ck .d{width:5px;height:5px;border-radius:50%;background:var(--live);
+  animation:ping 2.8s ease-out infinite}
+.bug .pr{flex:none;margin-left:auto;text-align:right;font:400 10px/1.5 var(--mono);color:var(--faint)}
+.bug .pr b{color:var(--gold-hi)}
+@media (max-width:720px){.bug .nm{display:none}}
+
+/* the live score, on the open */
+.score{font-family:var(--disp);font-weight:700;line-height:.88;
+  font-size:clamp(56px,13vw,170px);font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+  color:transparent;background:linear-gradient(176deg,#fff 6%,#f2dba4 50%,#b1862f 100%);
+  -webkit-background-clip:text;background-clip:text;
+  filter:drop-shadow(0 0 60px rgba(212,169,78,.45)) drop-shadow(0 8px 20px rgba(0,0,0,.95))}
+.score em{font-style:normal;font-weight:400;-webkit-text-fill-color:rgba(255,255,255,.2)}
+.clock{display:inline-flex;align-items:center;gap:9px;margin-top:16px;padding:8px 15px;
+  border:1px solid rgba(229,56,79,.4);background:rgba(229,56,79,.12);
+  font:700 10px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:#ff9fab;
+  box-shadow:0 0 30px -10px rgba(229,56,79,.75)}
+.clock .d{width:6px;height:6px;border-radius:50%;background:var(--live);
+  animation:ping 2.8s ease-out infinite}
+.clock b{color:#fff}
+/* goals hang off each club, minutes in mono at the outer edge */
+.goals{margin-top:16px;display:flex;flex-direction:column;gap:0}
+.goals div{display:flex;align-items:baseline;gap:9px;padding:5px 0;font-size:12.5px}
+.fx .side.a .goals div{flex-direction:row-reverse}
+.goals span{font:400 10px/1 var(--mono);letter-spacing:.06em;color:var(--faint)}
+.goals div.off{color:var(--muted)}
+.goals div.off b{font-weight:400;text-decoration:line-through}
+
+/* live stats: figure, bar, figure. No boxes. */
+.sth{display:flex;justify-content:space-between;padding-bottom:12px;
+  border-bottom:1px solid var(--rule);
+  font:700 9px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase}
+.sth b:first-child{color:var(--gold-hi)}
+.sth b:last-child{color:var(--navy-hi)}
+.str{display:grid;grid-template-columns:52px minmax(0,1fr) 52px;gap:0 14px;align-items:center;
+  padding:13px 0;border-bottom:1px solid var(--rule)}
+.str .v{font-family:var(--disp);font-weight:700;font-size:21px;line-height:1;
+  font-variant-numeric:tabular-nums}
+.str .v.a{text-align:right}
+.str .c{min-width:0;text-align:center}
+.str .c .k{font:700 8.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.str .c .bar{display:flex;height:5px;margin-top:9px;background:rgba(242,242,242,.06)}
+.str .c .bar i{display:block;height:100%;transform-origin:left;animation:grow 1s var(--film) both}
+.str .c .bar i.h{margin-left:auto;transform-origin:right;
+  background:linear-gradient(90deg,#8a6a24,var(--gold-hi))}
+.str .c .bar i.a{background:linear-gradient(90deg,var(--navy-hi),#2d4a8c)}
+
+/* a running ticket, with the cash-out question under it */
+.tkl{padding:22px 0;border-bottom:1px solid var(--rule)}
+.tkl .top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.tkl .top .s{font:400 12.5px/1.5 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+.tkl .top .s b{color:var(--text)}
+.tkl .top .p{margin-left:auto;font-family:var(--disp);font-weight:700;font-size:32px;line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--gold-hi)}
+.tkl .lg{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:12px;align-items:center;
+  padding:11px 0;font-size:13px;border-bottom:1px solid var(--rule)}
+.tkl .lg:last-of-type{border-bottom:0}
+.tkl .lg small{display:block;margin-top:3px;font:400 10px/1.4 var(--mono);color:var(--faint)}
+.tkl .lg b{font:400 11.5px/1 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.tkl .lg b.w{color:var(--up)}.tkl .lg b.l{color:var(--down)}
+.tkl .co{margin-top:16px;display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+.tkl .co label{display:block;margin-bottom:9px;font:700 8.5px/1 var(--mono);
+  letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+.tkl .co input{width:130px;padding:12px 13px;border:0;background:var(--raise);color:var(--text);
+  font:400 16px/1 var(--mono);font-variant-numeric:tabular-nums;
+  box-shadow:inset 0 0 0 1px var(--rule-2);transition:box-shadow .4s var(--film)}
+.tkl .co input:focus{outline:0;box-shadow:inset 0 0 0 1px var(--gold)}
+.tkl .vd{margin-top:16px;font-size:13px;line-height:1.7;color:var(--muted)}
+.tkl .vd b{display:block;margin-bottom:8px;font:700 10px/1 var(--mono);
+  letter-spacing:.17em;text-transform:uppercase;color:var(--muted)}
+.tkl .vd.good b{color:var(--up)}
+.tkl .vd.bad b{color:var(--down)}
+
+/* the half-time / live check */
+.ht{padding:22px 0;border-bottom:1px solid var(--rule)}
+.ht .ht-t{font-size:15px;line-height:1.5;font-weight:600}
+.ht .ht-m{margin-top:7px;font:400 11px/1.6 var(--mono);color:var(--faint)}
+.ht .ht-row{display:flex;gap:28px;align-items:flex-end;flex-wrap:wrap;margin-top:18px}
+.ht .ht-row .k,.ht .ht-row label{display:block;margin-bottom:9px;font:700 8.5px/1 var(--mono);
+  letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+.ht .ht-row .v{font-family:var(--disp);font-weight:700;font-size:30px;line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--gold-hi)}
+.ht .ht-row input{width:120px;padding:11px 12px;border:0;background:var(--raise);color:var(--text);
+  font:400 15px/1 var(--mono);font-variant-numeric:tabular-nums;
+  box-shadow:inset 0 0 0 1px var(--rule-2);transition:box-shadow .4s var(--film)}
+.ht .ht-row input:focus{outline:0;box-shadow:inset 0 0 0 1px var(--gold)}
+.ht .ht-v{margin-top:16px;font-size:13px;line-height:1.6}
+.ht-ask{color:var(--faint)}
+.ht-say{color:var(--muted)}
+.ht-say b{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.ht-say.good{color:var(--up)}
+.ht-say.near{color:var(--gold-hi)}
+.ht-say.bad{color:var(--muted)}
+
+/* the live price table, quietly */
+.pr-h,.pr-r{display:grid;grid-template-columns:minmax(0,1fr) 62px 60px 66px 78px;gap:14px;
+  align-items:center}
+.pr-h{padding:0 2px 11px;border-bottom:1px solid var(--rule)}
+.pr-h span{text-align:right;font:700 8.5px/1 var(--mono);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint)}
+.pr-h span:first-child{text-align:left}
+.pr-r{padding:14px 2px;border-bottom:1px solid var(--rule);transition:background .4s var(--film)}
+.pr-r:hover{background:var(--raise)}
+.pr-r .nm{font-size:13.5px;line-height:1.45;min-width:0}
+.pr-r .nm i{display:block;margin-top:4px;font-style:normal;font:400 10px/1.4 var(--mono);color:var(--faint)}
+.pr-r > span{text-align:right;font:400 12.5px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+.pr-r .b{color:var(--text)}
+.pr-r .e.up{color:var(--up)}
+.pr-r .take{justify-self:end}
+.pr-r.val .b{color:var(--gold-hi)}
+.pr-form{padding:20px 2px 24px;border-bottom:1px solid var(--rule);background:var(--raise)}
+
+/* ============================== LINEUPS ================================
+   Ported from the old builder, with the palette remapped: home is gold and
+   away is navy here, the same as the chance bar on every other page.
+   ======================================================================== */
+.lu-badge{display:inline-flex;align-items:center;gap:9px;padding:8px 14px;
+  font:700 9.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;
+  color:var(--muted);box-shadow:inset 0 0 0 1px var(--rule-2)}
+.lu-badge.ok{color:var(--up);box-shadow:inset 0 0 0 1px rgba(79,212,134,.35)}
+.lu-badge.live{color:#ff9fab;background:rgba(229,56,79,.12);box-shadow:inset 0 0 0 1px rgba(229,56,79,.4)}
+.lu-badge .d{width:6px;height:6px;border-radius:50%;background:var(--live);animation:ping 2.8s ease-out infinite}
+
+.pitch{position:relative;width:100%;aspect-ratio:16/10;overflow:hidden;
+  background:repeating-linear-gradient(90deg,#11301f 0 6.25%,#0e2a1b 6.25% 12.5%)}
+.pitch svg{position:absolute;inset:0;width:100%;height:100%;fill:none;
+  stroke:rgba(255,255,255,.28);stroke-width:.5;vector-effect:non-scaling-stroke}
+.pitch .pl-v{display:none}
+.stage3d{margin-top:20px;perspective:1100px;perspective-origin:50% 25%;
+  touch-action:pan-y;cursor:grab;user-select:none;-webkit-user-select:none}
+.stage3d.grabbing{cursor:grabbing}
+.stage3d img{pointer-events:none;-webkit-user-drag:none}
+.stage3d.p3d .pitch{overflow:visible;transform-style:preserve-3d;
+  transform:rotateX(var(--rx)) rotateZ(var(--rz));transition:transform .5s var(--film);margin:-5% 0 -3%}
+.stage3d.p3d .pm{transform-style:preserve-3d;transform-origin:50% 100%;
+  transform:translate(-50%,-100%) rotateZ(calc(var(--rz) * -1)) rotateX(calc(var(--rx) * -1));
+  transition:transform .5s var(--film)}
+.stage3d.p3d .pm:hover{transform:translate(-50%,-100%) rotateZ(calc(var(--rz) * -1)) rotateX(calc(var(--rx) * -1)) scale(1.1)}
+.stage3d.p3d.grabbing .pitch,.stage3d.p3d.grabbing .pm{transition:none}
+.stage3d.p3d .pm .shirt{box-shadow:0 6px 10px -3px rgba(0,0,0,.7)}
+.p3d-ctl{display:flex;align-items:center;justify-content:flex-end;gap:9px;margin-top:12px}
+.p3d-ctl .p3d-hint{margin-right:auto;font:400 10.5px/1 var(--mono);color:var(--faint)}
+
+.pm{position:absolute;left:var(--hl);top:var(--ht);transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;gap:2px;width:72px;cursor:pointer;
+  transition:transform .35s var(--film)}
+.pm:hover{transform:translate(-50%,-50%) scale(1.08);z-index:2}
+.pm .shirt{position:relative;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  font-weight:800;font-size:11.5px;border:2px solid rgba(255,255,255,.7)}
+.pm.home .shirt{background:var(--gold);color:#231a06}
+.pm.away .shirt{background:var(--navy);color:#06101f}
+.pm .shirt.face{width:36px;height:36px;background:#14151a;border-width:2.5px}
+.pm.home .shirt.face{border-color:var(--gold)}
+.pm.away .shirt.face{border-color:var(--navy)}
+.pm .shirt.face img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;
+  object-fit:cover;object-position:top}
+.pm .shirt.face .no{position:absolute;right:-7px;bottom:-4px;min-width:17px;height:17px;padding:0 3px;
+  border-radius:9px;display:grid;place-items:center;font-size:9.5px;font-weight:800}
+.pm.home .shirt.face .no{background:var(--gold);color:#231a06}
+.pm.away .shirt.face .no{background:var(--navy);color:#06101f}
+.pm .nm{font-size:10.5px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000;
+  max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pm .tg{font-size:9.5px;font-weight:700;color:#fff;background:rgba(6,6,8,.68);padding:1px 6px;white-space:nowrap}
+.pm.gone{opacity:.42}
+/* came on — green, because gold already means "home" on this pitch */
+.pm.subon .shirt,.pm.subon .shirt.face{border-color:var(--up)}
+.pm.star .shirt{box-shadow:0 0 0 3px rgba(255,255,255,.5),0 0 18px rgba(255,255,255,.55)}
+.stage3d.p3d .pm.star .shirt{box-shadow:0 0 0 3px rgba(255,255,255,.5),0 0 18px rgba(255,255,255,.55),0 6px 10px -3px rgba(0,0,0,.7)}
+.pm.mine .nm{color:var(--gold-hi)}
+
+.lu-legend{margin:16px 0 0;font-size:11.5px;line-height:1.7;color:var(--faint)}
+.lu-teams{display:grid;grid-template-columns:1fr 1fr;gap:clamp(16px,2.4vw,30px);margin-top:26px}
+.lu-tname{display:flex;align-items:center;gap:9px;margin-bottom:12px;
+  font-family:var(--disp);font-weight:700;text-transform:uppercase;font-size:17px;letter-spacing:.03em}
+.lu-tname .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.lu-tname .dot.home{background:var(--gold)}
+.lu-tname .dot.away{background:var(--navy)}
+.lu-tname .lu-form{font:400 10.5px/1 var(--mono);letter-spacing:.06em;color:var(--faint);
+  text-transform:none;margin-left:auto}
+.lu-row{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:9px}
+.lu-k{width:44px;flex:none;font:700 8.5px/1 var(--mono);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint)}
+.lu-none{color:var(--faint);font-size:12px}
+.lu-chip{padding:4px 10px;font-size:12px;white-space:nowrap;cursor:pointer;
+  box-shadow:inset 0 0 0 1px var(--rule-2);transition:all .35s var(--film)}
+.lu-chip:hover{box-shadow:inset 0 0 0 1px var(--gold);color:var(--gold-hi)}
+.lu-chip.on{color:var(--up);box-shadow:inset 0 0 0 1px rgba(79,212,134,.4)}
+.lu-chip.out{cursor:default;color:var(--down);box-shadow:inset 0 0 0 1px rgba(255,107,127,.3)}
+.lu-chip.out:hover{color:var(--down)}
+
+@media (max-width:620px){
+  /* the pitch stands up on a phone: home at the top, away at the bottom */
+  .pitch{aspect-ratio:10/15;background:repeating-linear-gradient(0deg,#11301f 0 6.25%,#0e2a1b 6.25% 12.5%)}
+  .pitch .pl-h{display:none}
+  .pitch .pl-v{display:block}
+  .pm{left:var(--vl);top:var(--vt);width:64px}
+  .lu-teams{grid-template-columns:1fr}
+}
+
+/* ========================= LAST 5 AND HEAD TO HEAD =====================
+   Readers, not inputs. HAWK's chances come from season-long rates — the
+   short window was measured over 2,237 matches and predicts a match's cards
+   at r +0.12 against the season rate's +0.23 — so these are set quietly and
+   say so underneath.
+   ======================================================================== */
+.form{display:inline-flex;gap:3px;margin-left:auto}
+.form b{width:17px;height:17px;display:grid;place-items:center;
+  font:700 9px/1 var(--mono);color:var(--ink)}
+.form b.w{background:var(--up)}
+.form b.d{background:#4a4a56;color:var(--text)}
+.form b.l{background:var(--down)}
+
+.l5{display:grid;grid-template-columns:1fr 1fr;gap:clamp(16px,2.6vw,34px)}
+.l5-ch{display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--rule-2)}
+.l5-ch img{width:24px;height:24px;object-fit:contain;flex:none}
+.l5-ch .nm{font-family:var(--disp);font-weight:700;text-transform:uppercase;font-size:17px;
+  letter-spacing:.03em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.l5-row{display:grid;grid-template-columns:44px 16px minmax(0,1fr) auto;gap:10px;align-items:center;
+  padding:11px 2px;border-bottom:1px solid var(--rule);cursor:pointer;
+  transition:background .4s var(--film)}
+.l5-row:hover{background:var(--raise)}
+.l5-row .sc{font:700 12.5px/1 var(--mono);font-variant-numeric:tabular-nums}
+.l5-row .sc.w{color:var(--up)}.l5-row .sc.l{color:var(--down)}.l5-row .sc.d{color:var(--muted)}
+.l5-row .ha{font:700 9px/1 var(--mono);color:var(--faint)}
+.l5-row .op{font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.l5-row .st{font:400 10.5px/1 var(--mono);color:var(--faint);white-space:nowrap}
+.l5-avg{display:flex;gap:16px;flex-wrap:wrap;padding-top:14px;
+  font:400 11.5px/1 var(--mono);color:var(--faint)}
+.l5-avg b{color:var(--text);font-weight:400}
+
+.h2h-sum{display:flex;gap:clamp(14px,2.4vw,28px);flex-wrap:wrap;align-items:baseline;
+  padding-bottom:18px;border-bottom:1px solid var(--rule-2);
+  font:400 12px/1.6 var(--mono);color:var(--faint)}
+.h2h-sum b{color:var(--text);font-weight:600;font-family:var(--sans)}
+.h2h-row{display:grid;grid-template-columns:72px minmax(0,1fr) auto 128px;gap:14px;align-items:center;
+  padding:13px 2px;border-bottom:1px solid var(--rule);cursor:pointer;
+  transition:background .4s var(--film)}
+.h2h-row:hover{background:var(--raise)}
+.h2h-row .dt{font:400 10.5px/1 var(--mono);color:var(--faint)}
+.h2h-row .tm{font-size:13.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h2h-row .h2h-sc{font:700 13px/1 var(--mono);font-variant-numeric:tabular-nums;margin:0 7px}
+.h2h-row .h2h-sc.w{color:var(--up)}.h2h-row .h2h-sc.l{color:var(--down)}.h2h-row .h2h-sc.d{color:var(--muted)}
+.h2h-row .ex{font:400 10.5px/1 var(--mono);color:var(--faint);white-space:nowrap}
+.h2h-row .cp{font:400 10px/1 var(--mono);color:var(--faint);text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+@media (max-width:720px){
+  .l5{grid-template-columns:1fr;gap:34px}
+  .h2h-row{grid-template-columns:minmax(0,1fr) auto;gap:8px}
+  .h2h-row .dt{display:none}
+  .h2h-row .cp{grid-column:1/-1;text-align:left}
+}
+
+/* ===================== MATCH NUMBERS · SCORE · UPSET ===================
+   The analysis block. All of it is background: it explains the chances the
+   page already showed rather than adding a step, and the notes say so.
+   ======================================================================== */
+/* what HAWK expects across 12,000 simulations — the numbers every goals,
+   corners and cards leg is priced from */
+.mtot{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--rule)}
+.mtot > div{background:var(--ink);padding:20px 18px}
+.mtot .k{font:700 8.5px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
+.mtot .v{margin-top:13px;font-family:var(--disp);font-weight:700;font-size:clamp(26px,3.2vw,36px);
+  line-height:1;font-variant-numeric:tabular-nums;color:var(--gold-hi)}
+.mtot .s{margin-top:9px;font:400 11px/1 var(--mono);color:var(--faint)}
+
+/* the correct-score grid: every scoreline HAWK simulated */
+.cs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:1px;background:var(--rule);
+  font-variant-numeric:tabular-nums}
+.cs > div{background:var(--ink);padding:10px 4px;text-align:center;font:400 11px/1 var(--mono)}
+.cs .hd{color:var(--faint);font-weight:700;font-size:9.5px;letter-spacing:.1em}
+.cs .c{color:var(--text)}
+.cs-ax{display:flex;justify-content:space-between;gap:12px;margin-top:12px;
+  font:700 8.5px/1.5 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+
+/* the value check: single legs where the book beats the consensus */
+.vrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;
+  padding:12px 2px;border-bottom:1px solid var(--rule);font-size:13.5px}
+.vrow .pz{font:400 12px/1 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.vrow .ed{font:700 12px/1 var(--mono);color:var(--up);font-variant-numeric:tabular-nums}
+
+/* the upset radar */
+.up-level{display:inline-flex;align-items:center;padding:7px 13px;
+  font:700 9.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase}
+.up-level.low{color:var(--up);box-shadow:inset 0 0 0 1px rgba(79,212,134,.35)}
+.up-level.med{color:var(--gold-hi);box-shadow:inset 0 0 0 1px rgba(212,169,78,.4)}
+.up-level.high{color:#ffb38a;box-shadow:inset 0 0 0 1px rgba(255,160,110,.4)}
+.up-level.vhigh{color:var(--down);box-shadow:inset 0 0 0 1px rgba(255,107,127,.4)}
+.up-who{margin-top:18px;font-size:13.5px;line-height:1.7;color:var(--muted)}
+.up-who b{color:var(--text);font-weight:600}
+.up-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;
+  background:var(--rule);margin-top:20px}
+.up-nums > div{background:var(--ink);padding:20px 18px}
+.up-nums .k{font:700 8.5px/1.5 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--faint)}
+.up-nums .v{margin-top:12px;font-family:var(--disp);font-weight:700;font-size:34px;line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--gold-hi)}
+.up-nums .s{margin-top:9px;font:400 11px/1.5 var(--mono);color:var(--faint)}
+.sig{display:grid;grid-template-columns:20px minmax(0,1fr);gap:11px;align-items:start;
+  padding:11px 0;border-bottom:1px solid var(--rule);font-size:13px;line-height:1.6}
+.sig span{font-size:12px;line-height:1.5}
+.sig.up span{color:var(--up)}
+.sig.down span{color:var(--down)}
+.sig.info span{color:var(--gold-hi)}
+
+@media (max-width:720px){
+  .cs > div{padding:8px 2px;font-size:10px}
+}
+
+/* ================================ VAULT ================================= */
+.chart{width:100%;height:auto;display:block}
+.chart .zero{stroke:var(--rule-2);stroke-dasharray:3 5}
+.chart .line{fill:none;stroke:var(--gold);stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.chart .dot.hi{fill:var(--up)}
+.chart .dot.lo{fill:var(--down)}
+.marks{display:flex;gap:22px;flex-wrap:wrap;margin-top:16px;
+  font:400 11px/1 var(--mono);color:var(--faint);letter-spacing:.04em}
+.marks b{color:var(--text)}
+.marks b.up{color:var(--up)}
+.marks b.dn{color:var(--down)}
+
+.filt{display:flex;gap:clamp(12px,2vw,24px);flex-wrap:wrap;align-items:baseline;
+  padding-bottom:18px;border-bottom:1px solid var(--rule)}
+.filt button{appearance:none;border:0;background:none;cursor:pointer;padding:0;
+  font:700 10px/1.6 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint);
+  transition:color .4s var(--film)}
+.filt button:hover{color:var(--muted)}
+.filt button[aria-pressed="true"]{color:var(--gold-hi)}
+.filt button i{font-style:normal;opacity:.55;margin-left:6px}
+
+.day{display:flex;align-items:baseline;gap:14px;padding:26px 2px 12px;
+  border-bottom:1px solid var(--rule-2)}
+.day h4{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;font-size:17px;
+  line-height:1;letter-spacing:.03em}
+.day .n{font:700 8.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--faint)}
+.day .pl{margin-left:auto;font:400 12px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+.day .pl.up{color:var(--up)}.day .pl.dn{color:var(--down)}
+
+.bt{display:grid;grid-template-columns:minmax(0,1fr) 110px 86px 92px;gap:16px;align-items:center;
+  padding:16px 2px;border-bottom:1px solid var(--rule)}
+.bt .w{min-width:0}
+.bt .w b{display:block;font-weight:600;font-size:14px;line-height:1.5}
+.bt .w i{display:block;margin-top:5px;font-style:normal;font:400 10.5px/1.5 var(--mono);color:var(--faint);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt .st{font:400 11.5px/1.5 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+.bt .rs{text-align:right;font:700 9px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase}
+.bt .rs.won{color:var(--up)}.bt .rs.lost{color:var(--down)}
+.bt .rs.pend{color:var(--gold-hi)}.bt .rs.cash{color:var(--navy-hi)}
+.bt .rs.void{color:var(--faint)}
+.bt .pl{text-align:right;font-family:var(--disp);font-weight:700;font-size:20px;line-height:1;
+  font-variant-numeric:tabular-nums}
+.bt .pl.up{color:var(--up)}.bt .pl.dn{color:var(--down)}.bt .pl.q{color:var(--faint)}
+.bt .act{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.bt .act button{appearance:none;cursor:pointer;padding:8px 14px;border:0;background:var(--raise);
+  color:var(--muted);font:700 9px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;
+  box-shadow:inset 0 0 0 1px var(--rule-2);transition:all .35s var(--film)}
+.bt .act button:hover{color:var(--text)}
+.bt .act button.w:hover{color:var(--up);box-shadow:inset 0 0 0 1px rgba(79,212,134,.5)}
+.bt .act button.l:hover{color:var(--down);box-shadow:inset 0 0 0 1px rgba(255,107,127,.5)}
+.bt .act button.c:hover{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+.bt .act input{width:104px;padding:8px 11px;border:0;background:var(--ink);color:var(--text);
+  font:400 13px/1 var(--mono);box-shadow:inset 0 0 0 1px var(--rule-2)}
+.bt .act input:focus{outline:0;box-shadow:inset 0 0 0 1px var(--gold)}
+
+.lgt{width:100%;border-collapse:collapse}
+.lgt th{padding:11px 12px;text-align:right;font:700 8.5px/1 var(--mono);letter-spacing:.15em;
+  text-transform:uppercase;color:var(--faint);border-bottom:1px solid var(--rule-2);white-space:nowrap}
+.lgt th:first-child,.lgt td:first-child{text-align:left;padding-left:0}
+.lgt th:last-child,.lgt td:last-child{padding-right:0}
+.lgt td{padding:13px 12px;text-align:right;border-bottom:1px solid var(--rule);
+  font:400 12px/1.4 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.lgt td:first-child{font-family:var(--sans);font-size:13.5px}
+.lgt .bar{position:relative;height:5px;background:rgba(242,242,242,.06);min-width:70px}
+.lgt .bar::before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--rule-2)}
+.lgt .bar i{position:absolute;top:0;height:100%}
+.lgt .bar i.p{left:50%;background:var(--up)}
+.lgt .bar i.m{right:50%;background:var(--down)}
+
+@media (max-width:760px){
+  .bt{grid-template-columns:minmax(0,1fr) 80px 86px;gap:10px}
+  .bt .st{display:none}
+  .lgt th:nth-child(3),.lgt td:nth-child(3){display:none}
+}
+
+.foot{padding:40px var(--gut) 70px;border-top:1px solid var(--rule);
+  color:var(--faint);font:400 12px/1.8 var(--sans)}
+.foot a{color:var(--muted);text-decoration:none}
+.foot a:hover{color:var(--gold-hi)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .hero canvas{opacity:1}
+  .tk .bar i{transform:none}
+}

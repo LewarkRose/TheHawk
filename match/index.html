@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Match · HAWK</title>
+<meta name="description" content="Build a bet and see what it is really worth.">
+<link rel="icon" href="../favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="../assets/hawk.css">
+<style>
+/* page-local: the fixture gets more room here than anywhere else, because on
+   this page it IS the moment rather than a card inside one */
+.hero .fx{margin-top:clamp(26px,4vw,44px)}
+.hero .fx .crest{width:clamp(62px,8vw,100px)}
+.hero .fx .side h2{font-size:clamp(18px,3vw,38px)}
+.hero .fx .mid .t{font-size:clamp(34px,6vw,76px)}
+.read{margin-top:clamp(30px,4.4vw,46px);animation:rise 1s 1.25s var(--film) both}
+.b3{display:flex;height:12px;gap:2px;overflow:hidden}
+.b3 i{display:block;height:100%;min-width:3px;transform-origin:left center;
+  animation:grow 1.4s 1.5s var(--film) both}
+.b3 i.h{background:linear-gradient(180deg,var(--gold-hi),#8a6a24);
+  box-shadow:0 0 24px -4px rgba(212,169,78,.85)}
+.b3 i.d{background:linear-gradient(180deg,#3d3d4a,#22222c)}
+.b3 i.a{background:linear-gradient(180deg,var(--navy-hi),#2d4a8c);
+  box-shadow:0 0 24px -4px rgba(107,143,224,.85);transform-origin:right center}
+.b3k{display:flex;justify-content:space-between;gap:12px;margin-top:13px;
+  font:700 9.5px/1.5 var(--mono);letter-spacing:.15em;text-transform:uppercase}
+.b3k b:first-child{color:var(--gold-hi)}
+.b3k b:nth-child(2){color:var(--muted)}
+.b3k b:last-child{color:var(--navy-hi)}
+.derby{margin:clamp(22px,3vw,30px) 0 0;max-width:62ch;font-size:13.5px;line-height:1.8;color:var(--muted);
+  animation:rise 1s 1.45s var(--film) both}
+.derby b{color:var(--gold-hi);font-weight:600}
+.back{display:inline-flex;align-items:center;gap:8px;text-decoration:none;
+  font:700 9.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--faint);
+  transition:color .4s var(--film);animation:rise .8s .05s var(--film) both}
+.back:hover{color:var(--gold-hi)}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <canvas aria-hidden="true"></canvas>
+  <div class="wrap">
+    <a class="back" href="../today/">← Today</a>
+    <div style="margin-top:18px"><span class="tag" id="tag"><span class="dot off"></span>Reading the match</span></div>
+
+    <div class="fx" id="fx" hidden>
+      <div class="side h"><img class="crest" id="cH" alt=""><h2 id="nH"></h2><div class="m" id="mH"></div></div>
+      <div class="mid"><div class="t" id="kT"></div><div class="k" id="kK"></div></div>
+      <div class="side a"><img class="crest" id="cA" alt=""><h2 id="nA"></h2><div class="m" id="mA"></div></div>
+    </div>
+
+    <h1 class="moment mid" id="fail" hidden>Couldn't<span class="q">open it</span></h1>
+    <p class="said" id="said">Asking HAWK for this match…</p>
+
+    <div class="read" id="read" hidden>
+      <div class="b3" id="bar"></div>
+      <div class="b3k" id="bark"></div>
+      <p class="derby" id="derby" hidden></p>
+    </div>
+  </div>
+</header>
+
+<details class="calm fold" id="numWrap" data-fold="numbers" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Match numbers</h3><span class="n" id="numN"></span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap">
+    <div class="mtot" id="mtot"></div>
+    <p class="note">What HAWK expects across 12,000 simulations — the numbers every goals, corners
+      and cards leg on this page is priced from.</p>
+  </div>
+</details>
+
+<details class="calm fold" id="upWrap" data-fold="upset" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Upset radar</h3><span class="n" id="upN"></span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap">
+    <div id="upset"></div>
+  </div>
+</details>
+
+<details class="calm fold" id="csWrap" data-fold="score" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Correct score</h3><span class="n" id="csN"></span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap two">
+    <main>
+      <div class="cs" id="cs"></div>
+      <div class="cs-ax" id="csAx"></div>
+    </main>
+    <aside>
+      <div class="lede"><h3>Value check</h3></div>
+      <div id="value"></div>
+    </aside>
+  </div>
+</details>
+
+<details class="calm fold" id="luWrap" data-fold="lineups" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Lineups</h3><span class="n" id="luN"></span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap">
+    <div id="lineups"></div>
+  </div>
+</details>
+
+<details class="calm fold" id="l5Wrap" data-fold="last5" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Last 5 games</h3><span class="n">each side, with corners, cards and shots</span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap">
+    <div id="last5"><div class="skel">Reading each side's last five…</div></div>
+    <p class="note">Averages are per game counting both teams, the way a corners or cards line settles.
+      Friendlies are left out. <b>HAWK's chances do not use these five</b> — measured over 2,237 matches
+      the short window predicts a match's cards at r +0.12 against the season rate's +0.23.</p>
+  </div>
+</details>
+
+<details class="calm fold" id="h2hWrap" data-fold="h2h" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Head to head</h3><span class="n" id="h2hN"></span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap">
+    <div id="h2h"><div class="skel">Reading their last meetings…</div></div>
+    <p class="note" id="h2hNote"></p>
+  </div>
+</details>
+
+<details class="calm fold" id="abWrap" data-fold="autobuild" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Auto-build</h3>
+    <span class="n" id="abN">let HAWK pick the legs</span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div class="set" id="abSet"></div>
+    <div class="btns" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:26px">
+      <button class="btn gold" id="abGo">Build a ticket</button>
+      <button class="btn ghost" id="abAgain" hidden>Build a different one</button>
+    </div>
+    <div id="abOut"></div>
+    <p class="note">HAWK picks legs that fit the price you asked for, then checks the whole ticket
+      together. <b>The Bet365 figure is an estimate</b> of what their builder would pay, not a price
+      from the feed — type their real one in the slip to get a verdict.</p>
+  </div>
+</details>
+
+<section class="calm">
+  <div class="wrap two">
+    <main>
+      <div class="lede"><h3>Selections</h3><span class="n" id="selN"></span></div>
+      <div class="cats" id="cats"></div>
+      <div id="markets"><div class="skel" style="padding:30px 0">Reading…</div></div>
+    </main>
+
+    <aside class="rail">
+      <div class="slip" id="slip">
+        <div class="hd"><h4>Your slip</h4><span class="n" id="slipN">0 legs</span></div>
+        <div class="empty">Tap a selection to add it. HAWK prices the whole slip together, so legs
+          that move with each other are not counted twice.</div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap"><a href="../home/">home</a> · <a href="../today/">today</a> ·
+    <a href="../builder/">old builder</a> · <a href="../">vault</a> ·
+    prices from <span id="book">Bet365</span> where the feed carries them</div>
+</footer>
+
+<script src="../builder/engine.js"></script>
+<script src="../assets/hawk-bg.js"></script>
+<script src="../assets/hawk-lineups.js"></script>
+<script src="../assets/hawk-fold.js"></script>
+<script>
+/* ===========================================================================
+   The match page.
+
+   The fixture is the loud moment and nothing beneath it competes: markets are
+   quiet disclosures, legs are separated by space rather than boxes, and the
+   only bright thing below the fold is the slip's combined price — which is
+   the number the page exists to produce.
+
+   Nothing here prices anything. Chances and fair odds come from HAWK.match();
+   the combined price comes from HAWK.evaluate(), which is the only thing that
+   knows how legs on one match move together. If a number here disagrees with
+   the old builder, this file is the one that is wrong.
+   =========================================================================== */
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const odds = (x) => (x > 0 && Number.isFinite(x) ? x.toFixed(2) : "—");
+  const pct = (p, dp = 0) => (Number.isFinite(p) ? `${(100 * p).toFixed(dp)}%` : "—");
+  const hhmm = (iso) => { const t = Date.parse(iso); return Number.isFinite(t)
+    ? new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""; };
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  // three chances that must read as 100 together
+  const pc100 = (a) => {
+    const v = a.map((x) => 100 * (x || 0)), r = v.map(Math.round);
+    let d = 100 - r.reduce((x, y) => x + y, 0);
+    while (d) { const i = v.map((x, k) => [Math.abs(x - r[k]), k]).sort((p, q) => q[0] - p[0])[0][1];
+      r[i] += d > 0 ? 1 : -1; d += d > 0 ? -1 : 1; }
+    return r;
+  };
+
+  /* The same grouping the old builder uses, so a market sits in the same place
+     on both. Copied rather than imported: it describes layout, not pricing. */
+  const CATEGORIES = {
+    "Result": ["Full Time Result", "Double Chance", "Win to Nil", "Winning Margin", "Handicap", "Correct Score", "First Team to Score"],
+    "Goals": ["Total Goals", "Both Teams to Score", "Team Goals", "Clean Sheet"],
+    "Halves": ["1st Half Result", "1st Half Goals", "2nd Half Result", "2nd Half Goals"],
+    "Corners, cards & SoT": ["Corners", "Team Corners", "Most Corners", "Total Cards", "Team Cards", "Match Shots on Target"],
+    "Players": ["Player Shots", "Player Shots on Target", "To Score at Any Time", "Player to Assist", "Score or Assist", "Player to be Booked", "Goalkeeper Saves"],
+    "Fouls & tackles": ["Player Fouls Committed", "Player Fouls Won", "Player Tackles", "Player Offsides"],
+  };
+  const ORDER = Object.values(CATEGORIES).flat();
+  const catOf = (m) => Object.keys(CATEGORIES).find((c) => CATEGORIES[c].includes(m)) || "Result";
+
+  // value: the book pays 2%+ over HAWK's fair odds — the same bar the old
+  // builder and the live page use
+  const beats = (l) => l.bookPrice > 1 && l.fair > 1 && l.bookPrice > l.fair * 1.02;
+
+  const S = { league: "", id: "", m: null, slip: [], cat: "All", book: "Bet365", ask: "" };
+
+  /* ----------------------------------------------------------- the moment */
+  function moment(m) {
+    const t = m.table || {};
+    const place = (side) => {
+      const r = t[side], base = side === "home" ? "Home" : "Away";
+      if (!r || !r.position) return base;
+      const n = r.position, s = ["th", "st", "nd", "rd"], v = n % 100;
+      return `${base} · ${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+    };
+    $("#cH").src = m.homeCrest || ""; $("#cA").src = m.awayCrest || "";
+    $("#nH").textContent = m.home;    $("#nA").textContent = m.away;
+    $("#mH").textContent = place("home"); $("#mA").textContent = place("away");
+    $("#kT").textContent = m.started ? "Live" : (hhmm(m.kickoff) || "TBC");
+    $("#kK").textContent = m.derby ? "Derby" : (m.league || "");
+    $("#fx").hidden = false;
+
+    $("#tag").innerHTML = m.derby
+      ? `<span class="dot q"></span>${esc(m.league || "")} · Derby`
+      : `<span class="dot q"></span>${esc(m.league || "Match")}`;
+
+    const p = m.probs || {}, hp = pc100([p.home, p.draw, p.away]);
+    $("#bar").innerHTML = `<i class="h" style="flex:${p.home || 0}"></i>`
+      + `<i class="d" style="flex:${p.draw || 0}"></i><i class="a" style="flex:${p.away || 0}"></i>`;
+    $("#bark").innerHTML = `<b>${esc(m.home)} ${hp[0]}%</b><b>Draw ${hp[1]}%</b><b>${esc(m.away)} ${hp[2]}%</b>`;
+    if (m.derby) {
+      $("#derby").innerHTML = `<b>Derby — ${esc(m.derby)}.</b> HAWK lifts this match's card lines by
+        ${(m.derbyFactor || 1.23).toFixed(2)}×, measured over 3,106 matches. It leaves goals and
+        corners alone, which showed nothing.`;
+      $("#derby").hidden = false;
+    }
+    $("#read").hidden = false;
+
+    const legs = m.legs || [];
+    const priced = legs.filter((l) => l.bookPrice > 1).length;
+    const val = legs.filter(beats).length;
+    $("#said").innerHTML = `${esc(m.home)} v ${esc(m.away)}. <b>${plural(legs.length, "selection")}</b>,
+      ${priced} with a ${esc(S.book)} price` + (val
+        ? `, <b class="up">${val} beating it</b>.`
+        : `, <b>none beating it</b> — which is normal.`);
+  }
+
+  /* --------------------------------------------------------- the markets */
+  function markets() {
+    const m = S.m, all = (m.legs || []).filter((l) => l && l.p > 0);
+    const counts = {};
+    for (const l of all) { const c = catOf(l.market); counts[c] = (counts[c] || 0) + 1; }
+    const cats = ["All", ...Object.keys(CATEGORIES).filter((c) => counts[c])];
+
+    $("#selN").textContent = `${all.length} in ${plural(Object.keys(counts).length, "group")}`;
+    $("#cats").innerHTML = cats.map((c) => `<button type="button" data-cat="${esc(c)}"
+      aria-pressed="${String(S.cat === c)}">${esc(c)}<i>${c === "All" ? all.length : counts[c]}</i></button>`).join("");
+
+    const shown = all.filter((l) => S.cat === "All" || catOf(l.market) === S.cat);
+    const by = {};
+    for (const l of shown.sort((a, b) => b.p - a.p)) (by[l.market] ||= []).push(l);
+    const rank = (g) => { const i = ORDER.indexOf(g); return i < 0 ? 999 : i; };
+    const names = Object.keys(by).sort((a, b) => rank(a) - rank(b));
+
+    const row = (l) => {
+      const on = S.slip.includes(l.id), v = beats(l);
+      return `<button type="button" class="leg${on ? " on" : ""}" data-leg="${esc(l.id)}">
+        <span class="nm">${esc(l.label)}${l.market ? `<i>${esc(l.market)}</i>` : ""}</span>
+        <span class="v p">${pct(l.p, l.p < 0.1 ? 1 : 0)}</span>
+        <span class="v">${odds(l.fair)}</span>
+        <span class="v b${v ? " val" : ""}">${odds(l.bookPrice)}</span>
+        <span class="add">${on ? "✓" : "+"}</span></button>`;
+    };
+
+    // first two open, the rest shut — the catalogue is 300-odd legs and an
+    // open disclosure for each is not a page
+    $("#markets").innerHTML = names.map((name, i) => {
+      const legs = by[name], v = legs.filter(beats).length;
+      return `<details class="mk"${i < 2 ? " open" : ""}>
+        <summary><h4>${esc(name)}</h4><span class="n">${plural(legs.length, "line")}</span>
+          ${v ? `<span class="v">${v} beating ${esc(S.book)}</span>` : ""}</summary>
+        <div class="legs">
+          <div class="legh"><span>Selection</span><span>HAWK</span><span>Fair</span>
+            <span>${esc(S.book)}</span><span></span></div>
+          ${legs.map(row).join("")}</div></details>`;
+    }).join("") || `<div class="skel" style="padding:30px 0">Nothing in this group.</div>`;
+  }
+
+  /* ------------------------------------------------------------- the slip
+     HAWK.evaluate() is the only thing that knows the legs correlate. Two legs
+     on one match are never independent, and multiplying their prices would
+     overstate the ticket every time — which is exactly what the slip says.
+     The book's own builder price is in no feed, so the page asks for it. */
+  function slip() {
+    const el = $("#slip"), m = S.m;
+    $("#slipN").textContent = plural(S.slip.length, "leg");
+    [...el.children].slice(1).forEach((n) => n.remove());
+
+    if (!S.slip.length) {
+      el.insertAdjacentHTML("beforeend", `<div class="empty">Tap a selection to add it. HAWK prices
+        the whole slip together, so legs that move with each other are not counted twice.</div>`);
+      return;
+    }
+
+    const byId = new Map((m.legs || []).map((l) => [l.id, l]));
+    const picked = S.slip.map((id) => byId.get(id)).filter(Boolean);
+
+    let out = null;
+    try { out = window.HAWK.evaluate({ id: String(S.id), legs: S.slip }); } catch { /* shown below */ }
+    const fair = out && out.fair, p = out && out.p;
+
+    const rows = picked.map((l) => `<div class="row">
+      <div>${esc(l.label)}<small>${esc(l.market || "")} · ${pct(l.p, l.p < 0.1 ? 1 : 0)}</small></div>
+      <div><b>${odds(l.fair)}</b><span class="x" data-drop="${esc(l.id)}" title="Remove">×</span></div></div>`).join("");
+
+    const ask = parseFloat(String(S.ask).replace(",", "."));
+    let say = `<div class="say"><b>Type the price</b>Put ${esc(S.book)}'s offer for this exact slip in
+      the box and HAWK will say whether it is worth taking. A bet builder's price is in no feed, so it
+      cannot be read for you.</div>`;
+    if (fair > 1 && ask > 1) {
+      const edge = ask / fair - 1, good = edge >= 0;
+      say = `<div class="say ${good ? "good" : "bad"}"><b>${good ? "Worth backing" : "Don't back it"}</b>
+        ${esc(S.book)} pays <b style="display:inline;color:var(--text)">${odds(ask)}</b> where HAWK makes it
+        ${odds(fair)} — ${good ? "+" : ""}${(100 * edge).toFixed(1)}%.
+        ${good ? "That is the book paying over the odds on HAWK's read of these legs together."
+               : "The gap is the margin; the correlation between these legs is already in HAWK's price."}</div>`;
+    }
+
+    const apart = picked.reduce((a, l) => a * (l.fair > 1 ? l.fair : 1), 1);
+    const note = fair > 1 && picked.length > 1
+      ? `<p class="note" style="margin-top:16px">Multiplied separately these legs make
+         ${odds(apart)}. HAWK says ${odds(fair)} because it simulates them on the same match.</p>` : "";
+
+    el.insertAdjacentHTML("beforeend", rows + `
+      <div class="big"><div class="n">${odds(fair)}</div><div class="k">HAWK's fair price</div></div>
+      <div class="pair">
+        <div><div class="k">Chance it lands</div><div class="v">${pct(p, p < 0.1 ? 1 : 0)}</div></div>
+        <div><div class="k">Legs</div><div class="v">${picked.length}</div></div>
+      </div>
+      <div class="ask"><label for="ask">${esc(S.book)}'s price for this slip</label>
+        <input id="ask" inputmode="decimal" placeholder="e.g. 4.80" value="${esc(S.ask)}"></div>
+      ${say}${note}
+      <div style="margin-top:20px"><button class="btn ghost sm" id="clear">Clear the slip</button></div>`);
+  }
+
+  /* ------------------------------------------------------------- loading */
+  async function load() {
+    if (!S.id) {
+      $("#said").innerHTML = `No match chosen. Pick one from
+        <a href="../today/" style="color:var(--gold-hi)">Today</a>.`;
+      $("#markets").innerHTML = "";
+      return;
+    }
+    let m;
+    try { m = await window.HAWK.match(S.league, S.id); }
+    catch (err) {
+      $("#fail").hidden = false;
+      $("#tag").innerHTML = `<span class="dot off"></span>Match`;
+      $("#said").textContent = (err && err.message) || "HAWK couldn't analyse this match.";
+      $("#markets").innerHTML = "";
+      return;
+    }
+    S.m = m;
+    S.book = m.priceBook || "Bet365";
+    $("#book").textContent = S.book;
+    document.title = `${m.home} v ${m.away} · HAWK`;
+    moment(m);
+    abControls();
+    numbers(m);
+    upset(m);
+    scoreGrid(m);
+    lineups(m);
+    markets();
+    slip();
+    // after the page, not before it — each costs a request per match
+    last5(m);
+    h2h(m);
+  }
+
+  /* The XIs, when there is one. HAWK.match() already carries m.players and
+     m.lineups, so this costs no extra call — the page was holding the data
+     and simply not drawing it. */
+  function lineups(m) {
+    if (!window.HAWKLineups) return;
+    if (!window.HAWKLineups.render($("#lineups"), m, { gameId: S.id })) return;
+    const lu = m.lineups || { home: {}, away: {} };
+    const confirmed = lu.home.status === "Confirmed" && lu.away.status === "Confirmed";
+    $("#luN").textContent = confirmed ? "confirmed"
+      : (lu.home.guess || lu.away.guess) ? "HAWK's guess" : "predicted";
+    $("#luWrap").hidden = false;
+  }
+
+  /* ---------------------------------------------------------- auto-build
+     HAWK picks the legs, the existing slip prices them. Settings are the
+     old builder's, under the same names, and are remembered. */
+  const AB_KEY = "hawk.autobuild";
+  const AB_DEF = { target: 4, style: "Balanced", maxLegs: 5, focus: "Mix",
+                   picks: "likely", favourite: true, extras: false };
+  let AB = { ...AB_DEF };
+  try { AB = { ...AB_DEF, ...JSON.parse(localStorage.getItem(AB_KEY) || "{}") }; } catch { /* defaults */ }
+  const abSave = () => { try { localStorage.setItem(AB_KEY, JSON.stringify(AB)); } catch { /* private */ } };
+
+  function abControls() {
+    const sel = (k, opts, hint) => `<div><label for="ab-${k}">${esc(k === "maxLegs" ? "Most legs" : k)}</label>
+      <select id="ab-${k}" data-ab="${k}">${opts.map(([v, t]) =>
+        `<option value="${esc(v)}"${String(AB[k]) === String(v) ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
+      ${hint ? `<div class="hint">${esc(hint)}</div>` : ""}</div>`;
+    $("#abSet").innerHTML = `
+      <div><label for="ab-target">Aiming for</label>
+        <input id="ab-target" data-ab="target" type="number" min="1.2" max="50" step="0.5" value="${AB.target}">
+        <div class="hint">the price you want the whole ticket at</div></div>
+      ${sel("style", [["Banker", "Banker — short and likely"], ["Balanced", "Balanced"],
+                      ["Punchy", "Punchy — longer, less likely"]])}
+      ${sel("maxLegs", [2, 3, 4, 5, 6, 7, 8, 10, 12].map((n) => [n, `${n} legs`]))}
+      ${sel("focus", [["Mix", "Mix"], ["Players", "Players"], ["Match", "Match markets"],
+                      ["Stats", "Stats — no result leg"]], "Stats bans the result market so goals, cards and corners carry it")}
+      ${sel("picks", [["likely", "Likeliest legs"], ["value", "Legs Bet365 overprices"]])}
+      <label class="chk"><input type="checkbox" data-ab="favourite"${AB.favourite ? " checked" : ""}>
+        <span>Start with the favourite</span></label>
+      <label class="chk"><input type="checkbox" data-ab="extras"${AB.extras ? " checked" : ""}>
+        <span>Allow fouls, tackles and offsides</span></label>`;
+    $("#abWrap").hidden = false;
+  }
+
+  function abShow(t, nth) {
+    if (!t || !t.legs || !t.legs.length) {
+      $("#abOut").innerHTML = `<p class="note" style="margin:22px 0 0">HAWK couldn't make a ticket at
+        that price with those settings. Try a longer price, more legs, or a different focus.</p>`;
+      $("#abAgain").hidden = true;
+      return;
+    }
+    const byId = new Map((S.m.legs || []).map((l) => [l.id, l]));
+    const legs = t.legs.map((l) => byId.get(l.id)).filter(Boolean);
+    // put it straight in the slip — the slip is what prices it
+    S.slip = legs.map((l) => l.id);
+    markets();
+    slip();
+
+    $("#abOut").innerHTML = `<div class="built">
+      <div class="top"><span class="n">${odds(t.fair)}</span><span class="k">HAWK's fair price</span>
+        <span class="vs">${pct(t.p, t.p < 0.1 ? 1 : 0)} it lands<br>
+          Bet365 would pay about <b>${odds(t.b365)}</b></span></div>
+      <ol>${legs.map((l, i) => `<li><span class="i">${i + 1}</span>
+        <span>${esc(l.label)}<small>${esc(l.market || "")}</small></span>
+        <b>${pct(l.p, l.p < 0.1 ? 1 : 0)}</b></li>`).join("")}</ol>
+      ${t.b365 < t.fair ? `<p class="note" style="margin-top:16px">At that estimate Bet365 pays
+        <b>${odds(t.b365)}</b> where HAWK makes it ${odds(t.fair)} — ${(100 * (t.b365 / t.fair - 1)).toFixed(1)}%.
+        That gap is the builder's margin and it is normal; the ticket is in your slip, so type their
+        real price there to settle it.</p>` : ""}</div>`;
+    $("#abN").textContent = nth ? `option ${nth}` : `${plural(legs.length, "leg")} at ${odds(t.fair)}`;
+    $("#abAgain").hidden = false;
+  }
+
+  let abOpts = [], abAt = 0;
+  function abBuild(again) {
+    if (!S.m) return;
+    const body = { id: String(S.id), target: +AB.target || 3, style: AB.style,
+                   maxLegs: +AB.maxLegs || 5, focus: AB.focus, picks: AB.picks,
+                   favourite: !!AB.favourite, extras: !!AB.extras };
+    try {
+      if (!again) {
+        abOpts = []; abAt = 0;
+        abShow(window.HAWK.build(body));
+        return;
+      }
+      if (!abOpts.length) {
+        const r = window.HAWK.buildOptions({ ...body, options: 4 }, 4);
+        abOpts = (r && r.options) || [];
+      }
+      if (!abOpts.length) { abShow(null); return; }
+      // buildOptions repeats the normal build as its first entry, so cycling
+      // blindly hands you the same ticket back. Skip anything whose legs match
+      // what is already in the slip.
+      const sig = (t) => (t.legs || []).map((l) => l.id).sort().join("|");
+      const now = [...S.slip].sort().join("|");
+      let tried = 0;
+      do { abAt = (abAt + 1) % abOpts.length; tried++; }
+      while (tried <= abOpts.length && sig(abOpts[abAt]) === now);
+      if (sig(abOpts[abAt]) === now) {
+        $("#abOut").insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:16px">That is the
+          only ticket these settings make at ${odds(+AB.target)}. Change the price, the legs or the
+          focus for a different one.</p>`);
+        return;
+      }
+      abShow(abOpts[abAt], abAt + 1);
+    } catch (err) {
+      $("#abOut").innerHTML = `<p class="note" style="margin:22px 0 0">Couldn't build it
+        (${esc(err.message || "")}).</p>`;
+    }
+  }
+
+  /* ------------------------------------------------------- match numbers
+     The totals strip: goals, shots on target, corners and cards, with the
+     per-team split underneath each. */
+  function numbers(m) {
+    const e = m.expected;
+    if (!e) return;
+    const tile = (k, v, s) => `<div><div class="k">${esc(k)}</div><div class="v">${v}</div>
+      <div class="s">${esc(s)}</div></div>`;
+    $("#numN").textContent = "12,000 simulations";
+    $("#mtot").innerHTML =
+      tile("Goals", (e.goals[0] + e.goals[1]).toFixed(2), `${e.goals[0].toFixed(2)} – ${e.goals[1].toFixed(2)}`)
+      + tile("On target", (e.sot[0] + e.sot[1]).toFixed(1), `${e.sot[0].toFixed(1)} – ${e.sot[1].toFixed(1)}`)
+      + tile("Corners", e.corners.toFixed(1), "both teams")
+      + tile("Cards", (e.cards[0] + e.cards[1]).toFixed(1), `${e.cards[0].toFixed(1)} – ${e.cards[1].toFixed(1)}`);
+    $("#numWrap").hidden = false;
+  }
+
+  /* ---------------------------------------------------------- upset radar
+     Background, not an extra step: the chances above already allow for all
+     of it. That is said twice on the page because it is the thing most
+     likely to be misread as a tip. */
+  const UPSET_TONE = ["low", "med", "high", "vhigh"];
+  function upset(m) {
+    const u = m.upset;
+    if (!u || m.started) return;
+    const ups = (u.signals || []).filter((s) => s.dir === "up");
+    const downs = (u.signals || []).filter((s) => s.dir === "down");
+    const infos = (u.signals || []).filter((s) => s.dir === "info");
+    const level = u.open
+      ? `<span class="up-level med">Toss-up · no clear favourite</span>`
+      : `<span class="up-level ${UPSET_TONE[u.level]}">${esc(u.label)} risk · ${esc(u.favName)} could slip up</span>`;
+    $("#upN").textContent = u.open ? "toss-up" : `${String(u.label || "").toLowerCase()} risk`;
+    $("#upset").innerHTML = `${level}
+      <p class="up-who">Favourite <b>${esc(u.favName)}</b> (${pct(1 - u.favFail)} to win) ·
+        Underdog <b>${esc(u.dogName)}</b> (${pct(u.dogWin)})</p>
+      <div class="up-nums">
+        <div><div class="k">${esc(u.dogName)} to win</div><div class="v">${pct(u.dogWin)}</div>
+          <div class="s">${u.marketDog != null ? `bookmakers ${pct(u.marketDog)}` : ""}</div></div>
+        <div><div class="k">${esc(u.favName)} fail to win</div><div class="v">${pct(u.favFail)}</div>
+          <div class="s">draw ${pct(u.draw)} plus ${esc(u.dogName)} win</div></div>
+      </div>
+      ${u.open ? `<p class="note">${esc(u.favName)} are only slight favourites — them failing to win is
+        more likely than not, so it is no real upset either way.</p>` : ""}
+      <div style="margin-top:22px">
+        ${ups.map((s) => `<div class="sig up"><span>✅</span><span>${esc(s.text)}</span></div>`).join("")}
+        ${downs.map((s) => `<div class="sig down"><span>✖</span><span>${esc(s.text)}</span></div>`).join("")}
+        ${infos.map((s) => `<div class="sig info"><span>⚠</span><span>${esc(s.text)}</span></div>`).join("")}
+        ${ups.length || downs.length ? "" : `<p class="note" style="margin:0">Nothing unusual: no rotation,
+          team news, money, chances or form pointing either way.</p>`}
+      </div>
+      <p class="note">✅ points to an upset, ✖ points to ${esc(u.favName)}, ⚠ is a caution. It is a warning
+        light, not a prediction — even "Very high" usually means under 50%.</p>
+      <p class="note"><b>Nothing here changes HAWK's chances or prices.</b> The percentages on your legs
+        already allow for it; this is the reasoning behind them, not an extra step for you to take.</p>`;
+    $("#upWrap").hidden = false;
+  }
+
+  /* ------------------------------------------- correct score & value check */
+  function scoreGrid(m) {
+    if (!m.grid || !m.grid.length) return;
+    const max = Math.max(...m.grid.flat());
+    let best = 0, bi = 0, bj = 0;
+    m.grid.forEach((row, i) => row.forEach((v, j) => { if (v > best) { best = v; bi = i; bj = j; } }));
+    $("#csN").textContent = best
+      ? `most likely ${bi === 4 ? "4+" : bi}–${bj === 4 ? "4+" : bj} at ${(100 * best).toFixed(0)}%` : "";
+    const head = [0, 1, 2, 3, "4+"].map((j) => `<div class="hd">${j}</div>`).join("");
+    $("#cs").innerHTML = `<div class="hd"></div>${head}` + m.grid.map((row, i) =>
+      `<div class="hd">${i === 4 ? "4+" : i}</div>` + row.map((v) =>
+        `<div class="c" style="background:rgba(212,169,78,${(0.05 + 0.6 * v / max).toFixed(3)})">${(100 * v).toFixed(1)}%</div>`
+      ).join("")).join("");
+    $("#csAx").innerHTML = `<span>Rows · ${esc(m.home)} goals</span><span>Columns · ${esc(m.away)} goals</span>`;
+
+    const v = m.value;
+    $("#value").innerHTML = !v ? ""
+      : !v.legs.length
+        ? `<p class="note" style="margin:0">No leg at ${esc(v.book)} beats the bookmaker consensus by
+           2% or more right now. Normal — genuine value is rare.</p>`
+        : v.legs.map((l) => `<div class="vrow"><div>${esc(l.label)}</div>
+            <div class="pz">${l.price.toFixed(2)}</div>
+            <div class="ed">+${(100 * l.edge).toFixed(1)}%</div></div>`).join("")
+          + `<p class="note">Single legs where ${esc(v.book)}'s price beats the true probability
+             (bookmaker consensus plus HAWK's model).</p>`;
+    $("#csWrap").hidden = false;
+  }
+
+  /* ------------------------------------------------- last 5 and head to head
+     Both cost a request per match for the stats, so they load after the page
+     rather than holding it up. Neither feeds a price; see the note under each. */
+  const dayMon = (iso) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  const formHTML = (s) => `<span class="form">${[...s].map((c) =>
+    `<b class="${c.toLowerCase()}">${c}</b>`).join("")}</span>`;
+
+  async function last5(m) {
+    if (!m.homeId || !m.awayId) return;
+    let d;
+    try {
+      d = await Promise.all([window.HAWK.recentGames(m.homeId, 5), window.HAWK.recentGames(m.awayId, 5)]);
+    } catch (err) {
+      $("#last5").innerHTML = `<p class="note" style="margin:0">Couldn't load the last five (${esc(err.message || "")}).</p>`;
+      $("#l5Wrap").hidden = false;
+      return;
+    }
+    if (String(S.id) !== String(m.id)) return;   // you moved on while it loaded
+
+    const col = (games, name, crest) => {
+      games = games || [];
+      if (!games.length) {
+        return `<div><div class="l5-ch">${crest ? `<img src="${esc(crest)}" alt="" onerror="this.remove()">` : ""}
+          <div class="nm">${esc(name)}</div></div><p class="note" style="margin:14px 0 0">No recent games.</p></div>`;
+      }
+      const n = games.length;
+      const avg = (k) => { const l = games.filter((g) => g[k]);
+        return l.length ? (l.reduce((s, g) => s + g[k][0] + g[k][1], 0) / l.length).toFixed(1) : "–"; };
+      const gf = (games.reduce((s, g) => s + g.mine, 0) / n).toFixed(1);
+      const ga = (games.reduce((s, g) => s + g.theirs, 0) / n).toFixed(1);
+      const form = games.map((g) => (g.mine > g.theirs ? "W" : g.mine < g.theirs ? "L" : "D")).join("");
+      const tot = (g, k) => (g[k] ? g[k][0] + g[k][1] : null);
+      return `<div><div class="l5-ch">${crest ? `<img src="${esc(crest)}" alt="" onerror="this.remove()">` : ""}
+          <div class="nm">${esc(name)}</div>${formHTML(form)}</div>
+        ${games.map((g) => {
+          const r = g.mine > g.theirs ? "w" : g.mine < g.theirs ? "l" : "d";
+          const c = tot(g, "corners"), k = tot(g, "cards"), s = tot(g, "sot");
+          return `<div class="l5-row" title="${esc(`${dayMon(g.date)} · ${g.comp} · ${g.atHome ? "vs" : "at"} ${g.opp}`)}">
+            <span class="sc ${r}">${g.mine}–${g.theirs}</span>
+            <span class="ha">${g.atHome ? "H" : "A"}</span>
+            <span class="op">${esc(g.opp)}</span>
+            <span class="st">${c == null ? "" : `🚩${c}`}${k == null ? "" : ` 🟨${k}`}${s == null ? "" : ` 🎯${s}`}</span></div>`;
+        }).join("")}
+        <div class="l5-avg"><span>⚽ <b>${gf}</b>–<b>${ga}</b></span><span>🚩 <b>${avg("corners")}</b></span>
+          <span>🟨 <b>${avg("cards")}</b></span><span>🎯 <b>${avg("sot")}</b></span></div></div>`;
+    };
+    $("#last5").innerHTML = `<div class="l5">${col(d[0], m.home, m.homeCrest)}${col(d[1], m.away, m.awayCrest)}</div>`;
+    $("#l5Wrap").hidden = false;
+  }
+
+  async function h2h(m) {
+    let d;
+    try { d = await window.HAWK.h2h(String(m.id)); }
+    catch (err) {
+      $("#h2h").innerHTML = `<p class="note" style="margin:0">Couldn't load the head to head (${esc(err.message || "")}).</p>`;
+      $("#h2hWrap").hidden = false;
+      return;
+    }
+    if (String(S.id) !== String(m.id)) return;
+    const games = (d && d.games) || [];
+    if (!games.length) {
+      $("#h2h").innerHTML = `<p class="note" style="margin:0">These two haven't met recently.</p>`;
+      $("#h2hWrap").hidden = false;
+      return;
+    }
+    // every meeting read from today's home side, whichever ground it was on
+    const us = (g) => (g.sameVenue ? [g.score[0], g.score[1]] : [g.score[1], g.score[0]]);
+    const n = games.length;
+    const wins = games.filter((g) => us(g)[0] > us(g)[1]).length;
+    const draws = games.filter((g) => us(g)[0] === us(g)[1]).length;
+    const goals = games.map((g) => g.score[0] + g.score[1]);
+    const avgOf = (k) => { const l = games.filter((g) => g[k]);
+      return l.length ? (l.reduce((s, g) => s + g[k][0] + g[k][1], 0) / l.length).toFixed(1) : "–"; };
+
+    $("#h2hN").textContent = `last ${n}`;
+    $("#h2h").innerHTML = `
+      <div class="h2h-sum"><span><b>${esc(m.home)}</b> ${wins}W</span><span>${draws}D</span>
+        <span><b>${esc(m.away)}</b> ${n - wins - draws}W</span>
+        <span>⚽ ${(goals.reduce((s, x) => s + x, 0) / n).toFixed(1)} a game</span>
+        <span>Over 2.5: ${goals.filter((x) => x > 2.5).length}/${n}</span>
+        <span>BTTS: ${games.filter((g) => g.score[0] > 0 && g.score[1] > 0).length}/${n}</span>
+        <span>🚩 ${avgOf("corners")}</span><span>🟨 ${avgOf("cards")}</span></div>
+      ${games.map((g) => {
+        const [a, b] = us(g), res = a > b ? "w" : a < b ? "l" : "d";
+        return `<div class="h2h-row" title="${esc(g.comp || "")}">
+          <span class="dt">${esc(new Date(g.date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" }))}</span>
+          <span class="tm">${esc(g.home)} <b class="h2h-sc ${res}">${g.score[0]}–${g.score[1]}</b> ${esc(g.away)}</span>
+          <span class="ex">${g.corners ? `🚩${g.corners[0] + g.corners[1]}` : ""}${g.cards ? ` 🟨${g.cards[0] + g.cards[1]}` : ""}</span>
+          <span class="cp">${esc(g.comp || "")}</span></div>`;
+      }).join("")}`;
+    $("#h2hNote").innerHTML = `Colours are from <b>${esc(m.home)}</b>'s side: green won, red lost.
+      Old meetings say less than current form — <b>HAWK's chances don't use them.</b>`;
+    $("#h2hWrap").hidden = false;
+  }
+
+  /* -------------------------------------------------------------- events */
+  document.addEventListener("click", (e) => {
+    const c = e.target.closest("#cats button[data-cat]");
+    if (c) { S.cat = c.dataset.cat; markets(); return; }
+
+    const leg = e.target.closest(".leg[data-leg]");
+    if (leg) {
+      const id = leg.dataset.leg, i = S.slip.indexOf(id);
+      if (i >= 0) S.slip.splice(i, 1); else S.slip.push(id);
+      leg.classList.toggle("on", i < 0);
+      $(".add", leg).textContent = i < 0 ? "✓" : "+";
+      slip();
+      return;
+    }
+
+    const drop = e.target.closest("[data-drop]");
+    if (drop) {
+      const id = drop.dataset.drop;
+      S.slip = S.slip.filter((x) => x !== id);
+      const b = document.querySelector(`.leg[data-leg="${CSS.escape(id)}"]`);
+      if (b) { b.classList.remove("on"); $(".add", b).textContent = "+"; }
+      slip();
+      return;
+    }
+
+    if (e.target.closest("#abGo")) { abBuild(false); return; }
+    if (e.target.closest("#abAgain")) { abBuild(true); return; }
+
+    if (e.target.closest("#clear")) {
+      S.slip = [];
+      document.querySelectorAll(".leg.on").forEach((b) => {
+        b.classList.remove("on"); $(".add", b).textContent = "+";
+      });
+      slip();
+    }
+  });
+
+  // the slip redraws on every keystroke, so the value lives in state and the
+  // caret is put back — otherwise typing "4.80" dies after the first key
+  // the build settings: remembered, and a change invalidates the alternatives
+  document.addEventListener("change", (e) => {
+    const f = e.target.closest("[data-ab]");
+    if (!f) return;
+    AB[f.dataset.ab] = f.type === "checkbox" ? f.checked : f.value;
+    abSave();
+    abOpts = []; abAt = 0;
+  });
+
+  document.addEventListener("input", (e) => {
+    if (e.target.id !== "ask") return;
+    const pos = e.target.selectionStart;
+    S.ask = e.target.value;
+    slip();
+    const again = $("#ask");
+    if (again) { again.focus(); again.setSelectionRange(pos, pos); }
+  });
+
+  /* ---------------------------------------------------------------- boot */
+  const q = new URLSearchParams(location.search);
+  S.league = q.get("league") || "";
+  S.id = q.get("id") || "";
+  if (window.HAWK && window.HAWK.match) load();
+  else $("#said").textContent = "The model didn't load, so nothing can be priced.";
+})();
+</script>
+</body>
+</html>

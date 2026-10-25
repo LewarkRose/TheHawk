@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HAWK</title>
+<meta name="description" content="Every bet, priced honestly.">
+<link rel="icon" href="../favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="../assets/hawk.css">
+</head>
+<body>
+
+<!-- ============================ the moment ============================== -->
+<header class="hero tall">
+  <canvas aria-hidden="true"></canvas>
+  <div class="wrap">
+    <span class="tag" id="tag"><span class="dot off"></span>Loading today</span>
+
+    <h1 class="moment">Every bet,<span class="q">priced honestly</span></h1>
+
+    <div class="fx" id="fx" hidden>
+      <div class="side h"><img class="crest" id="fxH" alt=""><h2 id="fxHN"></h2>
+        <div class="m" id="fxHM"></div></div>
+      <div class="mid"><div class="t" id="fxT"></div><div class="k" id="fxK"></div></div>
+      <div class="side a"><img class="crest" id="fxA" alt=""><h2 id="fxAN"></h2>
+        <div class="m" id="fxAM"></div></div>
+    </div>
+
+    <div class="acts">
+      <a class="btn gold" href="../builder/">Build a bet</a>
+      <a class="btn ghost" href="../today/">Your day</a>
+    </div>
+  </div>
+</header>
+
+<!-- ============================ and then quiet ========================== -->
+<section class="calm">
+  <div class="wrap">
+    <div class="lede"><h3>Today</h3><span class="n" id="todayN">reading…</span>
+      <a href="../builder/?view=scores">All scores →</a></div>
+    <div class="grid m3" id="today"><div class="m wide"><div class="skel">Reading today's card…</div></div></div>
+  </div>
+</section>
+
+<details class="calm fold" data-fold="hRecord">
+  <summary><div class="wrap"><div class="lede"><h3>Your record</h3>
+    <span class="n" id="recN"></span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div class="grid m4 rec" id="rec"><div class="wide"><div class="skel">Reading your Vault…</div></div></div>
+    <p class="note"><a href="../vault/" style="color:var(--gold-hi)">Open the Vault →</a></p>
+  </div>
+</details>
+
+<details class="calm fold" data-fold="hWays">
+  <summary><div class="wrap"><div class="lede"><h3>Where to go</h3><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div class="grid w4 ways">
+      <a href="../today/"><div class="i">01</div><h4>Today</h4>
+        <p>What is running, what is at risk, and what is still to come.</p></a>
+      <a href="../builder/"><div class="i">02</div><h4>Builder</h4>
+        <p>Pick a fixture and build a slip. HAWK prices every leg and says where Bet365 is ahead.</p></a>
+      <a href="../"><div class="i">03</div><h4>Vault</h4>
+        <p>Every bet you have placed, what it returned, and the bankroll that follows from it.</p></a>
+      <a href="../builder/?view=board"><div class="i">04</div><h4>Board</h4>
+        <p>Where HAWK has been right and where it has been wrong, market by market.</p></a>
+    </div>
+  </div>
+</details>
+
+<footer class="foot">
+  <div class="wrap">HAWK · one model, one bankroll, no tipsters ·
+    <a href="../today/">today</a> · <a href="../builder/">builder</a> · <a href="../">vault</a></div>
+</footer>
+
+<script src="../builder/engine.js"></script>
+<script src="../assets/hawk-bg.js"></script>
+<script src="../assets/hawk-fold.js"></script>
+<script>
+/* ===========================================================================
+   The home page's own data: today's card from the engine, your record from
+   the Vault's storage. Both fail quietly — a home page showing an error where
+   a score should be is worse than one that says nothing.
+   =========================================================================== */
+(() => {
+  "use strict";
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const pad = (n) => String(n).padStart(2, "0");
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+  const hhmm = (iso) => { const t = Date.parse(iso); return Number.isFinite(t)
+    ? new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""; };
+  const money = (n) => `${n < 0 ? "−" : ""}€${Math.abs(+n || 0).toFixed(2)}`;
+  const band = (g) => (g.status === 3 ? "live" : g.status === 4 ? "done" : "next");
+
+  /* the fixture that leads the page: whatever is most worth looking at now —
+     something in play, else the next to kick off */
+  function lead(games) {
+    const live = games.filter((g) => band(g) === "live");
+    const next = games.filter((g) => band(g) === "next")
+      .sort((a, b) => (Date.parse(a.kickoff || 0) || 0) - (Date.parse(b.kickoff || 0) || 0));
+    return live[0] || next[0] || null;
+  }
+
+  function paintLead(g) {
+    if (!g) return;
+    const live = band(g) === "live";
+    $("#fxH").src = g.homeCrest || ""; $("#fxA").src = g.awayCrest || "";
+    $("#fxHN").textContent = g.home; $("#fxAN").textContent = g.away;
+    $("#fxHM").textContent = "Home"; $("#fxAM").textContent = "Away";
+    $("#fxT").textContent = live ? `${g.score[0]}–${g.score[1]}` : (hhmm(g.kickoff) || "TBC");
+    $("#fxK").textContent = live ? `${g.clock || "Live"} · ${g.league || ""}` : `Today · ${g.league || ""}`;
+    $("#fx").hidden = false;
+  }
+
+  async function card() {
+    let games = [];
+    try { games = await window.HAWK.scores(today()); } catch { games = []; }
+    games = (games || []).filter((g) => g && g.home && g.away);
+
+    const tag = $("#tag");
+    if (!games.length) {
+      tag.innerHTML = `<span class="dot off"></span>`
+        + new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+      $("#today").innerHTML = `<div class="m wide"><div class="skel">No matches in HAWK's competitions today.</div></div>`;
+      $("#todayN").textContent = "";
+      return;
+    }
+    const live = games.filter((g) => band(g) === "live").length;
+    tag.innerHTML = live ? `<span class="dot"></span>${live} in play now`
+                         : `<span class="dot q"></span>${games.length} matches today`;
+
+    paintLead(lead(games));
+
+    const order = { live: 0, next: 1, done: 2 };
+    const ko = (g) => Date.parse(g.kickoff || 0) || 0;
+    const shown = games.slice()
+      .sort((a, b) => order[band(a)] - order[band(b)] || ko(a) - ko(b)).slice(0, 8);
+
+    $("#todayN").textContent = live ? `${live} in play · ${games.length} on the card`
+                                    : `${games.length} on the card`;
+
+    $("#today").innerHTML = shown.map((g) => {
+      const b = band(g), [sh, sa] = g.score || [];
+      const have = Number.isFinite(sh) && Number.isFinite(sa);
+      const mid = have ? `${sh}–${sa}` : (hhmm(g.kickoff) || "TBC");
+      const sub = b === "live" ? (g.clock || "live") : b === "done" ? "full time" : "kick-off";
+      const st = b === "live" ? "Live" : b === "done" ? "Full time" : "Upcoming";
+      const href = `${b === "live" ? "../live/" : "../match/"}`
+        + `?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}`;
+      return `<a class="m${b === "live" ? " live" : ""}" href="${href}">
+        <div class="st"><span class="d"></span>${st}</div>
+        <div class="c"><div class="teams">
+            <div class="${have && sh < sa ? "lost" : ""}">${esc(g.home)}</div>
+            <div class="${have && sa < sh ? "lost" : ""}">${esc(g.away)}</div>
+          </div><div class="sc">${esc(mid)}<small>${esc(sub)}</small></div></div>
+        <div class="lg">${esc(g.league || "")}</div></a>`;
+    }).join("");
+
+    if (live) setTimeout(card, 60000);
+  }
+
+  /* Mirrors the Vault's betProfit, except VOID is 0 — the Vault charges a void
+     bet a stake on one line and pays it back on another, and a bet that never
+     ran cost nothing. */
+  function betProfit(b) {
+    if (b.status === "WON") return (+b.potentialReturn || 0) - (+b.stake || 0);
+    if (b.status === "CASHED_OUT") return (+b.cashOutAmount || 0) - (+b.stake || 0);
+    if (b.status === "PENDING" || b.status === "VOID") return 0;
+    return -(+b.stake || 0);
+  }
+
+  function record() {
+    let bets = [], bank = null;
+    try {
+      bets = JSON.parse(localStorage.getItem("hawk_bets") || "[]");
+      const b = parseFloat(localStorage.getItem("hawk_bankroll"));
+      if (Number.isFinite(b)) bank = b;
+    } catch { bets = []; }
+    if (!Array.isArray(bets)) bets = [];
+
+    const settled = bets.filter((b) => b && b.status && b.status !== "PENDING");
+    const pending = bets.length - settled.length;
+    if (!settled.length) {
+      $("#rec").innerHTML = `<div class="wide"><div class="skel">${bets.length
+        ? `${bets.length} bet${bets.length === 1 ? "" : "s"} open, none settled yet.`
+        : "No bets in this browser's Vault yet."}</div></div>`;
+      return;
+    }
+    const staked = settled.reduce((a, b) => a + (+b.stake || 0), 0);
+    const net = settled.reduce((a, b) => a + betProfit(b), 0);
+    const roi = staked ? (100 * net / staked) : 0;
+    const won = settled.filter((b) => b.status === "WON").length;
+    const cls = (n) => (n > 0 ? " up" : n < 0 ? " dn" : "");
+
+    $("#recN").textContent = `${settled.length} settled${pending ? ` · ${pending} open` : ""}`;
+    $("#rec").innerHTML = `
+      <div><div class="n g">${bank == null ? "—" : money(bank)}</div><div class="k">Bankroll</div>
+        <div class="s">what the Vault has now</div></div>
+      <div><div class="n${cls(net)}">${net > 0 ? "+" : ""}${money(net)}</div><div class="k">Net</div>
+        <div class="s">across ${money(staked)} staked</div></div>
+      <div><div class="n${cls(roi)}">${roi > 0 ? "+" : ""}${roi.toFixed(2)}%</div><div class="k">Return</div>
+        <div class="s">on turnover</div></div>
+      <div><div class="n">${(100 * won / settled.length).toFixed(0)}%</div><div class="k">Strike rate</div>
+        <div class="s">${won} of ${settled.length} landed</div></div>`;
+  }
+
+  record();
+  if (window.HAWK && window.HAWK.scores) card();
+  else {
+    $("#tag").innerHTML = `<span class="dot off"></span>HAWK`;
+    $("#today").innerHTML = `<div class="m wide"><div class="skel">The model didn't load, so today's card can't be read.</div></div>`;
+  }
+})();
+</script>
+</body>
+</html>

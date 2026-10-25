@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live · HAWK</title>
+<meta name="description" content="A match as it happens, and whether anything is worth backing.">
+<link rel="icon" href="../favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="../assets/hawk.css">
+<style>
+/* page-local: on a live page the score is the moment, so the fixture row
+   gives it the middle and the clubs take the sides */
+.hero .fx{margin-top:clamp(24px,3.6vw,40px);align-items:start}
+.hero .fx .crest{width:clamp(54px,6.6vw,84px)}
+.hero .fx .side h2{font-size:clamp(16px,2.6vw,30px)}
+.read{margin-top:clamp(28px,4vw,44px);animation:rise 1s 1.3s var(--film) both}
+.b3{display:flex;height:12px;gap:2px;overflow:hidden}
+.b3 i{display:block;height:100%;min-width:3px;transform-origin:left center;
+  animation:grow 1.4s 1.55s var(--film) both}
+.b3 i.h{background:linear-gradient(180deg,var(--gold-hi),#8a6a24);box-shadow:0 0 24px -4px rgba(212,169,78,.85)}
+.b3 i.d{background:linear-gradient(180deg,#3d3d4a,#22222c)}
+.b3 i.a{background:linear-gradient(180deg,var(--navy-hi),#2d4a8c);
+  box-shadow:0 0 24px -4px rgba(107,143,224,.85);transform-origin:right center}
+.b3k{display:flex;justify-content:space-between;gap:12px;margin-top:13px;
+  font:700 9.5px/1.5 var(--mono);letter-spacing:.15em;text-transform:uppercase}
+.b3k b:first-child{color:var(--gold-hi)}
+.b3k b:nth-child(2){color:var(--muted)}
+.b3k b:last-child{color:var(--navy-hi)}
+.back{display:inline-flex;align-items:center;gap:8px;text-decoration:none;
+  font:700 9.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--faint);
+  transition:color .4s var(--film);animation:rise .8s .05s var(--film) both}
+.back:hover{color:var(--gold-hi)}
+</style>
+</head>
+<body>
+
+<!-- the bug: hidden until the hero has scrolled past -->
+<div class="bug" id="bug">
+  <div class="in">
+    <img id="bgH" alt=""><span class="nm" id="bgHN"></span>
+    <span class="sc" id="bgSC"></span>
+    <span class="nm r" id="bgAN"></span><img id="bgA" alt="">
+    <span class="ck"><span class="d"></span><span id="bgCK"></span></span>
+    <span class="pr" id="bgPR"></span>
+  </div>
+</div>
+
+<header class="hero" id="hero">
+  <canvas aria-hidden="true"></canvas>
+  <div class="wrap">
+    <a class="back" href="../today/">← Today</a>
+    <div style="margin-top:18px"><span class="tag" id="tag"><span class="dot off"></span>Reading the match</span></div>
+
+    <div class="fx" id="fx" hidden>
+      <div class="side h"><img class="crest" id="cH" alt=""><h2 id="nH"></h2>
+        <div class="goals" id="gH"></div></div>
+      <div class="mid">
+        <div class="score" id="sc"></div>
+        <div class="clock" id="ck"><span class="d"></span><span id="ckT"></span></div>
+        <div class="k" id="left" style="margin-top:12px"></div>
+      </div>
+      <div class="side a"><img class="crest" id="cA" alt=""><h2 id="nA"></h2>
+        <div class="goals" id="gA"></div></div>
+    </div>
+
+    <h1 class="moment mid" id="fail" hidden>Not in <span class="q">play</span></h1>
+    <p class="said" id="said">Asking HAWK what is happening…</p>
+
+    <div class="read" id="read" hidden>
+      <div class="b3" id="bar"></div>
+      <div class="b3k" id="bark"></div>
+      <p class="note" id="says"></p>
+    </div>
+  </div>
+</header>
+
+<section class="calm" id="yours" hidden>
+  <div class="wrap">
+    <div class="lede"><h3>Your bet</h3><span class="n" id="yoursN"></span>
+      <a href="../">Open the Vault →</a></div>
+    <div id="tickets"></div>
+  </div>
+</section>
+
+<section class="calm">
+  <div class="wrap">
+    <div class="lede"><h3>At <span id="book">Bet365</span></h3><span class="n" id="priceN"></span>
+      <a href="#" id="allToggle">Show all →</a></div>
+    <div id="prices"><div class="skel">Reading the board…</div></div>
+  </div>
+</section>
+
+<details class="calm fold" id="nextWrap" data-fold="ipNext" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Next goal</h3><span class="n" id="nextN"></span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap">
+    <div class="b3" id="nbar"></div>
+    <div class="b3k" id="nbark"></div>
+  </div>
+</details>
+
+<details class="calm fold" id="htWrap" data-fold="ipCheck" hidden>
+  <summary><div class="wrap"><div class="lede"><h3 id="htH">Live check</h3><span class="n" id="htN"></span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap">
+    <p class="note" style="margin:0 0 20px" id="htStats"></p>
+    <div id="htBody"></div>
+    <p class="note">Prices move fast and get suspended after chances and goals. The price you see has
+      to be at or above <b>worth it from</b> for the bet to pay its way.</p>
+  </div>
+</details>
+
+<details class="calm fold" id="luWrap" data-fold="ipLineups" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Lineups</h3><span class="n">live</span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap">
+    <div id="lineups"></div>
+  </div>
+</details>
+
+<details class="calm fold" id="statWrap" data-fold="ipStats" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Live stats</h3><span class="n">Match</span><span class="mk-t"></span></div></div></summary>
+
+  <div class="wrap">
+    <div id="stats"></div>
+  </div>
+</details>
+
+<footer class="foot">
+  <div class="wrap"><a href="../home/">home</a> · <a href="../today/">today</a> ·
+    <a href="#" id="preLink">pre-match</a> · <a href="../">vault</a> ·
+    chances refresh every 15 seconds</div>
+</footer>
+
+<script src="../builder/engine.js"></script>
+<script src="../assets/hawk-bg.js"></script>
+<script src="../assets/hawk-lineups.js"></script>
+<script src="../assets/hawk-fold.js"></script>
+<script>
+/* ===========================================================================
+   The in-play page.
+
+   The score is the moment on the open; once the hero scrolls past, a bug
+   takes over at the top so the score never leaves the screen. A live score
+   you have to scroll back to is one you stop checking.
+
+   Everything beneath the hero is quiet, including — deliberately — the most
+   common answer this page gives, which is that nothing beats the price.
+   =========================================================================== */
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const odds = (x) => (x > 0 && Number.isFinite(x) ? x.toFixed(2) : "—");
+  const pct = (p, dp = 0) => (Number.isFinite(p) ? `${(100 * p).toFixed(dp)}%` : "—");
+  const money = (n) => `€${(+n || 0).toFixed(2)}`;
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const pc100 = (a) => {
+    const v = a.map((x) => 100 * (x || 0)), r = v.map(Math.round);
+    let d = 100 - r.reduce((x, y) => x + y, 0);
+    while (d) { const i = v.map((x, k) => [Math.abs(x - r[k]), k]).sort((p, q) => q[0] - p[0])[0][1];
+      r[i] += d > 0 ? 1 : -1; d += d > 0 ? -1 : 1; }
+    return r;
+  };
+
+  const REFRESH = 15000;
+  // value: the book pays 2%+ over HAWK's chance on a selection of 20%+.
+  // Longshot "edges" are mostly an artefact of removing the margin.
+  const isValue = (r) => r.edge >= 0.02 && r.p >= 0.2;
+
+  const S = { id: "", league: "", d: null, m: null, all: false, take: null, stake: "",
+              offers: {}, htPrices: {}, timer: 0 };
+
+  /* The pre-match object, fetched once and kept. liveMatch() has the score and
+     the events but not the squads, so the pitch needs both — which is exactly
+     what the old builder does. One call, not one every fifteen seconds. */
+  async function squads() {
+    if (S.m || !window.HAWK.match) return S.m;
+    try { S.m = await window.HAWK.match(S.league, S.id); } catch { S.m = null; }
+    return S.m;
+  }
+  function lineups() {
+    if (!(window.HAWKLineups && S.m && S.d)) return;
+    const ok = window.HAWKLineups.render($("#lineups"), S.m, { live: S.d, gameId: S.id });
+    $("#luWrap").hidden = !ok;
+  }
+
+  /* ======================================================= taking a price
+     A live row carries no leg id — liveMatch() returns label, market, price,
+     chance and edge and nothing a settler could key on. So an id is derived
+     for the four families ticketLive() can actually test, and anything
+     outside them says so BEFORE you log it rather than after. */
+  function legId(r, d) {
+    const L = String(r.label || ""), mk = String(r.market || "");
+    if (/Full Time Result/i.test(mk)) {
+      if (/draw/i.test(L)) return "res:draw";
+      if (L.includes(d.home)) return "res:home";
+      if (L.includes(d.away)) return "res:away";
+      return null;
+    }
+    if (/Double Chance/i.test(mk)) {
+      if (!/draw/i.test(L)) return null;          // "home or away" has no draw cover
+      return L.includes(d.home) ? "dc:home" : L.includes(d.away) ? "dc:away" : null;
+    }
+    if (/Total Goals/i.test(mk)) {
+      const m = /(over|under)\s*([\d.]+)/i.exec(L);
+      return m ? `goals:${m[1].toLowerCase() === "over" ? "o" : "u"}${m[2]}` : null;
+    }
+    if (/Both Teams/i.test(mk)) return /\bno\b/i.test(L) ? "btts:no" : "btts:yes";
+    return null;
+  }
+
+  function toast(msg) {
+    const el = document.createElement("div");
+    el.textContent = msg;
+    el.style.cssText = `position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:200;
+      max-width:min(92vw,520px);padding:14px 18px;background:#14151a;color:#f2f2f2;
+      box-shadow:inset 0 0 0 1px rgba(212,169,78,.4),0 18px 44px -18px #000;
+      font:400 13px/1.55 system-ui,sans-serif`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 5200);
+  }
+
+  /* Writes a PENDING bet in the Vault's own format and takes the stake off
+     the bankroll, exactly as the old builder's saveToVault does. A bet logged
+     here must be indistinguishable from one logged there, or the Vault stops
+     being one record. */
+  function logLive(r, stake) {
+    const d = S.d;
+    let bank, bets;
+    try {
+      bank = parseFloat(localStorage.getItem("hawk_bankroll"));
+      if (!Number.isFinite(bank)) bank = 1000;
+      bets = JSON.parse(localStorage.getItem("hawk_bets") || "[]");
+      if (!Array.isArray(bets)) bets = [];
+    } catch { toast("Couldn't open the Vault's storage in this browser."); return false; }
+
+    if (!(stake > 0)) { toast("Enter a stake first."); return false; }
+    if (bank < stake) { toast(`Not enough in your Vault bankroll (${money(bank)}).`); return false; }
+    if (stake / bank >= 0.1 && !confirm(
+      `${money(stake)} is ${Math.round(100 * stake / bank)}% of your ${money(bank)} bankroll.\n\nLog it anyway?`)) return false;
+
+    const id = legId(r, d), price = +r.price, p = +r.p, edge = price / r.fair - 1;
+    bets.unshift({
+      id: "bet_" + Date.now(),
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+      legs: [{
+        fixture: `${d.home} vs ${d.away}`, selection: r.label,
+        angle: `HAWK live at ${d.clock || ""}: ${pct(p, 1)} to land · fair ${odds(r.fair)} · `
+             + `${edge >= 0 ? "+" : ""}${(100 * edge).toFixed(1)}% at ${odds(price)} · score ${d.score[0]}–${d.score[1]}`,
+        odds: price, type: "live", league: S.league || "",
+        subSelections: [{ label: r.label, odds: +price.toFixed(2) }],
+        hawk: { game: String(S.id), league: S.league || "", home: d.home, away: d.away,
+                kickoff: null, p, homeCrest: d.homeCrest || null, awayCrest: d.awayCrest || null,
+                live: true, takenAt: d.clock || null, takenScore: [d.score[0], d.score[1]],
+                legs: [{ id, label: r.label, market: r.market || null, p, pRaw: p,
+                         player: null, side: null, bookPrice: price, refPrice: null, refBooks: null }] },
+      }],
+      stake, odds: price, potentialReturn: stake * price, status: "PENDING",
+      source: "hawk-live", hawkP: p,
+    });
+    try {
+      localStorage.setItem("hawk_bankroll", (bank - stake).toFixed(2));
+      localStorage.setItem("hawk_bets", JSON.stringify(bets));
+    } catch { toast("Couldn't save to the Vault's storage."); return false; }
+
+    toast(id
+      ? `Logged: ${money(stake)} @ ${odds(price)} on ${r.label}. It tracks here and settles itself.`
+      : `Logged: ${money(stake)} @ ${odds(price)} on ${r.label}. This market has no live settler — settle it by hand in the Vault.`);
+    return true;
+  }
+
+  /* ================================================================ paint */
+  function bug(d) {
+    $("#bgH").src = d.homeCrest || ""; $("#bgA").src = d.awayCrest || "";
+    $("#bgHN").textContent = d.home; $("#bgAN").textContent = d.away;
+    $("#bgSC").textContent = `${d.score[0]}–${d.score[1]}`;
+    $("#bgCK").textContent = `${d.clock || ""}${d.statusText ? ` · ${d.statusText}` : ""}`.trim();
+  }
+
+  function moment(d) {
+    $("#cH").src = d.homeCrest || ""; $("#cA").src = d.awayCrest || "";
+    $("#nH").textContent = d.home;    $("#nA").textContent = d.away;
+    $("#sc").innerHTML = `${d.score[0]}<em>–</em>${d.score[1]}`;
+    $("#ckT").innerHTML = `<b>${esc(d.clock || "")}</b>${d.statusText ? ` · ${esc(d.statusText)}` : ""}`;
+    $("#left").textContent = d.remaining > 0 ? `About ${Math.round(d.remaining)} minutes left incl. stoppage` : "";
+    $("#tag").innerHTML = `<span class="dot"></span>In play · ${esc(S.league || d.statusText || "")}`;
+    $("#fx").hidden = false;
+
+    // goals and reds against each club
+    const side = (s) => {
+      const out = [];
+      for (const e of (d.events || []).filter((e) => e.side === s)) {
+        if (e.type === "goal") out.push(`<div><b>⚽ ${esc((e.player || "").split(" ").pop())}</b><span>${esc(e.minute || "")}</span></div>`);
+        else if (e.type === "disallowed") out.push(`<div class="off"><b>${esc((e.player || "").split(" ").pop())}</b><span>${esc(e.minute || "")} · VAR</span></div>`);
+        else if (e.type === "red") out.push(`<div><b>🟥 ${esc((e.player || "").split(" ").pop())}</b><span>${esc(e.minute || "")}</span></div>`);
+      }
+      return out.join("");
+    };
+    $("#gH").innerHTML = side("home"); $("#gA").innerHTML = side("away");
+
+    const p = d.probs || {}, hp = pc100([p.home, p.draw, p.away]);
+    $("#bar").innerHTML = `<i class="h" style="flex:${p.home || 0}"></i>`
+      + `<i class="d" style="flex:${p.draw || 0}"></i><i class="a" style="flex:${p.away || 0}"></i>`;
+    $("#bark").innerHTML = `<b>${esc(d.home)} ${hp[0]}%</b><b>Draw ${hp[1]}%</b><b>${esc(d.away)} ${hp[2]}%</b>`;
+
+    const i = hp.indexOf(Math.max(...hp));
+    const who = [`${d.home} to win`, "The draw", `${d.away} to win`][i];
+    const bk = d.market ? pc100([d.market.home, d.market.draw, d.market.away])[i] : null;
+    $("#says").innerHTML = bk == null
+      ? `${esc(who)} is the likeliest result from here at <b>${hp[i]}%</b>. No live bookmaker prices right now, so this is HAWK's own read.`
+      : bk === hp[i]
+        ? `${esc(who)} is the likeliest result from here: HAWK <b>${hp[i]}%</b>, bookmakers <b>${bk}%</b> — they agree.`
+        : `${esc(who)} is the likeliest result from here: bookmakers <b>${bk}%</b>, HAWK <b>${hp[i]}%</b>.`;
+    $("#read").hidden = false;
+    $("#said").textContent = "";
+  }
+
+  function nextGoal(d) {
+    const n = d.next;
+    if (!n) return;
+    const v = pc100([n.home, 1 - n.any, n.away]);
+    $("#nextN").textContent = `${pct(n.any)} another${n.by ? ` · 50/50 by ${n.by}'` : ""} · ${pct(n.twoPlus)} two or more`;
+    $("#nbar").innerHTML = `<i class="h" style="flex:${n.home || 0}"></i>`
+      + `<i class="d" style="flex:${1 - (n.any || 0)}"></i><i class="a" style="flex:${n.away || 0}"></i>`;
+    $("#nbark").innerHTML = `<b>${esc(d.home)} ${v[0]}%</b><b>No more ${v[1]}%</b><b>${esc(d.away)} ${v[2]}%</b>`;
+    $("#nextWrap").hidden = false;
+  }
+
+  const STATS = [
+    ["Expected Goals", "Expected goals", (x) => (+x).toFixed(2)],
+    ["Shots On Target", "Shots on target"], ["Total Shots", "Shots"],
+    ["Big Chances Created", "Big chances"], ["Corners", "Corners"],
+    ["Possession", "Possession", (x) => x + "%"], ["Offsides", "Offsides"],
+    ["Goalkeeper Saves", "Saves"],
+  ];
+  function stats(d) {
+    const st = d.stats || {}, rows = [];
+    const row = (a, b, label, fmt = (x) => x, title = "") => {
+      const tot = (+a || 0) + (+b || 0) || 1;
+      return `<div class="str"${title ? ` title="${esc(title)}"` : ""}><div class="v">${fmt(a)}</div>
+        <div class="c"><div class="k">${esc(label)}</div><div class="bar">
+          <i class="h" style="width:${(100 * a / tot).toFixed(1)}%"></i>
+          <i class="a" style="width:${(100 * b / tot).toFixed(1)}%"></i></div></div>
+        <div class="v a">${fmt(b)}</div></div>`;
+    };
+    for (const [key, label, fmt] of STATS) {
+      const v = st[key];
+      if (!v || (v[0] == null && v[1] == null)) continue;
+      rows.push(row(+v[0] || 0, +v[1] || 0, label, fmt));
+    }
+    // cards in booking points — a yellow is 1 and a red is 2, which is how
+    // the card markets settle
+    const y = st["Yellow Cards"], r = st["Red Cards"] || [0, 0];
+    if (y && (y[0] != null || y[1] != null)) {
+      rows.push(row((+y[0] || 0) + 2 * (+r[0] || 0), (+y[1] || 0) + 2 * (+r[1] || 0),
+        "Cards · booking pts", (x) => x, "A yellow is 1 and a red is 2, the way card markets settle."));
+    }
+    if (!rows.length) return;
+    $("#stats").innerHTML = `<div class="sth"><b>${esc(d.home)}</b><b>${esc(d.away)}</b></div>${rows.join("")}`;
+    $("#statWrap").hidden = false;
+  }
+
+  /* ---------------------------------------------------------- the prices */
+  function prices(d) {
+    const rows = d.rows || [];
+    const el = $("#prices");
+    if (!rows.length) {
+      $("#priceN").textContent = "";
+      $("#allToggle").style.display = "none";
+      el.innerHTML = `<p class="note" style="margin:0"><b>No live prices right now.</b> Bet365
+        suspends them after a chance and around a goal, so this usually clears in a minute.</p>`;
+      return;
+    }
+    const val = rows.filter(isValue).sort((a, b) => b.edge - a.edge);
+    const rest = rows.filter((r) => !isValue(r)).sort((a, b) => b.edge - a.edge);
+    const list = S.all ? [...val, ...rest] : val;
+
+    $("#priceN").textContent = val.length
+      ? `${val.length} of ${rows.length} beating it` : `${rows.length} lines`;
+    $("#allToggle").style.display = "";
+    $("#allToggle").textContent = S.all ? "Value only →" : `Show all ${rows.length} →`;
+
+    if (!list.length) {
+      // Why a row was left out is not one answer. Either the board is simply
+      // short of HAWK's read, or something IS paying over the odds but on a
+      // longshot, where the "edge" is mostly an artefact of removing the
+      // bookmaker's margin. Calling the second one "short" was a lie: the row
+      // below said 106% short of a line paying +102%.
+      const best = rest[0];
+      const over = best && best.edge > 0;
+      const why = over
+        ? `The only line paying over the odds is <b>${esc(best.label)}</b> at ${odds(best.price)} —
+           but HAWK gives it ${pct(best.p, best.p < 0.1 ? 1 : 0)}, under the 20% floor where an edge
+           stops meaning much once the bookmaker's margin is taken out.`
+        : `The best of the ${rows.length} live lines is
+           ${Math.abs(100 * (best ? best.edge : 0)).toFixed(1)}% short of HAWK's chance.`;
+      el.innerHTML = `<p class="note" style="margin:0"><b>Nothing worth backing right now.</b>
+        ${why} That is normal — in-play prices are sharp, and this page is here to tell you not to bet
+        as often as it finds you something. Checking again every 15 seconds.</p>`;
+      return;
+    }
+
+    const row = (r) => {
+      const good = isValue(r), open = S.take === r.label;
+      return `<div class="pr-r${good ? " val" : ""}">
+          <div class="nm">${esc(r.label)}<i>${esc(r.market || r.basis || "")}</i></div>
+          <span class="b">${odds(r.price)}</span>
+          <span>${odds(r.fair)}</span>
+          <span>${pct(r.p, r.p < 0.1 ? 1 : 0)}</span>
+          <span class="e${good ? " up" : ""}">${r.edge >= 0 ? "+" : ""}${(100 * r.edge).toFixed(1)}%</span>
+          <button class="btn ${good ? "gold" : "ghost"} sm take" data-take="${esc(r.label)}">${open ? "Close" : "Take"}</button>
+        </div>` + (open ? form(r, d) : "");
+    };
+
+    el.innerHTML = `<div class="pr-h"><span>Bet</span><span>Bet365</span><span>Fair</span>
+      <span>Chance</span><span>Edge</span><span></span></div>${list.map(row).join("")}
+      <p class="note">Only selections of 20%+ count as value: longshot edges are mostly an artefact of
+      removing the bookmaker's margin. Prices move every few seconds and get suspended after chances,
+      so check it is still there before you take it. <b>Losing on this match? Don't chase it.</b></p>`;
+  }
+
+  // the take form, under its own row — it says what HAWK thinks BEFORE the
+  // button, including when HAWK thinks it is a bad bet, which is most of the time
+  function form(r, d) {
+    const stake = parseFloat(String(S.stake).replace(",", "."));
+    const edge = r.price / r.fair - 1, good = isValue(r), id = legId(r, d);
+    const ret = stake > 0 ? stake * r.price : null;
+    return `<div class="pr-form">
+      <div class="vd ${good ? "good" : "bad"}" style="margin:0 0 16px">
+        <b>${good ? "HAWK says this beats the price" : "HAWK says don't"}</b>
+        Bet365 pays ${odds(r.price)} where HAWK makes it ${odds(r.fair)} —
+        ${good ? `${(100 * edge).toFixed(1)}% over` : `${Math.abs(100 * edge).toFixed(1)}% short`},
+        on a ${pct(r.p, r.p < 0.1 ? 1 : 0)} chance${!good && r.p < 0.2 ? ", and under the 20% floor where edges stop meaning much" : ""}.
+        ${good ? "" : " You can still log it; the Vault records it honestly either way."}</div>
+      <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+        <div><label for="lvStake" style="display:block;margin-bottom:9px;font:700 8.5px/1 var(--mono);
+          letter-spacing:.16em;text-transform:uppercase;color:var(--faint)">Stake</label>
+          <input id="lvStake" inputmode="decimal" placeholder="e.g. 5.00" value="${esc(S.stake)}"
+            style="width:130px;padding:12px 13px;border:0;background:var(--ink);color:var(--text);
+            font:400 16px/1 var(--mono);box-shadow:inset 0 0 0 1px var(--rule-2)"></div>
+        <button class="btn gold" data-log="${esc(r.label)}">Log it in the Vault</button>
+        ${ret ? `<span style="font:400 12.5px/1.6 var(--mono);color:var(--muted)">returns
+          <b style="color:var(--gold-hi)">${money(ret)}</b> if it lands</span>` : ""}
+      </div>
+      ${id ? "" : `<p class="note" style="margin-top:15px;color:var(--down)"><b style="color:var(--down)">This
+        market has no live settler.</b> HAWK tracks result, double chance, total goals and both-teams-to-score
+        in play; this one it cannot, so the bet sits pending until you settle it by hand.</p>`}
+      <p class="note" style="margin-top:12px">One leg at a time. HAWK cannot price two live legs
+        together — the engine's combining step works off the pre-match catalogue — and multiplying two
+        live prices would overstate the ticket, so this page does not offer it.</p></div>`;
+  }
+
+  /* ------------------------------------------------ the half-time check
+     At the break, and once there is anything worth saying during play. The
+     markets are the ones a half-time read can actually move: result, double
+     chance, totals and both-teams-to-score. */
+  const HT_TYPES = new Set([1, 14, 15, 3, 12]);
+  const isHalfTime = (x) => /half.?time|^ht$|break/i.test((x && x.statusText) || "");
+
+  // A line the score has already settled is not a tip. At 2–1 "Over 2.5 goals"
+  // has landed, and nobody pays 1.44 for a bet that has already won.
+  function htSettled(r, d) {
+    const s = d.score || [], hg = s[0] || 0, ag = s[1] || 0;
+    const m = /^(Over|Under) ([\d.]+) Goals/.exec(r.label || "");
+    if (m) return hg + ag > +m[2];
+    if (/^Both Teams to Score/.test(r.label || "")) return hg > 0 && ag > 0;
+    return false;
+  }
+  const htTips = (d) => (d.rows || [])
+    .filter((r) => HT_TYPES.has(r.type) && r.p >= 0.4 && r.p < 0.97 && r.price >= 1.2
+      && r.edge >= 0.02 && !htSettled(r, d))
+    .sort((a, b) => b.edge - a.edge).slice(0, 2);
+
+  const htStatsLine = (d) => {
+    const st = d.stats || {};
+    const pair = (k) => (st[k] && (st[k][0] != null || st[k][1] != null) ? `${st[k][0] || 0}–${st[k][1] || 0}` : null);
+    return [["Total Shots", "shots"], ["Shots On Target", "on target"], ["Corners", "corners"]]
+      .map(([k, t]) => pair(k) && `${t} ${pair(k)}`)
+      .concat(st["Expected Goals"] ? [`xG ${(st["Expected Goals"][0] || 0).toFixed(1)}–${(st["Expected Goals"][1] || 0).toFixed(1)}`] : [])
+      .filter(Boolean).join(" · ");
+  };
+
+  // The goals line in words: at 1–0, "Over 1.5 goals" means one more goal.
+  function htLabel(r, d) {
+    const m = /^(Over|Under) ([\d.]+) Goals/.exec(r.label), now = (d.score[0] || 0) + (d.score[1] || 0);
+    if (!m) return r.label;
+    const need = Math.floor(+m[2]) + 1 - now, spare = Math.max(0, Math.ceil(+m[2]) - 1 - now);
+    return `${r.label} — ${m[1] === "Over"
+      ? (need <= 0 ? "already landed" : `${need} more goal${need > 1 ? "s" : ""}${isHalfTime(d) ? " in the 2nd half" : ""}`)
+      : (spare === 0 ? "no more goals" : `no more than ${spare} more`)}`;
+  }
+
+  function htVerdict(r) {
+    const x = parseFloat(String(S.htPrices[r.label] || "").replace(",", ".")), need = r.fair * 1.02;
+    if (!(x > 1)) return `<span class="ht-ask">Type Bet365's price to check it</span>`;
+    const good = x >= need, near = !good && x >= r.fair * 0.95;
+    return `<span class="ht-say ${good ? "good" : near ? "near" : "bad"}">
+      <b>${pct(r.p)}</b> lands · <b>${pct(1 / x)}</b> needed at ${odds(x)} —
+      ${good ? "worth it" : near ? "close, but short" : "not worth it"}</span>`;
+  }
+
+  function htCheck(d) {
+    if (!d.live) { $("#htWrap").hidden = true; return; }
+    const ht = isHalfTime(d), tips = htTips(d);
+    $("#htH").textContent = ht ? "Half-time check" : "Live check";
+    $("#htN").textContent = tips.length ? `${plural(tips.length, "worth a look")}` : "nothing right now";
+    $("#htStats").textContent = `${ht ? "1st half" : "So far"}: ${htStatsLine(d) || "no stats yet"}`;
+    $("#htBody").innerHTML = tips.length
+      ? tips.map((r) => `<div class="ht">
+          <div class="ht-t">${esc(htLabel(r, d))}</div>
+          <div class="ht-m">HAWK: lands ${pct(r.p)} · Bet365 live ≈ ${odds(r.price)} (can lag a little)</div>
+          <div class="ht-row">
+            <div><div class="k">Worth it from</div><div class="v">${odds(r.fair * 1.02)}+</div></div>
+            <div><label for="ht-${esc(r.label)}">Bet365's price</label>
+              <input id="ht-${esc(r.label)}" data-ht="${esc(r.label)}" inputmode="decimal"
+                placeholder="${odds(r.price)}" value="${esc(S.htPrices[r.label] || "")}"></div>
+          </div>
+          <div class="ht-v">${htVerdict(r)}</div></div>`).join("")
+      : `<p class="note" style="margin:0">Nothing worth betting right now — Bet365's live prices are in
+         line with HAWK's read. It keeps checking every 15 seconds while this page is open.</p>`;
+    $("#htWrap").hidden = false;
+  }
+
+  /* -------------------------------------------------------- your tickets */
+  async function tickets(d) {
+    let bets = [];
+    try { bets = JSON.parse(localStorage.getItem("hawk_bets") || "[]"); } catch { bets = []; }
+    if (!Array.isArray(bets)) bets = [];
+    const mine = bets.filter((b) => b && b.status === "PENDING"
+      && (b.legs || []).some((l) => l && l.hawk && String(l.hawk.game) === String(S.id)));
+    if (!mine.length) { $("#yours").hidden = true; $("#bgPR").textContent = ""; return null; }
+
+    const icon = { won: "✅", lost: "❌", live: "⏳", wait: "⏸", void: "⊘" };
+    const out = [];
+    let firstP = null;
+
+    for (const b of mine) {
+      const here = (b.legs || []).filter((l) => l.hawk && String(l.hawk.game) === String(S.id))
+        .flatMap((l) => l.hawk.legs || []);
+      let live = null;
+      try { live = await window.HAWK.ticketLive(String(S.id), here); } catch { /* skipped */ }
+      if (!live) continue;
+
+      // legs on other matches cannot be priced live; they are counted at the
+      // chance stored with the bet, and the ticket says so
+      const elsewhere = (b.legs || []).filter((l) => !(l.hawk && String(l.hawk.game) === String(S.id)));
+      let pOther = 1, approx = false;
+      for (const l of elsewhere) {
+        const p = l.hawk && Number.isFinite(l.hawk.p) ? l.hawk.p : null;
+        approx = true;
+        if (p != null) pOther *= p;
+      }
+      const p = (live.p == null ? 0 : live.p) * pOther;
+      if (firstP == null) firstP = p;
+      const ret = +b.potentialReturn || 0, hold = p * ret;
+      const offer = parseFloat(String(S.offers[b.id] || "").replace(",", "."));
+
+      const legs = (live.legs || []).map((r) => `<div class="lg"><span>${icon[r.state] || "⏳"}</span>
+        <span>${esc(r.label)}${r.note ? `<small>${esc(r.note)}</small>` : ""}</span>
+        <b class="${r.state === "won" ? "w" : r.state === "lost" ? "l" : ""}">${
+          r.state === "won" ? "done" : r.state === "lost" ? "lost"
+            : r.p == null ? "—" : pct(r.p, r.p < 0.1 ? 1 : 0)}</b></div>`).join("");
+      const others = elsewhere.length ? `<div class="lg"><span>🕒</span><span>${plural(elsewhere.length, "leg")}
+        on other matches<small>counted at the chance stored with the bet</small></span><b>—</b></div>` : "";
+
+      const vd = !(offer > 0)
+        ? `<div class="vd"><b>Worth ${money(hold)} on average</b>Type Bet365's cash-out offer to see whether it is worth taking.</div>`
+        : offer >= hold
+          ? `<div class="vd good"><b>Take it</b>${money(offer)} is more than the ticket is worth on average
+             from here (${money(hold)}). Cash-out offers usually sit 5–10% below fair, so this one is generous.</div>`
+          : `<div class="vd bad"><b>Keep it</b>On average the ticket is worth ${money(hold)} —
+             ${money(hold - offer)} more than the offer.</div>`;
+
+      out.push(`<div class="tkl">
+        <div class="top"><span class="s">${money(b.stake)} @ <b>${(+b.odds || 0).toFixed(2)}</b> → ${money(ret)}${
+          approx ? `<br><span style="color:var(--faint);font-size:10.5px">includes other matches at stored chances</span>` : ""}</span>
+          <span class="p">${pct(p, p < 0.1 ? 1 : 0)}</span></div>
+        ${legs}${others}
+        <div class="co"><div><label for="of-${esc(b.id)}">Bet365 cash-out</label>
+          <input id="of-${esc(b.id)}" data-offer="${esc(b.id)}" inputmode="decimal"
+            placeholder="e.g. 2.10" value="${esc(S.offers[b.id] || "")}"></div></div>
+        ${vd}</div>`);
+    }
+
+    if (!out.length) { $("#yours").hidden = true; return null; }
+    $("#yoursN").textContent = plural(out.length, "ticket");
+    $("#tickets").innerHTML = out.join("");
+    $("#yours").hidden = false;
+    $("#bgPR").innerHTML = firstP == null ? "" : `Your ticket<br><b>${pct(firstP)}</b>`;
+    return firstP;
+  }
+
+  /* ================================================================= load */
+  async function render() {
+    const d = S.d;
+    bug(d); moment(d); htCheck(d); nextGoal(d); prices(d); stats(d);
+    await squads();
+    lineups();
+    await tickets(d);
+    if (!$("#bgPR").textContent) {
+      const v = (d.rows || []).filter(isValue).length;
+      $("#bgPR").textContent = v ? `${v} beating the price` : "No value right now";
+    }
+  }
+
+  async function load() {
+    if (!S.id) {
+      $("#said").innerHTML = `No match chosen. Pick one in play from
+        <a href="../today/" style="color:var(--gold-hi)">Today</a>.`;
+      return;
+    }
+    let d;
+    try { d = await window.HAWK.liveMatch(String(S.id)); }
+    catch (err) {
+      $("#fail").hidden = false;
+      $("#said").textContent = (err && err.message) || "365Scores didn't answer.";
+      return;
+    }
+    $("#preLink").href = `../match/?league=${encodeURIComponent(S.league)}&id=${encodeURIComponent(S.id)}`;
+    if (!d.live) {
+      $("#fail").hidden = false;
+      $("#tag").innerHTML = `<span class="dot off"></span>${esc(d.statusText || "Not in play")}`;
+      $("#said").innerHTML = `${esc(d.home)} v ${esc(d.away)} —
+        ${d.status === 4 ? "this match has finished" : "not in play right now"}.
+        <a href="../match/?league=${encodeURIComponent(S.league)}&id=${encodeURIComponent(S.id)}"
+           style="color:var(--gold-hi)">Open the match page</a>.`;
+      document.querySelectorAll(".calm").forEach((s) => (s.hidden = true));
+      clearTimeout(S.timer);
+      return;
+    }
+    S.d = d;
+    document.title = `${d.home} ${d.score[0]}–${d.score[1]} ${d.away} · HAWK`;
+    await render();
+    clearTimeout(S.timer);
+    S.timer = setTimeout(load, REFRESH);
+  }
+
+  /* --------------------------------------------------------------- events */
+  document.addEventListener("click", async (e) => {
+    const all = e.target.closest("#allToggle");
+    if (all) { e.preventDefault(); S.all = !S.all; S.take = null; prices(S.d); return; }
+
+    const take = e.target.closest("[data-take]");
+    if (take) {
+      S.take = S.take === take.dataset.take ? null : take.dataset.take;
+      S.stake = "";
+      prices(S.d);
+      const box = $("#lvStake"); if (box) box.focus();
+      return;
+    }
+    const log = e.target.closest("[data-log]");
+    if (log) {
+      const r = (S.d.rows || []).find((x) => x.label === log.dataset.log);
+      if (!r) { toast("That price has gone — the board moved."); return; }
+      const stake = Math.round(parseFloat(String(S.stake).replace(",", ".")) * 100) / 100;
+      if (logLive(r, stake)) { S.take = null; S.stake = ""; prices(S.d); await tickets(S.d); }
+    }
+  });
+
+  // both boxes redraw their section on every keystroke, so the value lives in
+  // state and the caret goes back — otherwise typing dies after the first key
+  document.addEventListener("input", async (e) => {
+    // the half-time price box only redraws its own verdict, so the caret stays put
+    const htBox = e.target.closest("[data-ht]");
+    if (htBox) {
+      S.htPrices[htBox.dataset.ht] = htBox.value;
+      const r = htTips(S.d).find((x) => x.label === htBox.dataset.ht);
+      const out = htBox.closest(".ht") && htBox.closest(".ht").querySelector(".ht-v");
+      if (r && out) out.innerHTML = htVerdict(r);
+      return;
+    }
+    if (e.target.id === "lvStake") {
+      const pos = e.target.selectionStart;
+      S.stake = e.target.value;
+      prices(S.d);
+      const again = $("#lvStake");
+      if (again) { again.focus(); again.setSelectionRange(pos, pos); }
+      return;
+    }
+    const off = e.target.closest("[data-offer]");
+    if (off) {
+      const id = off.dataset.offer, pos = off.selectionStart;
+      S.offers[id] = off.value;
+      await tickets(S.d);
+      const again = document.querySelector(`[data-offer="${CSS.escape(id)}"]`);
+      if (again) { again.focus(); again.setSelectionRange(pos, pos); }
+    }
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) clearTimeout(S.timer);
+    else if (S.d) load();
+  });
+
+  // the bug takes over once the hero has gone
+  const hero = $("#hero");
+  if (hero && "IntersectionObserver" in window) {
+    new IntersectionObserver(([e]) => $("#bug").classList.toggle("on", !e.isIntersecting),
+      { rootMargin: "-70px 0px 0px 0px" }).observe(hero);
+  }
+
+  /* ----------------------------------------------------------------- boot */
+  const q = new URLSearchParams(location.search);
+  S.id = q.get("id") || ""; S.league = q.get("league") || "";
+  if (window.HAWK && window.HAWK.liveMatch) load();
+  else $("#said").textContent = "The model didn't load, so nothing can be read.";
+})();
+</script>
+</body>
+</html>

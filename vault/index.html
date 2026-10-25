@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vault · HAWK</title>
+<meta name="description" content="Every bet, what it returned, and the bankroll that follows.">
+<link rel="icon" href="../favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="../assets/hawk.css">
+</head>
+<body>
+
+<header class="hero">
+  <canvas aria-hidden="true"></canvas>
+  <div class="wrap">
+    <a class="back" href="../home/" style="display:inline-flex;align-items:center;gap:8px;
+      text-decoration:none;font:700 9.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;
+      color:var(--faint)">← Home</a>
+    <div style="margin-top:18px"><span class="tag" id="tag"><span class="dot off"></span>Reading your Vault</span></div>
+    <h1 class="moment mid" id="bank">—</h1>
+    <p class="said" id="said">Counting what you have placed…</p>
+    <div class="acts">
+      <a class="btn gold" href="../today/">Your day</a>
+      <a class="btn ghost" href="../">Open v1's Vault</a>
+    </div>
+  </div>
+</header>
+
+<section class="calm" id="statWrap" hidden>
+  <div class="wrap">
+    <div class="lede"><h3>The record</h3><span class="n" id="statN"></span></div>
+    <div class="grid m4 rec" id="stats"></div>
+  </div>
+</section>
+
+<details class="calm fold" id="wkWrap" data-fold="vWeek" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Weekly report</h3>
+    <span class="n" id="wkN"></span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div class="filt" id="wkTabs" style="margin-bottom:26px"></div>
+    <div id="wkBody"></div>
+  </div>
+</details>
+
+<details class="calm fold" id="chartWrap" data-fold="vChart" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>Profit over time</h3>
+    <span class="n" id="chartN"></span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <svg class="chart" id="chart" viewBox="0 0 720 200" preserveAspectRatio="none" role="img"></svg>
+    <div class="marks" id="marks"></div>
+    <p class="note">Every settled bet in order, oldest to newest. A cash-out counts what came back,
+      not what the ticket would have returned.</p>
+  </div>
+</details>
+
+<details class="calm fold" id="lgWrap" data-fold="vLeagues" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>By competition</h3>
+    <span class="n" id="lgN"></span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <table class="lgt" id="lgt"></table>
+    <p class="note">The bar is return either side of break-even. Competitions with fewer than three
+      settled bets are left out — at two bets a number says nothing.</p>
+  </div>
+</details>
+
+<details class="calm fold" id="scWrap" data-fold="vScore" hidden>
+  <summary><div class="wrap"><div class="lede"><h3>How good is HAWK</h3>
+    <span class="n" id="scN"></span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <p class="said" id="scSaid" style="margin:0 0 30px;animation:none"></p>
+    <div class="lede" style="margin-bottom:18px"><h3 style="font-size:19px">Does 60% really mean 60%?</h3></div>
+    <table class="lgt" id="scBands"></table>
+    <p class="note">Each row takes every leg HAWK gave roughly the same chance, then checks how often
+      they actually landed. It saves those chances before kick-off and marks them afterwards, so it
+      fills up whether you bet or not.</p>
+    <div class="lede" style="margin:40px 0 18px"><h3 style="font-size:19px">Where it is off</h3>
+      <span class="n">200+ legs on the live model</span></div>
+    <table class="lgt" id="scMarkets"></table>
+    <p class="note" id="scNote"></p>
+  </div>
+</details>
+
+<details class="calm fold" id="bkWrap" data-fold="vBackup">
+  <summary><div class="wrap"><div class="lede"><h3>Backup</h3>
+    <span class="n" id="bkN"></span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <button class="btn gold" id="bkExport">Download a backup</button>
+      <label class="btn ghost" style="cursor:pointer">Restore from a file
+        <input type="file" id="bkImport" accept="application/json,.json" hidden></label>
+    </div>
+    <p class="note">The backup is a plain JSON file holding every bet and your bankroll — the same
+      format the old site writes, so either can read the other's. <b>Restoring replaces everything
+      in this browser</b>, so a backup is downloaded first, automatically.</p>
+    <p class="note" id="bkOut"></p>
+  </div>
+</details>
+
+<section class="calm">
+  <div class="wrap">
+    <div class="lede"><h3>Every bet</h3><span class="n" id="betsN"></span></div>
+    <div class="filt" id="filt"></div>
+    <div id="bets"><div class="skel" style="padding:30px 0">Reading…</div></div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap"><a href="../home/">home</a> · <a href="../today/">today</a> ·
+    <a href="../builder/">builder</a> · <a href="../">v1 vault</a> ·
+    bets and bankroll are this browser's, shared with the old site</div>
+</footer>
+
+<script src="../assets/hawk-bg.js"></script>
+<script src="../assets/hawk-fold.js"></script>
+<script>
+/* ===========================================================================
+   The Vault.
+
+   Reads and writes the same two keys as the old site — hawk_bets and
+   hawk_bankroll — so a bet settled here is settled there. The money rules are
+   copied from v1's settleBet() exactly, because a ticket must be worth the
+   same on both pages:
+
+     WON         bankroll += potentialReturn   (the stake went at lock-in)
+     LOST        nothing
+     CASHED_OUT  bankroll += what you got back
+     VOID        bankroll += stake             — see the note below
+
+   v1 has no VOID button, so a void bet can only arrive by sync or by hand,
+   and there are none in the current record. Where v1 does mention one it
+   disagrees with itself: its payout line pays the stake back while its profit
+   line charges it. A bet that never ran cost nothing, so that is what this
+   page does, and it never creates one.
+   =========================================================================== */
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const money = (n) => `${n < 0 ? "−" : ""}€${Math.abs(+n || 0).toFixed(2)}`;
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const round2 = (v) => Math.round((+v || 0) * 100) / 100;
+
+  const S = { bets: [], bank: 0, filter: "ALL", cashing: null };
+
+  /* ------------------------------------------------------------- storage */
+  function load() {
+    try {
+      const b = JSON.parse(localStorage.getItem("hawk_bets") || "[]");
+      S.bets = Array.isArray(b) ? b : [];
+    } catch { S.bets = []; }
+    const n = parseFloat(localStorage.getItem("hawk_bankroll"));
+    S.bank = Number.isFinite(n) ? n : 0;
+  }
+  function save() {
+    // v1 rounds the bankroll on every save: a return is stake x odds, so €2.57
+    // at 11.4 is €29.298, and a hundred of those leave a balance like
+    // 103.42509999999999 — which is where its "+€0.01 manual edit" entries
+    // came from. Same rule here, or the two pages drift by cents.
+    S.bank = round2(S.bank);
+    try {
+      localStorage.setItem("hawk_bets", JSON.stringify(S.bets));
+      localStorage.setItem("hawk_bankroll", S.bank.toFixed(2));
+      return true;
+    } catch {
+      alert("This browser's storage is full, so that change was NOT saved.");
+      return false;
+    }
+  }
+
+  /* ------------------------------------------------------------- figures */
+  function profit(b) {
+    if (b.status === "WON") return (+b.potentialReturn || 0) - (+b.stake || 0);
+    if (b.status === "CASHED_OUT") return (+b.cashOutAmount || 0) - (+b.stake || 0);
+    if (b.status === "PENDING" || b.status === "VOID") return 0;
+    return -(+b.stake || 0);
+  }
+  const settled = () => S.bets.filter((b) => b && b.status && b.status !== "PENDING");
+  const whenOf = (b) => {
+    const t = Date.parse(b.settledAt || "");
+    if (Number.isFinite(t)) return t;
+    const d = Date.parse(b.date || "");       // "Oct 15, 08:58 PM" parses in most locales
+    return Number.isFinite(d) ? d : 0;
+  };
+  const dayOf = (b) => {
+    const t = whenOf(b);
+    if (!t) return "Undated";
+    return new Date(t).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  };
+
+  /* --------------------------------------------------------- the moment */
+  function moment() {
+    const s = settled();
+    const pending = S.bets.length - s.length;
+    const staked = s.reduce((a, b) => a + (+b.stake || 0), 0);
+    const net = s.reduce((a, b) => a + profit(b), 0);
+    const roi = staked ? (100 * net / staked) : 0;
+    const atRisk = S.bets.filter((b) => b.status === "PENDING").reduce((a, b) => a + (+b.stake || 0), 0);
+
+    $("#bank").innerHTML = `${money(S.bank).replace("€", "€")}<span class="q">in the vault</span>`;
+    $("#tag").innerHTML = pending
+      ? `<span class="dot"></span>${plural(pending, "ticket")} running`
+      : `<span class="dot q"></span>All settled`;
+    $("#said").innerHTML = s.length
+      ? `<b>${plural(s.length, "bet")}</b> settled, <b>${money(staked)}</b> through the book,
+         <b class="${net > 0 ? "up" : net < 0 ? "dn" : ""}">${net > 0 ? "+" : ""}${money(net)}</b>
+         at <b>${roi > 0 ? "+" : ""}${roi.toFixed(2)}%</b>.${
+         pending ? ` ${money(atRisk)} still at risk.` : ""}`
+      : `Nothing settled yet.${S.bets.length ? ` ${plural(S.bets.length, "ticket")} running.` : ""}`;
+    return { s, staked, net, roi, pending, atRisk };
+  }
+
+  /* ------------------------------------------------------------ the record */
+  function stats(f) {
+    if (!f.s.length) { $("#statWrap").hidden = true; return; }
+    const won = f.s.filter((b) => b.status === "WON").length;
+    const cashed = f.s.filter((b) => b.status === "CASHED_OUT").length;
+    const lost = f.s.filter((b) => b.status === "LOST").length;
+    const avgOdds = f.s.reduce((a, b) => a + (+b.odds || 0), 0) / f.s.length;
+
+    // worst drawdown: the biggest fall from any peak of the running total
+    const order = f.s.slice().sort((a, b) => whenOf(a) - whenOf(b));
+    let run = 0, peak = 0, dd = 0;
+    for (const b of order) { run += profit(b); peak = Math.max(peak, run); dd = Math.max(dd, peak - run); }
+
+    const cls = (n) => (n > 0 ? " up" : n < 0 ? " dn" : "");
+    $("#statN").textContent = `${plural(f.s.length, "bet")}${f.pending ? ` · ${f.pending} open` : ""}`;
+    $("#stats").innerHTML = `
+      <div><div class="n${cls(f.net)}">${f.net > 0 ? "+" : ""}${money(f.net)}</div>
+        <div class="k">Net</div><div class="s">on ${money(f.staked)} staked</div></div>
+      <div><div class="n${cls(f.roi)}">${f.roi > 0 ? "+" : ""}${f.roi.toFixed(2)}%</div>
+        <div class="k">Return</div><div class="s">per euro through the book</div></div>
+      <div><div class="n">${(100 * won / f.s.length).toFixed(0)}%</div>
+        <div class="k">Strike rate</div><div class="s">${won}W · ${lost}L${cashed ? ` · ${cashed} cashed` : ""}</div></div>
+      <div><div class="n dn">${money(dd)}</div>
+        <div class="k">Worst drawdown</div><div class="s">peak to trough</div></div>
+      <div><div class="n g">${avgOdds.toFixed(2)}</div>
+        <div class="k">Average price</div><div class="s">across settled bets</div></div>
+      <div><div class="n${f.atRisk ? "" : " "}">${money(f.atRisk)}</div>
+        <div class="k">At risk</div><div class="s">${f.pending ? plural(f.pending, "ticket") + " running" : "nothing running"}</div></div>`;
+    $("#statWrap").hidden = false;
+  }
+
+  /* -------------------------------------------------------------- chart */
+  function chart(f) {
+    const order = f.s.slice().sort((a, b) => whenOf(a) - whenOf(b));
+    if (order.length < 2) { $("#chartWrap").hidden = true; return; }
+    let run = 0;
+    const series = order.map((b) => (run += profit(b)));
+    const hi = Math.max(0, ...series), lo = Math.min(0, ...series);
+    const span = (hi - lo) || 1;
+    const X0 = 16, X1 = 704, Y0 = 16, Y1 = 184;
+    const x = (i) => X0 + (X1 - X0) * (series.length === 1 ? 0 : i / (series.length - 1));
+    const y = (v) => Y0 + (Y1 - Y0) * (hi - v) / span;
+
+    const pts = series.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    const iHi = series.indexOf(hi), iLo = series.indexOf(lo);
+    $("#chart").innerHTML = `
+      <line class="zero" x1="${X0}" y1="${y(0).toFixed(1)}" x2="${X1}" y2="${y(0).toFixed(1)}"/>
+      <polyline class="line" points="${pts}"/>
+      ${hi > 0 ? `<circle class="dot hi" cx="${x(iHi).toFixed(1)}" cy="${y(hi).toFixed(1)}" r="3"/>` : ""}
+      ${lo < 0 ? `<circle class="dot lo" cx="${x(iLo).toFixed(1)}" cy="${y(lo).toFixed(1)}" r="3"/>` : ""}`;
+    $("#chartN").textContent = `${plural(series.length, "settled bet")}`;
+    const now = series[series.length - 1];
+    $("#marks").innerHTML = `
+      <span>Best <b class="up">+${money(hi)}</b></span>
+      <span>Worst <b class="dn">${money(lo)}</b></span>
+      <span>Now <b class="${now > 0 ? "up" : now < 0 ? "dn" : ""}">${now > 0 ? "+" : ""}${money(now)}</b></span>
+      <span>Turnover <b>${money(f.staked)}</b></span>`;
+    $("#chartWrap").hidden = false;
+  }
+
+  /* ------------------------------------------------------- by competition */
+  function leagues(f) {
+    const by = new Map();
+    for (const b of f.s) {
+      const k = ((b.legs || [])[0] || {}).league || "Other";
+      if (!by.has(k)) by.set(k, []);
+      by.get(k).push(b);
+    }
+    // under three settled bets a return is noise, so it is left out rather
+    // than printed as if it meant something
+    const rows = [...by.entries()].map(([name, list]) => {
+      const st = list.reduce((a, b) => a + (+b.stake || 0), 0);
+      const pl = list.reduce((a, b) => a + profit(b), 0);
+      return { name, n: list.length, st, pl, roi: st ? (100 * pl / st) : 0 };
+    }).filter((r) => r.n >= 3).sort((a, b) => b.pl - a.pl);
+    if (!rows.length) { $("#lgWrap").hidden = true; return; }
+
+    const cap = Math.max(50, ...rows.map((r) => Math.abs(r.roi)));
+    $("#lgN").textContent = `${plural(rows.length, "competition")}`;
+    $("#lgt").innerHTML = `<thead><tr><th>Competition</th><th>Bets</th><th>Staked</th>
+        <th></th><th>Profit</th><th>Return</th></tr></thead><tbody>${rows.map((r) => `
+      <tr><td>${esc(r.name)}</td><td>${r.n}</td><td>${money(r.st)}</td>
+        <td><div class="bar"><i class="${r.roi >= 0 ? "p" : "m"}"
+          style="width:${Math.min(50, 50 * Math.abs(r.roi) / cap).toFixed(1)}%"></i></div></td>
+        <td class="${r.pl > 0 ? "up" : r.pl < 0 ? "dn" : ""}">${r.pl > 0 ? "+" : ""}${money(r.pl)}</td>
+        <td class="${r.roi > 0 ? "up" : r.roi < 0 ? "dn" : ""}">${r.roi > 0 ? "+" : ""}${r.roi.toFixed(1)}%</td></tr>`).join("")}</tbody>`;
+    $("#lgWrap").hidden = false;
+  }
+
+  /* --------------------------------------------------------- the bet list */
+  const STATE = { WON: ["won", "Won"], LOST: ["lost", "Lost"], PENDING: ["pend", "Running"],
+                  CASHED_OUT: ["cash", "Cashed out"], VOID: ["void", "Void"] };
+
+  function betList() {
+    const counts = { ALL: S.bets.length };
+    for (const b of S.bets) counts[b.status] = (counts[b.status] || 0) + 1;
+    const tabs = [["ALL", "All"], ["PENDING", "Running"], ["WON", "Won"],
+                  ["LOST", "Lost"], ["CASHED_OUT", "Cashed out"]]
+      .filter(([k]) => k === "ALL" || counts[k]);
+    $("#filt").innerHTML = tabs.map(([k, t]) => `<button type="button" data-f="${k}"
+      aria-pressed="${String(S.filter === k)}">${esc(t)}<i>${counts[k] || 0}</i></button>`).join("");
+
+    const list = S.bets.filter((b) => S.filter === "ALL" || b.status === S.filter);
+    $("#betsN").textContent = `${plural(list.length, "ticket")}`;
+    if (!list.length) {
+      $("#bets").innerHTML = `<p class="note" style="margin:22px 0 0">Nothing here.</p>`;
+      return;
+    }
+
+    // newest first — the array is built that way by both sites
+    let out = "", day = null;
+    for (const b of list.slice(0, 200)) {
+      const d = dayOf(b);
+      if (d !== day) {
+        day = d;
+        const same = list.filter((x) => dayOf(x) === d);
+        const pl = same.reduce((a, x) => a + profit(x), 0);
+        const anySettled = same.some((x) => x.status && x.status !== "PENDING");
+        out += `<div class="day"><h4>${esc(d)}</h4><span class="n">${plural(same.length, "bet")}</span>
+          ${anySettled ? `<span class="pl ${pl > 0 ? "up" : pl < 0 ? "dn" : ""}">${
+            pl > 0 ? "+" : ""}${money(pl)}</span>` : ""}</div>`;
+      }
+      const [cls, word] = STATE[b.status] || ["", b.status || "—"];
+      const pl = profit(b), pending = b.status === "PENDING";
+      const sel = (b.legs || []).map((l) => l.selection).filter(Boolean).join(" + ") || "—";
+      const where = (b.legs || []).map((l) => l.fixture).filter(Boolean).join(" · ");
+      out += `<div class="bt">
+        <span class="w"><b>${esc(sel)}</b><i>${esc(where)}${
+          (b.legs || []).length > 1 ? ` · ${plural(b.legs.length, "leg")}` : ""}</i></span>
+        <span class="st">${money(b.stake)} @ ${(+b.odds || 0).toFixed(2)}<br>→ ${money(b.potentialReturn)}</span>
+        <span class="rs ${cls}">${esc(word)}</span>
+        <span class="pl ${pending ? "q" : pl > 0 ? "up" : pl < 0 ? "dn" : "q"}">${
+          pending ? "—" : `${pl > 0 ? "+" : ""}${money(pl)}`}</span>
+        ${pending ? `<span class="act">
+          <button class="w" data-won="${esc(b.id)}">Won</button>
+          <button class="l" data-lost="${esc(b.id)}">Lost</button>
+          ${S.cashing === b.id
+            ? `<input id="co" inputmode="decimal" placeholder="got back €" autofocus>
+               <button class="c" data-docash="${esc(b.id)}">Confirm</button>
+               <button data-cancel="1">Cancel</button>`
+            : `<button class="c" data-cash="${esc(b.id)}">Cash out</button>`}
+        </span>` : ""}</div>`;
+    }
+    if (list.length > 200) {
+      out += `<p class="note">Showing the most recent 200 of ${list.length}.</p>`;
+    }
+    $("#bets").innerHTML = out;
+  }
+
+  /* ------------------------------------------------------------ settling */
+  function settle(id, outcome, amount) {
+    const b = S.bets.find((x) => x.id === id);
+    if (!b || b.status !== "PENDING") return;
+    b.status = outcome;
+    b.settledAt = new Date().toISOString();
+    b.settledBy = "you";
+    delete b.needsCheck;
+    if (outcome === "WON") S.bank += (+b.potentialReturn || 0);
+    else if (outcome === "CASHED_OUT") { b.cashOutAmount = amount; S.bank += (+amount || 0); }
+    if (!save()) return;
+    S.cashing = null;
+    draw();
+  }
+
+  function draw() {
+    const f = moment();
+    stats(f); chart(f); leagues(f); betList();
+  }
+
+  /* -------------------------------------------------------- weekly report
+     Which week a ticket belongs to is THE NIGHT IT WAS PLAYED, not when it
+     settled. Exactly one ticket in the log falls in different weeks under the
+     two rules — Bahia v Flamengo, settled a week after it was played — and it
+     was enough to flip a week's sign between this block and the rows below it
+     on the same page. Lewzu chose match day on 2026-10-22. */
+  function betTime(b) {
+    const kos = (b.legs || []).map((l) => l.hawk && Date.parse(l.hawk.kickoff)).filter(Boolean);
+    if (kos.length) return Math.max(...kos);
+    const placed = /^bet_(\d{12,})/.exec(b.id || "");
+    if (placed) return +placed[1];
+    return Date.parse(b.settledAt || "") || 0;
+  }
+  const payout = (b) => (b.status === "WON" ? (+b.potentialReturn || 0)
+    : b.status === "CASHED_OUT" ? (+b.cashOutAmount || 0) : 0);
+
+  function weekRange(which) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    if (which === "this") return [monday.getTime(), Date.now() + 1, monday, new Date()];
+    const prev = new Date(monday); prev.setDate(monday.getDate() - 7);
+    const sun = new Date(monday); sun.setDate(monday.getDate() - 1);
+    return [prev.getTime(), monday.getTime(), prev, sun];
+  }
+
+  let wkTab = "this";
+  function weekly(G) {
+    const [from, to, d1, d2] = weekRange(wkTab);
+    const fmt = (d) => d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    $("#wkTabs").innerHTML = [["this", "This week"], ["last", "Last week"]]
+      .map(([k, t]) => `<button type="button" data-wk="${k}" aria-pressed="${String(wkTab === k)}">${t}</button>`).join("");
+
+    const inWeek = (t) => t >= from && t < to;
+    const placed = S.bets.filter((b) => inWeek(betTime(b)));
+    const done = placed.filter((b) => b.status && b.status !== "PENDING");
+    const open = placed.length - done.length;
+    $("#wkN").textContent = `${fmt(d1)} – ${fmt(d2)}`;
+
+    if (!placed.length) {
+      $("#wkBody").innerHTML = `<p class="note" style="margin:0">Nothing played that week.</p>`;
+      $("#wkWrap").hidden = false;
+      return;
+    }
+
+    const staked = done.reduce((a, b) => a + (+b.stake || 0), 0);
+    const back = done.reduce((a, b) => a + payout(b), 0);
+    const pl = back - staked;
+    const won = done.filter((b) => b.status === "WON").length;
+    const lost = done.filter((b) => b.status === "LOST").length;
+    // counted, not inferred: "whatever is left over" would label a void or a
+    // typo as a cash-out while the tiles above count it as a loss
+    const cashed = done.filter((b) => b.status === "CASHED_OUT").length;
+
+    const byPl = done.map((b) => ({ b, pl: payout(b) - (+b.stake || 0) })).sort((x, y) => y.pl - x.pl);
+    const nameOf = (b) => (b.legs || []).map((l) => l.fixture).filter(Boolean).slice(0, 2).join(" + ") || "a ticket";
+
+    // HAWK's own week, from the graded file: what it said against what landed
+    const p2 = (n) => String(n).padStart(2, "0");
+    const wkKey = `${d1.getFullYear()}-${p2(d1.getMonth() + 1)}-${p2(d1.getDate())}`;
+    const W = G && G.weeks && G.weeks[wkKey];
+
+    const cls = (n) => (n > 0 ? " up" : n < 0 ? " dn" : "");
+    $("#wkBody").innerHTML = `
+      <p class="said" style="margin:0 0 28px;animation:none">${done.length
+        ? `<b class="${pl > 0 ? "up" : pl < 0 ? "dn" : ""}">${pl > 0 ? "+" : ""}${money(pl)}</b>
+           across ${plural(done.length, "settled ticket")} — ${money(staked)} staked,
+           ${money(back)} back.${open ? ` ${plural(open, "ticket")} still running.` : ""}`
+        : `${plural(open, "ticket")} placed, none settled yet.`}</p>
+      <div class="grid m4 rec">
+        <div><div class="n${cls(pl)}">${pl > 0 ? "+" : ""}${money(pl)}</div><div class="k">Profit</div>
+          <div class="s">${staked ? `${(100 * pl / staked).toFixed(1)}% return` : "nothing settled"}</div></div>
+        <div><div class="n">${won}–${lost}${cashed ? `–${cashed}` : ""}</div><div class="k">W · L${cashed ? " · Cashed" : ""}</div>
+          <div class="s">${done.length ? `${(100 * won / done.length).toFixed(0)}% strike` : "—"}</div></div>
+        <div><div class="n g">${money(staked)}</div><div class="k">Staked</div>
+          <div class="s">${plural(placed.length, "ticket")} played</div></div>
+        <div><div class="n${W ? "" : " "}">${W ? `${(100 * W.won / W.legs).toFixed(1)}%` : "—"}</div>
+          <div class="k">HAWK landed</div>
+          <div class="s">${W ? `said ${(100 * W.said / W.legs).toFixed(1)}% · ${W.legs.toLocaleString()} legs` : "no graded week"}</div></div>
+      </div>
+      ${byPl.length ? `<div style="margin-top:30px">
+        <div class="bt" style="border-bottom:1px solid var(--rule-2)">
+          <span class="w"><b>${esc(nameOf(byPl[0].b))}</b><i>best of the week</i></span>
+          <span class="st">${money(byPl[0].b.stake)} @ ${(+byPl[0].b.odds || 0).toFixed(2)}</span>
+          <span class="rs won">Best</span>
+          <span class="pl ${byPl[0].pl > 0 ? "up" : "q"}">${byPl[0].pl > 0 ? "+" : ""}${money(byPl[0].pl)}</span></div>
+        ${byPl.length > 1 ? `<div class="bt">
+          <span class="w"><b>${esc(nameOf(byPl[byPl.length - 1].b))}</b><i>worst of the week</i></span>
+          <span class="st">${money(byPl[byPl.length - 1].b.stake)} @ ${(+byPl[byPl.length - 1].b.odds || 0).toFixed(2)}</span>
+          <span class="rs lost">Worst</span>
+          <span class="pl dn">${money(byPl[byPl.length - 1].pl)}</span></div>` : ""}</div>` : ""}
+      ${W ? `<p class="note">HAWK's own week across every fixture it graded, not just the ones you
+        backed — ${W.legs.toLocaleString()} legs from ${W.matches} matches.</p>` : ""}`;
+    $("#wkWrap").hidden = false;
+  }
+
+  /* --------------------------------------------------- how good is HAWK
+     Read from data/graded.json, which the build writes after every match —
+     HAWK grades its chances on EVERY fixture, not just the ones you bet, so
+     this fills up whether you play or not. Your own bets are a far smaller
+     sample and are not what this table is measuring. */
+  async function scorecard() {
+    let G = null;
+    try {
+      const r = await fetch("../data/graded.json", { cache: "no-store" });
+      if (r.ok) G = await r.json();
+    } catch { /* not published yet */ }
+    S.G = G;     // kept, so switching week does not refetch 88KB
+    weekly(G);   // the weekly report wants the graded file too, when there is one
+    if (!G || !G.bands || !G.bands.length) { $("#scWrap").hidden = true; return; }
+
+    const pc = (x) => `${(100 * x).toFixed(1)}%`;
+    const band = (b) => (b.lo === 0 ? `Under ${Math.round(100 * b.hi)}%`
+      : b.hi > 1 ? `${Math.round(100 * b.lo)}% and over`
+      : `${Math.round(100 * b.lo)}–${Math.round(100 * b.hi)}%`);
+
+    // the headline is decided by the big bands, because they are the only
+    // ones with the volume to mean anything
+    const big = G.bands.filter((b) => b.n >= 500);
+    const worst = big.length ? Math.max(...big.map((b) => Math.abs(b.won - b.p) / b.n)) : null;
+    const pts = worst == null ? null : (100 * worst).toFixed(1);
+    $("#scN").textContent = `${(G.legs || 0).toLocaleString()} legs · ${G.matches || 0} matches`;
+    $("#scSaid").innerHTML = worst == null ? ""
+      : worst <= 0.03
+        ? `<b class="up">HAWK's chances come true.</b> Across
+           <b>${(G.legs || 0).toLocaleString()}</b> graded legs from ${G.matches} matches, no chance
+           band is more than <b>${pts}</b> points from what actually landed. At this many legs that
+           is not luck — the percentages mean what they say.`
+        : `<b class="dn">Off by up to ${pts} points.</b> Across
+           <b>${(G.legs || 0).toLocaleString()}</b> graded legs, one band is ${pts} points out. The
+           builder corrects a market once it has 30+ graded legs.`;
+
+    const cap = Math.max(2, ...G.bands.filter((b) => b.n).map((b) => Math.abs(100 * (b.won - b.p) / b.n)));
+    $("#scBands").innerHTML = `<thead><tr><th>HAWK said</th><th>Legs</th><th>Said</th>
+        <th></th><th>Landed</th><th>Gap</th></tr></thead><tbody>${
+      G.bands.filter((b) => b.n).map((b) => {
+        const said = b.p / b.n, got = b.won / b.n, gap = 100 * (got - said);
+        return `<tr><td>${esc(band(b))}</td><td>${b.n.toLocaleString()}</td><td>${pc(said)}</td>
+          <td><div class="bar"><i class="${gap >= 0 ? "p" : "m"}"
+            style="width:${Math.min(50, 50 * Math.abs(gap) / cap).toFixed(1)}%"></i></div></td>
+          <td>${pc(got)}</td>
+          <td class="${Math.abs(gap) < 1 ? "" : gap > 0 ? "up" : "dn"}">${gap > 0 ? "+" : ""}${gap.toFixed(1)}</td></tr>`;
+      }).join("")}</tbody>`;
+
+    /* Markets are read from byKey, NOT byMarket, and the difference matters.
+       byMarket keeps every leg ever graded under a name, across every version
+       of the model that priced it, and never resets. byKey groups them the way
+       the builder actually corrects — and the build starts a group over when
+       its MODEL_VERSION changes, so it only ever describes the model that is
+       live now. On byMarket, Player Tackles once read 13.3 points out from a
+       model replaced two versions ago. */
+    const rows = Object.entries(G.byKey || {})
+      .map(([k, b]) => ({ k, n: b.n, said: b.p / b.n, got: b.won / b.n, ver: b.ver }))
+      .filter((x) => x.n >= 200)
+      .map((x) => ({ ...x, gap: 100 * (x.got - x.said) }))
+      .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap))
+      .slice(0, 10);
+    const mcap = Math.max(2, ...rows.map((r) => Math.abs(r.gap)));
+    $("#scMarkets").innerHTML = rows.length
+      ? `<thead><tr><th>Market</th><th>Legs</th><th>Said</th><th></th><th>Landed</th><th>Gap</th></tr></thead>
+         <tbody>${rows.map((r) => `<tr><td>${esc(r.k)}${r.ver ? ` <span style="color:var(--faint)">v${r.ver}</span>` : ""}</td>
+           <td>${r.n.toLocaleString()}</td><td>${pc(r.said)}</td>
+           <td><div class="bar"><i class="${r.gap >= 0 ? "p" : "m"}"
+             style="width:${Math.min(50, 50 * Math.abs(r.gap) / mcap).toFixed(1)}%"></i></div></td>
+           <td>${pc(r.got)}</td>
+           <td class="${Math.abs(r.gap) < 1 ? "" : r.gap > 0 ? "up" : "dn"}">${r.gap > 0 ? "+" : ""}${r.gap.toFixed(1)}</td></tr>`).join("")}</tbody>`
+      : `<tbody><tr><td>Nothing with 200+ legs on the live model yet.</td></tr></tbody>`;
+    $("#scNote").innerHTML = `A positive gap means it landed more often than HAWK said; negative
+      means less. Grouped the way the builder corrects, and a group's record starts over when its
+      model version changes — so this describes the model running now, not one it replaced.
+      ${G.updated ? `Last built ${esc(new Date(G.updated).toLocaleString())}.` : ""}`;
+    $("#scWrap").hidden = false;
+  }
+
+  /* ------------------------------------------------------------- backup */
+  function stamp() {
+    const d = new Date(), p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+  function download(name, text) {
+    const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+  // Same shape the old site writes, so either can read the other's file.
+  const backupText = () => JSON.stringify({ bankroll: S.bank, bets: S.bets }, null, 2);
+
+  function exportBackup() {
+    download(`hawk_backup_${stamp()}.json`, backupText());
+    $("#bkOut").textContent = `Downloaded ${plural(S.bets.length, "ticket")} and a ${money(S.bank)} bankroll.`;
+  }
+
+  async function importBackup(file) {
+    let data;
+    try { data = JSON.parse(await file.text()); }
+    catch { $("#bkOut").textContent = "That file isn't readable JSON."; return; }
+    const bets = Array.isArray(data) ? data : data.bets;
+    if (!Array.isArray(bets)) { $("#bkOut").textContent = "No bets in that file."; return; }
+    const bank = Number.isFinite(+data.bankroll) ? +data.bankroll : S.bank;
+    if (!confirm(`Replace this browser's Vault with ${bets.length} tickets and a €${(+bank).toFixed(2)} bankroll?\n\n`
+      + `Your current ${S.bets.length} tickets will be downloaded as a backup first.`)) return;
+    // the safety net goes out before anything is overwritten
+    download(`hawk_before_restore_${stamp()}.json`, backupText());
+    S.bets = bets; S.bank = bank;
+    if (!save()) return;
+    draw();
+    $("#bkOut").textContent = `Restored ${plural(bets.length, "ticket")}. Your previous Vault was downloaded first.`;
+  }
+
+  /* -------------------------------------------------------------- events */
+  document.addEventListener("click", (e) => {
+    const f = e.target.closest("#filt button[data-f]");
+    if (f) { S.filter = f.dataset.f; betList(); return; }
+
+    const won = e.target.closest("[data-won]");
+    if (won) { if (confirm("Mark this ticket WON? The return goes back into your bankroll."))
+      settle(won.dataset.won, "WON"); return; }
+
+    const lost = e.target.closest("[data-lost]");
+    if (lost) { if (confirm("Mark this ticket LOST?")) settle(lost.dataset.lost, "LOST"); return; }
+
+    const cash = e.target.closest("[data-cash]");
+    if (cash) { S.cashing = cash.dataset.cash; betList(); const i = $("#co"); if (i) i.focus(); return; }
+
+    if (e.target.closest("[data-cancel]")) { S.cashing = null; betList(); return; }
+
+    const wk = e.target.closest("#wkTabs button[data-wk]");
+    if (wk) { wkTab = wk.dataset.wk; weekly(S.G); return; }
+
+    if (e.target.closest("#bkExport")) { exportBackup(); return; }
+
+    const go = e.target.closest("[data-docash]");
+    if (go) {
+      const v = parseFloat(String(($("#co") || {}).value || "").replace(",", "."));
+      if (!(v >= 0)) { alert("Enter what you got back."); return; }
+      settle(go.dataset.docash, "CASHED_OUT", round2(v));
+    }
+  });
+
+  // another tab — or the live page taking a price — changed the Vault
+  addEventListener("storage", (e) => {
+    if (e.key === "hawk_bets" || e.key === "hawk_bankroll") { load(); draw(); }
+  });
+
+  document.addEventListener("change", (e) => {
+    if (e.target.id !== "bkImport") return;
+    const f = e.target.files && e.target.files[0];
+    if (f) importBackup(f);
+    e.target.value = "";
+  });
+
+  load();
+  draw();
+  $("#bkN").textContent = `${plural(S.bets.length, "ticket")} · ${money(S.bank)}`;
+  scorecard();
+})();
+</script>
+</body>
+</html>

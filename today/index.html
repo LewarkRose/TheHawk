@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Today · HAWK</title>
+<meta name="description" content="What is running, what is at risk, and what is left to do.">
+<link rel="icon" href="../favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="../assets/hawk.css">
+</head>
+<body>
+
+<!-- ======================= the moment: your day, in one line ============ -->
+<header class="hero">
+  <canvas aria-hidden="true"></canvas>
+  <div class="wrap">
+    <span class="tag" id="tag"><span class="dot off"></span>Reading your day</span>
+    <h1 class="moment mid" id="day">Today</h1>
+    <p class="said" id="said">Checking what is running and what is still to come…</p>
+    <div class="acts">
+      <a class="btn gold" href="../builder/?view=scan">Find today's value</a>
+      <a class="btn ghost" href="../builder/">Open the builder</a>
+    </div>
+  </div>
+</header>
+
+<!-- ======================= what you have running ======================== -->
+<section class="calm">
+  <div class="wrap">
+    <div class="lede"><h3>Running</h3><span class="n" id="runN"></span>
+      <a href="../">Open the Vault →</a></div>
+    <div class="grid m3" id="run"><div class="tk wide"><div class="skel">Reading your Vault…</div></div></div>
+    <p class="note" id="runNote"></p>
+  </div>
+</section>
+
+<!-- ======================= today's card ================================= -->
+<details class="calm fold" data-fold="tCard">
+  <summary><div class="wrap"><div class="lede"><h3>On today</h3>
+    <span class="n" id="cardN">reading…</span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div class="grid m3" id="card"><div class="m wide"><div class="skel">Reading today's card…</div></div></div>
+    <p class="note"><a href="../builder/?view=scores" style="color:var(--gold-hi)">All scores →</a></p>
+  </div>
+</details>
+
+<!-- ======================= the day's money ============================== -->
+<details class="calm fold" data-fold="tMoney">
+  <summary><div class="wrap"><div class="lede"><h3>Today's money</h3>
+    <span class="n" id="moneyN"></span><span class="mk-t"></span></div></div></summary>
+  <div class="wrap">
+    <div class="grid m4 rec" id="money"><div class="wide"><div class="skel">Reading…</div></div></div>
+    <p class="note">A day's plan is capped at a share of the bankroll, and every stake is
+      quarter Kelly. <b>Settled today</b> counts bets that finished today, whenever they were placed.</p>
+  </div>
+</details>
+
+<footer class="foot">
+  <div class="wrap"><a href="../home/">home</a> · <a href="../builder/">builder</a> ·
+    <a href="../">vault</a> · <a href="../builder/?view=scan">scan</a></div>
+</footer>
+
+<script src="../builder/engine.js"></script>
+<script src="../assets/hawk-bg.js"></script>
+<script src="../assets/hawk-fold.js"></script>
+<script>
+/* ===========================================================================
+   Today — what is running, what is at risk, what is left.
+
+   Deliberately NOT the scores page. The question this answers is "what is my
+   day", and the expensive part of v1's Today — the day's picks — comes from a
+   scan that sweeps every fixture and takes minutes. Running one on page load
+   would be dishonest about the cost, so the scan has a button and this page
+   shows only what is true instantly.
+   =========================================================================== */
+(() => {
+  "use strict";
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const pad = (n) => String(n).padStart(2, "0");
+  const dayOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const hhmm = (iso) => { const t = Date.parse(iso); return Number.isFinite(t)
+    ? new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""; };
+  const money = (n) => `${n < 0 ? "−" : ""}€${Math.abs(+n || 0).toFixed(2)}`;
+  const pct = (p) => (Number.isFinite(p) ? `${Math.round(100 * p)}%` : "—");
+  const band = (g) => (g.status === 3 ? "live" : g.status === 4 ? "done" : "next");
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+  const S = { games: [], live: new Map(), timer: 0 };
+
+  /* ---------------------------------------------------------- your bets -- */
+  function vault() {
+    try {
+      const b = JSON.parse(localStorage.getItem("hawk_bets") || "[]");
+      return Array.isArray(b) ? b : [];
+    } catch { return []; }
+  }
+  function bankroll() {
+    const b = parseFloat(localStorage.getItem("hawk_bankroll"));
+    return Number.isFinite(b) ? b : null;
+  }
+  // Mirrors the Vault's betProfit, except a VOID bet is 0: the Vault charges it
+  // a stake on one line and pays the stake back on another, and a bet that
+  // never ran cost nothing.
+  function profit(b) {
+    if (b.status === "WON") return (+b.potentialReturn || 0) - (+b.stake || 0);
+    if (b.status === "CASHED_OUT") return (+b.cashOutAmount || 0) - (+b.stake || 0);
+    if (b.status === "PENDING" || b.status === "VOID") return 0;
+    return -(+b.stake || 0);
+  }
+  // every 365Scores game id a bet touches
+  const gamesOf = (b) => [...new Set((b.legs || [])
+    .map((l) => l.hawk && l.hawk.game).filter(Boolean).map(String))];
+
+  /* ------------------------------------------------------- today's card -- */
+  async function loadCard() {
+    try { S.games = (await window.HAWK.scores(dayOf(new Date()))) || []; }
+    catch { S.games = []; }
+    S.games = S.games.filter((g) => g && g.home && g.away);
+  }
+
+  function paintCard() {
+    const g = S.games;
+    if (!g.length) {
+      $("#card").innerHTML = `<div class="m wide"><div class="skel">No matches in HAWK's competitions today.</div></div>`;
+      $("#cardN").textContent = "";
+      return;
+    }
+    const live = g.filter((x) => band(x) === "live").length;
+    const next = g.filter((x) => band(x) === "next").length;
+    $("#cardN").textContent = live ? `${live} in play · ${next} to come` : `${plural(g.length, "match")}`;
+
+    const order = { live: 0, next: 1, done: 2 };
+    const ko = (x) => Date.parse(x.kickoff || 0) || 0;
+    const shown = g.slice().sort((a, b) => order[band(a)] - order[band(b)] || ko(a) - ko(b)).slice(0, 6);
+
+    $("#card").innerHTML = shown.map((x) => {
+      const b = band(x), [sh, sa] = x.score || [];
+      const have = Number.isFinite(sh) && Number.isFinite(sa);
+      const mid = have ? `${sh}–${sa}` : (hhmm(x.kickoff) || "TBC");
+      const sub = b === "live" ? (x.clock || "live") : b === "done" ? "full time" : "kick-off";
+      const st = b === "live" ? "Live" : b === "done" ? "Full time" : "Upcoming";
+      const href = `${b === "live" ? "../live/" : "../match/"}`
+        + `?league=${encodeURIComponent(x.league || "")}&id=${encodeURIComponent(x.id)}`;
+      return `<a class="m${b === "live" ? " live" : ""}" href="${href}">
+        <div class="st"><span class="d"></span>${st}</div>
+        <div class="c"><div class="teams">
+          <div class="${have && sh < sa ? "lost" : ""}">${esc(x.home)}</div>
+          <div class="${have && sa < sh ? "lost" : ""}">${esc(x.away)}</div></div>
+          <div class="sc">${esc(mid)}<small>${esc(sub)}</small></div></div>
+        <div class="lg">${esc(x.league || "")}</div></a>`;
+    }).join("");
+  }
+
+  /* ----------------------------------------------------------- running --
+     Pending bets, ordered by how soon they matter: in play, then kicking off
+     today, then everything else. A live chance is asked of the engine only for
+     matches actually being played — anywhere else it would be the pre-match
+     number wearing a live badge. */
+  async function paintRunning() {
+    const pending = vault().filter((b) => b && b.status === "PENDING");
+    const byId = new Map(S.games.map((g) => [String(g.id), g]));
+
+    if (!pending.length) {
+      $("#run").innerHTML = `<div class="tk wide"><div class="skel">Nothing running. Everything you have
+        placed is settled.</div></div>`;
+      $("#runN").textContent = "";
+      $("#runNote").innerHTML = `Bets you log in the builder appear here until they settle.`;
+      return { pending: [], atRisk: 0, liveN: 0, todayN: 0 };
+    }
+
+    const rows = pending.map((b) => {
+      const ids = gamesOf(b);
+      const gs = ids.map((i) => byId.get(i)).filter(Boolean);
+      const live = gs.some((g) => band(g) === "live");
+      const today = gs.length > 0;
+      const soonest = gs.map((g) => Date.parse(g.kickoff || 0) || 0).filter(Boolean).sort()[0] || 0;
+      return { b, ids, gs, live, today, soonest };
+    });
+    rows.sort((a, b) => (b.live - a.live) || (b.today - a.today) || (a.soonest - b.soonest));
+
+    // live chances, one engine call per live match we actually have a bet on
+    await Promise.all(rows.filter((r) => r.live).map(async (r) => {
+      const g = r.gs.find((x) => band(x) === "live");
+      const legs = (r.b.legs || []).filter((l) => l.hawk && String(l.hawk.game) === String(g.id))
+        .flatMap((l) => l.hawk.legs || []);
+      if (!legs.length) return;
+      try { r.now = await window.HAWK.ticketLive(String(g.id), legs); } catch { /* left out */ }
+      r.clock = g.clock || "live";
+    }));
+
+    const atRisk = pending.reduce((a, b) => a + (+b.stake || 0), 0);
+    const liveN = rows.filter((r) => r.live).length;
+    const todayN = rows.filter((r) => r.today).length;
+
+    $("#runN").textContent = `${plural(pending.length, "ticket")} · ${money(atRisk)} at risk`;
+    $("#run").innerHTML = rows.slice(0, 6).map((r) => {
+      const b = r.b;
+      const sel = (b.legs || []).map((l) => l.selection || "").filter(Boolean).join(" + ") || "—";
+      const where = (b.legs || []).map((l) => l.fixture || "").filter(Boolean)[0] || "";
+      const p = r.now && Number.isFinite(r.now.p) ? r.now.p : null;
+      const when = r.live ? `Live · ${esc(r.clock || "")}`
+        : r.today ? `Kicks off ${esc(hhmm((r.gs[0] || {}).kickoff) || "today")}`
+        : "Later";
+      const href = r.live && r.gs.length
+        ? `../live/?league=${encodeURIComponent(r.gs[0].league || "")}&id=${encodeURIComponent(r.gs[0].id)}`
+        : "../";
+      return `<a class="tk${r.live ? " live" : ""}" href="${href}">
+        <div class="top"><span class="s">${money(b.stake)} @ <b>${(+b.odds || 0).toFixed(2)}</b>
+            → ${money(b.potentialReturn)}</span>
+          <span class="p${p == null ? " q" : ""}">${p == null ? "—" : pct(p)}</span></div>
+        <div class="sel">${esc(sel)}</div>
+        <div class="where">${esc(where)}${b.legs && b.legs.length > 1 ? ` · ${plural(b.legs.length, "leg")}` : ""}</div>
+        <div class="when"><span class="d"></span>${when}</div>
+        ${p == null ? "" : `<div class="bar"><i style="width:${Math.max(2, Math.round(100 * p))}%"></i></div>`}</a>`;
+    }).join("");
+
+    $("#runNote").innerHTML = liveN
+      ? `A chance is shown only for the ${plural(liveN, "ticket")} on a match being played — that is the
+         only time the number is live rather than the pre-match one wearing a badge.`
+      : `Chances appear here once a match kicks off.`;
+
+    return { pending, atRisk, liveN, todayN };
+  }
+
+  /* ------------------------------------------------------ today's money -- */
+  function paintMoney(run) {
+    const bets = vault();
+    const today = dayOf(new Date());
+    // settled today, whenever it was placed
+    const settledToday = bets.filter((b) => b && b.settledAt
+      && dayOf(new Date(b.settledAt)) === today && b.status !== "PENDING");
+    const net = settledToday.reduce((a, b) => a + profit(b), 0);
+    const staked = settledToday.reduce((a, b) => a + (+b.stake || 0), 0);
+    const bank = bankroll();
+    const cls = net > 0 ? " up" : net < 0 ? " dn" : "";
+
+    $("#moneyN").textContent = settledToday.length
+      ? `${plural(settledToday.length, "bet")} settled today` : "nothing settled yet today";
+    $("#money").innerHTML = `
+      <div><div class="n g">${bank == null ? "—" : money(bank)}</div><div class="k">Bankroll</div>
+        <div class="s">what the Vault has now</div></div>
+      <div><div class="n">${money(run.atRisk)}</div><div class="k">At risk</div>
+        <div class="s">${run.pending.length ? plural(run.pending.length, "ticket") + " running" : "nothing running"}</div></div>
+      <div><div class="n${cls}">${net > 0 ? "+" : ""}${money(net)}</div><div class="k">Settled today</div>
+        <div class="s">${settledToday.length ? `on ${money(staked)} staked` : "no results yet"}</div></div>
+      <div><div class="n">${run.liveN}</div><div class="k">In play now</div>
+        <div class="s">${run.liveN ? "of your tickets" : "none of your tickets"}</div></div>`;
+  }
+
+  /* ---------------------------------------------------------- the moment */
+  function paintMoment(run) {
+    const d = new Date();
+    const hour = d.getHours();
+    const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+    $("#day").innerHTML = `${esc(d.toLocaleDateString(undefined, { weekday: "long" }))}<span class="q">${
+      esc(d.toLocaleDateString(undefined, { day: "numeric", month: "long" }))}</span>`;
+
+    const liveMatches = S.games.filter((g) => band(g) === "live").length;
+    const next = S.games.filter((g) => band(g) === "next")
+      .sort((a, b) => (Date.parse(a.kickoff || 0) || 0) - (Date.parse(b.kickoff || 0) || 0))[0];
+
+    const tag = $("#tag");
+    tag.innerHTML = run.liveN
+      ? `<span class="dot"></span>${plural(run.liveN, "ticket")} in play`
+      : liveMatches ? `<span class="dot"></span>${liveMatches} matches in play`
+      : `<span class="dot q"></span>${greet}`;
+
+    // One sentence, in the order you would want to hear it: what is live,
+    // then what is at stake, then what is next.
+    const bits = [];
+    if (run.liveN) bits.push(`<b class="live">${plural(run.liveN, "ticket")}</b> of yours ${run.liveN === 1 ? "is" : "are"} in play`);
+    else if (liveMatches) bits.push(`<b>${liveMatches}</b> matches in play, none of them yours`);
+    if (run.pending.length) bits.push(`<b>${money(run.atRisk)}</b> at risk across ${plural(run.pending.length, "ticket")}`);
+    if (next) bits.push(`next up ${esc(next.home)} v ${esc(next.away)} at <b>${esc(hhmm(next.kickoff))}</b>`);
+    if (!bits.length) bits.push(S.games.length
+      ? `<b>${plural(S.games.length, "match")}</b> on the card and nothing of yours running`
+      : `nothing on in HAWK's competitions`);
+
+    const s = bits.join(" · ");
+    $("#said").innerHTML = s.charAt(0).toUpperCase() + s.slice(1) + ".";
+  }
+
+  /* --------------------------------------------------------------- boot - */
+  async function run() {
+    await loadCard();
+    paintCard();
+    const r = await paintRunning();
+    paintMoney(r);
+    paintMoment(r);
+    // only worth repeating while something is actually moving
+    clearTimeout(S.timer);
+    if (S.games.some((g) => band(g) === "live")) S.timer = setTimeout(run, 60000);
+  }
+
+  if (window.HAWK && window.HAWK.scores) {
+    run();
+  } else {
+    $("#tag").innerHTML = `<span class="dot off"></span>HAWK`;
+    $("#said").textContent = "The model didn't load, so today's card can't be read.";
+    $("#card").innerHTML = `<div class="m wide"><div class="skel">Unavailable.</div></div>`;
+    paintMoney({ pending: vault().filter((b) => b.status === "PENDING"), atRisk: 0, liveN: 0, todayN: 0 });
+  }
+})();
+</script>
+</body>
+</html>

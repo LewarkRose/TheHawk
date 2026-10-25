@@ -25,7 +25,7 @@
     <h1 class="moment mid" id="bank">—</h1>
     <p class="said" id="said">Counting what you have placed…</p>
     <div class="acts">
-      <a class="btn gold" href="../today/">Your day</a>
+      <a class="btn gold" href="../scores/">Today's matches</a>
       <a class="btn ghost" href="../vault-v1.html">Open v1's Vault</a>
     </div>
   </div>
@@ -44,6 +44,12 @@
       <button class="tbtn" id="asGo" type="button">Check results</button></div>
     <!-- what the robot did, in a line, the way v1 reported it -->
     <p class="note as" id="asOut" hidden></p>
+    <!-- The two Bet365 rules that decide how a leg settles. They used to live
+         only on the live page, inside a section that stays hidden unless you
+         have a bet on the match you are watching — a setting that decides
+         whether a ticket is WON or LOST cannot be that hard to find. -->
+    <div class="sw" id="rules"></div>
+    <p class="note" id="rulesNote"></p>
     <div class="filt" id="filt"></div>
     <div id="bets"><div class="skel" style="padding:30px 0">Reading…</div></div>
   </div>
@@ -169,7 +175,7 @@
 </details>
 
 <footer class="foot">
-  <div class="wrap"><a href="../home/">home</a> · <a href="../today/">today</a> ·
+  <div class="wrap"><a href="../home/">home</a> · <a href="../scores/">scores</a> ·
     <a href="../scores/">build a bet</a> · <a href="../acca/">acca</a> ·
     <a href="../vault-v1.html">v1 vault</a> ·
     bets and bankroll are this browser's, shared with the old site</div>
@@ -421,55 +427,122 @@
       if (last && last.d === d) last.bets.push(b); else days.push({ d, bets: [b] });
     }
 
+    /* …and the days fold into WEEKS, because thirty-eight day rows is the
+       same problem one level up: you scroll a list of dates looking for a
+       date. Monday to Sunday, the same week the report above uses, so a
+       week's figure here and its figure there are the same number. This
+       week is open; the rest wait to be asked for. */
+    const mondayOf = (ms) => {
+      const d = new Date(ms); d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7));     // Sunday counts as the week before
+      return d;
+    };
+    const weeks = [];
+    for (const grp of days) {
+      const mon = mondayOf(betTime(grp.bets[0]) || Date.now());
+      const key = mon.getTime();
+      const last = weeks[weeks.length - 1];
+      if (last && last.key === key) last.days.push(grp);
+      else weeks.push({ key, mon, days: [grp] });
+    }
+    const thisMon = mondayOf(Date.now()).getTime();
+    const dfmt = (d) => d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
+    const tally = (bets) => ({
+      pl: bets.reduce((a, x) => a + profit(x), 0),
+      won: bets.filter((x) => x.status === "WON").length,
+      lost: bets.filter((x) => x.status === "LOST").length,
+      openN: bets.filter((x) => x.status === "PENDING").length,
+      settled: bets.some((x) => x.status && x.status !== "PENDING"),
+    });
+    const figures = (t, n) => `<span class="n">${plural(n, "ticket")}</span>
+      <span class="wl">${t.won ? `<b class="w">✓ ${t.won}</b>` : ""}${
+        t.lost ? `<b class="l">✗ ${t.lost}</b>` : ""}${
+        t.openN ? `<b class="o">● ${t.openN}</b>` : ""}</span>
+      ${t.settled ? `<span class="pl ${t.pl > 0 ? "up" : t.pl < 0 ? "dn" : ""}">${
+        t.pl > 0 ? "+" : ""}${money(t.pl)}</span>` : `<span class="pl q">—</span>`}`;
+
     let out = "";
-    for (const [di, grp] of days.entries()) {
-      const pl = grp.bets.reduce((a, x) => a + profit(x), 0);
-      const won = grp.bets.filter((x) => x.status === "WON").length;
-      const lost = grp.bets.filter((x) => x.status === "LOST").length;
-      const openN = grp.bets.filter((x) => x.status === "PENDING").length;
-      const anySettled = grp.bets.some((x) => x.status && x.status !== "PENDING");
-      out += `<details class="dayg"${di < 2 || openN ? " open" : ""}>
-        <summary><div class="day"><h4>${esc(grp.d)}</h4>
-          <span class="n">${plural(grp.bets.length, "ticket")}</span>
-          <span class="wl">${won ? `<b class="w">✓ ${won}</b>` : ""}${
-            lost ? `<b class="l">✗ ${lost}</b>` : ""}${
-            openN ? `<b class="o">● ${openN}</b>` : ""}</span>
-          ${anySettled ? `<span class="pl ${pl > 0 ? "up" : pl < 0 ? "dn" : ""}">${
-            pl > 0 ? "+" : ""}${money(pl)}</span>` : `<span class="pl q">—</span>`}</div></summary>
-        <div class="dayb">`;
-      for (const b of grp.bets) out += betRow(b);
+    for (const wk of weeks) {
+      const all = wk.days.flatMap((g) => g.bets);
+      const t = tally(all);
+      const sun = new Date(wk.mon); sun.setDate(sun.getDate() + 6);
+      const title = wk.key === thisMon ? "This week"
+        : `${dfmt(wk.mon)} – ${dfmt(sun)}`;
+      out += `<details class="weekg"${wk.key === thisMon || t.openN ? " open" : ""}>
+        <summary><div class="day wk"><h4>${esc(title)}</h4>
+          <span class="dn">${plural(wk.days.length, "day")}</span>
+          ${figures(t, all.length)}</div></summary>
+        <div class="weekb">`;
+
+      for (const grp of wk.days) {
+        const dt = tally(grp.bets);
+        out += `<details class="dayg"${dt.openN ? " open" : ""}>
+          <summary><div class="day"><h4>${esc(grp.d)}</h4>
+            ${figures(dt, grp.bets.length)}</div></summary>
+          <div class="dayb">`;
+        for (const b of grp.bets) out += betRow(b);
+        out += `</div></details>`;
+      }
       out += `</div></details>`;
     }
     $("#bets").innerHTML = out;
     return;
   }
 
+  /* A ticket is a receipt, so it is drawn as one: torn top and bottom, the
+     legs itemised down it with a ✓ or ✗ against each, and the return at the
+     foot where the total goes. The per-leg marks are the reason it is worth
+     the room — they come from the settler and they are the only place you
+     can see WHICH leg cost you the ticket. */
+  const LEGMARK = { won: ["w", "✓"], lost: ["l", "✗"], void: ["v", "∅"], unknown: ["u", "?"] };
+
   function betRow(b) {
-    let out = "";
-    {
-      const [cls, word] = STATE[b.status] || ["", b.status || "—"];
-      const pl = profit(b), pending = b.status === "PENDING";
-      const sel = (b.legs || []).map((l) => l.selection).filter(Boolean).join(" + ") || "—";
-      // several legs on one match name it once, not once each
-      const where = [...new Set((b.legs || []).map((l) => l.fixture).filter(Boolean))].join(" · ");
-      out += `<div class="bt">
-        <span class="w"><b>${esc(sel)}</b><i>${esc(where)}${
-          (b.legs || []).length > 1 ? ` · ${plural(b.legs.length, "leg")}` : ""}</i></span>
-        <span class="st">${money(b.stake)} @ ${(+b.odds || 0).toFixed(2)}<br>→ ${money(b.potentialReturn)}</span>
+    const [cls, word] = STATE[b.status] || ["", b.status || "—"];
+    const pl = profit(b), pending = b.status === "PENDING";
+    const where = [...new Set((b.legs || []).map((l) => l.fixture).filter(Boolean))].join(" · ");
+
+    /* HAWK's own legs when it has them, the typed selection when it does not
+       — a ticket logged by hand has one line and no marks, and says so by
+       simply not having any. */
+    const hawkLegs = (b.legs || []).flatMap((l) => (l.hawk && l.hawk.legs) || []);
+    const items = hawkLegs.length
+      ? hawkLegs.map((h) => [h.label || "—", h.result || null])
+      : (b.legs || []).map((l) => [l.selection || "—", null]);
+
+    const when = b.date || (b.settledAt ? new Date(b.settledAt).toLocaleString() : "");
+    const n = items.length;
+
+    return `<div class="rcpt ${cls}">
+      <div class="rhd">
+        <h4>${esc(where || "Ticket")}</h4>
+        <div class="rwhen">${esc(when)}${n > 1 ? ` · ${plural(n, "leg")}` : ""}</div>
+      </div>
+      <ul class="rlegs">${items.map(([label, res]) => {
+        const [mc, mk] = LEGMARK[res] || ["o", "·"];
+        return `<li><span class="tk ${mc}">${mk}</span><span class="lb">${esc(label)}</span></li>`;
+      }).join("")}</ul>
+      <div class="rsum">
+        <div><span>Stake</span><span>${money(b.stake)}</span></div>
+        <div><span>Price</span><span>${(+b.odds || 0).toFixed(2)}</span></div>
+        <div><span>${pending ? "Returns" : "Paid"}</span>
+          <span class="big">${money(b.status === "CASHED_OUT" ? b.cashOutAmount : b.potentialReturn)}</span></div>
+      </div>
+      <div class="rft">
         <span class="rs ${cls}">${esc(word)}</span>
         <span class="pl ${pending ? "q" : pl > 0 ? "up" : pl < 0 ? "dn" : "q"}">${
           pending ? "—" : `${pl > 0 ? "+" : ""}${money(pl)}`}</span>
-        ${pending ? `<span class="act">
-          <button class="w" data-won="${esc(b.id)}">Won</button>
-          <button class="l" data-lost="${esc(b.id)}">Lost</button>
-          ${S.cashing === b.id
-            ? `<input id="co" inputmode="decimal" placeholder="got back €" autofocus>
-               <button class="c" data-docash="${esc(b.id)}">Confirm</button>
-               <button data-cancel="1">Cancel</button>`
-            : `<button class="c" data-cash="${esc(b.id)}">Cash out</button>`}
-        </span>` : ""}</div>`;
-    }
-    return out;
+      </div>
+      ${b.needsCheck ? `<p class="rchk">${esc(b.needsCheck)}</p>` : ""}
+      ${pending ? `<div class="act">
+        <button class="w" data-won="${esc(b.id)}">Won</button>
+        <button class="l" data-lost="${esc(b.id)}">Lost</button>
+        ${S.cashing === b.id
+          ? `<input id="co" inputmode="decimal" placeholder="got back €" autofocus>
+             <button class="c" data-docash="${esc(b.id)}">Confirm</button>
+             <button data-cancel="1">Cancel</button>`
+          : `<button class="c" data-cash="${esc(b.id)}">Cash out</button>`}
+      </div>` : ""}</div>`;
   }
 
   /* ------------------------------------------------------------ settling */
@@ -510,6 +583,14 @@
          automatically; they are handed back to you.
 
      105 minutes after kick-off is v1's rule for "this should be over". */
+  /* How a leg on THIS bet is read. The switches above are the default; a bet
+     logged with a rule off keeps it off, because the ticket was placed under
+     the rule that was in force at the time. */
+  const settleOpts = (b) => ({
+    earlyPayout: rule("ep") && b.ep !== false,
+    subOn: rule("subOn") && b.subOn !== false,
+  });
+
   let settler = null, settling = false;
   function hawkSettle() {
     if (!settler) settler = new Promise((res) => {
@@ -521,10 +602,32 @@
     });
     return settler;
   }
-  const subOnPref = () => {
-    try { return JSON.parse(localStorage.getItem("hawk.subOn") ?? "true") !== false; }
-    catch { return true; }
+  /* Bet365's own two rules, on v1's own keys, so the old builder, the live
+     page and this settler cannot disagree about what a leg did. Both on by
+     default, because Bet365 applies both by default. */
+  const RULES = [
+    ["ep", "Early Payout", true,
+     "A result leg is paid once that side goes two goals ahead, even if they are pegged back."],
+    ["subOn", "Sub On Play On", true,
+     "A player leg moves to his replacement when he is substituted. Only the sub's own numbers count."],
+  ];
+  const rule = (k) => {
+    const dflt = (RULES.find((r) => r[0] === k) || [, , true])[2];
+    try { const v = localStorage.getItem(`hawk.${k}`); return v === null ? dflt : JSON.parse(v) !== false; }
+    catch { return dflt; }
   };
+  const subOnPref = () => rule("subOn");
+
+  function paintRules() {
+    const box = $("#rules");
+    if (!box) return;
+    box.innerHTML = RULES.map(([k, name, , why]) =>
+      `<button type="button" data-rule="${k}" aria-pressed="${String(rule(k))}">
+        <b>${esc(name)}</b><span>${esc(why)}</span></button>`).join("");
+    $("#rulesNote").textContent = "Bet365's rules, not HAWK's reading of the match, and both are on "
+      + "because Bet365 applies them by default. They decide how a finished ticket settles, so "
+      + "turning one off changes what counts as won. A bet logged with one off keeps it off.";
+  }
 
   async function autoSettle(loud) {
     if (settling) return;
@@ -570,9 +673,9 @@
         if (!f || !f.finished) continue;
         if (!f.off) {
           l.hawk.score = l.hawk.score || `${f.ft[0]}-${f.ft[1]}`;
-          const subOn = b.subOn !== false && subOnPref();
+          const opts = settleOpts(b);
           for (const h of l.hawk.legs || [])
-            if (!h.result) h.result = h.userDone ? "won" : legResult(h, f, { earlyPayout: true, subOn });
+            if (!h.result) h.result = h.userDone ? "won" : legResult(h, f, opts);
         }
         l.hawk.marked = true;
       }
@@ -582,7 +685,7 @@
       let waiting = 0, checks = 0;
       for (const b of S.bets) {
         if (b.status !== "PENDING" || !(b.legs || []).some((l) => l && l.hawk)) continue;
-        const subOn = b.subOn !== false && subOnPref();
+        const opts = settleOpts(b);
         let anyLost = false, allWon = b.legs.every((l) => l && l.hawk), allDone = true;
         const issues = [];
         for (const l of b.legs) {
@@ -593,7 +696,7 @@
           l.hawk.score = `${f.ft[0]}-${f.ft[1]}`;
           // a leg you ticked off yourself during the match counts as won
           for (const h of l.hawk.legs)
-            h.result = h.userDone ? "won" : legResult(h, f, { earlyPayout: true, subOn });
+            h.result = h.userDone ? "won" : legResult(h, f, opts);
           const rs = l.hawk.legs.map((h) => h.result);
           if (rs.includes("lost")) anyLost = true;
           else if (!rs.every((r) => r === "won")) {
@@ -1076,7 +1179,18 @@
 
   /* Checks once on open, and again on the button. Quiet when it has nothing
      to say, so a page with no running tickets does not announce itself. */
+  paintRules();
   $("#asGo").addEventListener("click", () => autoSettle(true));
+  /* Turning a rule off changes what a finished leg counts as, so the bets
+     already settled under it are not re-read — only what settles from here. */
+  $("#rules").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-rule]");
+    if (!b) return;
+    const k = b.dataset.rule, now = !rule(k);
+    try { localStorage.setItem(`hawk.${k}`, JSON.stringify(now)); } catch { /* private */ }
+    if (k === "ep" && window.HAWK && window.HAWK.setEarlyPayout) window.HAWK.setEarlyPayout(now);
+    paintRules();
+  });
   if (S.bets.some((b) => b && b.status === "PENDING")) autoSettle(false);
 })();
 </script>

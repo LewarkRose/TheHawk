@@ -47,7 +47,7 @@
 <header class="hero">
   <canvas aria-hidden="true"></canvas>
   <div class="wrap">
-    <a class="back" href="../today/">← Today</a>
+    <a class="back" href="../scores/">← Scores</a>
     <div style="margin-top:18px"><span class="tag" id="tag"><span class="dot off"></span>Reading the match</span></div>
 
     <div class="fx" id="fx" hidden>
@@ -71,6 +71,47 @@
     </div>
   </div>
 </header>
+
+<!-- Scores -> a match -> build, with the price beside you while you do it.
+     The builder and the markets share one column and the slip rails down
+     the other, so a ticket and what it is worth are never on different
+     screens. The builder used to be the eighth block down, under six folds. -->
+<section class="calm">
+  <div class="wrap two">
+    <main>
+      <details class="fold bare" id="abWrap" data-fold="autobuild" data-open-default hidden>
+        <summary><div class="lede"><h3>Auto-build</h3>
+          <span class="n" id="abN">let HAWK pick the legs</span><span class="mk-t"></span></div></summary>
+        <div>
+          <div id="abSet"></div>
+          <p class="plan" id="abPlan"></p>
+          <div class="btns" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:26px">
+            <button class="btn gold" id="abGo">Build my bet builder</button>
+          </div>
+          <!-- every build these settings make, side by side — picking beats
+               pressing "build a different one" until something turns up -->
+          <div class="opts" id="abOpts" hidden></div>
+          <div id="abOut"></div>
+          <p class="note">HAWK picks legs that fit the price you asked for, then checks the whole
+            ticket together. <b>The Bet365 figure is an estimate</b> of what their builder would
+            pay, not a price from the feed — type their real one in the slip for a verdict.</p>
+        </div>
+      </details>
+
+      <div class="lede selh"><h3>Selections</h3><span class="n" id="selN"></span></div>
+      <div class="cats" id="cats"></div>
+      <div id="markets"><div class="skel" style="padding:30px 0">Reading…</div></div>
+    </main>
+
+    <aside class="rail">
+      <div class="slip" id="slip">
+        <div class="hd"><h4>Your slip</h4><span class="n" id="slipN">0 legs</span></div>
+        <div class="empty">Tap a selection to add it. HAWK prices the whole slip together, so legs
+          that move with each other are not counted twice.</div>
+      </div>
+    </aside>
+  </div>
+</section>
 
 <details class="calm fold" id="numWrap" data-fold="numbers" hidden>
   <summary><div class="wrap"><div class="lede"><h3>Match numbers</h3><span class="n" id="numN"></span><span class="mk-t"></span></div></div></summary>
@@ -133,45 +174,8 @@
   </div>
 </details>
 
-<details class="calm fold" id="abWrap" data-fold="autobuild" hidden>
-  <summary><div class="wrap"><div class="lede"><h3>Auto-build</h3>
-    <span class="n" id="abN">let HAWK pick the legs</span><span class="mk-t"></span></div></div></summary>
-  <div class="wrap">
-    <div id="abSet"></div>
-    <p class="plan" id="abPlan"></p>
-    <div class="btns" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:26px">
-      <button class="btn gold" id="abGo">Build my bet builder</button>
-    </div>
-    <!-- every build these settings make, side by side — picking beats pressing
-         "build a different one" until something good turns up -->
-    <div class="opts" id="abOpts" hidden></div>
-    <div id="abOut"></div>
-    <p class="note">HAWK picks legs that fit the price you asked for, then checks the whole ticket
-      together. <b>The Bet365 figure is an estimate</b> of what their builder would pay, not a price
-      from the feed — type their real one in the slip to get a verdict.</p>
-  </div>
-</details>
-
-<section class="calm">
-  <div class="wrap two">
-    <main>
-      <div class="lede"><h3>Selections</h3><span class="n" id="selN"></span></div>
-      <div class="cats" id="cats"></div>
-      <div id="markets"><div class="skel" style="padding:30px 0">Reading…</div></div>
-    </main>
-
-    <aside class="rail">
-      <div class="slip" id="slip">
-        <div class="hd"><h4>Your slip</h4><span class="n" id="slipN">0 legs</span></div>
-        <div class="empty">Tap a selection to add it. HAWK prices the whole slip together, so legs
-          that move with each other are not counted twice.</div>
-      </div>
-    </aside>
-  </div>
-</section>
-
 <footer class="foot">
-  <div class="wrap"><a href="../home/">home</a> · <a href="../today/">today</a> ·
+  <div class="wrap"><a href="../home/">home</a> · <a href="../scores/">scores</a> ·
     <a href="../builder/">old builder</a> · <a href="../vault/">vault</a> ·
     prices from <span id="book">Bet365</span> where the feed carries them</div>
 </footer>
@@ -522,7 +526,7 @@
   async function load() {
     if (!S.id) {
       $("#said").innerHTML = `No match chosen. Pick one from
-        <a href="../today/" style="color:var(--gold-hi)">Today</a>.`;
+        <a href="../scores/" style="color:var(--gold-hi)">Scores</a>.`;
       $("#markets").innerHTML = "";
       return;
     }

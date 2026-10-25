@@ -71,7 +71,7 @@
 <header class="hero" id="hero">
   <canvas aria-hidden="true"></canvas>
   <div class="wrap">
-    <a class="back" href="../today/">← Today</a>
+    <a class="back" href="../scores/">← Scores</a>
     <div style="margin-top:18px"><span class="tag" id="tag"><span class="dot off"></span>Reading the match</span></div>
 
     <div class="fx" id="fx" hidden>
@@ -160,7 +160,7 @@
 </details>
 
 <footer class="foot">
-  <div class="wrap"><a href="../home/">home</a> · <a href="../today/">today</a> ·
+  <div class="wrap"><a href="../home/">home</a> · <a href="../scores/">scores</a> ·
     <a href="#" id="preLink">pre-match</a> · <a href="../vault/">vault</a> ·
     chances refresh every 15 seconds</div>
 </footer>
@@ -723,7 +723,7 @@
       ? list("In play", live, true) + list("Next hour", soon, false)
       : `<p class="note" style="margin:0">Nothing to read right now.
          <a href="../scores/" style="color:var(--gold-hi)">The day's scores</a> or
-         <a href="../today/" style="color:var(--gold-hi)">what's coming</a>.</p>`;
+         <a href="../scores/" style="color:var(--gold-hi)">what's coming</a>.</p>`;
     $("#onnow").hidden = false;
     clearTimeout(S.timer);
     if (live.length) S.timer = setTimeout(onNow, 60000);

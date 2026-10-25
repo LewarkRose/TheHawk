@@ -33,10 +33,41 @@
   </div>
 </header>
 
+<!-- =====================================================================
+     V1's builder, which the rebuild never had: pick any match from the feed
+     and put a leg on the ticket without going to its page first. The chips
+     are HAWK's own prices for that match; the box underneath is for markets
+     HAWK does not price, where you supply Bet365's number yourself.
+     ===================================================================== -->
+<section class="calm" id="addSec">
+  <div class="wrap">
+    <div class="lede"><h3>Add a leg</h3><span class="n" id="addN">reading the feed…</span></div>
+    <div class="set" style="max-width:760px">
+      <div><label for="aWhen">Kick-off</label><select id="aWhen"></select>
+        <div class="hint">How far ahead to look.</div></div>
+      <div><label for="aLg">Competition</label><select id="aLg"></select>
+        <div class="hint" id="aLgHint">Only the ones with a match in the window.</div></div>
+      <div><label for="aFx">Match</label><select id="aFx"></select>
+        <div class="hint" id="aFxHint">Pick one and HAWK prices its markets.</div></div>
+    </div>
+
+    <div id="aChips" style="margin-top:28px"></div>
+
+    <div class="lgf" id="aHand" style="margin-top:28px" hidden>
+      <div><label for="aSel">Or type the selection</label>
+        <input id="aSel" placeholder="e.g. Mbappe 2+ shots on target"></div>
+      <div><label for="aOdds">Bet365's price</label>
+        <input id="aOdds" class="num" inputmode="decimal" placeholder="1.85"></div>
+      <div><button class="btn gold btn-sm" id="aAdd" type="button">Add to the acca</button></div>
+    </div>
+    <p class="note" id="aNote" hidden></p>
+  </div>
+</section>
+
 <section class="calm" id="boardSec">
   <div class="wrap">
     <div class="lede"><h3>Your acca</h3><span class="n" id="boardN"></span>
-      <a href="../picks/">Find one →</a></div>
+      <a href="../scores/">Find one →</a></div>
     <div id="board"></div>
     <p class="note" id="weak" hidden></p>
   </div>
@@ -112,7 +143,7 @@
 </details>
 
 <footer class="foot">
-  <div class="wrap"><a href="../home/">home</a> · <a href="../picks/">picks</a> ·
+  <div class="wrap"><a href="../home/">home</a> · <a href="../scores/">scores</a> ·
     <a href="../scores/">scores</a> · <a href="../vault/">vault</a> ·
     one part per match, in kick-off order</div>
 </footer>
@@ -178,6 +209,137 @@
 
   const C = { price: "", boost: "", stake: load("hawk.accaStake", "5") };
 
+  /* ================================================== V1's builder, ported
+     Pick a match from the feed and put a leg on the ticket. The rebuild only
+     ever let you add a part from the match page itself, which meant six page
+     loads to make a six-fold. The chips are HAWK's own prices for the chosen
+     match; the typed box is for markets HAWK has no price for, where the
+     number has to be yours. */
+  const WIN = [[12, "Next 12 hours"], [24, "Next 24 hours"],
+               [48, "Next 2 days"], [72, "Next 3 days"]];
+  const B = { hours: load("hawk.accaAddHours", 24), league: "", id: "", games: [], m: null, busy: false };
+
+  const dayKeys = (hours) => {
+    const out = [];
+    for (let i = 0; i <= Math.ceil(hours / 24); i++) {
+      const d = new Date(Date.now() + i * 86400e3);
+      out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+    }
+    return out;
+  };
+
+  async function addFeed() {
+    $("#aWhen").innerHTML = WIN.map(([h, t]) =>
+      `<option value="${h}"${h === B.hours ? " selected" : ""}>${t}</option>`).join("");
+    const until = Date.now() + B.hours * 3600e3;
+    let games = [];
+    for (const d of dayKeys(B.hours)) {
+      try { games = games.concat(await E.scores(d)); } catch { /* that day is short */ }
+    }
+    // not started, inside the window, and not already on the ticket
+    const on = new Set(A.list().map((p) => String(p.id)));
+    B.games = games.filter((g) => g && g.home && g.away && g.status === 2
+        && Date.parse(g.kickoff || 0) > Date.now() && Date.parse(g.kickoff || 0) <= until)
+      .sort((a, b) => Date.parse(a.kickoff || 0) - Date.parse(b.kickoff || 0));
+    $("#addN").textContent = B.games.length
+      ? `${plural(B.games.length, "match")} to choose from` : "nothing in that window";
+    $("#aLgHint").textContent = on.size
+      ? `${plural(on.size, "match")} already on the ticket — adding one again replaces it.`
+      : "Only the ones with a match in the window.";
+    addLeagues();
+  }
+
+  function addLeagues() {
+    const ls = [...new Set(B.games.map((g) => g.league || "Other"))].sort();
+    if (!ls.includes(B.league)) B.league = ls[0] || "";
+    $("#aLg").innerHTML = ls.map((l) =>
+      `<option${l === B.league ? " selected" : ""}>${esc(l)}</option>`).join("")
+      || `<option>—</option>`;
+    addFixtures();
+  }
+
+  function addFixtures() {
+    const fx = B.games.filter((g) => (g.league || "Other") === B.league);
+    if (!fx.some((g) => String(g.id) === String(B.id))) B.id = fx.length ? String(fx[0].id) : "";
+    $("#aFx").innerHTML = fx.map((g) => `<option value="${esc(g.id)}"${
+      String(g.id) === String(B.id) ? " selected" : ""}>${
+      [dayName(g.kickoff), hhmm(g.kickoff)].filter(Boolean).join(" ")} · ${
+      esc(g.home)} v ${esc(g.away)}</option>`).join("") || `<option>—</option>`;
+    addMarkets();
+  }
+
+  /* The markets worth a chip: one per common question, the way V1's "common
+     selections" worked, plus whichever of them Bet365 actually prices. */
+  const CHIP_IDS = ["dc:home", "dc:away", "res:home", "res:draw", "res:away",
+                    "goals:o1.5", "goals:o2.5", "goals:u2.5", "goals:u3.5",
+                    "btts:yes", "btts:no"];
+
+  async function addMarkets() {
+    const box = $("#aChips"), hand = $("#aHand");
+    if (!B.id) { box.innerHTML = `<p class="note" style="margin:0">Nothing to price.</p>`;
+                 hand.hidden = true; return; }
+    box.innerHTML = `<div class="skel">Pricing ${esc(B.league)}…</div>`;
+    hand.hidden = true;
+    const want = B.id;
+    B.busy = true;
+    let m = null;
+    try { m = await E.match(B.league, String(B.id)); } catch { /* said below */ }
+    B.busy = false;
+    if (String(want) !== String(B.id)) return;          // you moved on while it read
+    B.m = m;
+    if (!m) { box.innerHTML = `<p class="note" style="margin:0">HAWK couldn't price that one.</p>`;
+              hand.hidden = true; return; }
+
+    const byId = new Map((m.legs || []).map((l) => [l.id, l]));
+    const chips = CHIP_IDS.map((id) => byId.get(id)).filter(Boolean);
+    const already = A.get(String(m.id));
+    box.innerHTML = `<div class="achips">${chips.map((l) => {
+      const fair = l.p > 0 ? 1 / l.p : 0;
+      const beats = l.bookPrice && l.bookPrice > fair;
+      return `<button class="achip${beats ? " val" : ""}" type="button" data-add="${esc(l.id)}">
+        <span class="l">${esc(l.label)}</span>
+        <span class="r">${l.bookPrice ? odds(l.bookPrice) : "—"}<small>HAWK ${pct(l.p)}</small></span>
+      </button>`;
+    }).join("")}</div>`
+      + (already ? `<p class="note" style="margin:16px 0 0">${esc(m.home)} v ${esc(m.away)} is already
+          on the ticket with ${plural(already.legs.length, "leg")} — adding another replaces it,
+          because Bet365 prices one builder per match as a unit.</p>` : "");
+    hand.hidden = false;
+  }
+
+  function addLeg(id) {
+    const m = B.m;
+    if (!m) return;
+    const leg = (m.legs || []).find((l) => l.id === id);
+    if (!leg) return;
+    A.add(m, [leg], leg.p);
+    say(`${leg.label} — ${m.home} v ${m.away} is on the ticket.`);
+    C.price = "";
+    paint();
+    addMarkets();
+  }
+
+  /* A typed leg: HAWK has no chance for it, so the price you give IS the
+     chance, and the acca says so rather than pretending to a read it has not
+     got. That is also why it never counts as beating the price. */
+  function addTyped() {
+    const m = B.m;
+    if (!m) return;
+    const label = String($("#aSel").value || "").trim();
+    const price = num($("#aOdds").value);
+    if (!label) { say("Type what the leg is first."); return; }
+    if (!Number.isFinite(price) || price <= 1) { say("That price doesn't look like decimal odds."); return; }
+    const leg = { id: `typed:${Date.now()}`, label, market: "Typed in", kind: "typed",
+                  p: 1 / price, pRaw: 1 / price, fair: price, bookPrice: price, typed: true };
+    A.add(m, [leg], leg.p);
+    $("#aSel").value = ""; $("#aOdds").value = "";
+    say(`${label} — ${m.home} v ${m.away} is on the ticket, at the price you gave.`);
+    C.price = "";
+    paint();
+    addMarkets();
+  }
+  function say(t) { const n = $("#aNote"); n.textContent = t; n.hidden = false; }
+
   /* ======================================================= the departure board */
   function paint() {
     const parts = A.list(), t = A.totals(parts);
@@ -190,7 +352,7 @@
       $("#tot").hidden = true;
       $("#checkSec").hidden = true;
       $("#board").innerHTML = `<p class="note" style="margin:0">Empty. Add a builder from a match
-        page, or take one from <a href="../picks/" style="color:var(--gold-hi)">Picks</a>.
+        page, or take one from <a href="../scores/" style="color:var(--gold-hi)">Scores</a>.
         HAWK keeps one part per match and sorts them by kick-off.</p>`;
       $("#weak").hidden = true;
       return;
@@ -541,6 +703,17 @@
     });
   $("#stake").value = C.stake;
 
+  /* the builder's own controls */
+  $("#aWhen").onchange = (e) => { B.hours = +e.target.value; save("hawk.accaAddHours", B.hours); addFeed(); };
+  $("#aLg").onchange = (e) => { B.league = e.target.value; addFixtures(); };
+  $("#aFx").onchange = (e) => { B.id = e.target.value; addMarkets(); };
+  $("#aChips").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-add]");
+    if (b && !B.busy) addLeg(b.dataset.add);
+  });
+  $("#aAdd").onclick = addTyped;
+  $("#aOdds").addEventListener("keydown", (e) => { if (e.key === "Enter") addTyped(); });
+
   $("#toVault").onclick = toVault;
   $("#copy").onclick = copy;
   $("#clear").onclick = () => {
@@ -580,6 +753,8 @@
 
   /* ================================================================== boot */
   paint();
+  if (E && E.scores && E.match) addFeed();
+  else { $("#addN").textContent = "the model didn't load"; $("#addSec").hidden = true; }
   if (E && E.startMonster) monSetup();
   else $("#monN").textContent = "the model didn't load";
 })();

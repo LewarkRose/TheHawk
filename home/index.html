@@ -15,42 +15,33 @@
 </head>
 <body>
 
-<!-- ============================ the moment ============================== -->
+<!-- =========================================================================
+     Home is a welcome and four doors. It used to carry today's card, your
+     record and a "where to go" list of five pages — all of which were the
+     other pages' jobs done a second time. A front door you have to read is
+     not a front door.
+     ========================================================================= -->
 <header class="hero">
   <canvas aria-hidden="true"></canvas>
   <div class="wrap">
-    <div class="hsplit">
-      <div>
-        <span class="tag" id="tag"><span class="dot off"></span>Loading today</span>
-        <h1 class="moment mid">Every bet,<span class="q">priced honestly</span></h1>
-        <p class="said" id="said">HAWK prices every leg from its own simulation and says where
-          Bet365 is ahead of it. <b>Most days nothing beats the price</b> — and it says so.</p>
-        <div class="acts">
-          <a class="btn gold" href="../scores/">Build a bet</a>
-          <a class="btn ghost" href="../today/">Your day</a>
-        </div>
-      </div>
-
-      <!-- the match you opened HAWK for, where the empty half used to be -->
-      <a class="hlead" id="lead" href="../today/" style="text-decoration:none;color:inherit" hidden>
-        <div class="top" id="leadTop"><span class="d"></span><span id="leadWhen">Biggest match in play</span></div>
-        <div class="fx2">
-          <div class="side"><img id="lH" alt="" onerror="this.style.visibility='hidden'"><h3 id="lHN"></h3></div>
-          <div><div class="sc" id="lSC"></div><div class="ck" id="lCK"></div></div>
-          <div class="side"><img id="lA" alt="" onerror="this.style.visibility='hidden'"><h3 id="lAN"></h3></div>
-        </div>
-        <div class="b3h" id="lBar" hidden></div>
-        <div class="b3hk" id="lBark" hidden></div>
-        <div class="foot2" id="lFoot"></div>
-      </a>
+    <span class="tag" id="tag"><span class="dot off"></span>Welcome back</span>
+    <h1 class="moment mid">Every bet,<span class="q">priced honestly</span></h1>
+    <p class="said">HAWK prices every leg from its own simulation and tells you where Bet365 is
+      ahead of it. <b>Most nights nothing beats the price</b> — and it says so rather than
+      finding you something.</p>
+    <div class="acts">
+      <a class="btn gold" href="../scores/">Build a bet</a>
+      <a class="btn ghost" href="../vault/">Open the Vault</a>
     </div>
 
-    <!-- and where you stand -->
+    <!-- where you stand, and nothing else -->
     <div class="hmoney" id="money" hidden></div>
   </div>
 </header>
 
-<!-- ============================ and then quiet ========================== -->
+<!-- The top five only. The whole card is twenty-odd competitions and Scores
+     already shows it; on the way in you want the games you would actually
+     have an opinion about. -->
 <section class="calm">
   <div class="wrap">
     <div class="lede"><h3>Today</h3><span class="n" id="todayN">reading…</span>
@@ -59,156 +50,37 @@
   </div>
 </section>
 
-<details class="calm fold" data-fold="hRecord">
-  <summary><div class="wrap"><div class="lede"><h3>Your record</h3>
-    <span class="n" id="recN"></span><span class="mk-t"></span></div></div></summary>
-  <div class="wrap">
-    <div class="grid m4 rec" id="rec"><div class="wide"><div class="skel">Reading your Vault…</div></div></div>
-    <p class="note"><a href="../vault/" style="color:var(--gold-hi)">Open the Vault →</a></p>
-  </div>
-</details>
-
-<details class="calm fold" data-fold="hWays">
-  <summary><div class="wrap"><div class="lede"><h3>Where to go</h3><span class="mk-t"></span></div></div></summary>
-  <div class="wrap">
-    <div class="grid w4 ways">
-      <a href="../today/"><div class="i">01</div><h4>Today</h4>
-        <p>What is running, what is at risk, and what is still to come.</p></a>
-      <a href="../picks/"><div class="i">02</div><h4>Picks</h4>
-        <p>HAWK's best builder for every fixture, and whether any of them beats the price.
-          Most days none of them does, and the page says so.</p></a>
-      <a href="../acca/"><div class="i">03</div><h4>Acca</h4>
-        <p>Several matches on one ticket, in kick-off order, with the chance falling away
-          down the page so you can see which leg is costing you.</p></a>
-      <a href="../vault/"><div class="i">04</div><h4>Vault</h4>
-        <p>Every bet you have placed, what it returned, and the bankroll that follows from it.</p></a>
-      <a href="../board/"><div class="i">05</div><h4>Board</h4>
-        <p>Where HAWK has been right and where it has been wrong, market by market.</p></a>
-    </div>
-  </div>
-</details>
-
 <footer class="foot">
-  <div class="wrap">HAWK · one model, one bankroll, no tipsters ·
-    <a href="../today/">today</a> · <a href="../picks/">picks</a> · <a href="../acca/">acca</a> ·
-    <a href="../vault/">vault</a></div>
+  <div class="wrap"><a href="../scores/">scores</a> · <a href="../acca/">acca</a> ·
+    <a href="../board/">board</a> · <a href="../vault/">vault</a> ·
+    nothing here is advice</div>
 </footer>
 
 <script src="../builder/engine.js"></script>
 <script src="../assets/hawk-bg.js"></script>
-<script src="../assets/hawk-fold.js"></script>
 <script src="../assets/hawk-alerts.js"></script>
-<script src="../assets/hawk-table.js"></script>
 <script src="../assets/hawk-nav.js"></script>
 <script>
-/* ===========================================================================
-   The home page's own data: today's card from the engine, your record from
-   the Vault's storage. Both fail quietly — a home page showing an error where
-   a score should be is worse than one that says nothing.
-   =========================================================================== */
+/* The only thing this page works out for itself: where you stand. Read from
+   the same two keys the Vault writes, so the two can never disagree. */
 (() => {
   "use strict";
   const $ = (s) => document.querySelector(s);
-  const esc = (s) => String(s == null ? "" : s)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  const pad = (n) => String(n).padStart(2, "0");
-  const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
-  const hhmm = (iso) => { const t = Date.parse(iso); return Number.isFinite(t)
-    ? new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""; };
   const money = (n) => `${n < 0 ? "−" : ""}€${Math.abs(+n || 0).toFixed(2)}`;
-  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : /(ch|sh|s|x|z)$/.test(w) ? "es" : "s"}`;
-  const vaultBets = () => { try { const b = JSON.parse(localStorage.getItem("hawk_bets") || "[]");
-    return Array.isArray(b) ? b : []; } catch { return []; } };
-  const band = (g) => (g.status === 3 ? "live" : g.status === 4 ? "done" : "next");
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
-  /* Eight cards for a day with eighty matches on it, so which eight is the
-     whole question. In play first, then about to start — and within that, the
-     big leagues ahead of the small ones, in the engine's own order, so the
-     Premier League never sits behind the Scottish Premiership.
-
-     It is a sort, not a filter. On a Tuesday with no Top 5 football the grid
-     still fills, rather than telling you nothing is on.
-
-     Ranked league by league, not group by group: inside the top five the
-     groups are all equal, and that left Genoa v Venezia leading a page with
-     Liverpool on it. The engine lists them Premier League, La Liga, Serie A,
-     Bundesliga, Ligue 1 — that order is the answer and it already exists. */
-  const GROUPS = (window.HAWK && window.HAWK.LEAGUE_GROUPS) || [];
-  const GROUP_RANK = (() => {
-    const m = {};
-    let i = 0;
-    GROUPS.forEach((gr) => (gr.leagues || []).forEach((l) => (m[l] = i++)));
-    return (league) => (league in m ? m[league] : i);
-  })();
-  const TOP5 = new Set(((GROUPS.find((g) => g.key === "top5") || {}).leagues) || []);
-
-  /* the fixture that leads the page: whatever is most worth looking at now —
-     something in play, else the next to kick off */
-  /* The fixture that leads the page. Among the matches in play it is the
-     biggest one, not the first one the feed happened to list — a 0–0 in the
-     Allsvenskan is not the match you opened HAWK to see. */
-  function lead(games) {
-    const byRank = (a, b) => GROUP_RANK(a.league) - GROUP_RANK(b.league)
-      || (Date.parse(a.kickoff || 0) || 0) - (Date.parse(b.kickoff || 0) || 0);
-    const live = games.filter((g) => band(g) === "live").sort(byRank);
-    const next = games.filter((g) => band(g) === "next").sort(byRank);
-    return live[0] || next[0] || null;
-  }
-
-  /* HAWK's saved read of a fixture, when the build wrote one before kick-off.
-     predictions.json is { updated, matches: { id: { probs, level, kickoff } } }. */
-  let PREDS = null;
-  const readOf = (id) => {
-    const m = PREDS && (PREDS.matches || PREDS.m);
-    const p = m && m[String(id)];
-    return p && p.probs ? p.probs : null;
+  const vaultBets = () => {
+    try { const b = JSON.parse(localStorage.getItem("hawk_bets") || "[]"); return Array.isArray(b) ? b : []; }
+    catch { return []; }
   };
-  // percentages that add to 100 — three independent roundings do not
-  const pc100 = (a) => {
-    const v = a.map((x) => 100 * (x || 0)), r = v.map(Math.round);
-    let d = 100 - r.reduce((x, y) => x + y, 0);
-    while (d) {
-      const i = v.map((x, k) => [Math.abs(x - r[k]), k]).sort((p, q) => q[0] - p[0])[0][1];
-      r[i] += d > 0 ? 1 : -1; d += d > 0 ? -1 : 1;
-    }
-    return r;
+  // the Vault's own rules, copied: a ticket must be worth the same on both pages
+  const betProfit = (b) => {
+    if (b.status === "WON") return (+b.potentialReturn || 0) - (+b.stake || 0);
+    if (b.status === "CASHED_OUT") return (+b.cashOutAmount || 0) - (+b.stake || 0);
+    if (b.status === "PENDING" || b.status === "VOID") return 0;
+    return -(+b.stake || 0);
   };
 
-  function paintLead(g) {
-    if (!g) return;
-    const live = band(g) === "live";
-    const el = $("#lead");
-    el.href = `${live ? "../live/" : "../match/"}`
-      + `?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}`;
-    $("#leadTop").className = live ? "top" : "top q";
-    $("#leadWhen").textContent = live ? "Biggest match in play" : "Next up";
-    $("#lH").src = g.homeCrest || ""; $("#lA").src = g.awayCrest || "";
-    $("#lHN").textContent = g.home; $("#lAN").textContent = g.away;
-    $("#lSC").textContent = live ? `${g.score[0]}–${g.score[1]}` : (hhmm(g.kickoff) || "TBC");
-    $("#lCK").className = live ? "ck" : "ck q";
-    $("#lCK").textContent = live ? (g.clock || "Live") : "kick-off";
-
-    // HAWK's three-way read, only where it saved one — never a made-up bar
-    const p = readOf(g.id);
-    if (p) {
-      const v = pc100([p.home, p.draw, p.away]);
-      $("#lBar").innerHTML = `<i class="h" style="flex:${p.home || 0}"></i>`
-        + `<i class="d" style="flex:${p.draw || 0}"></i><i class="a" style="flex:${p.away || 0}"></i>`;
-      $("#lBark").innerHTML = `<b>${esc(g.home)} ${v[0]}%</b><b>Draw ${v[1]}%</b><b>${esc(g.away)} ${v[2]}%</b>`;
-      $("#lBar").hidden = false; $("#lBark").hidden = false;
-    } else { $("#lBar").hidden = true; $("#lBark").hidden = true; }
-
-    $("#lFoot").innerHTML = `<div><div class="k">Competition</div><div class="v">${esc(g.league || "—")}</div></div>`
-      + `<div><div class="k">Kick-off</div><div class="v">${esc(hhmm(g.kickoff) || "TBC")}</div></div>`
-      + (p ? `<div><div class="k">HAWK's pick</div><div class="v g">${
-          esc([g.home, "Draw", g.away][[p.home, p.draw, p.away].indexOf(Math.max(p.home, p.draw, p.away))])}</div></div>` : "");
-    el.hidden = false;
-  }
-
-  /* Where you stand, across the foot of the hero. Pending stakes are "at
-     risk" — money already out of the bankroll and not yet decided — and the
-     day's figure counts only what settled today, so an open ticket is never
-     quietly booked as a win or a loss. */
   function moneyStrip() {
     const bets = vaultBets();
     let bank = null;
@@ -236,39 +108,47 @@
         settled.length ? `${net > 0 ? "+" : ""}${money(net)}` : "—"}</div>
         <div class="s">${settled.length ? `across ${plural(settled.length, "ticket")}` : "nothing settled"}</div></div>`;
     $("#money").hidden = false;
+
+    const run = pending.length;
+    $("#tag").innerHTML = run
+      ? `<span class="dot"></span>${plural(run, "ticket")} running`
+      : `<span class="dot off"></span>Welcome back`;
   }
 
-  let lastGames = [];        // kept, so a late predictions.json can repaint the lead
-  async function card() {
-    let games = [];
-    try { games = await window.HAWK.scores(today()); } catch { games = []; }
-    games = (games || []).filter((g) => g && g.home && g.away);
-    lastGames = games;
+  /* ------------------------------------------------- today, top five only */
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const hhmm = (iso) => { const t = Date.parse(iso); return Number.isFinite(t)
+    ? new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""; };
+  const band = (g) => (g.status === 3 ? "live" : g.status === 4 ? "done" : "next");
+  const localDay = () => { const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
-    const tag = $("#tag");
+  const GROUPS = (window.HAWK && window.HAWK.LEAGUE_GROUPS) || [];
+  const TOP5 = new Set(((GROUPS.find((g) => g.key === "top5") || {}).leagues) || []);
+
+  async function card() {
+    if (!window.HAWK || !window.HAWK.scores) {
+      $("#today").innerHTML = `<div class="m wide"><div class="skel">The model didn't load, so today's card can't be read.</div></div>`;
+      $("#todayN").textContent = "";
+      return;
+    }
+    let games = [];
+    try { games = await window.HAWK.scores(localDay()); } catch { games = []; }
+    games = (games || []).filter((g) => g && g.home && g.away && TOP5.has(g.league));
+
     if (!games.length) {
-      tag.innerHTML = `<span class="dot off"></span>`
-        + new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
-      $("#today").innerHTML = `<div class="m wide"><div class="skel">No matches in HAWK's competitions today.</div></div>`;
+      $("#today").innerHTML = `<div class="m wide"><div class="skel">Nothing in the top five today.
+        <a href="../scores/" style="color:var(--gold-hi)">The rest of the card →</a></div></div>`;
       $("#todayN").textContent = "";
       return;
     }
     const live = games.filter((g) => band(g) === "live").length;
-    tag.innerHTML = live ? `<span class="dot"></span>${live} in play now`
-                         : `<span class="dot q"></span>${games.length} matches today`;
-
-    paintLead(lead(games));
+    $("#todayN").textContent = `${live ? `${live} in play · ` : ""}${games.length} in the top five`;
 
     const order = { live: 0, next: 1, done: 2 };
     const ko = (g) => Date.parse(g.kickoff || 0) || 0;
-    const shown = games.slice()
-      .sort((a, b) => order[band(a)] - order[band(b)]
-                   || GROUP_RANK(a.league) - GROUP_RANK(b.league)
-                   || ko(a) - ko(b)).slice(0, 8);
-
-    const big = games.filter((g) => TOP5.has(g.league)).length;
-    $("#todayN").textContent = `${live ? `${live} in play · ` : ""}${games.length} on the card`
-      + (big && games.length > shown.length ? ` · ${big} in the top five` : "");
+    const shown = games.slice().sort((a, b) => order[band(a)] - order[band(b)] || ko(a) - ko(b));
 
     $("#today").innerHTML = shown.map((g) => {
       const b = band(g), [sh, sa] = g.score || [];
@@ -290,66 +170,12 @@
     if (live) setTimeout(card, 60000);
   }
 
-  /* Mirrors the Vault's betProfit, except VOID is 0 — the Vault charges a void
-     bet a stake on one line and pays it back on another, and a bet that never
-     ran cost nothing. */
-  function betProfit(b) {
-    if (b.status === "WON") return (+b.potentialReturn || 0) - (+b.stake || 0);
-    if (b.status === "CASHED_OUT") return (+b.cashOutAmount || 0) - (+b.stake || 0);
-    if (b.status === "PENDING" || b.status === "VOID") return 0;
-    return -(+b.stake || 0);
-  }
-
-  function record() {
-    let bets = [], bank = null;
-    try {
-      bets = JSON.parse(localStorage.getItem("hawk_bets") || "[]");
-      const b = parseFloat(localStorage.getItem("hawk_bankroll"));
-      if (Number.isFinite(b)) bank = b;
-    } catch { bets = []; }
-    if (!Array.isArray(bets)) bets = [];
-
-    const settled = bets.filter((b) => b && b.status && b.status !== "PENDING");
-    const pending = bets.length - settled.length;
-    if (!settled.length) {
-      $("#rec").innerHTML = `<div class="wide"><div class="skel">${bets.length
-        ? `${bets.length} bet${bets.length === 1 ? "" : "s"} open, none settled yet.`
-        : "No bets in this browser's Vault yet."}</div></div>`;
-      return;
-    }
-    const staked = settled.reduce((a, b) => a + (+b.stake || 0), 0);
-    const net = settled.reduce((a, b) => a + betProfit(b), 0);
-    const roi = staked ? (100 * net / staked) : 0;
-    const won = settled.filter((b) => b.status === "WON").length;
-    const cls = (n) => (n > 0 ? " up" : n < 0 ? " dn" : "");
-
-    $("#recN").textContent = `${settled.length} settled${pending ? ` · ${pending} open` : ""}`;
-    $("#rec").innerHTML = `
-      <div><div class="n g">${bank == null ? "—" : money(bank)}</div><div class="k">Bankroll</div>
-        <div class="s">what the Vault has now</div></div>
-      <div><div class="n${cls(net)}">${net > 0 ? "+" : ""}${money(net)}</div><div class="k">Net</div>
-        <div class="s">across ${money(staked)} staked</div></div>
-      <div><div class="n${cls(roi)}">${roi > 0 ? "+" : ""}${roi.toFixed(2)}%</div><div class="k">Return</div>
-        <div class="s">on turnover</div></div>
-      <div><div class="n">${(100 * won / settled.length).toFixed(0)}%</div><div class="k">Strike rate</div>
-        <div class="s">${won} of ${settled.length} landed</div></div>`;
-  }
-
-  record();
   moneyStrip();
-  // HAWK's saved pre-match reads, for the bar on the lead card. It is written
-  // by the build, so locally it 404s and the bar simply does not appear —
-  // which is the right outcome, not a fault.
-  fetch("../data/predictions.json", { cache: "no-store" })
-    .then((r) => (r.ok ? r.json() : null))
-    .then((p) => { if (p) { PREDS = p; const g = lead(lastGames); if (g) paintLead(g); } })
-    .catch(() => { /* no saved reads */ });
-
-  if (window.HAWK && window.HAWK.scores) card();
-  else {
-    $("#tag").innerHTML = `<span class="dot off"></span>HAWK`;
-    $("#today").innerHTML = `<div class="m wide"><div class="skel">The model didn't load, so today's card can't be read.</div></div>`;
-  }
+  card();
+  // another tab settling a bet changes what this page says
+  addEventListener("storage", (e) => {
+    if (e.key === "hawk_bets" || e.key === "hawk_bankroll") moneyStrip();
+  });
 })();
 </script>
 </body>

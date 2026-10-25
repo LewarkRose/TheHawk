@@ -25,9 +25,8 @@
         <h1 class="moment mid" id="day">Today</h1>
         <p class="said" id="said">Checking what is running and what is still to come…</p>
         <div class="acts">
-          <a class="btn gold" href="../picks/">Find today's value</a>
-          <a class="btn ghost" href="../scores/">Build a bet</a>
-          <a class="btn ghost" href="../acca/">Your acca</a>
+          <a class="btn gold" href="../scores/">Build a bet</a>
+          <a class="btn ghost" href="../vault/">Open the Vault</a>
         </div>
       </div>
 
@@ -58,30 +57,30 @@
   </div>
 </section>
 
-<!-- ======================= today's card ================================= -->
-<details class="calm fold" data-fold="tCard">
-  <summary><div class="wrap"><div class="lede"><h3>On today</h3>
-    <span class="n" id="cardN">reading…</span><span class="mk-t"></span></div></div></summary>
-  <div class="wrap">
-    <div class="grid m3" id="card"><div class="m wide"><div class="skel">Reading today's card…</div></div></div>
-    <p class="note"><a href="../scores/" style="color:var(--gold-hi)">All scores →</a></p>
-  </div>
-</details>
+<!-- "On today" was the whole card again, which is Scores' job and now Home's
+     top five as well — three places listing the same fixtures. The elements
+     stay in the page, empty and hidden, because the script still fills them
+     and this page is about YOUR day, not the day. -->
+<div id="card" hidden></div><span id="cardN" hidden></span>
 
 <!-- ======================= the day's money ============================== -->
 <details class="calm fold" data-fold="tMoney">
   <summary><div class="wrap"><div class="lede"><h3>Today's money</h3>
     <span class="n" id="moneyN"></span><span class="mk-t"></span></div></div></summary>
   <div class="wrap">
-    <div class="grid m4 rec" id="money"><div class="wide"><div class="skel">Reading…</div></div></div>
+    <!-- dayMoney, not money: the hero strip above already owns that id, and
+         because it comes first in the DOM every lookup in this file found the
+         hero instead and this block sat on "Reading…" permanently. -->
+    <div class="grid m4 rec" id="dayMoney"><div class="wide"><div class="skel">Reading…</div></div></div>
     <p class="note">A day's plan is capped at a share of the bankroll, and every stake is
       quarter Kelly. <b>Settled today</b> counts bets that finished today, whenever they were placed.</p>
   </div>
 </details>
 
 <footer class="foot">
-  <div class="wrap"><a href="../home/">home</a> · <a href="../picks/">picks</a> ·
-    <a href="../acca/">acca</a> · <a href="../vault/">vault</a></div>
+  <div class="wrap"><a href="../home/">home</a> · <a href="../scores/">scores</a> ·
+    <a href="../acca/">acca</a> · <a href="../vault/">vault</a> ·
+    what you did today</div>
 </footer>
 
 <script src="../builder/engine.js"></script>
@@ -368,7 +367,7 @@
 
     $("#moneyN").textContent = settledToday.length
       ? `${plural(settledToday.length, "bet")} settled today` : "nothing settled yet today";
-    $("#money").innerHTML = `
+    $("#dayMoney").innerHTML = `
       <div><div class="n g">${bank == null ? "—" : money(bank)}</div><div class="k">Bankroll</div>
         <div class="s">what the Vault has now</div></div>
       <div><div class="n">${money(run.atRisk)}</div><div class="k">At risk</div>

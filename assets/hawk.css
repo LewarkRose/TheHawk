@@ -319,6 +319,33 @@ img{display:block;max-width:100%}
 .fold > summary h3{transition:color .4s var(--film)}
 /* a fold that has a link of its own keeps it out of the summary's click area */
 .fold > summary .lede a{margin-left:0}
+/* V1's "common selections": one tap puts a leg on the ticket. Two figures on
+   every chip because they answer different questions — what Bet365 pays, and
+   what HAWK thinks it is worth. Green outline only when the first beats the
+   second, which on most nights is none of them. */
+.achips{display:grid;grid-template-columns:repeat(auto-fill,minmax(236px,1fr));gap:9px}
+.achip{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  appearance:none;border:0;cursor:pointer;text-align:left;padding:12px 15px;
+  background:var(--raise);color:var(--text);font:inherit;
+  box-shadow:inset 0 0 0 1px var(--rule);
+  transition:box-shadow .3s var(--film),background .3s var(--film)}
+.achip:hover{box-shadow:inset 0 0 0 1px var(--rule-2)}
+.achip .l{font-size:13px;line-height:1.4;min-width:0}
+.achip .r{flex:none;text-align:right;font:400 13px/1 var(--mono);
+  font-variant-numeric:tabular-nums;color:var(--gold-hi)}
+.achip .r small{display:block;margin-top:6px;font-size:9.5px;color:var(--faint);letter-spacing:.04em}
+.achip.val{box-shadow:inset 0 0 0 1px rgba(79,212,134,.5)}
+.achip.val .r{color:var(--up)}
+
+/* A fold that lives INSIDE a column rather than being a band across the
+   page: no section padding of its own, and a rule under it to separate it
+   from the markets below. */
+.fold.bare{padding:0;border-top:0;border-bottom:1px solid var(--rule);
+  padding-bottom:clamp(24px,3vw,36px)}
+.fold.bare > summary .lede{margin-bottom:0}
+.fold.bare[open] > summary .lede{margin-bottom:clamp(20px,2.6vw,30px)}
+.two .selh{margin-top:clamp(30px,3.6vw,46px)}
+
 /* what auto-settle did, in a line */
 .note.as{margin:-14px 0 20px;color:var(--muted)}
 .note.as b{color:var(--gold-hi);font-weight:600}
@@ -1108,8 +1135,8 @@ img{display:block;max-width:100%}
    that is the point of the ledger and it does not move — but the slack now
    goes to the read, which is information, rather than to the gutter. */
 .lg-row{display:grid;
-  grid-template-columns:50px minmax(0,1fr) 62px minmax(0,1fr) 206px 52px 32px;
-  gap:11px;align-items:center;padding:12px 10px;
+  grid-template-columns:42px minmax(0,1fr) 58px minmax(0,1fr) 190px 42px 28px;
+  gap:10px;align-items:center;padding:7px 9px;
   border-bottom:1px solid var(--rule-2);
   /* a ledger on pure black reads as text floating in a void; the faintest
      surface under each row is what makes it a row */
@@ -1124,8 +1151,8 @@ img{display:block;max-width:100%}
 .lg-row .h{justify-content:flex-end;text-align:right}
 .lg-row .a{justify-content:flex-start;text-align:left}
 .lg-row .h span,.lg-row .a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lg-row .h img,.lg-row .a img{width:19px;height:19px;object-fit:contain;flex:none}
-.lg-row .s{text-align:center;font-family:var(--disp);font-weight:700;font-size:21px;line-height:1;
+.lg-row .h img,.lg-row .a img{width:17px;height:17px;object-fit:contain;flex:none}
+.lg-row .s{text-align:center;font-family:var(--disp);font-weight:700;font-size:19px;line-height:1;
   font-variant-numeric:tabular-nums;white-space:nowrap}
 .lg-row .s em{font-style:normal;color:var(--faint);font-weight:600;padding:0 .1em}
 .lg-row .st{text-align:right;font:700 9px/1 var(--mono);letter-spacing:.14em;
@@ -1145,13 +1172,13 @@ img{display:block;max-width:100%}
    under it with the likeliest one lit, then — only where the radar has
    something to say — one line saying what it is: an arrow at the underdog
    and how often they come out of it without losing. */
-.read3{display:grid;gap:7px;min-width:0}
+.read3{display:grid;gap:4px;min-width:0}
 /* The bar carries the shape; the line under it names the favourite. Three
    figures made you read a row of digits on every one of eighty rows — a
    name and one number is the same information in the way you would say it
    out loud. The draw is still there on hover. */
 .read3 .say{display:flex;align-items:center;gap:0;min-width:0;
-  font:400 12px/1.3 var(--sans);color:var(--muted)}
+  font:400 11.5px/1.25 var(--sans);color:var(--muted)}
 .read3 .say .mark{flex:none;margin-right:6px;opacity:.9}
 .read3 .say .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .read3 .say b{flex:none;margin-left:5px;color:var(--text);font-weight:600;
@@ -1159,15 +1186,15 @@ img{display:block;max-width:100%}
 .read3 .say.h b{color:var(--gold-hi)}
 .read3 .say.a b{color:var(--navy-hi)}
 .read3 .say.q .nm{color:var(--faint)}
-.read3 .ups{display:flex;align-items:center;gap:6px;min-width:0;
-  font:700 11.5px/1.3 var(--sans);color:var(--down)}
+.read3 .ups{display:flex;align-items:center;gap:5px;min-width:0;
+  font:700 10.5px/1.25 var(--sans);color:var(--down)}
 .read3 .ups .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .read3 .ups .lv3{animation:upPulse 3.2s ease-in-out infinite}
 .read3 .ups .ar{flex:none;font-size:10px;opacity:.9}
 .read3 .ups b{flex:none;font-weight:700;font-variant-numeric:tabular-nums}
 
 /* the bell, per row */
-.lg-row .fol-b{justify-self:end;width:26px;height:26px;display:grid;place-items:center;
+.lg-row .fol-b{justify-self:end;width:24px;height:24px;display:grid;place-items:center;
   border:0;background:none;cursor:pointer;font-size:12px;line-height:1;
   color:var(--faint);box-shadow:inset 0 0 0 1px var(--rule);
   transition:color .3s var(--film),box-shadow .3s var(--film)}
@@ -1175,14 +1202,14 @@ img{display:block;max-width:100%}
 .lg-row .fol-b.on{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
 
 /* a bar, not three numbers, at the top of the read */
-.sbar{display:flex;height:11px;gap:2px}
+.sbar{display:flex;height:4px;gap:1px}
 .sbar i{display:block;height:100%;min-width:2px}
 .sbar i.h{background:var(--gold)}
 .sbar i.d{background:#3a3a46}
 .sbar i.a{background:var(--navy)}
 /* no saved prediction: an empty track, so the column still reads as a column
    rather than as a row that lost something */
-.sbar.none{height:8px;background:repeating-linear-gradient(90deg,
+.sbar.none{height:4px;background:repeating-linear-gradient(90deg,
   rgba(242,242,242,.07) 0 3px,transparent 3px 6px)}
 
 /* ⚡ the upset radar, on the ledger.
@@ -1276,6 +1303,28 @@ img{display:block;max-width:100%}
 .day .wl b.l{color:var(--down)}
 .day .wl b.o{color:var(--gold)}
 
+/* …and the days fold into weeks. Thirty-eight day rows is the same problem
+   one level up — a list of dates you scroll looking for a date. The week is
+   the loud row and the days inside it step back and indent, so the two
+   levels never read as one flat list. */
+.weekg > summary{list-style:none;cursor:pointer}
+.weekg > summary::-webkit-details-marker{display:none}
+.weekg > summary .day{transition:background .35s var(--film)}
+.weekg > summary:hover .day{background:rgba(242,242,242,.04)}
+.weekg > summary h4::before{content:"▸";display:inline-block;margin-right:10px;
+  color:var(--faint);font-size:11px;transition:transform .35s var(--film)}
+.weekg[open] > summary h4::before{transform:rotate(90deg)}
+.weekg[open] > summary h4{color:var(--gold-hi)}
+.weekg .weekb{padding-left:clamp(10px,1.6vw,22px);
+  box-shadow:inset 1px 0 0 var(--rule)}
+.day.wk h4{font-size:20px}
+.day.wk .dn{font:700 8.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;
+  color:var(--faint)}
+/* a day inside a week is a quieter thing than a week */
+.weekb .day{padding-top:16px;border-bottom:1px solid var(--rule)}
+.weekb .day h4{font-size:14px;color:var(--muted)}
+.weekb .dayg[open] > summary h4{color:var(--text)}
+
 .day{display:flex;align-items:baseline;gap:14px;padding:26px 2px 12px;
   border-bottom:1px solid var(--rule-2)}
 .day h4{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;font-size:17px;
@@ -1283,6 +1332,59 @@ img{display:block;max-width:100%}
 .day .n{font:700 8.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--faint)}
 .day .pl{margin-left:auto;font:400 12px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
 .day .pl.up{color:var(--up)}.day .pl.dn{color:var(--down)}
+
+/* ============================ A TICKET IS A RECEIPT ====================
+   The teeth are cut out of the paper itself with two conic gradients, so
+   they stay sharp at any size and the slip can be any height. Black paper
+   rather than the page's own black, or a slip on a dark page is a rectangle
+   you cannot see the edge of.
+   ======================================================================= */
+.rcpt{--z:10px;position:relative;background:#000;
+  padding:clamp(16px,2vw,22px) clamp(14px,1.8vw,20px);margin:0 0 14px;
+  -webkit-mask:
+    conic-gradient(from 135deg at top,#0000,#000 1deg 89deg,#0000 90deg) top/var(--z) var(--z) repeat-x,
+    conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) bottom/var(--z) var(--z) repeat-x,
+    linear-gradient(#000 0 0) center/100% calc(100% - 2*var(--z)) no-repeat;
+  mask:
+    conic-gradient(from 135deg at top,#0000,#000 1deg 89deg,#0000 90deg) top/var(--z) var(--z) repeat-x,
+    conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) bottom/var(--z) var(--z) repeat-x,
+    linear-gradient(#000 0 0) center/100% calc(100% - 2*var(--z)) no-repeat;
+  /* Black paper on a black page is a rectangle you cannot see the edge of.
+     drop-shadow follows the MASK's alpha rather than the box, so it traces
+     the teeth — a hairline to draw them and a soft one to lift the slip off
+     the page. A border could not do this: there is no border left to draw. */
+  filter:drop-shadow(0 0 .6px rgba(242,242,242,.34))
+         drop-shadow(0 8px 22px rgba(0,0,0,.85));}
+.rcpt .rhd{text-align:center;padding-bottom:12px;margin-bottom:12px;
+  border-bottom:1px dashed var(--rule-2)}
+.rcpt .rhd h4{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  font-size:17px;line-height:1.2;letter-spacing:.05em;color:var(--text)}
+.rcpt .rwhen{font:400 10px/1.6 var(--mono);color:var(--faint);margin-top:5px;letter-spacing:.07em}
+.rcpt .rlegs{margin:0;padding:0;list-style:none;font:400 12px/1.6 var(--mono);color:var(--muted)}
+.rcpt .rlegs li{display:flex;gap:10px;padding:5px 0;align-items:flex-start}
+.rcpt .rlegs .tk{flex:none;width:11px;text-align:center}
+.rcpt .rlegs .tk.w{color:var(--up)}
+.rcpt .rlegs .tk.l{color:var(--down)}
+.rcpt .rlegs .tk.v,.rcpt .rlegs .tk.u{color:var(--gold)}
+.rcpt .rlegs .tk.o{color:var(--faint)}
+.rcpt .rlegs .lb{flex:1;min-width:0}
+.rcpt .rsum{margin-top:12px;padding-top:11px;border-top:1px dashed var(--rule-2);
+  font:400 12px/1.9 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.rcpt .rsum div{display:flex;justify-content:space-between;gap:14px}
+.rcpt .rsum .big{font-family:var(--disp);font-weight:700;font-size:23px;line-height:1.25;
+  color:var(--gold-hi)}
+.rcpt .rft{display:flex;align-items:baseline;gap:14px;margin-top:11px;padding-top:10px;
+  border-top:1px dashed var(--rule-2)}
+.rcpt .rft .pl{margin-left:auto;font:400 12px/1 var(--mono);font-variant-numeric:tabular-nums}
+.rcpt .rchk{margin:11px 0 0;font:400 11px/1.6 var(--sans);color:var(--gold)}
+.rcpt .act{margin-top:12px}
+/* a settled slip steps back; the one you still have running keeps the ink */
+.rcpt.won .rsum .big{color:var(--up)}
+.rcpt.lost{opacity:.72}
+.rcpt.lost .rsum .big{color:var(--faint)}
+/* two or three across once there is room, because a slip is tall */
+.dayb{display:grid;grid-template-columns:repeat(auto-fill,minmax(315px,1fr));
+  gap:0 14px;align-items:start}
 
 .bt{display:grid;grid-template-columns:minmax(0,1fr) 110px 86px 92px;gap:16px;align-items:center;
   padding:16px 2px;border-bottom:1px solid var(--rule)}

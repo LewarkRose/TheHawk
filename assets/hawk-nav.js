@@ -11,9 +11,12 @@
   "use strict";
 
   // every page is one folder deep, so "../" reaches the site root
+  /* Five, not nine. Picks is gone — it is reached from Scores like any other
+     match. A match page is somewhere you ARRIVE, by tapping a game, so it is
+     not a place to set off from either. Today stays, and it is not a second
+     Scores: Scores is the day's football, Today is what YOU did with it. */
   const LINKS = [
     ["today", "../today/", "Today"],
-    ["picks", "../picks/", "Picks"],
     ["scores", "../scores/", "Scores"],
     ["acca", "../acca/", "Acca"],
     ["board", "../board/", "Board"],

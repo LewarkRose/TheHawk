@@ -2,11 +2,14 @@
 // Network first for everything of HAWK's own, so a new version (or new data)
 // shows straight away; the last copy is used only when there's no connection.
 // Requests to other sites (365Scores, Polymarket, …) are left alone.
-const CACHE = "hawk-v4";
+// v5: Picks is gone and the nav changed, so an installed copy has to drop its
+// old shell rather than keep serving a page that no longer exists alongside a
+// nav that no longer points at it.
+const CACHE = "hawk-v5";
 const SHELL = ["./", "./index.html", "./builder/", "./builder/index.html", "./builder/engine.js", "./builder/hawk-settle.js",
                "./hawk-logo.svg", "./builder/hawk-logo.svg", "./icon.svg", "./favicon.svg", "./qr.js", "./manifest.webmanifest",
                // the rebuilt pages and the sheet and scripts they all share
-               "./home/", "./today/", "./scores/", "./match/", "./live/", "./picks/", "./acca/", "./board/", "./vault/",
+               "./home/", "./today/", "./scores/", "./match/", "./live/", "./acca/", "./board/", "./vault/",
                "./assets/hawk.css", "./assets/hawk-nav.js", "./assets/hawk-bg.js", "./assets/hawk-fold.js",
                "./assets/hawk-alerts.js", "./assets/hawk-acca.js", "./assets/hawk-lineups.js"];
 

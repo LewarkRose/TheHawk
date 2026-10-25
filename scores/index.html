@@ -30,8 +30,11 @@
 
 <section class="calm">
   <div class="wrap">
-    <div class="filt" id="bands"></div>
-    <div class="filt" id="comps" style="margin-top:14px;border-bottom:0"></div>
+    <!-- competition groups, then the bands inside the group you chose, then
+         the competitions inside that if you have narrowed to one group -->
+    <div class="filt" id="groups"></div>
+    <div class="filt" id="bands" style="margin-top:14px;border-bottom:0"></div>
+    <div class="filt sub" id="comps"></div>
     <div id="board" style="margin-top:26px"><div class="skel">Reading…</div></div>
   </div>
 </section>
@@ -90,7 +93,17 @@
   const BANDS = [["all", "All"], ["live", "Live"], ["soon", "Next hour"],
                  ["next", "Later"], ["done", "Finished"]];
 
-  const S = { day: dayFrom(0), games: [], preds: null, band: "all", comp: "all", timer: 0 };
+  /* Twenty-odd competitions is too many chips to be a filter; the engine
+     already groups them the way you think about them, so the groups are the
+     chips and the engine stays the one place that decides what "Top 5" is. */
+  const GROUPS = (window.HAWK && window.HAWK.LEAGUE_GROUPS) || [];
+  const GROUP_OF = (() => {
+    const m = {};
+    for (const gr of GROUPS) for (const l of gr.leagues || []) m[l] = gr.key;
+    return (league) => m[league] || "other";
+  })();
+
+  const S = { day: dayFrom(0), games: [], preds: null, group: "all", band: "all", comp: "all", timer: 0 };
 
   /* HAWK's pre-match read, when the build saved one for this fixture */
   async function predictions() {
@@ -135,18 +148,45 @@
       <span class="st">${state}</span></a>`;
   }
 
+  const chip = (attr, key, label, { icon = "", n = null, on = false, dead = false } = {}) =>
+    `<button type="button" data-${attr}="${esc(key)}" aria-pressed="${String(on)}"${dead ? " disabled" : ""}>${
+      icon}${esc(label)}${n == null ? "" : `<i>${n}</i>`}</button>`;
+
   function paint() {
     const all = S.games;
-    const counts = { all: all.length };
-    for (const g of all) { const b = band(g); counts[b] = (counts[b] || 0) + 1; }
-    $("#bands").innerHTML = BANDS.filter(([k]) => k === "all" || counts[k])
-      .map(([k, t]) => `<button type="button" data-band="${k}" aria-pressed="${String(S.band === k)}">${t}<i>${counts[k] || 0}</i></button>`).join("");
 
-    const byBand = all.filter((g) => S.band === "all" || band(g) === S.band);
+    /* 1. the groups, counted over the whole day — so the row tells you where
+       the day actually is before you press anything. A group with nothing on
+       still shows, greyed: its absence is information too. */
+    const gc = {};
+    for (const g of all) { const k = GROUP_OF(g.league); gc[k] = (gc[k] || 0) + 1; }
+    if (S.group !== "all" && !gc[S.group]) { S.group = "all"; S.comp = "all"; }
+    const rows = GROUPS.map((gr) => [gr.key, gr.name, gr.icon])
+      .concat(gc.other ? [["other", "Other", ""]] : []);
+    $("#groups").innerHTML =
+      chip("group", "all", "All", { n: all.length, on: S.group === "all" })
+      + rows.map(([k, name, icon]) => chip("group", k, name,
+          { icon: icon ? `<span class="ic">${icon}</span>` : "",
+            n: gc[k] || 0, on: S.group === k, dead: !gc[k] })).join("");
+
+    /* 2. the bands, counted INSIDE the group you chose */
+    const byGroup = all.filter((g) => S.group === "all" || GROUP_OF(g.league) === S.group);
+    const counts = { all: byGroup.length };
+    for (const g of byGroup) { const b = band(g); counts[b] = (counts[b] || 0) + 1; }
+    if (S.band !== "all" && !counts[S.band]) S.band = "all";
+    $("#bands").innerHTML = BANDS.filter(([k]) => k === "all" || counts[k])
+      .map(([k, t]) => chip("band", k, t,
+        { icon: k === "live" ? `<span class="lv"></span>` : "", n: counts[k] || 0, on: S.band === k })).join("");
+
+    /* 3. the competitions, only once you have narrowed to one group — at the
+       top level there are twenty of them and the groups are the better answer */
+    const byBand = byGroup.filter((g) => S.band === "all" || band(g) === S.band);
     const comps = [...new Set(byBand.map((g) => g.league || "Other"))].sort();
-    $("#comps").innerHTML = comps.length > 1
-      ? [["all", `All ${comps.length}`]].concat(comps.map((c) => [c, c]))
-          .map(([k, t]) => `<button type="button" data-comp="${esc(k)}" aria-pressed="${String(S.comp === k)}">${esc(t)}</button>`).join("")
+    if (S.comp !== "all" && !comps.includes(S.comp)) S.comp = "all";
+    $("#comps").innerHTML = S.group !== "all" && comps.length > 1
+      ? chip("comp", "all", `All ${comps.length}`, { on: S.comp === "all" })
+        + comps.map((c) => chip("comp", c, c,
+            { n: byBand.filter((g) => (g.league || "Other") === c).length, on: S.comp === c })).join("")
       : "";
 
     const list = byBand.filter((g) => S.comp === "all" || (g.league || "Other") === S.comp);
@@ -233,6 +273,10 @@
     load();
   });
   document.addEventListener("click", (e) => {
+    // each row resets the rows beneath it — narrowing to Top 5 and keeping a
+    // competition from World would leave an empty board and no reason for it
+    const gr = e.target.closest("#groups button[data-group]");
+    if (gr) { S.group = gr.dataset.group; S.band = "all"; S.comp = "all"; paint(); return; }
     const b = e.target.closest("#bands button[data-band]");
     if (b) { S.band = b.dataset.band; S.comp = "all"; paint(); return; }
     const c = e.target.closest("#comps button[data-comp]");

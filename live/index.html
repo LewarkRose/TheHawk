@@ -649,7 +649,8 @@
     if (window.HAWKAlerts && !$("#fol").dataset.on) {
       $("#fol").dataset.on = "1";
       $("#fol").hidden = false;
-      window.HAWKAlerts.followButton($("#fol"), S.id);
+      window.HAWKAlerts.followButton($("#fol"), S.id,
+        { league: S.league, home: d.home, away: d.away, started: true });
     }
     document.title = `${d.home} ${d.score[0]}–${d.score[1]} ${d.away} · HAWK`;
     await render();

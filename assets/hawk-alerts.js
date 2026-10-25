@@ -11,25 +11,29 @@
    -------------------------------------------------------------------------
    WHAT THIS IS NOT
 
-   The old builder has three more alert machines that are deliberately NOT
-   here, because each one is a separate piece of work and a half-ported one
-   is worse than none:
+   Everything the old builder alerts on is here: goals through both feeds,
+   goals taken off, red cards, lineups confirmed, your bet leg by leg,
+   half-time, full time — and a bet that can no longer land is settled as
+   LOST in the Vault the moment that is certain, not at full time.
 
-     · the Unibet fast lane — a second live-score feed polled every 5 s, so
-       a goal showed before 365Scores had it. Here a goal arrives on the
-       365Scores cadence instead: this poll is every 12 s, on top of
-       whatever that feed's own lag is. Expect a goal a few seconds to a
-       minute later than the old builder gave you.
-     · lineup alerts — "the XI is confirmed" needs the ESPN cross-check,
-       because 365Scores calls a predicted XI confirmed a day out and then
-       downgrades it. That belongs with the lineups, not here.
-     · the background value scan (half-time tips).
-
-   And one thing it will not DO: the old builder marks a bet LOST in your
-   Vault the moment a leg is gone twice over. This file only tells you. It
-   does not write to your bankroll behind your back from a page you opened
-   to read the Board.
+   Two things in the old builder are NOT alerts and are not here: the
+   background value scan (half-time tips), and striking the dead legs on
+   the slip in front of you when the XIs land. Both belong to the builder.
    =========================================================================== */
+/* ---------------------------------------------------------------------------
+   THE ONE THING THIS FILE WRITES
+
+   settleLost(). A leg that is gone is gone, and a bet carrying it cannot
+   come back — so it is marked LOST in the Vault there and then, which is
+   what stops it haunting your running bets, the 🎟 on Scores, and these
+   alerts for the next two hours. It is the old builder's rule exactly: the
+   same leg has to read "lost" on two consecutive checks, ten seconds or
+   more apart, so one bad frame of data cannot do it.
+
+   No money moves. The stake came off your bankroll when the bet was
+   logged, and a losing bet returns nothing — the Vault's own settle does
+   the same. Nothing else in this file writes to hawk_bets.
+   --------------------------------------------------------------------------- */
 (() => {
   "use strict";
   if (window.HAWKAlerts) return;
@@ -55,7 +59,9 @@
   // at kick-off.
   let TITLE = document.title;
 
-  const GOALS_MS = 12 * 1000;
+  // The heartbeat is the fast lane's: Unibet every 5 s, 365Scores every
+  // other beat, lineups once a minute.
+  const FAST_MS = 5 * 1000;
   // A phone shows one card at a time over what you are reading, so it gets out
   // of the way sooner; on a PC they sit in the corner and can linger.
   const SHOW_MS = phone() ? 8000 : 15000;
@@ -84,6 +90,9 @@
   const G = {
     on: loadPref("hawk.goalAlerts", true),
     last: {}, src: {}, said: {}, pending: {}, games: [], busy: false,
+    // the fast lane's last reading per match, and whether Unibet's score for
+    // it has ever agreed with 365Scores (see fastGoals)
+    fast: {}, ok: {},
     // what has been announced, and when — persisted, so two HAWK tabs open at
     // once do not both beep at you for the same goal
     told: loadPref("hawk.goalTold", {}),
@@ -168,8 +177,8 @@
     for (const b of vaultBets())
       if (b.status === "PENDING")
         for (const l of b.legs || []) if (l && l.hawk && l.hawk.game) ids.add(String(l.hawk.game));
-    // lineup alerts set in the old builder follow the match for goals too
-    for (const w of loadPref("hawk.lineupWatch", []) || []) if (w && w.id != null) ids.add(String(w.id));
+    // a lineup alert follows the match for goals too — set here or in v1
+    for (const w of watchList()) if (w && w.id != null) ids.add(String(w.id));
     const follow = loadPref("hawk.goalFollow", {}), now = Date.now();
     let changed = false;
     for (const [id, ko] of Object.entries(follow)) {
@@ -183,6 +192,68 @@
       if (here) ids.add(String(here));
     }
     return ids;
+  }
+
+  /* ===================================================== lineup alerts
+     "Both XIs are confirmed" — the one alert that happens BEFORE a match,
+     and the only one worth being woken by, because it is the last moment a
+     build is still worth making.
+
+     The difficult half is already done elsewhere: engine.js's lineups()
+     asks ESPN as well, because 365Scores marks a predicted XI "Confirmed"
+     a day out and quietly downgrades it later. All this does is ask, and
+     say so once.
+
+     The list is v1's own key and v1's own entry shape, so an alert set in
+     the old builder fires here and one set here fires there. */
+  const WATCH_KEY = "hawk.lineupWatch";
+  function watchList() { const v = loadPref(WATCH_KEY, []); return Array.isArray(v) ? v : []; }
+  const isWatched = (id) => watchList().some((w) => String(w.id) === String(id));
+  async function toggleWatch(g) {
+    const list = watchList(), on = isWatched(g.id);
+    if (on) {
+      savePref(WATCH_KEY, list.filter((w) => String(w.id) !== String(g.id)));
+      notice({ icon: "🔕", word: "Alert off", tone: "info",
+               text: `${g.home} v ${g.away} — nothing when the lineups land.` });
+    } else {
+      savePref(WATCH_KEY, [...list, { id: String(g.id), league: g.league, home: g.home, away: g.away }]);
+      if (!G.on) { G.on = true; savePref("hawk.goalAlerts", true); }
+      await askPermission();
+      notice({ icon: "🔔", word: "Alert on", tone: "good",
+               text: `${g.home} v ${g.away} — the moment both XIs are confirmed, then its goals.`
+                   + (canNotify() ? "" : " Keep a HAWK tab open; this browser is not allowing notifications.") });
+      checkLineups();
+    }
+    paintBell();
+    document.dispatchEvent(new CustomEvent("hawk:follow", { detail: { id: String(g.id) } }));
+  }
+  let lineupBusy = false;
+  async function checkLineups() {
+    const list = watchList();
+    if (!G.on || lineupBusy || !list.length || !E() || !E().lineups) return;
+    lineupBusy = true;
+    try {
+      let keep = list, changed = false;
+      for (const w of list) {
+        let st = null;
+        try { st = await E().lineups(w.id); } catch { continue; }   // ask again next time
+        if (!st || !(st.confirmed || st.started)) continue;
+        // Once the XIs are in — or the match has started without them — the
+        // lineup alert is done. Goals keep coming for the next three hours.
+        keep = keep.filter((x) => String(x.id) !== String(w.id));
+        changed = true;
+        const follow = loadPref("hawk.goalFollow", {});
+        follow[String(w.id)] = new Date().toISOString();
+        savePref("hawk.goalFollow", follow);
+        if (st.confirmed && firstTime(`xi|${w.id}`))
+          card({ tone: "warn", icon: "🔔", word: "LINEUPS IN", clock: "XI",
+                 href: `../match/?league=${encodeURIComponent(w.league || "")}&id=${encodeURIComponent(w.id)}`,
+                 g: { id: w.id, league: w.league, home: w.home, away: w.away, score: [null, null], status: 1 },
+                 body: `Both XIs are confirmed${st.source === "ESPN" ? " <span>· ESPN had them first</span>" : ""}
+                        <br><span>Tap to build it on the real teams</span>` });
+      }
+      if (changed) { savePref(WATCH_KEY, keep); paintBell(); }
+    } finally { lineupBusy = false; }
   }
 
   /* ================================================= once and only once
@@ -248,7 +319,7 @@
   // readable afterwards under the bell. Last 20, oldest dropped.
   function logAlert(icon, word, text) {
     const list = loadPref("hawk.alertLog", []);
-    list.unshift({ icon, word, text: String(text || "").slice(0, 160), at: Date.now() });
+    list.unshift({ icon, word, text: String(text || "").replace(/\s+/g, " ").trim().slice(0, 160), at: Date.now() });
     savePref("hawk.alertLog", list.slice(0, LOG_KEEP));
     paintBell();
   }
@@ -453,8 +524,43 @@
     return check ? { check } : { won: true };
   }
 
+  /* ====================================== a bet that cannot land any more
+     Marked LOST in the Vault now rather than at full time, with each leg's
+     result as it stands, so it drops out of your running bets, the 🎟 on
+     Scores, and these alerts. No money moves: the stake came off when the
+     bet was logged and a lost bet returns nothing, which is exactly what
+     the Vault's own settle does.
+
+     Called only when the SAME leg has read "lost" on two consecutive
+     checks, so one bad frame of data cannot settle a live bet. */
+  function settleLost(betId, label, gameId, rows) {
+    const bets = vaultBets();
+    const b = bets.find((x) => x.id === betId);
+    if (!b || b.status !== "PENDING") return false;
+    const st = Object.fromEntries(rows.map((r) => [r.id, r.state]));
+    for (const l of b.legs || [])
+      if (l && l.hawk && String(l.hawk.game) === String(gameId))
+        for (const h of l.hawk.legs || [])
+          if (st[h.id] === "won" || st[h.id] === "lost") h.result = st[h.id];
+    b.status = "LOST";
+    b.settledAt = new Date().toISOString();
+    b.settledBy = "HAWK";
+    b.lostEarly = label;
+    delete b.needsCheck;
+    try { localStorage.setItem("hawk_bets", JSON.stringify(bets)); } catch { return false; }
+    // Clear this match's notifications already sitting on your PC or phone.
+    if ("serviceWorker" in navigator)
+      navigator.serviceWorker.getRegistration("../")
+        .then((reg) => (reg ? reg.getNotifications() : []))
+        .then((ns) => ns.filter((n) => String(n.tag || "").includes(String(gameId))).forEach((n) => n.close()))
+        .catch(() => { /* none to clear */ });
+    return true;
+  }
+
   /* ============================================================ the goal card */
-  async function goalAlert(g, side, score) {
+  const scorerLine = (s) => `<b>${esc(s.player)}</b> ${esc(s.minute)}${
+    s.detail ? ` <span>· ${esc(s.detail)}</span>` : ""}${s.assist ? ` <span>· assist ${esc(s.assist)}</span>` : ""}`;
+  async function goalAlert(g, side, score, fast = false) {
     const off = side.endsWith("-off"), who = side.startsWith("home") ? "home" : "away";
     const team = g[who];
     // Who scored (the latest goal for that side) and what it did to your bet.
@@ -468,12 +574,28 @@
     try { const mine = await myLiveTickets(g.id); if (mine.length) bet = mine[0]; } catch { /* no bet */ }
 
     const body = off ? `${esc(team)}'s goal was taken off`
-      : scorer && scorer.player
-        ? `<b>${esc(scorer.player)}</b> ${esc(scorer.minute)}${scorer.detail ? ` <span>· ${esc(scorer.detail)}</span>` : ""}${
-            scorer.assist ? ` <span>· assist ${esc(scorer.assist)}</span>` : ""}`
-        : `${esc(team)} score`;
-    card({ tone: off ? "bad" : "goal", icon: off ? "❌⚽" : "⚽", word: off ? "GOAL OFF" : "GOAL",
-           g: { ...g, score }, body, bet, hit: off ? null : who });
+      : scorer && scorer.player ? scorerLine(scorer)
+      : `${esc(team)} score`;
+    const el = card({ tone: off ? "bad" : "goal", icon: off ? "❌⚽" : "⚽", word: off ? "GOAL OFF" : "GOAL",
+                      g: { ...g, score }, body, bet, hit: off ? null : who });
+
+    // From Unibet, before 365Scores had the goal: the card goes up with the
+    // score alone and the scorer's name arrives into it (every 10 s, for two
+    // minutes). Waiting for the name would throw away the whole point of the
+    // fast lane, which is the ten to sixty seconds it buys.
+    if (fast && !off && !(scorer && scorer.player)) {
+      const n0 = score[who === "home" ? 0 : 1];
+      (async () => {
+        for (let i = 0; i < 12 && el.isConnected; i++) {
+          await new Promise((r) => setTimeout(r, 10000));
+          try {
+            const goals = (await E().matchReport(g.id)).events.filter((e) => e.type === "goal" && e.side === who);
+            const sc = goals.length >= n0 ? goals[goals.length - 1] : null;
+            if (sc && sc.player) { el.querySelector(".b").innerHTML = scorerLine(sc); return; }
+          } catch { /* try again */ }
+        }
+      })();
+    }
   }
 
   /* ========================================= red cards, your bet, half-time */
@@ -512,13 +634,25 @@
           const was = states[t.id];
           states[t.id] = Object.fromEntries(rows.map((r) => [r.id, r.state]));
           if (!was) continue;                     // first look at this bet: just remember it
+          // A leg lost on two checks in a row (10 s or more apart, so a data
+          // blip cannot do it): the bet is settled as lost in the Vault now,
+          // and its alerts stop.
+          const gone = rows.find((r) => r.state === "lost" && was[r.id] === "lost");
+          if (gone && settleLost(t.id, gone.label, g.id, rows)) {
+            delete states[t.id];
+            card({ tone: "bad", icon: "❌", word: "BET LOST", g, href: "../vault/",
+                   body: `${esc(gone.label)} <span>· €${(+t.stake).toFixed(2)} stake · settled as lost
+                          in your Vault, so its alerts stop</span>` });
+            continue;
+          }
           for (const r of rows) {
             if (was[r.id] === r.state) continue;
             if (r.state === "won" && firstTime(`leg|${t.id}|${r.id}|won`))
               card({ tone: "good", icon: "✅", word: "LEG LANDED", g, body: esc(r.label), bet: t });
             if (r.state === "lost" && firstTime(`leg|${t.id}|${r.id}|lost`))
               card({ tone: "bad", icon: "❌", word: "LEG LOST", g,
-                     body: `${esc(r.label)} <span>· the bet can't land now · settle it in your Vault</span>` });
+                     body: `${esc(r.label)} <span>· the bet can't land now. HAWK settles it as lost
+                            once the next check says the same.</span>` });
           }
           const open = rows.filter((r) => r.state !== "won");
           const others = t.parts.filter((pt) => !pt.live && pt.other !== "won");
@@ -549,6 +683,44 @@
     savePref("hawk.betStates", states);
   }
 
+  /* ================================================== ⚡ the fast lane
+     Unibet's live score for the matches you follow, every 5 s. A goal shows
+     the moment Unibet has it, which is usually well before 365Scores; the
+     scorer's name fills itself in afterwards.
+
+     A match is only trusted once Unibet's score has matched 365Scores' at
+     least once (G.ok). Unibet is found by name and kick-off time, so the
+     wrong event can be matched to a fixture — and a mix-up that is never
+     checked against the other feed would alert you about somebody else's
+     game. One agreement is cheap and rules that out. */
+  let fastBusy = false;
+  async function fastGoals() {
+    if (!G.on || fastBusy || !G.games.length || !E() || !E().kambiLive) return;
+    const follow = followedGames();
+    const games = G.games.filter((g) => g.status === 3 && follow.has(String(g.id)));
+    if (!games.length) return;
+    fastBusy = true;
+    try {
+      const live = await E().kambiLive(games);
+      for (const g of games) {
+        const k = live[g.id], was = G.last[String(g.id)];
+        if (!k || !was) continue;
+        const now = k.score;
+        if (now[0] === was[0] && now[1] === was[1]) {       // the two feeds agree
+          G.ok[g.id] = true; G.src[`fast|${g.id}`] = now; continue;
+        }
+        if (!G.ok[g.id]) continue;                          // never agreed: not trusted
+        const move = goalMove("fast", g.id, now, k.minute);
+        if (!move) continue;
+        G.last[String(g.id)] = now;
+        G.fast[g.id] = { score: now, at: Date.now() };
+        goalAlert({ ...g, score: now, clock: k.minute != null ? `${k.minute}'` : g.clock },
+                  move.side, now, true).catch((e) => console.warn("[hawk] goal alert:", e.message));
+      }
+    } catch (e) { console.warn("[hawk] fast lane:", e.message); }
+    finally { fastBusy = false; }
+  }
+
   /* ================================================================= the poll */
   async function check() {
     if (!G.on || G.busy || !E() || !E().scores) return;
@@ -569,6 +741,13 @@
       G.games = games;
       for (const g of games) {
         const now = [g.score[0] || 0, g.score[1] || 0], was = G.last[String(g.id)];
+        // Unibet already had this goal: 365Scores is catching up, not a goal
+        // being taken off.
+        const fast = G.fast[g.id];
+        if (fast && Date.now() - fast.at < 5 * 60e3 && now[0] <= fast.score[0] && now[1] <= fast.score[1]) {
+          if (now[0] === fast.score[0] && now[1] === fast.score[1]) delete G.fast[g.id];
+          continue;
+        }
         G.last[String(g.id)] = now;
         // first look, or a finished match that has not moved: just remember it
         if (!was || (g.status === 4 && was[0] === now[0] && was[1] === now[1])) {
@@ -627,10 +806,13 @@
     const log = loadPref("hawk.alertLog", []);
     const n = followedGames().size;
     const perm = "Notification" in window ? Notification.permission : "none";
+    const xi = watchList().length;
     pop.innerHTML = `<h5>Alerts</h5>
       <p>${G.on
-        ? `Goals, red cards, and every leg of your bet — for ${n ? plural(n, "match") : "any match you follow"}.
-           A match you have a bet on is followed automatically.`
+        ? `Lineups confirmed, goals, red cards, and every leg of your bet — for
+           ${n ? plural(n, "match") : "any match you follow"}${xi ? `, ${xi} waiting on the XIs` : ""}.
+           A match you have a bet on is followed automatically, and a bet that can no longer
+           land is settled as lost in your Vault.`
         : `Off. Nothing will interrupt you, including a leg of your bet going down.`}</p>
       <div class="row">
         <button data-al="toggle">${G.on ? "Turn off" : "Turn on"}</button>
@@ -678,23 +860,41 @@
     return bell;
   }
 
-  /* ========================================= a 🔔 button for one match */
-  function followButton(el, id) {
+  /* ========================================= a 🔔 button for one match
+     One button, two meanings, decided by whether the match has started.
+     Before kick-off the thing worth being told is that the XIs are in —
+     it is the last moment a build is still worth making — and a lineup
+     alert follows the match for goals afterwards anyway. Once it is under
+     way there are no lineups left to wait for, so it is goals only.
+
+     `info` is {league, home, away, started}; a lineup watch needs the names
+     to be able to say what it is about hours later. */
+  function followButton(el, id, info = {}) {
     if (!el) return;
+    const pre = !info.started;
     const paint = () => {
-      const st = followState(id);
-      el.className = `fol${st.bet ? " bet" : st.on ? " on" : ""}`;
+      const st = followState(id), watched = pre && isWatched(id);
+      const lit = st.bet || st.on || watched;
+      el.className = `fol${st.bet ? " bet" : lit ? " on" : ""}`;
       el.textContent = st.bet ? "🔔 Alerts on — you have a bet"
+        : watched ? "🔔 Alerts on — lineups, then goals"
         : st.on ? "🔔 Alerts on"
         : st.here ? "🔕 Keep alerts after I leave"
+        : pre ? "🔕 Alert me when the lineups land"
         : "🔕 Alert me";
       el.title = st.bet ? "You have a bet on this match, so its alerts cannot be turned off."
+        : watched ? "You'll be told the moment both XIs are confirmed, then goals and red cards. Click to turn off."
         : st.on ? "Goals, red cards and your bet. Click to turn off."
         : st.here ? "You get this match's goals while this page is open. Click to keep them for three hours after you leave."
+        : pre ? "Both XIs confirmed — ESPN is asked too, because 365Scores calls a predicted XI confirmed a day out. Goals follow."
         : "Goals and red cards on this match, for the next three hours.";
     };
     paint();
-    el.onclick = async () => { await toggleFollow(id); paint(); };
+    el.onclick = async () => {
+      if (pre && !followState(id).bet) await toggleWatch({ id, ...info });
+      else await toggleFollow(id);
+      paint();
+    };
     document.addEventListener("hawk:follow", paint);
     return el;
   }
@@ -704,14 +904,24 @@
      but a worker's are not — so alerts stay quick while HAWK sits behind
      something else. That is the whole reason for the worker. */
   function run() {
-    const beat = () => check();
+    // Unibet every beat (5 s), 365Scores every other one (10 s), lineups
+    // once a minute — they land an hour before kick-off, not every five
+    // seconds.
+    let n = 0;
+    const beat = () => {
+      fastGoals();
+      if (++n % 2 === 0) check();
+      if (n % 12 === 0) checkLineups();
+    };
     try {
       const url = URL.createObjectURL(new Blob(
-        [`setInterval(() => postMessage(0), ${GOALS_MS})`], { type: "text/javascript" }));
+        [`setInterval(() => postMessage(0), ${FAST_MS})`], { type: "text/javascript" }));
       new Worker(url).onmessage = beat;
-    } catch { setInterval(beat, GOALS_MS); }
-    setTimeout(check, 3500);
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); });
+    } catch { setInterval(beat, FAST_MS); }
+    setTimeout(() => { check(); checkLineups(); }, 3500);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) { check(); checkLineups(); }
+    });
   }
 
   window.HAWKAlerts = {
@@ -719,7 +929,8 @@
     // show() is the full card (a match, a score, your bet on it); notice() is
     // the plain one. Pages raise their own through these rather than inventing
     // a second kind of popup.
-    show: card, notice, check, paintBell,
+    show: card, notice, check, checkLineups, paintBell,
+    toggleWatch, isWatched, watchList,
     get on() { return G.on; },
     log: () => loadPref("hawk.alertLog", []),
   };

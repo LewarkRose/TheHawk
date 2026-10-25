@@ -257,11 +257,13 @@
         corners alone, which showed nothing.`;
       $("#derby").hidden = false;
     }
-    // goals and red cards once this one kicks off, set before it does
+    // before kick-off the 🔔 means "tell me when both XIs are confirmed" —
+    // the last moment a build is still worth making — and goals follow after
     if (window.HAWKAlerts && !$("#fol").dataset.on) {
       $("#fol").dataset.on = "1";
       $("#fol").hidden = false;
-      window.HAWKAlerts.followButton($("#fol"), S.id);
+      window.HAWKAlerts.followButton($("#fol"), S.id,
+        { league: S.league, home: m.home, away: m.away, started: !!m.started });
     }
     $("#read").hidden = false;
 

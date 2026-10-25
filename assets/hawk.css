@@ -915,14 +915,34 @@ img{display:block;max-width:100%}
 .marks b.up{color:var(--up)}
 .marks b.dn{color:var(--down)}
 
-.filt{display:flex;gap:clamp(12px,2vw,24px);flex-wrap:wrap;align-items:baseline;
-  padding-bottom:18px;border-bottom:1px solid var(--rule)}
-.filt button{appearance:none;border:0;background:none;cursor:pointer;padding:0;
-  font:700 10px/1.6 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint);
-  transition:color .4s var(--film)}
-.filt button:hover{color:var(--muted)}
-.filt button[aria-pressed="true"]{color:var(--gold-hi)}
-.filt button i{font-style:normal;opacity:.55;margin-left:6px}
+/* Eight words in a row with numbers after them do not read as something you
+   can press, so a filter is a chip: a hairline box, lit in gold when it is
+   the one you are on. The count is the point of it — "Top 5 22" tells you
+   whether the row is worth pressing before you press it. */
+.filt{display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+  padding-bottom:16px;border-bottom:1px solid var(--rule)}
+.filt button{appearance:none;border:0;background:none;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;padding:7px 12px;
+  font:700 9.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+  box-shadow:inset 0 0 0 1px var(--rule);
+  transition:color .35s var(--film),box-shadow .35s var(--film)}
+.filt button:hover{color:var(--text);box-shadow:inset 0 0 0 1px var(--rule-2)}
+.filt button[aria-pressed="true"]{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+.filt button i{font-style:normal;font-size:10px;letter-spacing:.04em;opacity:.5;
+  font-variant-numeric:tabular-nums}
+.filt button[aria-pressed="true"] i{opacity:.9}
+.filt button .ic{font-size:11px;letter-spacing:0;opacity:.85}
+/* a competition with nothing on today still shows, so the shape of the day is
+   visible — but it is plainly not worth pressing */
+.filt button[disabled]{opacity:.3;cursor:default}
+.filt button[disabled]:hover{color:var(--faint);box-shadow:inset 0 0 0 1px var(--rule)}
+.filt button .lv{width:6px;height:6px;border-radius:50%;background:var(--live);flex:none}
+/* the third row, when you have narrowed to one group: quieter than the two
+   above it, because it is a refinement and not a choice you have to make */
+.filt.sub{gap:6px;padding-bottom:0;border-bottom:0;margin-top:12px}
+.filt.sub button{padding:5px 10px;font-size:9px;letter-spacing:.11em;box-shadow:none;color:var(--faint)}
+.filt.sub button:hover{color:var(--text);box-shadow:none}
+.filt.sub button[aria-pressed="true"]{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--rule-2)}
 
 .day{display:flex;align-items:baseline;gap:14px;padding:26px 2px 12px;
   border-bottom:1px solid var(--rule-2)}

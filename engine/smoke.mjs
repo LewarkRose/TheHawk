@@ -147,14 +147,11 @@ const check = (ok, what) => { if (!ok) failures.push(what); return ok; };
 // This is a source check rather than a behaviour one, because the Vault's page
 // script is not loaded here. Crude, and it still catches the regression: the day
 // someone reaches for settleTime inside renderWeekly again, the deploy stops.
-// Both Vaults, because there are two now: vault-v1.html is the original (it
-// was index.html until the site switched over to the rebuild, which is why
-// this check used to read index.html and would otherwise be reading a
-// thirty-line redirect), and vault/index.html is the one in use. The rule is
-// the same in both and a page that breaks it is wrong wherever it lives.
+// One Vault now. vault-v1.html was the original — it was index.html until the
+// site switched to the rebuild — and it has been deleted, so the rule only has
+// one page left to hold.
 {
   const VAULTS = [
-    ["vault-v1.html", "function renderWeekly"],
     ["vault/index.html", "function weekly"],
   ];
   for (const [file, marker] of VAULTS) {
@@ -175,56 +172,29 @@ const check = (ok, what) => { if (!ok) failures.push(what); return ok; };
   }
 }
 
-// 0c. NO TWO LABELS MAY SHARE A WORD FOR DIFFERENT THINGS.
-// The builder put "⚠️ Weak leg" on three unrelated problems — a poor price, bad
-// form, and a leg whose chance falls once the others are applied — while the card
-// beside it tagged the LOWEST-CHANCE leg "weak link", a fourth meaning again. The
-// result Lewzu saw on 2026-10-23: a 72% leg marked "Weak leg" above a 59% leg
-// marked "OK", the 59% one wearing the "WEAK LINK" tag. Every label was right on
-// its own and together they were nonsense.
-{
-  const src = await readFile(path.join(ROOT, "builder/index.html"), "utf8");
-  // The words a verdict label may be built from, and the tag words, must not meet.
-  const labels = [...src.matchAll(/label:\s*"([^"]+)"/g)].map((m) => m[1]);
-  const tagWords = new Set(["weak", "link"]);
-  const clash = labels.filter((l) => l.toLowerCase().split(/\W+/).some((w) => w && tagWords.has(w)));
-  check(!clash.length,
-    `builder/index.html: a leg VERDICT is using a word the leg TAG already owns — ${clash.join(", ")}. `
-    + `"weak" belongs to the lowest-chance tag only. A verdict must name its own cause `
-    + `(poor price / form says no / pulls against), or the two labels contradict on one card.`);
-  check(labels.length >= 5, "builder/index.html: leg verdict labels have gone — this check cannot run");
-
-  // 0e. EVERY DOOR INTO THE VAULT STORES THE SAME THING.
-  // Three places build the `hawk` object a logged ticket carries — "Send to Vault",
-  // "I placed it", and the linker that adopts a ticket typed into the Vault by hand.
-  // Only the first stored the clubs' crests, so two tickets on the SAME match could
-  // sit in the list with one wearing its badges and the other blank. 87 of 298
-  // linked tickets had them. Once a match leaves the feed there is nothing left to
-  // look them up by, so a ticket logged without them is blank for good.
-  {
-    // A window around each `linked: true`, not a brace match: one of these objects
-    // nests `legs.map((l) => ({...}))` inside it, and a [^{}] pattern skipped it
-    // entirely — so the first version of this check silently covered one of the two.
-    const sites = [...src.matchAll(/\blinked:\s*true/g)].map((m) => src.slice(Math.max(0, m.index - 400), m.index + 400));
-    check(sites.length >= 2, `builder/index.html: expected at least 2 \`linked: true\` sites, found ${sites.length} — this check cannot run`);
-    for (const b of sites) {
-      check(/homeCrest/.test(b) && /awayCrest/.test(b),
-        "builder/index.html: a ticket is being linked to a match without storing homeCrest/awayCrest. "
-        + "Every door into the Vault must store the same thing, or the same match shows up twice "
-        + "with only one of them wearing its badges.");
-    }
-  }
-
-  // 0d. A TILE MAY ONLY NARRATE ITS OWN SOURCE.
-  // The "Fair odds" tile showed HAWK's number with "▲ from 1.33" beneath it, and
-  // 1.33 was BET365's opening price — so one card presented the same figure as the
-  // origin of HAWK's estimate and, two lines lower, of Bet365's. HAWK's fair odds
-  // had not moved at all. A price move belongs to the book that moved.
-  for (const m of src.matchAll(/<div class="tk">Fair odds<\/div>([\s\S]{0,400}?)<\/div>\s*<\/div>/g)) {
+// 0d. A TILE MAY ONLY NARRATE ITS OWN SOURCE.
+// The "Fair odds" tile showed HAWK's number with "▲ from 1.33" beneath it, and
+// 1.33 was BET365's opening price — so one card presented the same figure as the
+// origin of HAWK's estimate and, two lines lower, of Bet365's. HAWK's fair odds
+// had not moved at all. A price move belongs to the book that moved.
+//
+// This used to read builder/index.html, which has been deleted. The tile moved
+// to the rebuilt pages and the rule moved with it: it is about what a tile is
+// allowed to say, not about the page it happens to sit on. Two checks that sat
+// here did NOT move, because their subject is gone rather than relocated —
+// the "Weak leg"/"weak link" word clash and the three-doors crest check both
+// guarded code that only ever existed in the old builder. Deleting a check
+// whose subject still exists is how a fixed bug comes back; deleting one whose
+// subject is gone is just tidying up after it.
+for (const file of ["match/index.html", "acca/index.html"]) {
+  const src = await readFile(path.join(ROOT, file), "utf8");
+  const tiles = [...src.matchAll(/<div class="k">Fair odds<\/div>([\s\S]{0,400}?)<\/div>\s*<\/div>/g)];
+  check(tiles.length >= 1, `${file}: the Fair odds tile has gone — this check cannot run`);
+  for (const m of tiles) {
     check(!/bookOpen|bookPrice/.test(m[1]),
-      "builder/index.html: a Fair odds tile is reading Bet365's bookOpen/bookPrice. That tile carries "
-      + "HAWK's number only — a price move goes in the Bet365 tile, or the card tells you one book's "
-      + "figure came from another's.");
+      `${file}: a Fair odds tile is reading the book's bookOpen/bookPrice. That tile carries `
+      + "HAWK's number only — a price move goes in the bookmaker's tile, or the card tells you one "
+      + "book's figure came from another's.");
   }
 }
 

@@ -2,12 +2,16 @@
 // Network first for everything of HAWK's own, so a new version (or new data)
 // shows straight away; the last copy is used only when there's no connection.
 // Requests to other sites (365Scores, Polymarket, …) are left alone.
-// v5: Picks is gone and the nav changed, so an installed copy has to drop its
-// old shell rather than keep serving a page that no longer exists alongside a
-// nav that no longer points at it.
-const CACHE = "hawk-v5";
-const SHELL = ["./", "./index.html", "./builder/", "./builder/index.html", "./builder/engine.js", "./builder/hawk-settle.js",
-               "./hawk-logo.svg", "./builder/hawk-logo.svg", "./icon.svg", "./favicon.svg", "./qr.js", "./manifest.webmanifest",
+// v6: the two v1 pages are gone — builder/index.html and vault-v1.html — so an
+// installed copy has to drop a shell that still holds them. addAll is atomic:
+// one 404 in the list and NOTHING precaches, which the catch below would have
+// swallowed silently, leaving an app that works online and not off it.
+//
+// builder/engine.js and builder/hawk-settle.js stay, and are not v1 leftovers:
+// they are the model and the settler, and every rebuilt page loads them.
+const CACHE = "hawk-v6";
+const SHELL = ["./", "./index.html", "./builder/engine.js", "./builder/hawk-settle.js",
+               "./hawk-logo.svg", "./icon.svg", "./favicon.svg", "./qr.js", "./manifest.webmanifest",
                // the rebuilt pages and the sheet and scripts they all share
                "./home/", "./today/", "./scores/", "./match/", "./live/", "./acca/", "./board/", "./vault/",
                "./assets/hawk.css", "./assets/hawk-nav.js", "./assets/hawk-bg.js", "./assets/hawk-fold.js",
@@ -25,14 +29,15 @@ self.addEventListener("activate", (e) => {
 // the open HAWK window if there is one, otherwise a new one.
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || new URL("./builder/", self.registration.scope).href;
+  // Home, not ./builder/ — that was the front door until the rebuild, and with
+  // builder/index.html deleted a notification with no url of its own would have
+  // opened a 404.
+  const url = (e.notification.data && e.notification.data.url) || new URL("./home/", self.registration.scope).href;
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-    // Any HAWK window will take itself to the match: the old builder listens
-    // for this message, and so does assets/hawk-alerts.js on the new pages.
-    // Without the second case a tap opened a THIRD tab while HAWK was already
-    // open in front of you.
-    const hawk = list.find((c) => c.url.includes("/builder/"))
-              || list.find((c) => c.url.startsWith(self.registration.scope));
+    // Any HAWK window takes itself to the match — assets/hawk-alerts.js listens
+    // for this message on every page. It used to prefer a /builder/ window
+    // because the old builder listened too; there is no such window now.
+    const hawk = list.find((c) => c.url.startsWith(self.registration.scope));
     if (hawk) { hawk.postMessage({ open: url }); return hawk.focus(); }
     return self.clients.openWindow(url);
   }));

@@ -16,7 +16,7 @@
   "shortcuts": [
     { "name": "Today", "url": "./today/", "icons": [{ "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml" }] },
     { "name": "Scores", "url": "./scores/", "icons": [{ "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml" }] },
-    { "name": "Picks", "url": "./picks/", "icons": [{ "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml" }] },
+    { "name": "Acca", "url": "./acca/", "icons": [{ "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml" }] },
     { "name": "Vault", "url": "./vault/", "icons": [{ "src": "icon.svg?v=5", "sizes": "any", "type": "image/svg+xml" }] }
   ]
 }

@@ -56,7 +56,7 @@
 
 <footer class="foot">
   <div class="wrap"><a href="../home/">home</a> · <a href="../acca/">acca</a> ·
-    <a href="../vault/">vault</a> · <a href="../builder/">v1</a> ·
+    <a href="../vault/">vault</a> ·
     live scores refresh every 60 seconds</div>
 </footer>
 
@@ -195,12 +195,49 @@
              <span class="nm">${esc(dogName)}</span><b>${notLose}% not to lose</b></span>`
         : "";
 
-      read = `<span class="read3" title="HAWK before kick-off: ${esc(g.home)} ${v[0]}% · draw ${v[1]}% · ${esc(g.away)} ${v[2]}%">
-        <span class="sbar"><i class="h" style="flex:${p.home || 0}"></i><i class="d" style="flex:${
-          p.draw || 0}"></i><i class="a" style="flex:${p.away || 0}"></i></span>
-        <span class="say${favCls}"><span class="mark">🦅</span>
-          <span class="nm">${esc(favName)}</span>${tossUp ? "" : `<b>${v[top]}%</b>`}</span>
-        ${ups}</span>`;
+      /* favCls goes on the LINE as well as on the figure: home is the left of
+         the row and away is the right, so the read sits under the side it is
+         picking. The eagle walks to whoever it fancies, and a glance down the
+         card tells you which way a league is leaning without reading a word.
+         A toss-up has no side to stand on, so it stays in the middle. */
+      /* ===================================== FINISHED: HAWK MARKS ITSELF
+         Once a match is over, "River Plate 62%" is a prediction with nothing
+         at stake — the result is RIGHT THERE two inches to the left. So a
+         finished row stops forecasting and starts reporting: all three of
+         HAWK's figures, a tick or a cross against what actually happened,
+         and whether the upset radar earned its flag.
+
+         It is the only place HAWK grades itself in the open, on every row,
+         whether it looks good or not. A ✗ next to 42% is the whole point:
+         a model that only shows you its hits is a model you cannot read. */
+      if (b === "done" && have) {
+        const got = sh > sa ? 0 : sh === sa ? 1 : 2;        // what the match did
+        const hit = top === got;
+        const hd = ["H", "D", "A"];
+        const trio = v.map((n, i) => `<span${i === got ? ' class="was"' : ""}>${
+          hd[i]}<b>${n}</b></span>`).join("<i>·</i>");
+        /* The radar's own verdict, scored on its own terms: it never says the
+           underdog WINS, it says they are live — so not losing is the call,
+           and that is what it gets marked on. */
+        const dogSurvived = dogIsHome ? sh >= sa : sa >= sh;
+        const radar = lv >= 2
+          ? `<span class="verdict ${dogSurvived ? "hit" : "miss"}"><span class="lt">⚡</span>${
+              dogSurvived ? `called it · <b>${notLose}%</b>` : "missed"}</span>`
+          : "";
+        read = `<span class="read3 done" title="HAWK before kick-off: ${esc(g.home)} ${v[0]}% · draw ${v[1]}% · ${esc(g.away)} ${v[2]}%">
+          <span class="sbar"><i class="h" style="flex:${p.home || 0}"></i><i class="d" style="flex:${
+            p.draw || 0}"></i><i class="a" style="flex:${p.away || 0}"></i></span>
+          <span class="trio"><span class="mark">🦅</span>${trio}<i class="${
+            hit ? "ok" : "no"}">${hit ? "✓" : "✗"}</i></span>
+          ${radar}</span>`;
+      } else {
+        read = `<span class="read3${favCls}" title="HAWK before kick-off: ${esc(g.home)} ${v[0]}% · draw ${v[1]}% · ${esc(g.away)} ${v[2]}%">
+          <span class="sbar"><i class="h" style="flex:${p.home || 0}"></i><i class="d" style="flex:${
+            p.draw || 0}"></i><i class="a" style="flex:${p.away || 0}"></i></span>
+          <span class="say${favCls}"><span class="mark">🦅</span>
+            <span class="nm">${esc(favName)}</span>${tossUp ? "" : `<b>${v[top]}%</b>`}</span>
+          ${ups}</span>`;
+      }
     }
 
     const crest = (u) => (u ? `<img src="${esc(u)}" alt="" onerror="this.remove()">` : "");
@@ -211,13 +248,20 @@
       <span class="h${hc}"><span>${esc(g.home)}</span>${crest(g.homeCrest)}</span>
       <span class="s">${mid}</span>
       <span class="a${ac}">${crest(g.awayCrest)}<span>${esc(g.away)}</span></span>
-      ${read}
       <span class="st">${state}</span>
+      <!-- Filled in by xiSweep() below, and only for the handful of matches
+           where the answer can change in the next hour. Empty until then. -->
+      <span class="xi" data-xi="${esc(g.id)}"></span>
       <button class="fol-b${followed && (followed.on || followed.bet) ? " on" : ""}" type="button"
         data-bell="${esc(g.id)}" title="${followed && followed.bet
           ? "You have a bet on this match — its alerts stay on"
           : followed && followed.on ? "Alerts on. Click to turn off."
-          : "Goals and red cards on this match"}">🔔</button></a>`;
+          : "Goals and red cards on this match"}">🔔</button>
+      <!-- HAWK's read goes UNDERNEATH, on its own line, and it is last in the
+           markup so the grid can put it there: the fixture and the score get
+           the full width of the row to themselves, and the prediction stops
+           competing with them for the same horizontal band. -->
+      ${read}</a>`;
   }
 
   const chip = (attr, key, label, { icon = "", n = null, on = false, dead = false } = {}) =>
@@ -321,6 +365,67 @@
       <div class="lg-h"><h3>${esc(gr.name)}</h3><span class="n">${gr.l.length}</span>
         <button class="tbtn" type="button" data-table="${esc(gr.name)}">Table</button></div>
       ${gr.l.map(row).join("")}</section>`).join("");
+    xiSweep(list);
+  }
+
+  /* ===================================================== the XI mark
+     "Both XIs are in" beside the bell, because it is the moment a build is
+     worth making — and the moment a player leg can quietly die.
+
+     STRICTLY BOUNDED, and that is the whole design. HAWK.lineups() is a
+     network call per match, and on 365Scores a near-kick-off one can make a
+     SECOND call to ESPN; a card of 84 fixtures would therefore fire up to
+     168 requests on every repaint, which is how you get rate-limited out of
+     your own feed. So it asks only where the answer can change — kicking off
+     inside the next two hours, not started — takes the soonest 10 of those,
+     and remembers each answer. Everything else keeps an empty span.
+
+     Confirmed is also not quite true: 365Scores will call a predicted XI
+     confirmed a day out and downgrade it later, which is why the engine
+     cross-checks ESPN and reports which source said so. The mark carries
+     that in its tooltip rather than claiming more than it knows. */
+  const XI = new Map();                       // id -> {confirmed, source, at}
+  const XI_TTL = 4 * 60e3;
+  let xiBusy = false;
+  async function xiSweep(games) {
+    if (xiBusy || !window.HAWK || !window.HAWK.lineups) return;
+    const now = Date.now();
+    const due = games
+      .filter((g) => {
+        const ko = Date.parse(g.kickoff || "");
+        if (!Number.isFinite(ko) || band(g) !== "soon" && band(g) !== "next") return false;
+        if (ko < now || ko - now > 2 * 3600e3) return false;      // too late, or too far off
+        const seen = XI.get(String(g.id));
+        return !(seen && (seen.confirmed || now - seen.at < XI_TTL));
+      })
+      .sort((a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff))
+      .slice(0, 10);
+    if (!due.length) { xiPaint(); return; }
+    xiBusy = true;
+    try {
+      for (const g of due) {
+        let st = null;
+        try { st = await window.HAWK.lineups(g.id); } catch { /* ask again next paint */ }
+        XI.set(String(g.id), { confirmed: !!(st && st.confirmed), source: (st && st.source) || "", at: Date.now() });
+        xiPaint();
+      }
+    } finally { xiBusy = false; }
+  }
+  /* Three states, not two. Blank for a match where the question is not live
+     yet; a dim XI once HAWK is watching for them, which says "asked, not out
+     yet" rather than leaving you wondering whether the feature works; and a
+     lit one when both are in. A control that is invisible until the moment it
+     fires looks broken for the hour before it. */
+  function xiPaint() {
+    for (const el of document.querySelectorAll("[data-xi]")) {
+      const s = XI.get(el.dataset.xi);
+      if (!s) { el.textContent = ""; el.className = "xi"; el.removeAttribute("title"); continue; }
+      el.textContent = "XI";
+      el.className = s.confirmed ? "xi on" : "xi wait";
+      el.title = s.confirmed
+        ? `Both XIs confirmed${s.source ? ` — ${s.source}` : ""}. This is the moment a build is worth making.`
+        : "Lineups not out yet — HAWK is watching. They usually land about an hour before kick-off.";
+    }
   }
 
   function headline() {

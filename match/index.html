@@ -154,9 +154,17 @@
       <!-- …and the markets last. The left column reads top to bottom as
            "here is the match"; building happens in the rail, which is beside
            all of it rather than after it. -->
-      <div class="lede selh"><h3><span class="emj">📋</span>Selections</h3><span class="n" id="selN"></span></div>
-      <div class="cats" id="cats"></div>
-      <div id="markets"><div class="skel" style="padding:30px 0">Reading…</div></div>
+      <!-- Folded, and SHUT by default. It is 271 lines across five groups —
+           the longest thing on the page by a distance — and it sits under
+           everything you came to read. Open, you scroll past every market in
+           football to reach the head to head. The rail builds the ticket for
+           you; this is for when you want to pick a leg by hand. -->
+      <details class="sub fold" id="selWrap" data-fold="selections">
+        <summary><div class="lede selh"><h3><span class="emj">📋</span>Selections</h3><span
+          class="n" id="selN"></span><span class="mk-t"></span></div></summary>
+        <div class="cats" id="cats"></div>
+        <div id="markets"><div class="skel" style="padding:30px 0">Reading…</div></div>
+      </details>
     </main>
     <aside class="rail">
       <!-- The button leads, the way v1 leads with it. It sits OUTSIDE the
@@ -182,7 +190,7 @@
       </div>
 
       <div class="slip" id="slip">
-        <div class="hd"><h4>Your slip</h4><span class="n" id="slipN">0 legs</span></div>
+        <div class="hd"><h4><span class="emj">🧾</span>Your slip</h4><span class="n" id="slipN">0 legs</span></div>
         <div class="empty">Tap a selection to add it. HAWK prices the whole slip together, so legs
           that move with each other are not counted twice.</div>
       </div>
@@ -193,7 +201,7 @@
 
 <footer class="foot">
   <div class="wrap"><a href="../home/">home</a> · <a href="../scores/">scores</a> ·
-    <a href="../builder/">old builder</a> · <a href="../vault/">vault</a> ·
+    <a href="../vault/">vault</a> ·
     prices from <span id="book">Bet365</span> where the feed carries them</div>
 </footer>
 
@@ -737,13 +745,35 @@
   try { AB = { ...AB_DEF, ...JSON.parse(localStorage.getItem(AB_KEY) || "{}") }; } catch { /* defaults */ }
   const abSave = () => { try { localStorage.setItem(AB_KEY, JSON.stringify(AB)); } catch { /* private */ } };
 
+  /* Bet365's two settling rules, on the SAME keys the Vault and the settler
+     use. They were AB.ep here and hawk.ep there — two stores for one rule, so
+     turning Early Payout off in the Vault left it on for every price on this
+     page and the two screens quietly disagreed about what a result leg is
+     worth. There is one copy now, and it is the settler's. */
+  const ruleOn = (k) => {
+    try { const v = localStorage.getItem(`hawk.${k}`); return v === null ? true : JSON.parse(v) !== false; }
+    catch { return true; }
+  };
+  const setRule = (k, on) => { try { localStorage.setItem(`hawk.${k}`, JSON.stringify(!!on)); } catch { /* private */ } };
+
   function abControls() {
     const LABEL = { maxLegs: "Most legs", options: "Options", style: "Legs like",
                     focus: "Made of", picks: "Picks" };
-    const sel = (k, opts, hint) => `<div><label for="ab-${k}">${esc(LABEL[k] || k)}</label>
-      <select id="ab-${k}" data-ab="${k}">${opts.map(([v, t]) =>
-        `<option value="${esc(v)}"${String(AB[k]) === String(v) ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
+    /* A ROW OF CHIPS, not a dropdown. Every choice is on the page: you can see
+       that "Made of" has four settings without opening anything, and the chip
+       is the same component as the price rungs above it — one gesture for the
+       whole panel. Five dropdowns hid their options behind five taps and made
+       the rail look emptier than it was. */
+    const chips = (k, opts, hint) => `<div class="cset"><span class="cap">${esc(LABEL[k] || k)}</span>
+      <div class="chips">${opts.map(([v, t]) =>
+        `<button type="button" data-ab="${k}" data-v="${esc(v)}" aria-pressed="${
+          String(String(AB[k]) === String(v))}">${esc(t)}</button>`).join("")}</div>
       ${hint ? `<div class="hint">${esc(hint)}</div>` : ""}</div>`;
+    // a number you nudge rather than pick from a list of nine
+    const step = (k, lo, hi, word) => `<div class="step">
+      <button type="button" data-abstep="${k}" data-d="-1" aria-label="Fewer">−</button>
+      <b>${AB[k]} ${esc(word)}</b>
+      <button type="button" data-abstep="${k}" data-d="1" aria-label="More">+</button></div>`;
     /* The target price, loud, with a slider and the usual rungs — the old
        builder led with this and it was right to: every other setting here is
        a refinement of "what do you want it to pay". The slider is logarithmic
@@ -765,31 +795,35 @@
           v === 0 ? t < 1.2 : Math.abs(t - v) < 0.01)}">${lab}</button>`).join("")}</div>
     </div>`;
 
-    $("#abSet").innerHTML = aim + `<div class="set" style="margin-top:28px">
-      ${sel("style", [["Banker", "Safe legs — short and likely"], ["Balanced", "Mixed"],
-                      ["Punchy", "Bold legs — longer, less likely"]])}
-      ${sel("maxLegs", [2, 3, 4, 5, 6, 7, 8, 10, 12].map((n) => [n, `${n} legs`]))}
-      ${sel("focus", [["Mix", "Mix of markets"], ["Players", "Player props"], ["Match", "Match markets"],
-                      ["Stats", "No result leg"]], "No result leg bans the result market, so goals, cards and corners carry it")}
-      ${sel("picks", [["likely", "Most likely"], ["value", "Legs Bet365 overprices"]])}
-      ${sel("options", [2, 3, 4, 5, 6, 8].map((n) => [n, `${n} to choose from`]),
-            "How many different builds to offer for these settings")}
-    </div>
+    // Bet365's settling rules, counted for the "More" line
+    const RULES = [
+      ["ep", "Early payout", "Result legs paid once that side goes two goals ahead"],
+      ["subOn", "Sub on play on", "A player leg moves to his replacement when he is taken off"],
+    ];
+    const rulesOn = RULES.filter(([k]) => ruleOn(k)).length;
 
-    <div class="sw">
-      <button type="button" data-sw="priced" aria-pressed="${String(!!AB.priced)}">
-        <b>${esc(S.book)}-priced · no props</b>
-        <span>Only legs with a real bookmaker price. Measured blind, these come in at
-          0.924 of fair against 0.741 with a prop in.</span></button>
-      <button type="button" data-sw="favourite" aria-pressed="${String(!!AB.favourite)}">
-        <b>Favourite first</b>
-        <span>Open every build with the favourite, or their double chance.</span></button>
-      <button type="button" data-sw="extras" aria-pressed="${String(!!AB.extras)}">
-        <b>Fouls, tackles, offsides</b>
-        <span>Counted from the player's own record alone, so HAWK is less sure of them.</span></button>
-      <button type="button" data-sw="ep" aria-pressed="${String(!!AB.ep)}">
-        <b>Early Payout</b>
-        <span>A result leg is paid once that side goes two goals ahead.</span></button>
+    $("#abSet").innerHTML = aim + `<div class="cwrap">
+      ${chips("style", [["Banker", "Safe"], ["Balanced", "Mixed"], ["Punchy", "Bold"]])}
+      ${chips("focus", [["Mix", "Mix"], ["Players", "Players"], ["Match", "Match"],
+                        ["Stats", "No result"]], "No result leg bans the result market, so goals, cards and corners carry it")}
+      ${chips("picks", [["likely", "Most likely"], ["value", "Overpriced"]])}
+      <div class="two">${step("maxLegs", 2, 12, "legs")}${step("options", 2, 8, "options")}</div>
+      <div class="tog">
+        <button type="button" data-sw="priced" aria-pressed="${String(!!AB.priced)}">${esc(S.book)}-priced · no props</button>
+        <button type="button" data-sw="favourite" aria-pressed="${String(!!AB.favourite)}">Favourite first</button>
+        <button type="button" data-sw="extras" aria-pressed="${String(!!AB.extras)}">Fouls, tackles, offsides</button>
+      </div>
+
+      <!-- The two settling rules, as switches rather than chips — because they
+           are not build settings at all. The three above change what HAWK
+           PICKS; these two change what a leg is WORTH, here, in the Vault and
+           in the settler at once. A switch says "this is a state the whole app
+           is in"; a chip would have said "this is another filter". -->
+      <div class="more"><span class="cap">More — ${rulesOn} on</span>
+        <div class="sw2">${RULES.map(([k, name, why]) =>
+          `<button type="button" data-rule="${k}" aria-pressed="${String(ruleOn(k))}">
+            <i></i><span><b>${esc(name)}</b><span>${esc(why)}</span></span></button>`).join("")}</div>
+      </div>
     </div>`;
 
     abPlan();
@@ -839,9 +873,47 @@
       : ["Long shot", `lands about 1 in ${Math.round(1 / Math.max(t.p, 0.001))}`];
 
     $("#abOut").innerHTML = `<div class="built">
-      <div class="top"><span class="n">${odds(t.fair)}</span><span class="k">HAWK's fair price</span>
-        <span class="vs">${pct(t.p, t.p < 0.1 ? 1 : 0)} it lands<br>
-          ${esc(S.book)} would pay about <b>${odds(t.b365)}</b></span></div>
+      <!-- THE CHANCE LEADS, and the bar is the whole argument in one line.
+           A fair price IS one over the chance, so leading with "3.31" put the
+           number HAWK invented in the biggest type and the number it measured
+           in grey beside it — backwards, for a site whose claim is that it
+           says what it actually knows.
+
+           The bar compares the two percentages that decide whether a ticket
+           is worth taking: the fill is how often HAWK says it lands, the mark
+           is how often it HAS to land for that price to be fair. Mark to the
+           right of the fill and the price does not cover the chance.
+
+           The mark is DASHED while the price is HAWK's guess — a builder's
+           price is in no feed, and a leg without a bookmaker price makes the
+           whole total an estimate. Type the real one and it goes solid. That
+           distinction is the reason the block exists; a solid mark over a
+           guessed price would be the page lying about what it knows. -->
+      ${(() => {
+        const need = t.b365 > 1 ? 1 / t.b365 : null;      // break-even chance
+        const guess = !legs.length || legs.some((l) => !(l.bookPrice > 1));
+        const num = (t.p * 100).toFixed(1).split(".");
+        return `<div class="top">
+          <div class="pc"><span class="n">${num[0]}<small>.${num[1]}%</small></span>
+            <span class="k">lands</span></div>
+          <div class="mid">
+            <div class="scale" role="img" aria-label="${pct(t.p, 1)} it lands against ${
+              need != null ? pct(need, 0) : "—"} needed">
+              <i class="fill" style="width:${Math.max(1, Math.min(100, t.p * 100)).toFixed(1)}%"></i>
+              ${need != null ? `<i class="mark${guess ? " guess" : ""}"
+                style="left:${Math.max(0, Math.min(100, need * 100)).toFixed(1)}%"></i>` : ""}
+            </div>
+            <p class="say">${need == null ? `No ${esc(S.book)} price for this one.`
+              : guess
+                ? `${guess ? "Dashed" : "Solid"} mark — HAWK's <b>guess</b> at ${esc(S.book)}'s price
+                   (<b>${odds(t.b365)}</b>, ${pct(need, 0)}). Type the real one below and it goes solid.`
+                : `Solid mark — ${esc(S.book)}'s own price (<b>${odds(t.b365)}</b>) needs
+                   ${pct(need, 0)} to break even.`}</p>
+          </div>
+          <div class="bk"><span class="k">${esc(S.book)} ${guess ? "≈" : ""}</span>
+            <span class="v">${odds(t.b365)}</span></div>
+        </div>`;
+      })()}
 
       <!-- the verdict, before the legs: two percentages and which is bigger -->
       <div class="verdict ${worth ? "good" : "bad"}">
@@ -1217,6 +1289,40 @@
       abSave(); abOpts = []; abAt = 0; abControls();
       return;
     }
+    // a setting chip — the same job the <select> used to do on "change"
+    const abChip = e.target.closest("button[data-ab]");
+    if (abChip) {
+      const k = abChip.dataset.ab, v = abChip.dataset.v;
+      AB[k] = /^\d+$/.test(v) ? +v : v;
+      abSave(); abOpts = []; abAt = 0; abControls();
+      return;
+    }
+    // a stepper on one of the two numbers
+    const abStep = e.target.closest("[data-abstep]");
+    if (abStep) {
+      const k = abStep.dataset.abstep;
+      const [lo, hi] = k === "maxLegs" ? [2, 12] : [2, 8];
+      AB[k] = Math.max(lo, Math.min(hi, (+AB[k] || lo) + (+abStep.dataset.d)));
+      abSave(); abOpts = []; abAt = 0; abControls();
+      return;
+    }
+    /* One of Bet365's settling rules. Not a build parameter: it changes what
+       every result leg on the page is WORTH, so the match is priced again —
+       and it is written to the key the Vault and the settler read, so all
+       three cannot disagree about what a leg did. */
+    const ruleBtn = e.target.closest("[data-rule]");
+    if (ruleBtn) {
+      const k = ruleBtn.dataset.rule, now = !ruleOn(k);
+      setRule(k, now);
+      abOpts = []; abAt = 0;
+      if (k === "ep" && window.HAWK.setEarlyPayout) {
+        window.HAWK.setEarlyPayout(now);
+        load();                      // every result leg is worth something else now
+      } else {
+        abControls();
+      }
+      return;
+    }
     // an on/off switch
     const sw = e.target.closest("[data-sw]");
     if (sw) {
@@ -1225,13 +1331,6 @@
       sw.setAttribute("aria-pressed", String(!!AB[k]));
       abSave(); abOpts = []; abAt = 0;
       abPlan();
-      // Early Payout is an engine-wide setting, not a build parameter: it
-      // changes what every result leg on the page is worth, so the whole
-      // match has to be priced again.
-      if (k === "ep" && window.HAWK.setEarlyPayout) {
-        window.HAWK.setEarlyPayout(AB[k]);
-        load();
-      }
       return;
     }
 
@@ -1253,15 +1352,9 @@
 
   // the slip redraws on every keystroke, so the value lives in state and the
   // caret is put back — otherwise typing "4.80" dies after the first key
-  // the build settings: remembered, and a change invalidates the alternatives
-  document.addEventListener("change", (e) => {
-    const f = e.target.closest("[data-ab]");
-    if (!f) return;
-    AB[f.dataset.ab] = f.type === "checkbox" ? f.checked : f.value;
-    abSave();
-    abOpts = []; abAt = 0;
-    abPlan();
-  });
+  /* The settings used to be <select>s and this listened for "change". They are
+     chips now and a button fires "click", so the work moved up into the click
+     handler beside the steppers. Nothing listens here any more. */
 
   // the target slider: logarithmic, so the travel is spent where prices live
   const fromSlider = (v) => 1.5 * Math.pow(25 / 1.5, v / 100);
@@ -1294,6 +1387,13 @@
   const q = new URLSearchParams(location.search);
   S.league = q.get("league") || "";
   S.id = q.get("id") || "";
+  /* Apply the stored Early Payout rule BEFORE the first pricing run. It was
+     only ever set when you pressed the switch, so a fresh page priced every
+     result leg on the engine's default no matter what the rule said — and
+     turning it off, reloading, and reading a different price for the same leg
+     is the kind of thing that makes a model look untrustworthy when it is the
+     page that forgot. */
+  if (window.HAWK && window.HAWK.setEarlyPayout) window.HAWK.setEarlyPayout(ruleOn("ep"));
   if (window.HAWK && window.HAWK.match) load();
   else $("#said").textContent = "The model didn't load, so nothing can be priced.";
 })();

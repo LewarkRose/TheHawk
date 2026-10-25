@@ -3,9 +3,10 @@
    old builder ended up with three styling systems is that its furniture was
    pasted into each page and then edited in only some of them.
 
-   It lists what EXISTS in the new language and nothing else. The old site is
-   reached through the one "v1" link, which is now there for the scans and
-   tools that have not been rebuilt rather than for anything in this list.
+   It lists what EXISTS in the new language and nothing else. The "v1" link
+   that used to sit beside My bets has gone with the page it pointed at —
+   builder/index.html is deleted. The engine it shared a folder with is not
+   deleted and never could be: every page here loads builder/engine.js.
    =========================================================================== */
 (() => {
   "use strict";
@@ -120,7 +121,6 @@
         `<a href="${href}"${k === here ? ' aria-current="page"' : ""}><i>${icon}</i>${label}</a>`).join("")}</div>
       <div class="right">
         <span id="navMine">${myBets(running())}</span>
-        <a class="old" href="../builder/" title="The old builder, for what has not been rebuilt">v1</a>
         <a class="btn gold btn-sm" href="../scores/">Build a bet</a>
       </div>
     </div>`;

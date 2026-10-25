@@ -137,6 +137,40 @@
             background: linear-gradient(90deg, var(--accent-d), var(--accent) 45%, var(--accent-d));
         }
 
+        /* Section headings in the editorial face, matching the Board's masthead and
+           the landing page. Sentence case deliberately: "Profit Over Time" was Title
+           Case, which is a product-name convention, and these are not product names.
+           Declared with the Tailwind classes REMOVED from the markup rather than
+           fighting them — text-sm and font-bold would otherwise still win on size. */
+        html body .vh3 {
+            margin: 0;
+            font: italic 400 20px/1.25 Georgia, "Iowan Old Style", "Times New Roman", serif;
+            color: var(--text); letter-spacing: -.005em;
+        }
+        @media (max-width: 560px) { html body .vh3 { font-size: 17.5px; } }
+
+        /* The readout under the profit line. Tabular mono so the three figures
+           agree on their decimal point, which a proportional face will not do —
+           and these three are read against each other or not at all. */
+        html body .pl-marks {
+            display: flex; flex-wrap: wrap; gap: 8px 26px; margin-top: 12px;
+        }
+        html body .pl-marks i {
+            display: block; font-style: normal;
+            font: 600 8.5px/1.5 "Segoe UI"; letter-spacing: .16em; text-transform: uppercase; color: var(--faint);
+        }
+        html body .pl-marks b {
+            display: block; margin-top: 6px;
+            font: 700 14px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+            font-variant-numeric: tabular-nums; letter-spacing: 0;
+        }
+        /* --up and --down, not --green and --red: those are the builder's names and
+           this file does not declare them. */
+        html body .pl-marks b.up { color: var(--up); }
+        html body .pl-marks b.dn { color: var(--down); }
+        html body .pl-marks b.qt { color: var(--muted); font-size: 11.5px; font-weight: 400;
+            font-family: "Segoe UI", system-ui, sans-serif; }
+
         /* ════ THE STATEMENT ═════════════════════════════════════════════════
            Your numbers, set as the bank statement they are: the same stock as
            the ticket and the stub, a printed rule along the top, dashed rules
@@ -924,7 +958,7 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
             <div class="vband"><span>This week</span><i></i></div>
             <div class="bg-zinc-900/60 p-4 rounded-2xl border border-[#e8e0cf]/40 space-y-3" id="weekly-card">
                 <div class="flex flex-wrap justify-between items-center gap-2">
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">🗓️</span> Weekly HAWK report <span id="weekly-new" class="hidden text-[10px] font-bold bg-[#e8e0cf] text-black px-2 py-0.5 rounded-full">NEW</span></h3>
+                    <h3 class="vh3 flex items-center gap-2"><span class="icon-gold">🗓️</span> Weekly HAWK report <span id="weekly-new" class="hidden text-[10px] font-bold bg-[#e8e0cf] text-black px-2 py-0.5 rounded-full">NEW</span></h3>
                     <div class="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs gap-1">
                         <button type="button" data-week="last" class="week-tab px-3 py-1 rounded-lg">Last week</button>
                         <button type="button" data-week="this" class="week-tab px-3 py-1 rounded-lg">This week so far</button>
@@ -971,7 +1005,7 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
 
                 <div class="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
                     <div class="flex justify-between items-baseline gap-2">
-                        <h3 class="text-sm font-bold text-white flex items-center gap-2"><span class="icon-gold">📈</span> Profit Over Time</h3>
+                        <h3 class="vh3 flex items-center gap-2"><span class="icon-gold">📈</span> Profit over time</h3>
                         <span id="pl-chart-caption" class="text-[10px] text-zinc-500"></span>
                     </div>
                     <div id="pl-chart" class="w-full"></div>
@@ -3230,18 +3264,38 @@ try { localStorage.removeItem("hawk.theme"); } catch (e) { /* private window */ 
             const x = (i) => P + (i * (W - 2 * P)) / (vals.length - 1);
             const y = (v) => P + ((hi - v) * (H - 2 * P)) / span;
             const line = vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-            const up = cum >= 0, color = up ? '#34d399' : '#f87171';
-            const area = `${x(0)},${y(0)} ${line} ${x(vals.length - 1)},${y(0)}`;
+            const up = cum >= 0;
             const best = Math.max(...vals), worst = Math.min(...vals);
+            const money = (v) => `${v < 0 ? '−' : '+'}€${Math.abs(v).toFixed(2)}`;
+            // The gradient fill is gone. A filled area answers "how much", and this
+            // line is about WHICH SIDE OF ZERO — which the dashed rule already says.
+            // Filling it also meant the chart's loudest element was its least
+            // informative one.
+            //
+            // The three colours here were #34d399, #f87171 and #3f3f46: Tailwind's
+            // emerald, red and zinc, hardcoded. Nothing pointed at them from the
+            // palette, so they would not have followed it if it ever changed.
+            //
+            // Two traps caught on the way to fixing that, both of which draw an
+            // INVISIBLE line rather than failing loudly:
+            //   1. They are set as inline STYLE, not as a stroke attribute. A
+            //      presentation attribute is XML and does not resolve var() —
+            //      stroke="var(--up)" computes to `none`.
+            //   2. The names are the VAULT's. This file has --up, --down and --rule;
+            //      --green, --red and --line are the builder's names and are not
+            //      declared here at all. An undefined var() in a stroke is also none.
             el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="w-full h-44 block">
-                <defs><linearGradient id="plfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".35"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
-                <line x1="${P}" x2="${W - P}" y1="${y(0)}" y2="${y(0)}" stroke="#3f3f46" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
-                <polygon points="${area}" fill="url(#plfill)"/>
-                <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+                <line x1="${P}" x2="${W - P}" y1="${y(0)}" y2="${y(0)}"
+                      style="stroke:var(--rule)" stroke-dasharray="3 5" vector-effect="non-scaling-stroke"/>
+                <polyline points="${line}" fill="none" style="stroke:var(${up ? '--up' : '--down'})"
+                          stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
             </svg>
-            <div class="flex justify-between text-[10px] text-zinc-500 mt-1"><span>First settled ticket</span>
-                <span>Best €${best >= 0 ? '+' : ''}${best.toFixed(2)} · worst €${worst.toFixed(2)}</span>
-                <span class="${up ? 'text-emerald-400' : 'text-red-400'} font-bold">Now €${cum >= 0 ? '+' : ''}${cum.toFixed(2)}</span></div>`;
+            <div class="pl-marks">
+                <span><i>Best</i><b class="up">${money(best)}</b></span>
+                <span><i>Worst</i><b class="dn">${money(worst)}</b></span>
+                <span><i>Now</i><b class="${up ? 'up' : 'dn'}">${money(cum)}</b></span>
+                <span><i>Since</i><b class="qt">first settled ticket</b></span>
+            </div>`;
             cap.textContent = `${settled.length} settled tickets · top-ups and bankroll edits not included`;
         }
 

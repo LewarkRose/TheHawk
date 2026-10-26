@@ -141,6 +141,24 @@
   // every page: the switch has to be wherever you are when you want it off.
   if (window.HAWKAlerts) window.HAWKAlerts.mountBell(nav.querySelector(".right"));
 
+  /* HOW TALL THE BAR ACTUALLY IS.
+     The bar is fixed and every page clears it with one padding on .hero. That
+     padding used to be a guess in CSS, and a guess cannot survive the bar
+     WRAPPING: on a phone the five page links take a row of their own, and on a
+     360px screen — the commonest Android width there is — the mark, My bets,
+     Build a bet and the bell wrap to a row as well. Measured at 360px that is
+     a 126px bar under a 130px padding: four pixels, with the headline sitting
+     on top of the links.
+     So it is measured instead of guessed. Nothing downstream can be wrong
+     about it, whatever is added to the bar later, whatever the font scaling,
+     at any width. The CSS keeps a sensible fallback for the moment before this
+     runs and for the case where it never does. */
+  const setNavH = () => document.documentElement.style
+    .setProperty("--navh", `${Math.round(nav.getBoundingClientRect().height)}px`);
+  setNavH();
+  if (window.ResizeObserver) new ResizeObserver(setNavH).observe(nav);
+  else addEventListener("resize", setNavH);
+
   // transparent over the hero, lit once you have scrolled past it
   const hero = document.querySelector(".hero");
   const lit = () => nav.classList.toggle("lit", scrollY > (hero ? 60 : 10));

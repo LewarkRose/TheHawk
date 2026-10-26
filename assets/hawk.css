@@ -198,11 +198,49 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
   font:700 9px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;
   transition:color .35s var(--film)}
 .nav .old:hover{color:var(--gold-hi)}
-/* the hero sits under a fixed bar, so it starts below it */
-.hero{padding-top:clamp(104px,13vh,160px)}
+/* The rule that used to be here — .hero{padding-top:clamp(104px,13vh,160px)},
+   under a comment saying the hero starts below the fixed bar — had never once
+   applied. `.hero{padding:…}` in THE MOMENT below is a shorthand at the same
+   specificity and comes later, so it won every time: the hero has always used
+   that 89px. The real offset now lives beside that shorthand, where it can
+   actually beat it. Dead code that reads as load-bearing is worse than none. */
+/* On a phone the five links take a row of their own under the mark.
+   They used to be display:none here, and NOTHING replaced them — no menu, no
+   tabs — so Today, Scores, Acca, Board and Vault could only be reached from a
+   footer link or by typing the address. The bar looked fine, which is why it
+   survived the rebuild: it read as a tidy phone header rather than as a site
+   you cannot get around.
+
+   A second row costs about 40px of every page, permanently, and that is the
+   whole argument against it. The argument for it won: nothing is hidden,
+   nothing has to be discovered, and no page is more than one tap away.
+
+   space-between, not a gap: five items spread across 375px put the outer two
+   under the thumbs that reach them and need no measuring to stay centred. */
 @media (max-width:760px){
-  .nav .links{display:none}
-  .nav .in{padding-top:11px;padding-bottom:11px}
+  .nav .in{flex-wrap:wrap;row-gap:0;padding-top:11px;padding-bottom:0}
+  .nav .links{display:flex;order:3;width:100%;margin:0;gap:2px;
+    justify-content:space-between;border-top:1px solid var(--rule);padding:1px 0 2px}
+  .nav .links a{font-size:10px;letter-spacing:.06em;padding:9px 2px;gap:5px}
+  .nav .links a i{font-size:13px}
+}
+/* A second row only helps if the FIRST one stops wrapping. The mark plus My
+   bets, Build a bet and the bell came to 320px against the 320px a 360px
+   phone has — the commonest Android width there is, landing exactly on the
+   line — so the bar went to three rows and 126px. Build a bet is the wide
+   one at 147px; at 92px the row fits with 50px spare and the bar is 91px
+   again. The button is still the biggest thing in the bar, which is right. */
+@media (max-width:430px){
+  .nav .in{gap:8px}
+  .nav .btn-sm{padding:10px 12px;font-size:9.5px;letter-spacing:.1em}
+  .nav .mine{padding:7px 6px}
+}
+/* Below ~360px the five links overflowed by 18px and Board and Vault fell off
+   the end — the same unreachable-page bug, just narrower. Four pixels off
+   each one is all it takes: 235px of links in 280px of room at 320px. */
+@media (max-width:380px){
+  .nav .links a{font-size:9px;letter-spacing:.03em;padding:9px 0;gap:4px}
+  .nav .links a i{font-size:12px}
 }
 
 /* ============================== THE MOMENT ==============================
@@ -210,6 +248,16 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
    ======================================================================== */
 .hero{position:relative;display:grid;align-content:center;overflow:hidden;isolation:isolate;
   padding:clamp(72px,11vh,130px) var(--gut) clamp(46px,7vh,84px)}
+/* Clearing the fixed bar on a phone — and it has to be HERE, after the
+   shorthand above, or it loses to it (see the note up by the nav).
+   --navh is the bar's measured height, set by hawk-nav.js, because a phone bar
+   wraps: two rows at 375px, and on a narrow one the top row can wrap too. No
+   fixed number survives that, which is why the old one was 24px of clearance
+   at 65px and would have been none at 126px. The fallback is the common case,
+   so the headline lands right even in the frame before the script runs. */
+@media (max-width:760px){
+  .hero{padding-top:calc(var(--navh,91px) + 28px)}
+}
 .hero.tall{min-height:min(92vh,880px)}
 /* the canvas carries the depth: drawn, not gradients faking it. The
    gradients below are a finished picture on their own, so if it never runs

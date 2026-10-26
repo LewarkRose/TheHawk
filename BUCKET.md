@@ -7,6 +7,22 @@ SoT Over, the 3+ leg selection edge, and why the price learning stays off.
 
 ---
 
+## A bet on a match blocks its XI alert
+
+`checkLineups()` only walks `hawk.lineupWatch`, and nothing adds a bet's match
+to it. `followButton`'s click (`hawk-alerts.js:971`) routes to `toggleWatch`
+only when `!followState(id).bet` — so once a bet exists, the bell goes to
+`toggleFollow`, which returns early with "Already on" and arms nothing.
+
+The result: the matches where a confirmed XI matters MOST — you have money on
+them, and a player leg can die the moment the teams land — are the only ones
+you cannot set a lineup alert for. It is order-dependent too: watch-then-bet
+works, bet-then-watch is impossible.
+
+Fix is probably that a pending bet should imply a lineup watch, the same way it
+already implies goal-following (`pendingBetsOn`), rather than excluding one.
+Check it does not double-notify a match that is already watched by hand.
+
 ## Grade HAWK's own builders under the Vault's rules
 
 `engine/grade.mjs:588` settles the `tickets` control with

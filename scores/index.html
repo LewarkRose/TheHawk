@@ -242,6 +242,10 @@
 
     const crest = (u) => (u ? `<img src="${esc(u)}" alt="" onerror="this.remove()">` : "");
     const followed = window.HAWKAlerts && window.HAWKAlerts.followState(g.id);
+    // before kick-off the bell arms the LINEUPS, not the goals — see the click
+    // handler. `watched` is that alert already set; `pre` is "it could be".
+    const pre = b !== "live" && b !== "done";
+    const watched = !!(window.HAWKAlerts && window.HAWKAlerts.isWatched(g.id));
 
     return `<a class="lg-row is-${b}" href="${href}">
       <span class="t">${esc(hhmm(g.kickoff))}</span>
@@ -252,10 +256,12 @@
       <!-- Filled in by xiSweep() below, and only for the handful of matches
            where the answer can change in the next hour. Empty until then. -->
       <span class="xi" data-xi="${esc(g.id)}"></span>
-      <button class="fol-b${followed && (followed.on || followed.bet) ? " on" : ""}" type="button"
+      <button class="fol-b${followed && (followed.on || followed.bet) || watched ? " on" : ""}" type="button"
         data-bell="${esc(g.id)}" title="${followed && followed.bet
           ? "You have a bet on this match — its alerts stay on"
+          : watched ? "Waiting on the XIs, then goals. Click to turn off."
           : followed && followed.on ? "Alerts on. Click to turn off."
+          : pre ? "Tell me when both XIs are confirmed, then goals and red cards"
           : "Goals and red cards on this match"}">🔔</button>
       <!-- HAWK's read goes UNDERNEATH, on its own line, and it is last in the
            markup so the grid can put it there: the fixture and the score get
@@ -492,9 +498,26 @@
     const bell = e.target.closest("[data-bell]");
     if (bell) {
       e.preventDefault(); e.stopPropagation();
-      if (!window.HAWKAlerts) return;
-      const st = await window.HAWKAlerts.toggleFollow(bell.dataset.bell);
-      bell.classList.toggle("on", !!(st && (st.on || st.bet)));
+      const A = window.HAWKAlerts;
+      if (!A) return;
+      const id = bell.dataset.bell;
+      /* LINEUPS FIRST, before kick-off — the same rule the match page's own
+         bell follows. This one called toggleFollow() unconditionally, so a
+         match six hours away could only ever be armed for goals, and the
+         Scores list is exactly where you arm tonight's card. The XIs are the
+         thing you are waiting for at that hour: they are the last moment a
+         build is worth making, and the moment a player leg can quietly die.
+         Once it has kicked off there is no lineup left to wait for, so it
+         falls through to goals as before. */
+      const g = (S.games || []).find((x) => String(x.id) === String(id));
+      const st = A.followState(id);
+      if (g && band(g) !== "live" && band(g) !== "done" && !st.bet) {
+        await A.toggleWatch({ id, league: g.league, home: g.home, away: g.away });
+        bell.classList.toggle("on", A.isWatched(id));
+      } else {
+        const now = await A.toggleFollow(id);
+        bell.classList.toggle("on", !!(now && (now.on || now.bet)));
+      }
       return;
     }
 

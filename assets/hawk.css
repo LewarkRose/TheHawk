@@ -1135,7 +1135,16 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
 .fx .side.a .goals div{flex-direction:row-reverse}
 .goals span{font:400 10px/1 var(--mono);letter-spacing:.06em;color:var(--faint)}
 .goals div.off{color:var(--muted)}
-.goals div.off b{font-weight:400;text-decoration:line-through}
+/* The strike moved off <b> and onto the <s> inside it, so the 📺❌ in front of
+   a disallowed goal is not crossed out along with the name. <s> is the right
+   element for it anyway: no longer accurate.
+   Two emoji butt together at 12.5px, so they get a hair of letter-spacing —
+   enough to read as two marks rather than one blob. No opacity: held back,
+   the pair goes muddy before it goes quiet, and it is still lighter than the
+   ⚽ above it. The <i> exists for the font-style. */
+.goals div.off b{font-weight:400;text-decoration:none}
+.goals div.off s{text-decoration:line-through}
+.goals div.off i{font-style:normal;letter-spacing:.09em}
 
 /* live stats: figure, bar, figure. No boxes. */
 .sth{display:flex;justify-content:space-between;padding-bottom:12px;

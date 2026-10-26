@@ -330,7 +330,14 @@
       const out = [];
       for (const e of (d.events || []).filter((e) => e.side === s)) {
         if (e.type === "goal") out.push(`<div><b>⚽ ${esc((e.player || "").split(" ").pop())}</b><span>${esc(e.minute || "")}</span></div>`);
-        else if (e.type === "disallowed") out.push(`<div class="off"><b>${esc((e.player || "").split(" ").pop())}</b><span>${esc(e.minute || "")} · VAR</span></div>`);
+        // A goal that was given and taken away. 365Scores keeps it as its own
+        // event (type 11, "Goal Disallowed") rather than deleting the goal, so
+        // this row survives a refresh and is here whether or not you saw it
+        // happen — unlike the GOAL OFF alert, which can only catch it live.
+        // Both marks, in the order it happened: it went to the monitor, and it
+        // was chalked off. The pair goes OUTSIDE the strike — a line through an
+        // emoji is a smudge — and the name keeps the strike of its own.
+        else if (e.type === "disallowed") out.push(`<div class="off"><b><i>📺❌</i> <s>${esc((e.player || "").split(" ").pop())}</s></b><span>${esc(e.minute || "")} · VAR</span></div>`);
         else if (e.type === "red") out.push(`<div><b>🟥 ${esc((e.player || "").split(" ").pop())}</b><span>${esc(e.minute || "")}</span></div>`);
       }
       return out.join("");

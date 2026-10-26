@@ -7,6 +7,34 @@ SoT Over, the 3+ leg selection edge, and why the price learning stays off.
 
 ---
 
+## Grade HAWK's own builders under the Vault's rules
+
+`engine/grade.mjs:588` settles the `tickets` control with
+`HawkSettle.legResult(leg, f)` — no options, so no early payout and no sub-on.
+`assets/hawk-alerts.js:573` settles your real bets with
+`{ earlyPayout: true, subOn }`. The control is therefore graded under STRICTER
+rules than the record it is the control for, and every comparison between the
+two is biased in the same direction as the selection edge.
+
+Do NOT change how `byKey` is graded — raw is deliberate there, so it measures
+the model and not model-plus-payout-rule (`grade.mjs:229`). Add a second tally
+to the `tickets` block settled the Vault's way, and compare like with like.
+
+Until that exists, the +7.6 points at 3+ legs is an upper bound.
+
+## Swap a leg, from the slip
+
+v1 had 🔄 swap on each leg: tap it and HAWK puts the next best leg in its place.
+The old builder's checklist still refers people to it — "If a leg isn't offered,
+tap 🔄 swap on it in the slip" — but nothing in the rebuild has it. The per-leg
+explanation cards on the match page are the obvious home for it: they already
+say WHY a leg is on the ticket, so "and here is the next one down" belongs on
+the same card.
+
+Needs the engine's alternatives for a leg at the same target price, the swap
+re-pricing the whole slip (same-match legs are priced together, so one swap
+moves every other leg's contribution), and the explanation lines redrawn.
+
 ## Clear button in the alerts
 
 The bell popup lists the last 20 alerts (`hawk.alertLog`, written by `notice()`

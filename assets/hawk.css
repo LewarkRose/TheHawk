@@ -1525,7 +1525,7 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
    The XI column is 24px whether or not it has anything in it, so a lineup
    landing mid-refresh does not shunt every bell on the page sideways. */
 .lg-row{display:grid;
-  grid-template-columns:42px minmax(0,1fr) 58px minmax(0,1fr) 62px 34px 28px;
+  grid-template-columns:42px minmax(0,1fr) 58px minmax(0,1fr) 62px 22px 34px 28px;
   gap:10px;align-items:center;padding:7px 9px;
   border-bottom:1px solid var(--rule-2);
   /* a ledger on pure black reads as text floating in a void; the faintest
@@ -1633,6 +1633,13 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
 .read3 .ups .lv3{animation:upPulse 3.2s ease-in-out infinite}
 .read3 .ups .ar{flex:none;font-size:10px;opacity:.9}
 .read3 .ups b{flex:none;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* 🎟 — you have money on this one. Its column is held open whether or not
+   there is a ticket in it, so a bet placed mid-refresh does not shunt the
+   bells on every other row sideways. Full colour on purpose: it is the one
+   mark on the card that is about you rather than about the football. */
+.lg-row .tkt{justify-self:center;min-width:0;line-height:1}
+.lg-row .tkt i{font-style:normal;font-size:13px;line-height:1}
 
 /* "XI" beside the bell: both teams' elevens are confirmed. Gold, because it
    is the one state on a scores row that means ACT NOW — the lineups are the
@@ -1750,6 +1757,22 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
    and nothing on these tiles competes with it — no gold "selected" state, no
    on/off — so there is nothing for its colour to contradict. */
 .rec .k i{font-style:normal;font-size:12px;line-height:1;margin-right:6px;opacity:.95}
+
+/* swap, on a leg of a built ticket. Quiet until you are looking at that leg:
+   it is an escape hatch, not the thing the card is for. */
+.built li.why .hd{display:flex;align-items:flex-start;gap:10px}
+.built li.why .hd .nm{flex:1;min-width:0}
+.built .swap{flex:none;appearance:none;border:0;cursor:pointer;
+  display:inline-flex;align-items:center;gap:5px;padding:5px 8px;
+  background:var(--ink);color:var(--faint);box-shadow:inset 0 0 0 1px var(--rule);
+  font:700 8.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;
+  transition:color .25s var(--film),box-shadow .25s var(--film),opacity .25s var(--film);
+  opacity:.5}
+.built li.why:hover .swap{opacity:1}
+.built .swap:hover{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold);opacity:1}
+.built .swap i{font-style:normal;font-size:11px;filter:grayscale(1);opacity:.8}
+.built .swap:hover i{filter:none;opacity:1}
+@media (max-width:620px){ .built .swap{opacity:1} }
 
 /* ------------------------------------------- the build settings, as chips
    Five dropdowns became chip rows: every choice is on the page, and the chip

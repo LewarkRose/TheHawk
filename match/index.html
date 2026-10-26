@@ -977,7 +977,9 @@
 
     return `<li class="why">
       <div class="hd"><span class="i">${i + 1}</span>
-        <span class="nm">${esc(l.label)}<small>${esc(l.market || "")}</small></span></div>
+        <span class="nm">${esc(l.label)}<small>${esc(l.market || "")}</small></span>
+        <button type="button" class="swap" data-swap="${esc(l.id)}"
+          title="Not keen on this one? HAWK builds the ticket again without it, at the same price."><i>🔄</i>Swap</button></div>
       <div class="nums">
         <div><div class="k">Chance</div><div class="v">${pct(l.p, l.p < 0.1 ? 1 : 0)}</div>
           <div class="s">on its own${l.ep ? " · EP" : ""}</div></div>
@@ -991,17 +993,29 @@
   }
 
   let abOpts = [], abAt = 0;
-  function abBuild() {
-    if (!S.m) return;
+  /* Legs you have swapped away from, this build. It GROWS: ask for a different
+     leg twice and you want a third option, not the one you just rejected
+     coming back. Cleared whenever a fresh build starts. */
+  let abBanned = [];
+
+  // the settings, in one place, so a swap rebuilds on exactly the same terms
+  const abBody = () => ({
+    id: String(S.id),
     // target 0 means "any odds": the engine wants a number, and 1.2 is the
     // lowest it accepts, which is the same thing as asking for no floor.
-    const body = { id: String(S.id), target: (+AB.target >= 1.2 ? +AB.target : 1.2), style: AB.style,
-                   maxLegs: +AB.maxLegs || 5, focus: AB.focus, picks: AB.picks,
-                   favourite: !!AB.favourite, extras: !!AB.extras,
-                   // never offered before, and it is the setting that matters most:
-                   // a build containing a prop comes in at 0.741 of fair, one
-                   // without at 0.924
-                   priced: !!AB.priced };
+    target: (+AB.target >= 1.2 ? +AB.target : 1.2), style: AB.style,
+    maxLegs: +AB.maxLegs || 5, focus: AB.focus, picks: AB.picks,
+    favourite: !!AB.favourite, extras: !!AB.extras,
+    // never offered before, and it is the setting that matters most:
+    // a build containing a prop comes in at 0.741 of fair, one
+    // without at 0.924
+    priced: !!AB.priced,
+  });
+
+  function abBuild() {
+    if (!S.m) return;
+    abBanned = [];
+    const body = abBody();
     try {
       const n = Math.max(2, Math.min(8, +AB.options || 5));
       const r = window.HAWK.buildOptions({ ...body, options: n }, n);
@@ -1018,6 +1032,63 @@
         (${esc(err.message || "")}).</p>`;
       $("#abOpts").hidden = true;
     }
+  }
+
+  /* ===================================================== SWAP ONE LEG
+     v1 had this and the rebuild lost it; the old builder's own checklist
+     still tells you to use it ("if a leg isn't offered, tap swap").
+
+     It does NOT pick a replacement itself. It BANS the leg you are done with,
+     LOCKS the ones you are keeping, and asks the engine to build again — so
+     the replacement is chosen by the same code that chose the original, at
+     the same target price and in the same style. That matters more than it
+     sounds: legs on one match are priced TOGETHER, so changing one changes
+     what every other leg on the ticket is worth. Picking a substitute by
+     hand and dropping it in would leave the total quietly wrong.
+
+     The engine already works this way internally — searchOptions builds its
+     alternatives by swapping each leg out in turn — so this is the same
+     mechanism, aimed at one leg by you instead of at all of them by HAWK. */
+  function abSwap(legId) {
+    const t = abOpts[abAt] || null;
+    const out = $("#abOut");
+    if (!S.m || !legId) return;
+    const current = (t && t.legs ? t.legs.map((l) => l.id) : []);
+    if (!current.includes(legId)) return;
+    abBanned = [...new Set([...abBanned, legId])];
+    let next = null;
+    try {
+      next = window.HAWK.build({
+        ...abBody(),
+        locked: current.filter((id) => id !== legId),   // keep the rest exactly
+        banned: abBanned,                                // and never this one again
+      });
+    } catch { /* reported below */ }
+
+    /* Nothing better exists. Say so and leave the ticket alone — the worst
+       outcome here would be silently replacing a good ticket with a worse
+       one because the engine could not do what was asked.
+
+       A SHORTER ticket counts as nothing, and that is the case that actually
+       bites. Once enough legs are banned the engine stops being able to reach
+       the target and returns what it can: swapping one slot repeatedly took a
+       four-leg ticket down to two, a leg at a time, with no warning. You asked
+       to change a leg, not to drop one. */
+    if (!next || !next.legs || next.legs.length < current.length) {
+      abBanned = abBanned.filter((id) => id !== legId);
+      const p = document.createElement("p");
+      p.className = "note";
+      p.style.margin = "16px 0 0";
+      p.textContent = "No other leg fits that price with the rest of this ticket. "
+        + "Try a longer price, more legs, or a different focus.";
+      out.appendChild(p);
+      setTimeout(() => p.remove(), 6000);
+      return;
+    }
+    // the swapped ticket becomes the one on screen, in the slot it came from
+    if (abOpts.length) abOpts[abAt] = next; else abOpts = [next];
+    abShow(next, abAt + 1);
+    abRow();
   }
 
   /* What a ticket returns per euro at the price HAWK expects Bet365 to show.
@@ -1333,6 +1404,9 @@
       abPlan();
       return;
     }
+
+    const sw2 = e.target.closest("[data-swap]");
+    if (sw2) { abSwap(sw2.dataset.swap); return; }
 
     if (e.target.closest("#abGo")) { abBuild(); return; }
     const optBtn = e.target.closest("#abOpts [data-opt]");

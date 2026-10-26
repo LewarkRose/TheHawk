@@ -253,6 +253,11 @@
       <span class="s">${mid}</span>
       <span class="a${ac}">${crest(g.awayCrest)}<span>${esc(g.away)}</span></span>
       <span class="st">${state}</span>
+      <!-- Money on it. The bell cannot say this: a lit bell means "alerts on",
+           which you get by asking for them OR by having a bet, and those are
+           not the same thing to look at a card and want to know. -->
+      <span class="tkt">${followed && followed.bet
+        ? `<i title="You have a bet on this match">🎟</i>` : ""}</span>
       <!-- Filled in by xiSweep() below, and only for the handful of matches
            where the answer can change in the next hour. Empty until then. -->
       <span class="xi" data-xi="${esc(g.id)}"></span>

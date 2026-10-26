@@ -7,37 +7,6 @@ SoT Over, the 3+ leg selection edge, and why the price learning stays off.
 
 ---
 
-## A bet on a match blocks its XI alert
-
-`checkLineups()` only walks `hawk.lineupWatch`, and nothing adds a bet's match
-to it. `followButton`'s click (`hawk-alerts.js:971`) routes to `toggleWatch`
-only when `!followState(id).bet` — so once a bet exists, the bell goes to
-`toggleFollow`, which returns early with "Already on" and arms nothing.
-
-The result: the matches where a confirmed XI matters MOST — you have money on
-them, and a player leg can die the moment the teams land — are the only ones
-you cannot set a lineup alert for. It is order-dependent too: watch-then-bet
-works, bet-then-watch is impossible.
-
-Fix is probably that a pending bet should imply a lineup watch, the same way it
-already implies goal-following (`pendingBetsOn`), rather than excluding one.
-Check it does not double-notify a match that is already watched by hand.
-
-## Grade HAWK's own builders under the Vault's rules
-
-`engine/grade.mjs:588` settles the `tickets` control with
-`HawkSettle.legResult(leg, f)` — no options, so no early payout and no sub-on.
-`assets/hawk-alerts.js:573` settles your real bets with
-`{ earlyPayout: true, subOn }`. The control is therefore graded under STRICTER
-rules than the record it is the control for, and every comparison between the
-two is biased in the same direction as the selection edge.
-
-Do NOT change how `byKey` is graded — raw is deliberate there, so it measures
-the model and not model-plus-payout-rule (`grade.mjs:229`). Add a second tally
-to the `tickets` block settled the Vault's way, and compare like with like.
-
-Until that exists, the +7.6 points at 3+ legs is an upper bound.
-
 ## Swap a leg, from the slip
 
 v1 had 🔄 swap on each leg: tap it and HAWK puts the next best leg in its place.

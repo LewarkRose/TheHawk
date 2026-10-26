@@ -127,8 +127,29 @@ const BUILDER_VERSION = 2;
 const TICKET_BANDS = [[0, .1], [.1, .2], [.2, .3], [.3, .4], [.4, 1.01]];
 const AGREE_BANDS = [[0, 1.05], [1.05, 1.15], [1.15, 1.35], [1.35, 99]];
 const newCell = () => ({ n: 0, p: 0, won: 0, stake: 0, back: 0 });
+/* `vault` is the SAME tickets settled the way the Vault settles: Early Payout
+   and Sub On Play On both on. Without it this record was graded under stricter
+   rules than the bets it is the control for — the Vault settles with
+   {earlyPayout, subOn} (assets/hawk-alerts.js) — so every comparison between
+   HAWK's own builders and Lewzu's was biased in the same direction as the
+   selection edge it is supposed to test. Measured 2026-10-26: his tickets came
+   in +7.6 points over HAWK's chance at 3+ legs while HAWK's own came in at
+   −0.2, and the rules asymmetry was the last thing that could explain it.
+
+   Kept BESIDE the raw figures, not instead of them. Raw is what the model
+   said; this is what Bet365 would have paid out on. byKey is untouched and
+   stays raw on purpose — see the note at DOES THE LEARNING HELP.
+
+   BUILDER_VERSION is deliberately NOT bumped: the 1,878 tickets already in the
+   record are the control, and throwing them away to add a column would cost
+   more than the column is worth. So `vault` starts counting later than `n`,
+   and it carries its OWN `p` for exactly that reason — compare vault.won
+   against vault.p, never against the record's `p`, or you are reading a win
+   count from one window against a chance total from a longer one. That is the
+   mistake byLeague already made once. */
 const newBuilders = () => ({
   ver: BUILDER_VERSION, n: 0, won: 0, p: 0, matches: 0, skipped: 0, clamped: 0,
+  vault: { n: 0, won: 0, p: 0, byLegs: {} },
   byLegs: {}, byOpen: {}, byFocus: {},
   byChance: TICKET_BANDS.map(([lo, hi]) => ({ lo, hi, ...newCell() })),
   byAgree: AGREE_BANDS.map(([lo, hi]) => ({ lo, hi, ...newCell() })),
@@ -575,7 +596,10 @@ for (const [id, pr] of Object.entries(state.pending)) {
   // id -> outcome, so a builder ticket can be resolved from the same settlements
   // rather than re-settling its legs. A leg that returned "unknown" is simply
   // absent, which is what makes a ticket containing it countable as skipped.
-  const legOut = new Map(), legP = new Map();
+  // legOut is RAW — the model's own call. legOutEP is the same legs settled the
+  // way the Vault settles them, so the builder record can be compared with real
+  // bets on equal terms. See newBuilders().
+  const legOut = new Map(), legP = new Map(), legOutEP = new Map();
   // Tackles legs that could not be graded because 365Scores never named the
   // player's tackles. Collected here so the second source can be asked what it
   // would have done with them — see crossCheck.
@@ -596,6 +620,9 @@ for (const [id, pr] of Object.entries(state.pending)) {
     if (r !== "won" && r !== "lost") continue;   // didn't play, or no data
     const w = r === "won";
     legOut.set(leg.id, w); legP.set(leg.id, leg.p);
+    // the same leg under Bet365's two settling rules
+    const rv = HawkSettle.legResult(leg, f, { earlyPayout: true, subOn: true });
+    legOutEP.set(leg.id, rv === "won" ? true : rv === "lost" ? false : w);
     abTally(shiftsNow, leg, w);
     // Tackles legs that DID grade, over the same matches as the discarded ones.
     if (/^p:(home|away):\d+:tackles\d*$/.test(leg.id || "") && leg.p > 0 && leg.p < 1) {
@@ -720,6 +747,15 @@ for (const [id, pr] of Object.entries(state.pending)) {
       const p = +t.p || 0, b365 = +t.b365 || 0;
       graded++;
       B.n++; B.p = +(B.p + p).toFixed(4); if (w) B.won++;
+      /* …and again under the Vault's rules, on the SAME tickets and the same
+         skip rule, so the two tallies differ only in how a leg settles. */
+      {
+        const V = (B.vault ||= { n: 0, won: 0, p: 0, byLegs: {} });
+        const wv = ids.every((i) => legOutEP.get(i));
+        V.n++; V.p = +(V.p + p).toFixed(4); if (wv) V.won++;
+        const cell = (V.byLegs[t.n || ids.length] ||= { n: 0, p: 0, won: 0 });
+        cell.n++; cell.p = +(cell.p + p).toFixed(4); if (wv) cell.won++;
+      }
       if (b365 > 1) { B.stake = (B.stake || 0) + 1; if (w) B.back = +((B.back || 0) + b365).toFixed(3); }
       // The clamp in evaluate() caps a ticket at its smallest leg's chance. Watching
       // how often it binds keeps it monitored rather than spot-checked.

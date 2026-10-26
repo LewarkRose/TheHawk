@@ -227,21 +227,53 @@
     paintBell();
     document.dispatchEvent(new CustomEvent("hawk:follow", { detail: { id: String(g.id) } }));
   }
+  /* A PENDING BET IS A LINEUP WATCH, without being asked.
+     It already means the goals are followed (followedGames above). It did NOT
+     mean the XIs were, and the bell refused to add one — toggleFollow returns
+     early on a bet — so the matches where a confirmed XI matters MOST were the
+     only ones you could not be told about. A player leg dies the moment the
+     teams land, and that is the last point you can do anything about it.
+
+     Derived, not stored: a bet placed on any page counts the moment it exists,
+     and nothing has to be cleaned up when it settles. Only before kick-off —
+     after that there is no lineup left to wait for. */
+  function betWatches() {
+    const out = new Map();
+    for (const b of vaultBets()) {
+      if (b.status !== "PENDING") continue;
+      for (const l of b.legs || []) {
+        const h = l && l.hawk;
+        if (!h || !h.game) continue;
+        const ko = Date.parse(h.kickoff || "");
+        if (Number.isFinite(ko) && ko < Date.now()) continue;        // already under way
+        out.set(String(h.game), { id: String(h.game), league: h.league, home: h.home, away: h.away });
+      }
+    }
+    return [...out.values()];
+  }
+
   let lineupBusy = false;
   async function checkLineups() {
     const list = watchList();
-    if (!G.on || lineupBusy || !list.length || !E() || !E().lineups) return;
+    // the hand-set watches, plus every match you have money on
+    const seen = new Set(list.map((w) => String(w.id)));
+    const all = [...list, ...betWatches().filter((w) => !seen.has(w.id))];
+    if (!G.on || lineupBusy || !all.length || !E() || !E().lineups) return;
     lineupBusy = true;
     try {
       let keep = list, changed = false;
-      for (const w of list) {
+      for (const w of all) {
         let st = null;
         try { st = await E().lineups(w.id); } catch { continue; }   // ask again next time
         if (!st || !(st.confirmed || st.started)) continue;
         // Once the XIs are in — or the match has started without them — the
         // lineup alert is done. Goals keep coming for the next three hours.
-        keep = keep.filter((x) => String(x.id) !== String(w.id));
-        changed = true;
+        // Only a HAND-SET watch has anything to remove; a bet-derived one is
+        // computed fresh each pass, and firstTime() below stops it repeating.
+        if (seen.has(String(w.id))) {
+          keep = keep.filter((x) => String(x.id) !== String(w.id));
+          changed = true;
+        }
         const follow = loadPref("hawk.goalFollow", {});
         follow[String(w.id)] = new Date().toISOString();
         savePref("hawk.goalFollow", follow);
@@ -329,7 +361,7 @@
   const liveHref = (g) => `../live/?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}`;
   const matchHref = (g) => `../match/?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}`;
 
-  function card({ tone = "good", icon, word, g, clock, body, bet, href, hit }) {
+  function card({ tone = "good", icon, word, g, clock, body, bet, href, hit, voice }) {
     const el = document.createElement("div");
     el.className = `ac t-${tone}`;
     el.style.setProperty("--acms", `${SHOW_MS}ms`);
@@ -358,7 +390,9 @@
       ? `${g.home} ${g.score && g.score[0] != null ? `${g.score[0]}-${g.score[1]}` : "v"} ${g.away} · ${flat.textContent}`
       : flat.textContent);
     add(el);
-    if (tone !== "info") beep(VOICE_OF[word] || TONE_VOICE[tone] || "won");
+    // `voice` wins when the caller knows something the word does not — a goal
+    // is a goal, but only the caller knows whose goal it was good for.
+    if (tone !== "info") beep(voice || VOICE_OF[word] || TONE_VOICE[tone] || "won");
     flashTitle(`${icon} ${word}`);
     if (document.hidden || !document.hasFocus())
       systemNotify(`${icon} ${word}${g ? ` · ${g.home} ${g.score && g.score[0] != null ? `${g.score[0]}–${g.score[1]}` : "v"} ${g.away}` : ""}`,
@@ -379,27 +413,138 @@
      voice. Synthesised rather than shipped as files: six tones that cost
      nothing to download and nothing for the service worker to carry.
 
-     A note is [frequency, startSeconds, lengthSeconds, waveform, loudness].
-     Falling means bad, rising means good, and the VAR take-back is the goal
-     played backwards, because that is what it is. */
+     A note is [frequency, startSeconds, lengthSeconds, waveform, loudness,
+     bendTo]. Falling means bad, rising means good. */
   const VOICES = {
-    goal:    [[523, 0, 0.5, "triangle", 0.22], [784, 0.1, 0.7, "triangle", 0.18],
-              [1047, 0.2, 0.9, "triangle", 0.12]],
-    goalOff: [[1047, 0, 0.5, "triangle", 0.18], [784, 0.12, 0.6, "triangle", 0.16],
-              [523, 0.24, 0.85, "triangle", 0.2]],
+    /* A GOAL IS A BELL, and a goal taken off is the same bell two octaves
+       down, sagging as it rings. They are a PAIR on purpose: one instrument
+       saying two things, so the second reads as the first being taken back
+       rather than as some unrelated noise arriving.
+
+       The multipliers are 1, 2.76, 5.4, 8.9 — not 1, 2, 3, 4. A struck bell
+       is inharmonic, and those ratios are the whole difference between a bell
+       and an organ chord. Keep them if either is ever retuned.
+
+       Four partials struck together SUM, so the obvious amplitudes rendered at
+       0.58 against every other alert's 0.195 — a goal would have been three
+       times louder than a bet winning. Measured offline and scaled to match;
+       the RATIOS between the partials are the timbre, so they are preserved
+       exactly and only the overall level moved. */
+    goal:    [[784, 0, 1.5, "sine", 0.101], [2164, 0, 1.1, "sine", 0.061],
+              [4234, 0, 0.7, "sine", 0.034], [6978, 0, 0.45, "sine", 0.017],
+              [5000, 0, 0.02, "noise", 0.084]],                   // the hammer
+
+    /* THE SAME BELL, STRUCK TWICE — and which way the second strike goes is
+       the whole message. A goal on its own is one strike; a goal that helped
+       your bet adds one ABOVE it, one that hurt adds one BELOW.
+
+       This is the pair you could not tell apart before, and it is the pair
+       that costs you money: both played the identical sound, so the phone in
+       your pocket could tell you a goal had happened and not whose side it
+       was on. One strike still means "a goal, and you have nothing on it". */
+    goalFor: [[784, 0, 1.2, "sine", 0.080], [2164, 0, 0.9, "sine", 0.048],
+              [4234, 0, 0.6, "sine", 0.027], [5000, 0, 0.02, "noise", 0.066],
+              [1175, 0.17, 1.3, "sine", 0.080], [3243, 0.17, 0.95, "sine", 0.048],
+              [6345, 0.17, 0.6, "sine", 0.027], [5000, 0.17, 0.02, "noise", 0.066]],
+    goalAgainst: [[784, 0, 1.2, "sine", 0.080], [2164, 0, 0.9, "sine", 0.048],
+              [4234, 0, 0.6, "sine", 0.027], [5000, 0, 0.02, "noise", 0.066],
+              [523, 0.17, 1.4, "sine", 0.086], [1443, 0.17, 1.0, "sine", 0.052],
+              [2824, 0.17, 0.65, "sine", 0.029], [4000, 0.17, 0.02, "noise", 0.060]],
+    // …and the low one bends DOWN as it decays, which is the sag
+    goalOff: [[196, 0, 1.88, "sine", 0.109, 0.84], [541, 0, 1.38, "sine", 0.066, 0.84],
+              [1058, 0, 0.88, "sine", 0.036, 0.84], [1744, 0, 0.56, "sine", 0.018, 0.84],
+              [2500, 0, 0.02, "noise", 0.051]],
     won:     [[523, 0, 0.4, "triangle", 0.2], [659, 0.1, 0.45, "triangle", 0.2],
               [784, 0.2, 0.5, "triangle", 0.2], [1047, 0.3, 0.9, "triangle", 0.18]],
     landed:  [[784, 0, 0.4, "triangle", 0.2], [1047, 0.09, 0.55, "triangle", 0.16]],
     lost:    [[392, 0, 0.5, "triangle", 0.2], [294, 0.18, 0.8, "triangle", 0.18]],
-    red:     [[196, 0, 0.9, "triangle", 0.24], [131, 0.05, 1.1, "triangle", 0.18]],
-    urgent:  [[880, 0, 0.3, "triangle", 0.2], [880, 0.22, 0.3, "triangle", 0.2],
-              [1047, 0.44, 0.6, "triangle", 0.2]],
+    /* Three voices need more than a list of notes can say, so they are
+       FUNCTIONS instead: a whistle needs vibrato on its frequency, a fanfare
+       needs a filter sweep per note, and neither fits in a tuple. `len` is
+       how long the voice runs, so beep() knows when to let the context go,
+       and `gain` is its measured level — see the note on the bell. */
+    red: Object.assign((c, t0, out) => {
+      // a pea whistle: the rattle IS the vibrato, and without it this is a kettle
+      for (const at of [0, 0.28]) {
+        const o = c.createOscillator(), g = c.createGain();
+        const v = c.createOscillator(), vg = c.createGain();
+        o.type = "sine"; o.frequency.value = 2350;
+        v.frequency.value = 38; vg.gain.value = 120;
+        v.connect(vg); vg.connect(o.frequency);
+        o.connect(g); g.connect(out);
+        g.gain.setValueAtTime(0.0001, t0 + at);
+        g.gain.exponentialRampToValueAtTime(0.2, t0 + at + 0.02);
+        g.gain.setValueAtTime(0.2, t0 + at + 0.16);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.21);
+        o.start(t0 + at); o.stop(t0 + at + 0.22);
+        v.start(t0 + at); v.stop(t0 + at + 0.22);
+      }
+    }, { len: 0.6, gain: 0.98 }),
+
+    won: Object.assign((c, t0, out) => {
+      // brass: a sawtooth under a lowpass that opens on the attack and shuts
+      [262, 330, 392, 523].forEach((f, i) => {
+        const at = i * 0.085, len = i === 3 ? 0.6 : 0.24;
+        const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter();
+        o.type = "sawtooth"; o.frequency.value = f;
+        lp.type = "lowpass"; lp.Q.value = 0.8;
+        lp.frequency.setValueAtTime(f * 2, t0 + at);
+        lp.frequency.exponentialRampToValueAtTime(f * 6, t0 + at + 0.06);
+        lp.frequency.exponentialRampToValueAtTime(f * 2.5, t0 + at + len);
+        o.connect(lp); lp.connect(g); g.connect(out);
+        g.gain.setValueAtTime(0.0001, t0 + at);
+        g.gain.exponentialRampToValueAtTime(0.22, t0 + at + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + len);
+        o.start(t0 + at); o.stop(t0 + at + len + 0.02);
+      });
+    }, { len: 1.0, gain: 0.90 }),
+
+    urgent: Object.assign((c, t0, out) => {
+      // two notes, three times: an alarm, not a chime. It is meant to nag.
+      for (let i = 0; i < 3; i++) {
+        for (const [f, off] of [[740, 0], [988, 0.085]]) {
+          const o = c.createOscillator(), g = c.createGain();
+          o.type = "square"; o.frequency.value = f;
+          o.connect(g); g.connect(out);
+          const at = i * 0.2 + off;
+          g.gain.setValueAtTime(0.0001, t0 + at);
+          g.gain.exponentialRampToValueAtTime(0.14, t0 + at + 0.012);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.085);
+          o.start(t0 + at); o.stop(t0 + at + 0.1);
+        }
+      }
+    }, { len: 0.6, gain: 1.42 }),
     warn:    [[587, 0, 0.4, "triangle", 0.2], [494, 0.22, 0.7, "triangle", 0.18]],
-    /* The lineups one is the odd job: the only alert that is not news. Three
-       taps on one note — a knock at the door rather than an announcement, and
-       on one note it cannot be mistaken for a goal, which rises. */
-    tick:    [[587, 0, 0.16, "triangle", 0.14], [587, 0.17, 0.16, "triangle", 0.14],
-              [587, 0.34, 0.3, "triangle", 0.14]],
+    /* The lineups one is the odd job: the only alert that is not news, so it
+       is the one sound here that is neither a bell (the pitch) nor a tone
+       (your ticket). Three struck wooden bars climbing — the XI going up.
+
+       A struck bar is three things at once: the knock of the mallet, the
+       bar's own note, and a partial at 4.1x that dies almost immediately.
+       That 4.1 is not a typo and not a harmonic; it is what stops this
+       sounding like a flute. */
+    tick: Object.assign((c, t0, out) => {
+      for (const [f, at] of [[523, 0], [659, 0.1], [784, 0.2]]) {
+        for (const [freq, len, peak] of [[f, 0.14, 0.26], [f * 4.1, 0.042, 0.078]]) {
+          const o = c.createOscillator(), g = c.createGain();
+          o.type = "sine"; o.frequency.value = freq;
+          o.connect(g); g.connect(out);
+          g.gain.setValueAtTime(0.0001, t0 + at);
+          g.gain.exponentialRampToValueAtTime(peak, t0 + at + 0.008);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + len);
+          o.start(t0 + at); o.stop(t0 + at + len + 0.02);
+        }
+        const n = Math.max(1, Math.floor(c.sampleRate * 0.01));
+        const b = c.createBuffer(1, n, c.sampleRate), d = b.getChannelData(0);
+        for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+        const s = c.createBufferSource(); s.buffer = b;
+        const bp = c.createBiquadFilter();
+        bp.type = "bandpass"; bp.frequency.value = 2200; bp.Q.value = 1;
+        const g = c.createGain(); g.gain.value = 0.14;
+        s.connect(bp); bp.connect(g); g.connect(out);
+        s.start(t0 + at); s.stop(t0 + at + 0.01);
+      }
+    }, { len: 0.4, gain: 0.59 }),
   };
   /* Which voice an alert gets, by the word on its card — the cards already
      name themselves and the names are stable, so nothing else has to change
@@ -417,19 +562,49 @@
     const notes = VOICES[voice] || VOICES.won;
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // A voice that builds itself. Everything goes through one gain so a
+      // whole sound can be levelled against the others by a single number.
+      if (typeof notes === "function") {
+        if (ctx.state === "suspended") ctx.resume().catch(() => {});
+        const out = ctx.createGain();
+        out.gain.value = notes.gain || 1;
+        out.connect(ctx.destination);
+        notes(ctx, ctx.currentTime, out);
+        setTimeout(() => { try { ctx.close(); } catch { /* already gone */ } },
+                   ((notes.len || 1.5) + 0.3) * 1000);
+        return;
+      }
       // A tab the user has never clicked cannot play anything; the card and
       // the system notification still do their job, so this stays quiet
       // rather than throwing.
       if (ctx.state === "suspended") ctx.resume().catch(() => {});
-      for (const [freq, at, len, type = "sine", peak = 0.3] of notes) {
+      /* A note is [frequency, start, length, waveform, loudness, bendTo].
+         Two additions for the bell: "noise" is a short filtered burst rather
+         than a tone — a hammer striking has no pitch — and `bendTo` slides the
+         frequency to a multiple of itself across the note, which is how the
+         low bell sags. Everything that does not use them is unaffected. */
+      for (const [freq, at, len, type = "sine", peak = 0.3, bend = 0] of notes) {
+        const t0 = ctx.currentTime + at;
+        if (type === "noise") {
+          const n = Math.max(1, Math.floor(ctx.sampleRate * len));
+          const b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
+          for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+          const s = ctx.createBufferSource(); s.buffer = b;
+          const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = freq;
+          const gn = ctx.createGain(); gn.gain.value = peak;
+          s.connect(hp); hp.connect(gn); gn.connect(ctx.destination);
+          s.start(t0); s.stop(t0 + len);
+          continue;
+        }
         const o = ctx.createOscillator(), gn = ctx.createGain();
         o.type = type;
-        o.frequency.value = freq;
+        o.frequency.setValueAtTime(freq, t0);
+        if (bend) o.frequency.exponentialRampToValueAtTime(freq * bend, t0 + len);
         o.connect(gn); gn.connect(ctx.destination);
-        gn.gain.setValueAtTime(0.0001, ctx.currentTime + at);
-        gn.gain.exponentialRampToValueAtTime(peak, ctx.currentTime + at + 0.02);
-        gn.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + len);
-        o.start(ctx.currentTime + at); o.stop(ctx.currentTime + at + len + 0.02);
+        gn.gain.setValueAtTime(0.0001, t0);
+        gn.gain.exponentialRampToValueAtTime(peak, t0 + 0.02);
+        gn.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+        o.start(t0); o.stop(t0 + len + 0.02);
       }
       // let the context go once the longest note has finished
       const end = Math.max(...notes.map(([, at, len]) => at + len)) + 0.1;
@@ -528,6 +703,17 @@
     }
     return out;
   }
+
+  /* What each ticket's chance was at the LAST look.
+     A goal alert can only say whether it helped you by comparing the chance
+     now against the chance a moment ago — nothing in a single reading tells
+     you which way a goal went for a ticket, because a goal can help one leg
+     and kill another on the same slip. The regular ten-second check keeps
+     this up to date; the goal handler reads it before refreshing it. */
+  const betWas = new Map();
+  const rememberP = (tickets) => {
+    for (const t of tickets) if (t && t.id != null && typeof t.p === "number") betWas.set(t.id, t.p);
+  };
   async function betNow(gameId) {
     let mine = [];
     try { mine = await myLiveTickets(gameId); } catch { return null; }
@@ -625,13 +811,32 @@
       // would be the previous one
       scorer = goals.length >= score[who === "home" ? 0 : 1] ? goals[goals.length - 1] : null;
     } catch { /* just the score then */ }
-    try { const mine = await myLiveTickets(g.id); if (mine.length) bet = mine[0]; } catch { /* no bet */ }
+    /* …and which way it went for you. `swing` is the ticket's chance now
+       against what it was at the last check, so the sound can say whose goal
+       this was. No stored reading — a goal in the first ten seconds, or no
+       bet at all — means no claim is made and it plays the plain bell. */
+    let swing = null;
+    try {
+      const mine = await myLiveTickets(g.id);
+      if (mine.length) {
+        bet = mine[0];
+        const prev = betWas.get(bet.id);
+        if (typeof prev === "number" && typeof bet.p === "number") swing = bet.p - prev;
+        rememberP(mine);
+      }
+    } catch { /* no bet */ }
 
     const body = off ? `${esc(team)}'s goal was taken off`
       : scorer && scorer.player ? scorerLine(scorer)
       : `${esc(team)} score`;
+    // a point either way is noise; two is a goal doing something
+    const voice = off ? null
+      : swing == null ? null
+      : swing > 0.02 ? "goalFor"
+      : swing < -0.02 ? "goalAgainst"
+      : null;
     const el = card({ tone: off ? "bad" : "goal", icon: off ? "❌⚽" : "⚽", word: off ? "GOAL OFF" : "GOAL",
-                      g: { ...g, score }, body, bet, hit: off ? null : who });
+                      g: { ...g, score }, body, bet, hit: off ? null : who, voice });
 
     // From Unibet, before 365Scores had the goal: the card goes up with the
     // score alone and the scorer's name arrives into it (every 10 s, for two
@@ -683,6 +888,8 @@
       if (g.status === 3) {
         let mine = [];
         try { mine = await myLiveTickets(g.id); } catch { continue; }
+        // the reading a goal alert will compare itself against
+        rememberP(mine);
         for (const t of mine) {
           const rows = t.parts.filter((pt) => pt.live).flatMap((pt) => pt.live.legs);
           const was = states[t.id];
@@ -964,13 +1171,15 @@
       const st = followState(id), watched = pre && isWatched(id);
       const lit = st.bet || st.on || watched;
       el.className = `fol${st.bet ? " bet" : lit ? " on" : ""}`;
-      el.textContent = st.bet ? "🔔 Alerts on — you have a bet"
+      el.textContent = st.bet ? (pre ? "🔔 Alerts on — lineups, then goals (you have a bet)"
+                                     : "🔔 Alerts on — you have a bet")
         : watched ? "🔔 Alerts on — lineups, then goals"
         : st.on ? "🔔 Alerts on"
         : st.here ? "🔕 Keep alerts after I leave"
         : pre ? "🔕 Alert me when the lineups land"
         : "🔕 Alert me";
-      el.title = st.bet ? "You have a bet on this match, so its alerts cannot be turned off."
+      el.title = st.bet ? (pre ? "You have a bet on this match: you'll be told the moment both XIs are confirmed, then goals and red cards. It cannot be turned off."
+                               : "You have a bet on this match, so its alerts cannot be turned off.")
         : watched ? "You'll be told the moment both XIs are confirmed, then goals and red cards. Click to turn off."
         : st.on ? "Goals, red cards and your bet. Click to turn off."
         : st.here ? "You get this match's goals while this page is open. Click to keep them for three hours after you leave."

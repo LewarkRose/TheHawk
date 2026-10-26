@@ -134,12 +134,26 @@ jobs:
                            if pr.get("skipped") else
                            f"- Player props: {pr.get('fresh', 0)} matches ({pr.get('legs', 0)} legs), {pr.get('reused', 0)} kept, {pr.get('missing', 0)} without")
           try:
-              b = (json.load(open("data/graded.json", encoding="utf-8")).get("builders") or {})
+              g = json.load(open("data/graded.json", encoding="utf-8"))
+              b = g.get("builders") or {}
               lines.append(f"- Builder tickets (1a, recording only): {b.get('recorded', 0)} this run, "
                            f"{b.get('stored', 0)} waiting across {b.get('matches', 0)} matches, "
                            f"{b.get('seen', 0)} recorded since {b.get('since') or 'n/a'}")
+              # 1b grades those same tickets twice — raw, and again the way the Vault
+              # settles a real bet. The Vault half only starts counting when a match
+              # holding stored tickets finishes, so an absent tally is a normal
+              # reading for hours and an indistinguishable one from a broken split.
+              # It has to be said out loud or the comparison it exists for can never
+              # be trusted.
+              t = g.get("tickets") or {}
+              lines.append(f"- Builder tickets (1b, graded): {t.get('n', 0)} over {t.get('matches', 0)} matches, {t.get('won', 0)} won vs {round(t.get('p', 0), 1)} expected, {t.get('skipped', 0)} ungradeable")
+              v = t.get("vault")
+              if v:
+                  lines.append(f"  - under the Vault's rules: {v.get('n', 0)} tickets, {v.get('won', 0)} won vs {round(v.get('p', 0), 1)} expected")
+              else:
+                  lines.append("  - under the Vault's rules: not started — no ticket has graded since the split shipped")
           except Exception as e:
-              lines.append(f"- Builder tickets (1a): no reading ({e})")
+              lines.append(f"- Builder tickets: no reading ({e})")
           lines += ["", *[f"- {x}" for x in m.get("problems", [])[:30]]]
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
               f.write("\n".join(lines) + "\n")

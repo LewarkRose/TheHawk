@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HAWK</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="favicon.svg">
+<meta name="theme-color" content="#080809">
+<!-- The other half of the signpost — see builder/index.html for the whole
+     reasoning. The v1 Vault lived at this address and was deleted in the
+     rebuild; a bookmark or an old link still asks for it and used to get
+     GitHub's 404.
+
+     Nothing is lost by coming here: the Vault reads the same `hawk_bets` in
+     the same browser storage it always did. It is the page that moved, not
+     the bets. -->
+<meta http-equiv="refresh" content="0; url=./vault/">
+<link rel="canonical" href="./vault/">
+<style>
+  html,body{height:100%}
+  body{margin:0;display:grid;place-items:center;background:#080809;color:#8b8b95;
+    font:400 13px/1.8 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:center}
+  a{color:#f2dba4}
+  .m{font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    letter-spacing:.2em;text-transform:uppercase;color:#55555f}
+</style>
+</head>
+<body>
+  <div>
+    <p class="m">HAWK</p>
+    <p>The Vault moved. Taking you to <a href="./vault/">the Vault</a> — your bets are still there.</p>
+  </div>
+<script>
+  location.replace("./vault/" + (location.hash || ""));
+</script>
+</body>
+</html>

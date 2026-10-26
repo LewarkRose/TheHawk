@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HAWK</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../favicon.svg">
+<meta name="theme-color" content="#080809">
+<!-- A SIGNPOST, NOT A PAGE. The v1 builder that lived here was deleted in the
+     rebuild, and this is three lines of redirect standing where it was.
+
+     Why it had to come back: this was HAWK's front door for a year. Anything
+     that remembers the old address lands here — a bookmark, a link, and above
+     all a PHONE. An installed app keeps the start_url it was installed with,
+     so a HAWK icon added to a home screen before the rebuild still opens
+     /builder/ and got GitHub's own 404 page: white, in English, with nothing
+     of HAWK on it and no way back.
+
+     Do NOT "fix" manifest.webmanifest's "id": "./builder/" to match the new
+     start_url. `id` is the app's permanent identity, and it is how a browser
+     recognises that a changed manifest belongs to an app it has already
+     installed. Change it and every installed copy is orphaned: it stops
+     taking updates and keeps its old start_url for good. The id is allowed
+     to point at nothing. It is a name, not an address.
+
+     The folder itself is not a v1 leftover either — engine.js and
+     hawk-settle.js live here and every page loads them. See the note at the
+     top of sw.js.
+
+     Belt and braces, as the root redirect does it: the meta refresh fires
+     with JavaScript off, the script fires immediately, and the link is there
+     if a browser does neither. GitHub Pages has no server, so a redirect has
+     to be a page. -->
+<meta http-equiv="refresh" content="0; url=../home/">
+<link rel="canonical" href="../home/">
+<style>
+  html,body{height:100%}
+  body{margin:0;display:grid;place-items:center;background:#080809;color:#8b8b95;
+    font:400 13px/1.8 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:center}
+  a{color:#f2dba4}
+  .m{font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    letter-spacing:.2em;text-transform:uppercase;color:#55555f}
+</style>
+</head>
+<body>
+  <div>
+    <p class="m">HAWK</p>
+    <p>The builder moved. Taking you to <a href="../home/">the Home page</a>.</p>
+  </div>
+<script>
+  // Carry a hash through, in case something was linked with one.
+  location.replace("../home/" + (location.hash || ""));
+</script>
+</body>
+</html>

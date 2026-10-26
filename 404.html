@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Not here · HAWK</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/TheHawk/favicon.svg">
+<meta name="theme-color" content="#080809">
+<!-- GitHub Pages serves this file for ANY address it cannot find, which is why
+     it is here rather than another handful of redirect stubs. The rebuild left
+     four dead addresses behind — /builder/, /vault-v1.html, /picks/ and an old
+     prototype — and a bookmark or a home-screen icon pointing at any of them
+     got GitHub's own 404: white, in English, no HAWK on it and no way back.
+     This catches those and every one nobody has thought of yet.
+
+     It does NOT redirect on its own. The two addresses that were front doors
+     have their own stubs that do (builder/index.html, vault-v1.html), because
+     an installed app has to land somewhere without anyone tapping anything.
+     A page that bounces every mistyped URL to Home only hides the mistake.
+
+     Paths are absolute from /TheHawk/ on purpose: this one file answers for
+     every depth, and "../home/" would resolve differently for /picks/ than
+     for /a/b/c/. Self-contained — no stylesheet, no fonts, no script — so it
+     works from a depth that would not find them. -->
+<style>
+  html,body{height:100%}
+  body{margin:0;display:grid;place-items:center;padding:32px;background:#080809;color:#8b8b95;
+    font:400 14px/1.75 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:center}
+  .m{font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    letter-spacing:.22em;text-transform:uppercase;color:#55555f;margin:0 0 20px}
+  h1{margin:0 0 14px;font:700 clamp(38px,11vw,62px)/1 "Barlow Condensed","Segoe UI Semibold",system-ui,sans-serif;
+    letter-spacing:.02em;text-transform:uppercase;color:#f2f2f2}
+  p{margin:0 auto 26px;max-width:44ch}
+  .go{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+  .go a{padding:11px 16px;border:1px solid rgba(242,242,242,.16);color:#f2f2f2;text-decoration:none;
+    font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.17em;text-transform:uppercase}
+  .go a.k{border-color:#d4a94e;color:#f2dba4}
+  .go a:hover{border-color:rgba(242,242,242,.4)}
+</style>
+</head>
+<body>
+  <div>
+    <p class="m">HAWK</p>
+    <h1>Not here</h1>
+    <p>This address does not exist any more. Some of the old pages moved in the
+       rebuild — nothing was lost with them, and your bets are untouched.</p>
+    <div class="go">
+      <a class="k" href="/TheHawk/home/">Home</a>
+      <a href="/TheHawk/today/">Today</a>
+      <a href="/TheHawk/scores/">Scores</a>
+      <a href="/TheHawk/acca/">Acca</a>
+      <a href="/TheHawk/vault/">Vault</a>
+    </div>
+  </div>
+</body>
+</html>

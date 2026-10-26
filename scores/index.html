@@ -151,12 +151,25 @@
     return `<span class="upf lv${lv}" title="Upset radar · ${esc(UPSET_SAY[lv])}">⚡</span>`;
   };
 
+  /* The minute mark, split off so it can blink on its own — a clock's colon,
+     not an alarm. Escaped FIRST and only then split, so nothing a feed sends
+     can reach the page through the one place here that writes a tag.
+
+     The mark has to be the last character, which is what makes this right
+     rather than merely clever: "19'" and "45+2'" tick, "HT" has no mark and
+     stays still. A half-time row is not a running clock and should not
+     pretend to be one. */
+  const liveClock = (c) => {
+    const t = esc(c || "Live");
+    return t.endsWith("'") ? `${t.slice(0, -1)}<i class="ap">'</i>` : t;
+  };
+
   function row(g) {
     const b = band(g), [sh, sa] = g.score || [];
     const have = Number.isFinite(sh) && Number.isFinite(sa);
     const hc = have && sh < sa ? " lost" : "", ac = have && sa < sh ? " lost" : "";
     const mid = have ? `${sh}<em>–</em>${sa}` : b === "done" ? "–<em>–</em>–" : "v";
-    const state = b === "live" ? esc(g.clock || "Live")
+    const state = b === "live" ? liveClock(g.clock)
       : b === "done" ? "FT"
       : esc(hhmm(g.kickoff) || "TBC");
     const href = `${b === "live" ? "../live/" : "../match/"}`

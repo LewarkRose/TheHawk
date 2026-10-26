@@ -2417,6 +2417,18 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
   box-shadow:inset 0 0 0 1px var(--rule);transition:color .2s,box-shadow .2s}
 .bellpop .hear button:hover{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
 .bellpop .hear p{width:100%;margin:8px 0 0;font-size:10.5px;color:var(--faint)}
+/* the history's own little header, so Clear sits with the thing it clears
+   rather than in the row of switches above, where it would read as a fourth
+   setting instead of an action */
+.bellpop .lghd{display:flex;align-items:baseline;justify-content:space-between;
+  gap:10px;margin-top:4px;padding-top:11px;border-top:1px solid var(--rule)}
+.bellpop .lghd .k{font:700 8.5px/1 var(--mono);letter-spacing:.17em;
+  text-transform:uppercase;color:var(--faint)}
+.bellpop .lghd button{appearance:none;border:0;background:none;cursor:pointer;padding:3px 0;
+  font:700 9px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+  transition:color .25s var(--film)}
+.bellpop .lghd button:hover{color:var(--down)}
+.bellpop .lghd + .lg{border-top:0}
 .bellpop .lg{display:flex;gap:9px;padding:9px 0;border-top:1px solid var(--rule);
   font:400 11.5px/1.5 var(--sans)}
 .bellpop .lg .i{flex:none}

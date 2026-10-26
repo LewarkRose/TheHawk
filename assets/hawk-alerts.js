@@ -886,6 +886,8 @@
       </div>` : ""}
       ${perm === "denied" && G.on ? `<p>This browser is blocking HAWK's notifications, so alerts only show
         while a HAWK tab is open. Allow them in the padlock menu beside the address bar.</p>` : ""}
+      ${log.length ? `<div class="lghd"><span class="k">${plural(log.length, "alert")}</span>
+          <button data-al="clear">Clear</button></div>` : ""}
       ${log.length ? log.map((a) => `<div class="lg"><span class="i">${a.icon || "🔔"}</span>
         <span class="tx"><b>${esc(a.word || "")}</b>${esc(a.text || "")}</span>
         <time>${ago(a.at)}</time></div>`).join("")
@@ -918,6 +920,15 @@
           savePref("hawk.alertSound", now);
           paintPop();
           if (now) beep("landed");
+          return;
+        }
+        /* Empty the history. It is the only place an alert you missed can
+           still be read, so it fills with Tuesday's goals and the one you
+           actually want is underneath them. The log only — the alerts
+           themselves, and which matches you follow, are untouched. */
+        if (b.dataset.al === "clear") {
+          savePref("hawk.alertLog", []);
+          paintPop();
           return;
         }
         if (b.dataset.al === "toggle") {

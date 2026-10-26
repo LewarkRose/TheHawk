@@ -1014,6 +1014,12 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
 .built li.why .nm{min-width:0;font-size:14px;line-height:1.3}
 .built li.why .nm small{display:block;margin-top:4px;font:700 8.5px/1 var(--mono);
   letter-spacing:.15em;text-transform:uppercase;color:var(--faint)}
+/* The second line is not a label like the market above it — it is the only
+   instruction on the card, so it takes the gold the rest of the page gives to
+   things you act on. Same slot, same size: it has to read as part of the name,
+   not as another number. */
+.built li.why .nm small.b365{margin-top:5px;letter-spacing:.11em;color:var(--gold)}
+.built li.why .nm small.b365 b{color:var(--gold-hi)}
 .built li.why .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
   background:var(--rule);margin:12px 0 0}
 .built li.why .nums > div{background:var(--raise);padding:9px 10px}

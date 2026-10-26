@@ -977,7 +977,18 @@
 
     return `<li class="why">
       <div class="hd"><span class="i">${i + 1}</span>
-        <span class="nm">${esc(l.label)}<small>${esc(l.market || "")}</small></span>
+        <span class="nm">${esc(l.label)}<small>${esc(l.market || "")}</small>${
+          /* What to tap on the real slip. Bet365 prices corners and cards 3-way
+             on WHOLE numbers, so HAWK's "Under 5.5 (5 or fewer)" is their
+             "Under 6" — the same bet under a different name. The engine has
+             always worked this out (b365Whole) to find the price, and nothing
+             ever showed it, so the one moment it matters — copying the leg
+             across — was the one moment it was missing. Only corners and cards
+             carry it, which is why no test for the market is needed here. */
+          /* "pick", not a colon: a team line is already "Arsenal: Over 4
+             Corners", and "On Bet365: Arsenal: Over 4 Corners" reads as two
+             labels rather than one instruction. */
+          l.b365 ? `<small class="b365">On ${esc(S.book)} pick <b>${esc(l.b365)}</b></small>` : ""}</span>
         <button type="button" class="swap" data-swap="${esc(l.id)}"
           title="Not keen on this one? HAWK builds the ticket again without it, at the same price."><i>🔄</i>Swap</button></div>
       <div class="nums">

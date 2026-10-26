@@ -593,6 +593,9 @@
   }
 
   /* -------------------------------------------------------- your tickets */
+  // bet id -> the dead leg and when it was first seen dead, so the same leg
+  // must read lost on two refreshes before the Vault is written to.
+  const DEAD = new Map();
   async function tickets(d) {
     let bets = [];
     try { bets = JSON.parse(localStorage.getItem("hawk_bets") || "[]"); } catch { bets = []; }
@@ -603,7 +606,7 @@
 
     const icon = { won: "✅", lost: "❌", live: "⏳", wait: "⏸", void: "⊘" };
     const out = [];
-    let firstP = null;
+    let firstP = null, firstGone = false;
 
     for (const b of mine) {
       const here = (b.legs || []).filter((l) => l.hawk && String(l.hawk.game) === String(S.id))
@@ -627,9 +630,34 @@
         if (p != null) pOther *= p;
       }
       const p = (live.p == null ? 0 : live.p) * pOther;
-      if (firstP == null) firstP = p;
+      if (firstP == null) { firstP = p; firstGone = (live.legs || []).some((r) => r.state === "lost"); }
       const ret = +b.potentialReturn || 0, hold = p * ret;
       const offer = parseFloat(String(S.offers[b.id] || "").replace(",", "."));
+
+      /* A ticket carrying a dead leg cannot come back. ticketLive() already
+         knows — it forces p to 0 the moment any leg reads "lost" — and what
+         this card did with that was carry on regardless: a 0.0% headline that
+         looks like a very long shot rather than a loss, live chances beside
+         legs that no longer decide anything, and a cash-out helper for a
+         ticket no bookmaker will offer you a penny for.
+
+         0.0% is the worst of it. It is the one number on the page that is
+         read as "nearly impossible" when it means "already over". */
+      const dead = (live.legs || []).filter((r) => r.state === "lost");
+      const gone = dead.length > 0;
+      const killer = dead.map((r) => r.label).join(" and ");
+      let settled = false;
+      /* The same leg has to read lost TWICE, ten seconds or more apart, before
+         anything is written — one bad frame of feed data must not settle a live
+         bet. This page refreshes every 15 s, so the second read is the next
+         refresh. settleLost() itself lives in hawk-alerts.js and is the only
+         thing in HAWK that writes a bet to LOST; this is a caller, not a copy. */
+      if (gone && window.HAWKAlerts && window.HAWKAlerts.settleLost) {
+        const prev = DEAD.get(b.id);
+        if (prev && prev.killer === killer && Date.now() - prev.t >= 10000)
+          settled = !!window.HAWKAlerts.settleLost(b.id, killer, String(S.id), live.legs);
+        else if (!prev || prev.killer !== killer) DEAD.set(b.id, { killer, t: Date.now() });
+      } else if (!gone) DEAD.delete(b.id);
 
       const legs = (live.legs || []).map((r) => `<div class="lg"><span>${icon[r.state] || "⏳"}</span>
         <span>${esc(r.label)}${r.note ? `<small>${esc(r.note)}</small>` : ""}</span>
@@ -639,7 +667,12 @@
       const others = elsewhere.length ? `<div class="lg"><span>🕒</span><span>${plural(elsewhere.length, "leg")}
         on other matches<small>counted at the chance stored with the bet</small></span><b>—</b></div>` : "";
 
-      const vd = !(offer > 0)
+      const vd = gone
+        ? `<div class="vd bad"><b>This one is gone</b>${esc(killer)} cannot come back, so the ticket
+           is lost whatever the other legs do. ${settled
+             ? "Settled as lost in the Vault — no money moves, the stake came off when you logged it."
+             : "Nothing to cash out: the offer would be nothing."}</div>`
+        : !(offer > 0)
         ? `<div class="vd"><b>Worth ${money(hold)} on average</b>Type Bet365's cash-out offer to see whether it is worth taking.</div>`
         : offer >= hold
           ? `<div class="vd good"><b>Take it</b>${money(offer)} is more than the ticket is worth on average
@@ -647,14 +680,14 @@
           : `<div class="vd bad"><b>Keep it</b>On average the ticket is worth ${money(hold)} —
              ${money(hold - offer)} more than the offer.</div>`;
 
-      out.push(`<div class="tkl">
+      out.push(`<div class="tkl${gone ? " gone" : ""}">
         <div class="top"><span class="s">${money(b.stake)} @ <b>${(+b.odds || 0).toFixed(2)}</b> → ${money(ret)}${
           approx ? `<br><span style="color:var(--faint);font-size:10.5px">includes other matches at stored chances</span>` : ""}</span>
-          <span class="p">${pct(p, p < 0.1 ? 1 : 0)}</span></div>
+          <span class="p">${gone ? "Gone" : pct(p, p < 0.1 ? 1 : 0)}</span></div>
         ${legs}${others}
-        <div class="co"><div><label for="of-${esc(b.id)}">Bet365 cash-out</label>
+        ${gone ? "" : `<div class="co"><div><label for="of-${esc(b.id)}">Bet365 cash-out</label>
           <input id="of-${esc(b.id)}" data-offer="${esc(b.id)}" inputmode="decimal"
-            placeholder="e.g. 2.10" value="${esc(S.offers[b.id] || "")}"></div></div>
+            placeholder="e.g. 2.10" value="${esc(S.offers[b.id] || "")}"></div></div>`}
         ${vd}</div>`);
     }
 
@@ -663,7 +696,8 @@
     $("#yoursN").textContent = plural(out.length, "ticket");
     $("#tickets").innerHTML = out.join("");
     $("#yours").hidden = false;
-    $("#bgPR").innerHTML = firstP == null ? "" : `Your ticket<br><b>${pct(firstP)}</b>`;
+    $("#bgPR").innerHTML = firstP == null ? ""
+      : `Your ticket<br><b>${firstGone ? "Gone" : pct(firstP)}</b>`;
     return firstP;
   }
 

@@ -1181,6 +1181,14 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
   letter-spacing:.17em;text-transform:uppercase;color:var(--muted)}
 .tkl .vd.good b{color:var(--up)}
 .tkl .vd.bad b{color:var(--down)}
+/* A ticket that cannot come back. The headline stops being a number — "Gone"
+   at 32px says in one word what "0.0%" only implies, and a percentage that
+   small reads as a long shot rather than a loss. The legs stay legible and
+   step back: each one's own chance is still a true thing to say, it just no
+   longer decides anything. */
+.tkl.gone .top .p{font-size:24px;letter-spacing:.04em;text-transform:uppercase;color:var(--down)}
+.tkl.gone .lg{opacity:.5}
+.tkl.gone .lg b.l{opacity:1}
 
 /* the half-time / live check */
 .ht{padding:22px 0;border-bottom:1px solid var(--rule)}

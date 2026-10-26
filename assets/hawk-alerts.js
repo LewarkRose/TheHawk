@@ -1276,6 +1276,11 @@
     // the plain one. Pages raise their own through these rather than inventing
     // a second kind of popup.
     show: card, notice, check, checkLineups, paintBell,
+    /* The Live page sees a dead ticket too — it calls ticketLive() every 15
+       seconds and gets the same "lost" back. It must not grow a second copy
+       of this: one function writes hawk_bets, and the two-consecutive-reads
+       rule stays with whoever calls it. */
+    settleLost,
     toggleWatch, isWatched, watchList,
     get on() { return G.on; },
     log: () => loadPref("hawk.alertLog", []),

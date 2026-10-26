@@ -252,6 +252,41 @@
     return [...out.values()];
   }
 
+  /* ------------------------------------------- did HAWK WATCH them land?
+     The alert used to say "Both XIs are confirmed" whenever it first noticed,
+     which is not the same thing as when it happened. Arm a bell late, or open
+     a tab late, and you get a card that reads like news about something that
+     happened half an hour ago — and the one alert worth being woken by is the
+     one that must never cry wolf.
+
+     365Scores reports lineups as a STATUS with no timestamp, so "confirmed 34
+     minutes ago" is not available to be printed honestly. What IS knowable is
+     whether HAWK ever saw this match UNCONFIRMED before: if it did, it watched
+     the XIs land and "just confirmed" is true. If its very first look already
+     said confirmed, it has no idea how long they have been in, and says so.
+
+     Kept in storage, not memory, so a reload does not turn a watched flip into
+     a first look. Pruned past kick-off + 4h, when the question is dead. */
+  const XI_OPEN_KEY = "hawk.xiOpen";
+  function xiOpenMap() { const v = loadPref(XI_OPEN_KEY, {}); return v && typeof v === "object" ? v : {}; }
+  function markXiOpen(id) {
+    const m = xiOpenMap(), now = Date.now();
+    for (const k of Object.keys(m)) if (now - m[k] > 12 * 3600e3) delete m[k];
+    m[String(id)] = now;
+    savePref(XI_OPEN_KEY, m);
+  }
+  /* What is left, not what has passed — the only honest clock here, and the
+     more useful one: a lineup alert exists to tell you there is still time. */
+  function toKick(iso) {
+    const t = Date.parse(iso || "");
+    if (!Number.isFinite(t)) return "";
+    const m = Math.round((t - Date.now()) / 60000);
+    if (m > 180 || m < -240) return "";
+    if (m > 1) return `${m} min to kick-off`;
+    if (m >= -1) return "kicking off now";
+    return `under way, ${-m} min in`;
+  }
+
   let lineupBusy = false;
   async function checkLineups() {
     const list = watchList();
@@ -265,6 +300,10 @@
       for (const w of all) {
         let st = null;
         try { st = await E().lineups(w.id); } catch { continue; }   // ask again next time
+        // Seen open: the next pass that finds them confirmed KNOWS it watched
+        // them land. Recorded before the early return, because a match whose
+        // XIs are not out yet is exactly the case this has to remember.
+        if (st && !st.confirmed && !st.started) markXiOpen(w.id);
         if (!st || !(st.confirmed || st.started)) continue;
         // Once the XIs are in — or the match has started without them — the
         // lineup alert is done. Goals keep coming for the next three hours.
@@ -277,12 +316,22 @@
         const follow = loadPref("hawk.goalFollow", {});
         follow[String(w.id)] = new Date().toISOString();
         savePref("hawk.goalFollow", follow);
-        if (st.confirmed && firstTime(`xi|${w.id}`))
+        if (st.confirmed && firstTime(`xi|${w.id}`)) {
+          // Watched them land, or only just looked? The claim changes; the word
+          // and its sound do not, so a late card still reads as the same alert.
+          const watched = !!xiOpenMap()[String(w.id)];
+          const when = toKick(st.kickoff);
+          const lead = st.started ? "Both XIs are in — this one is already under way"
+            : watched ? `Both XIs are confirmed${st.source === "ESPN" ? " <span>· ESPN had them first</span>" : ""}`
+            : "Both XIs were already in when HAWK looked";
+          const tail = st.started ? "Tap to see what HAWK made of it"
+            : watched ? "Tap to build it on the real teams"
+            : "HAWK cannot tell how long ago — it has only just checked this one";
           card({ tone: "warn", icon: "🔔", word: "LINEUPS IN", clock: "XI",
-                 href: `../match/?league=${encodeURIComponent(w.league || "")}&id=${encodeURIComponent(w.id)}`,
+                 href: `../${st.started ? "live" : "match"}/?league=${encodeURIComponent(w.league || "")}&id=${encodeURIComponent(w.id)}`,
                  g: { id: w.id, league: w.league, home: w.home, away: w.away, score: [null, null], status: 1 },
-                 body: `Both XIs are confirmed${st.source === "ESPN" ? " <span>· ESPN had them first</span>" : ""}
-                        <br><span>Tap to build it on the real teams</span>` });
+                 body: `${lead}<br><span>${when ? `${when} · ` : ""}${tail}</span>` });
+        }
       }
       if (changed) { savePref(WATCH_KEY, keep); paintBell(); }
     } finally { lineupBusy = false; }

@@ -2774,7 +2774,13 @@
         .filter((p) => String(p.statusText) === "Starting")
         .map((p) => names[p.id] || names[p.athleteId] || "")
         .filter(Boolean);
-    return { ...st, confirmed, source, xi, started: !!(g.startTime && new Date(g.startTime) < new Date()) };
+    // The kick-off goes back with it. 365Scores reports lineups as a STATUS and
+    // never says when they were confirmed, so nothing downstream can honestly
+    // print "confirmed 20 minutes ago" — it only knows when it looked. What it
+    // can say is how long is left to do something about them, which is the
+    // thing you actually want from a lineup alert anyway.
+    return { ...st, confirmed, source, xi, kickoff: g.startTime || null,
+             started: !!(g.startTime && new Date(g.startTime) < new Date()) };
   }
 
   // Background jobs over every fixture in a time window, two matches at a

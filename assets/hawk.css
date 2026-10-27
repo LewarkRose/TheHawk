@@ -1070,6 +1070,25 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
 .built li.why .nm small.b365 b{color:var(--gold-hi)}
 .built li.why .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
   background:var(--rule);margin:12px 0 0}
+/* The line stepper. Two square buttons either side of the number they move,
+   because that is the one arrangement where which button does what needs no
+   label. Disabled at the ends of the board rather than removed: a missing
+   button slides the other one under your thumb, and the end of a market is
+   worth being able to see. */
+.built li.why .step{display:flex;align-items:center;gap:8px;margin-top:12px}
+.built li.why .step .lab{font:700 8px/1 var(--mono);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint);margin-right:2px}
+.built li.why .step .sbtn{appearance:none;cursor:pointer;width:30px;height:30px;flex:none;
+  border:0;background:var(--raise);color:var(--text);
+  font:700 15px/1 var(--mono);box-shadow:inset 0 0 0 1px var(--rule-2);
+  transition:color .25s var(--film),box-shadow .25s var(--film)}
+.built li.why .step .sbtn:hover{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+.built li.why .step .sbtn.off{color:var(--faint);cursor:not-allowed;
+  background:none;box-shadow:inset 0 0 0 1px var(--rule)}
+.built li.why .step .sbtn.off:hover{color:var(--faint);box-shadow:inset 0 0 0 1px var(--rule)}
+.built li.why .step .nxt{min-width:42px;text-align:center;
+  font:700 15px/1 var(--disp);letter-spacing:.04em;color:var(--gold-hi);
+  font-variant-numeric:tabular-nums}
 .built li.why .nums > div{background:var(--raise);padding:9px 10px}
 .built li.why .nums .k{font:700 8px/1 var(--mono);letter-spacing:.12em;
   text-transform:uppercase;color:var(--faint)}

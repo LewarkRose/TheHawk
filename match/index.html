@@ -1000,6 +1000,7 @@
         <div><div class="k">Fair odds</div><div class="v">${odds(fair)}</div>
           <div class="s">HAWK's price</div></div>
       </div>
+      ${lineStep(l)}
       <ul class="lines">${lines.join("")}</ul></li>`;
   }
 
@@ -1060,6 +1061,84 @@
      The engine already works this way internally — searchOptions builds its
      alternatives by swapping each leg out in turn — so this is the same
      mechanism, aimed at one leg by you instead of at all of them by HAWK. */
+  /* ============================================== the line stepper (v1's)
+     Swap is "give me a different leg". This is "the same bet, a notch along" —
+     Under 9.5 shots to Under 10.5 — and they are not the same question. Swap
+     hands the choice back to the engine; this keeps the leg you picked and
+     only moves its line, which is what you want when you like the market and
+     not the number.
+
+     A leg id ends in its line (sot:u9.5, cards:o4.5, tcorners:home:u3.5), so
+     the siblings are the legs sharing that stem. The market has to match too:
+     the stem alone would let a player's 2+ shots sit beside a match total. */
+  const LINE_ID = /^(.*?)(\d+(?:\.\d+)?)$/;
+  /* Correct Score ends in a number too, and it is not a line. "cs:1-0" and
+     "cs:1-1" share the stem "cs:1-", so the stepper would happily offer to
+     move you from a 1-0 to a 1-1 under a label reading "Line". Those are two
+     different bets, not one bet a notch along, which is the whole idea here.
+     (Clean sheet is cs:home / cs:away and has no trailing digit, so it was
+     never in danger.) */
+  const NOT_A_LINE = /^cs:\d/;
+  function lineSiblings(leg) {
+    if (!leg || !leg.id || NOT_A_LINE.test(leg.id)) return [];
+    const m = LINE_ID.exec(leg.id);
+    if (!m) return [];
+    const stem = m[1];
+    return (S.m && S.m.legs ? S.m.legs : [])
+      .filter((x) => x.market === leg.market && LINE_ID.test(x.id) && LINE_ID.exec(x.id)[1] === stem)
+      .sort((a, b) => parseFloat(LINE_ID.exec(a.id)[2]) - parseFloat(LINE_ID.exec(b.id)[2]));
+  }
+  /* The row: the line it is on, and the two either side. A disabled button
+     rather than a missing one — an end of the board is worth seeing, and a
+     control that vanishes at the edges moves the other one under your thumb. */
+  function lineStep(l) {
+    const sibs = lineSiblings(l);
+    if (sibs.length < 2) return "";
+    const i = sibs.findIndex((x) => x.id === l.id);
+    if (i < 0) return "";
+    const btn = (to, sign) => to
+      ? `<button type="button" class="sbtn" data-line="${esc(to.id)}" data-from="${esc(l.id)}"
+           title="${esc(to.label)} — HAWK makes it ${pct(to.p, to.p < 0.1 ? 1 : 0)}">${sign}</button>`
+      : `<button type="button" class="sbtn off" disabled
+           title="No ${sign === "−" ? "lower" : "higher"} line in this market">${sign}</button>`;
+    return `<div class="step"><span class="lab">Line</span>
+      ${btn(sibs[i - 1], "−")}<span class="nxt">${esc(LINE_ID.exec(l.id)[2])}</span>${btn(sibs[i + 1], "+")}</div>`;
+  }
+  /* Moving a line REPRICES the whole ticket, which is the reason this goes
+     through the engine instead of editing a label. Legs on one match are
+     priced together, so Under 9.5 → Under 10.5 changes what every other leg
+     on the slip is worth; evaluate() prices the exact set and hands back the
+     ticket, the same object abShow() already draws. */
+  function abStepLine(fromId, toId) {
+    const t = abOpts[abAt] || null;
+    if (!S.m || !t || !t.legs || !fromId || !toId) return;
+    const ids = t.legs.map((l) => l.id), i = ids.indexOf(fromId);
+    if (i < 0) return;
+    if (ids.includes(toId)) return;            // already on the ticket
+    const next = ids.slice(); next[i] = toId;
+    let out = null;
+    try { out = window.HAWK.evaluate({ id: String(S.id), legs: next }); } catch { /* below */ }
+    if (!out || !out.legs || out.legs.length !== next.length) {
+      abNote("That line cannot be priced with the rest of this ticket.");
+      return;
+    }
+    if (abOpts.length) abOpts[abAt] = out; else abOpts = [out];
+    abShow(out, abAt + 1);
+    abRow();
+  }
+  // one place for the "it didn't work" line under the ticket, so swap and the
+  // stepper say it the same way and neither leaves one on screen
+  function abNote(text) {
+    const out = $("#abOut");
+    if (!out) return;
+    const p = document.createElement("p");
+    p.className = "note";
+    p.style.margin = "16px 0 0";
+    p.textContent = text;
+    out.appendChild(p);
+    setTimeout(() => p.remove(), 6000);
+  }
+
   function abSwap(legId) {
     const t = abOpts[abAt] || null;
     const out = $("#abOut");
@@ -1415,6 +1494,10 @@
       abPlan();
       return;
     }
+
+    // the line stepper, before swap: both live on the same leg card
+    const step = e.target.closest("[data-line]");
+    if (step) { abStepLine(step.dataset.from, step.dataset.line); return; }
 
     const sw2 = e.target.closest("[data-swap]");
     if (sw2) { abSwap(sw2.dataset.swap); return; }

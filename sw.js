@@ -9,13 +9,17 @@
 //
 // builder/engine.js and builder/hawk-settle.js stay, and are not v1 leftovers:
 // they are the model and the settler, and every rebuilt page loads them.
-const CACHE = "hawk-v6";
+// v7: hawk-table.js was never in the shell though six pages load it, so an
+// installed copy offline had no table and no cup bracket; and the version is
+// bumped so activate() drops v6 and with it whatever stale copies it held.
+const CACHE = "hawk-v7";
 const SHELL = ["./", "./index.html", "./builder/engine.js", "./builder/hawk-settle.js",
                "./hawk-logo.svg", "./icon.svg", "./favicon.svg", "./qr.js", "./manifest.webmanifest",
                // the rebuilt pages and the sheet and scripts they all share
                "./home/", "./today/", "./scores/", "./match/", "./live/", "./acca/", "./board/", "./vault/",
                "./assets/hawk.css", "./assets/hawk-nav.js", "./assets/hawk-bg.js", "./assets/hawk-fold.js",
-               "./assets/hawk-alerts.js", "./assets/hawk-acca.js", "./assets/hawk-lineups.js"];
+               "./assets/hawk-alerts.js", "./assets/hawk-acca.js", "./assets/hawk-lineups.js",
+               "./assets/hawk-table.js"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => { /* first visit offline: fine */ }));
@@ -45,7 +49,21 @@ self.addEventListener("notificationclick", (e) => {
 self.addEventListener("fetch", (e) => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== location.origin) return;
-  e.respondWith(fetch(req).then((res) => {
+  /* NETWORK FIRST HAS TO MEAN THE NETWORK.
+     It did not. The browser's own HTTP cache sits UNDERNEATH this fetch, and
+     GitHub Pages serves every asset with max-age=600, so a plain fetch() here
+     could be answered from that cache with a copy up to ten minutes old and
+     this worker would never know — it would then store the stale copy as if
+     it were fresh. HAWK's script tags carry no version string, so nothing
+     else corrected it either: a deploy could land and the app keep running
+     the previous build until the ten minutes were up.
+     "no-cache" does not mean "do not cache". It means revalidate every time:
+     the browser still sends If-None-Match and a 304 still costs almost
+     nothing, but it can never hand back something the server has replaced.
+     Navigations are left alone — a Request in navigate mode cannot be
+     rebuilt with an init, which throws. */
+  const fresh = req.mode === "navigate" ? fetch(req) : fetch(req, { cache: "no-cache" });
+  e.respondWith(fresh.then((res) => {
     if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
     return res;
   }).catch(() => caches.match(req, { ignoreSearch: true })

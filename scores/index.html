@@ -385,9 +385,12 @@
     const groups = [...by.entries()].map(([name, l]) => ({ name, l: l.sort((a, b) => ko(a) - ko(b)) }))
       .sort((a, b) => rank(a.l) - rank(b.l));
 
+    // a cup has no table — the same panel draws its bracket, so the button says so
+    const cups = ((window.HAWK.LEAGUE_GROUPS || []).find((g) => g.key === "cups") || {}).leagues || [];
     $("#board").innerHTML = groups.map((gr) => `<section class="lg-sec">
       <div class="lg-h"><h3>${esc(gr.name)}</h3><span class="n">${gr.l.length}</span>
-        <button class="tbtn" type="button" data-table="${esc(gr.name)}">Table</button></div>
+        <button class="tbtn" type="button" data-table="${esc(gr.name)}">${
+          cups.includes(gr.name) ? "Bracket" : "Table"}</button></div>
       ${gr.l.map(row).join("")}</section>`).join("");
     xiSweep(list);
   }

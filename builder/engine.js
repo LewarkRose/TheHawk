@@ -3367,7 +3367,25 @@
       } else if ((t = goalTest(id2))) {
         goalTests.push(t);
         row.p = sumCells(M, t);
-        if (row.p > 0.9999) { row.state = "won"; row.p = 1; } else if (row.p < 1e-4) { row.state = "lost"; row.p = 0; }
+        /* DEAD MEANS IMPOSSIBLE, NOT UNLIKELY.
+           This used to read `p < 1e-4` for lost and `p > 0.9999` for won, and
+           on 28 Oct it settled a live bet: Genoa 2-0 Juventus at half an hour,
+           Result: Juventus called LOST while HAWK's own honest number for it
+           was 7.6%. The remaining-goal rates here are FITTED to the in-play
+           prices, and fitRemaining's floor is 0.005 goals — around a goal the
+           market is suspended and the median can be one book, so the fit
+           collapses, and from 2-0 any fitted away rate of 0.05 or less puts
+           the leg under 1e-4. Two consecutive reads saw the same bad fit, so
+           the ten-second double-check in settleLost() passed it through.
+           The threshold bought nothing. The matrix is built from the score
+           already on the board, so a leg that genuinely cannot happen comes
+           back as EXACTLY zero — cs:1-0 at 2-0, Under 1.5 at two goals — and
+           one that cannot fail comes back as exactly one. Those are the only
+           two states worth settling on. Everything else is a long shot and
+           gets to stay on the slip until full time, where the real settler
+           (hawk-settle.js) reads the finished match instead of a model.
+           1e-9 is float dust: sumCells returns 1.0000000000000002 for certain. */
+        if (row.p >= 1 - 1e-9) { row.state = "won"; row.p = 1; } else if (row.p <= 0) { row.state = "lost"; row.p = 0; }
         row.note = `score ${sh}-${sa}`;
       } else if ((m = /^qual:(home|away)$/.exec(id2))) {
         const [ah, aa] = preAgg(game, hc.name), pH = sumCells(M, (i, j) => i > j), pA = sumCells(M, (i, j) => j > i), share = etShare(pH, pA);

@@ -312,6 +312,12 @@
       const tb = $("#tblBtn");
       tb.dataset.table = m.league;
       tb.dataset.hl = JSON.stringify([m.home, m.away]);
+      /* A cup has no table, and the button said "League table" anyway — so it
+         promised a thing that opened empty. The same panel draws the bracket
+         for those, with these two lit in it. The cup list is the engine's own
+         grouping, not a second list of names kept here to drift from it. */
+      const cups = ((window.HAWK.LEAGUE_GROUPS || []).find((g) => g.key === "cups") || {}).leagues || [];
+      tb.textContent = cups.includes(m.league) ? "Cup bracket" : "League table";
       tb.hidden = false;
     }
     $("#read").hidden = false;

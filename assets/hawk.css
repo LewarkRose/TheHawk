@@ -2378,7 +2378,11 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
   padding:clamp(12px,3vw,40px);background:rgba(4,4,6,.78);
   backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
   animation:pcIn .35s var(--film) both;overflow-y:auto}
-.tpanel .in{width:min(700px,100%);background:var(--raise);
+/* min-width:0 is load-bearing: .in is a grid item, and a grid item's
+   min-width defaults to its CONTENT, which beats the width above. Without it
+   the bracket's columns push the whole panel wider than the window instead of
+   scrolling inside it, and the page grows a horizontal scrollbar. */
+.tpanel .in{width:min(700px,100%);min-width:0;background:var(--raise);
   box-shadow:inset 0 0 0 1px var(--rule-2),0 40px 90px -30px #000;
   padding:clamp(18px,2.6vw,28px);animation:pcUp .5s var(--film) both}
 .tpanel .hd{display:flex;align-items:baseline;gap:14px;padding-bottom:16px}
@@ -2442,6 +2446,71 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
 .tleg span{display:flex;align-items:center;gap:7px}
 .tleg .tdst{width:3px;height:12px;display:block}
 
+/* ---------------------------------------------------------- the cup bracket
+   The same panel, drawing the draw instead of a table. Every box is the same
+   height on purpose: hawk-table.js works each column's gap and top offset out
+   from the one before it, so a slot sits exactly level with the middle of the
+   pair feeding it. Change .btie's height here and the tree bends there. */
+.brack{margin:0 0 2px;overflow-x:auto;overflow-y:hidden;padding-bottom:12px;
+  -webkit-overflow-scrolling:touch}
+.brack .bhd{display:flex;gap:20px;padding:0 0 10px}
+.brack .bhd span{flex:0 0 168px;font:700 9px/1 var(--mono);letter-spacing:.15em;
+  text-transform:uppercase;color:var(--faint)}
+.brack .bhd span.now{color:var(--gold-hi)}
+.brack .brow{display:flex;gap:20px;align-items:stretch}
+.bcol{flex:0 0 168px;display:flex;flex-direction:column}
+.bpair{display:flex;align-items:stretch}
+.bpair .bin{flex:1;min-width:0;display:flex;flex-direction:column}
+.bjoin{flex:0 0 14px;border:1px solid var(--rule-2);border-left:0}
+/* the gutter with nothing proved to draw in it — it still holds the width so
+   every box in a column is the same size */
+.bjoin.off{border-color:transparent}
+.btie{display:block;height:56px;box-sizing:border-box;padding:6px 9px;background:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--rule);text-decoration:none;color:var(--text);
+  transition:background .3s var(--film),box-shadow .3s var(--film)}
+a.btie:hover{background:rgba(242,242,242,.04);box-shadow:inset 0 0 0 1px var(--rule-2)}
+.btie.hl{background:rgba(212,169,78,.09);box-shadow:inset 0 0 0 1px var(--gold)}
+.btie.tbd{background:none}
+/* bkt, not bt: .bt above is the Vault's bet row, grid with 16px of padding,
+   and a bare class name beat the scoped display here into a 48px line. */
+.btie .bkt{display:flex;align-items:center;gap:6px}
+.btie .bkt b{flex:1;min-width:0;font:400 11.5px/1.35 var(--sans);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btie .bkt em{flex:none;font:400 10.5px/1.35 var(--mono);font-style:normal;
+  font-variant-numeric:tabular-nums;color:var(--muted)}
+.btie .bkt.go b{color:var(--gold-hi);font-weight:600}
+.btie .bkt.go em{color:var(--text)}
+.btie .bkt.out b,.btie .bkt.out em,.btie.tbd .bkt b{color:var(--faint)}
+.btie .bw{display:block;padding-top:3px;font:400 8.5px/1 var(--mono);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);overflow:hidden;white-space:nowrap}
+.btie .bw.lv{color:var(--live)}
+
+/* the rounds a tree cannot hold: the early ones, or all of them before the
+   competition has narrowed to eight ties */
+.brds .bhdr{margin:20px 0 8px;font:700 9px/1 var(--mono);letter-spacing:.15em;
+  text-transform:uppercase;color:var(--faint)}
+.brd{border-bottom:1px solid var(--rule)}
+.brd > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:11px;
+  padding:11px 8px;transition:background .35s var(--film)}
+.brd > summary::-webkit-details-marker{display:none}
+.brd > summary:hover,.brd[open] > summary{background:rgba(242,242,242,.05)}
+.brd .rn{flex:1;min-width:0;font:700 10px/1 var(--mono);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--gold-hi)}
+.brd .rc{flex:none;font:400 10px/1 var(--mono);color:var(--faint)}
+.btr{display:flex;align-items:center;gap:9px;padding:8px;text-decoration:none;
+  color:var(--text);box-shadow:inset 0 1px 0 var(--rule)}
+a.btr:hover{background:rgba(242,242,242,.04)}
+.btr.hl{background:rgba(212,169,78,.09)}
+.btr .hm,.btr .aw{flex:1;min-width:0;font-size:12.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btr .hm{text-align:right}
+.btr .sc{flex:0 0 46px;text-align:center;font:400 11px/1 var(--mono);
+  font-variant-numeric:tabular-nums;color:var(--muted)}
+.btr .wh{flex:0 0 52px;text-align:right;font:400 9px/1 var(--mono);
+  letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.btr .go{color:var(--gold-hi);font-weight:600}
+.btr .out{color:var(--faint)}
+
 /* the button that opens it */
 .tbtn{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:0;background:none;
   cursor:pointer;color:var(--faint);font:700 9px/1 var(--mono);letter-spacing:.15em;
@@ -2451,6 +2520,12 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
 @media (max-width:620px){
   .trow .lform{display:none}
   .lopen{padding-left:44px}
+  /* narrower columns, not a narrower tree: the bracket is meant to be
+     scrolled sideways on a phone, and shrinking it to fit would make four
+     rounds unreadable rather than make them fit */
+  .brack .bhd span,.bcol{flex-basis:146px}
+  .brack .bhd,.brack .brow{gap:16px}
+  .btr .wh{display:none}
 }
 
 /* ================================ ALERTS ================================

@@ -407,6 +407,29 @@
   const ago = (t) => { const m = Math.max(0, Math.round((Date.now() - t) / 60000));
     return m < 1 ? "now" : m < 60 ? `${m}m` : `${Math.round(m / 60)}h`; };
 
+  /* ------------------------------------------------------------- unread
+     What the badge on the bell counts. It used to be followedGames().size —
+     how many matches are being followed — drawn as a small red circle on the
+     top right of a bell, which in every app anyone has ever used means "two
+     new things to read". So it promised alerts and delivered a watchlist:
+     the panel underneath said "Nothing yet" beneath a red 2, and both were
+     true at the same time. The count it LOOKS like is the one it now is.
+     What is followed is still said, in words, in the panel's first line,
+     where it reads as a setting rather than as news. */
+  /* READ_KEY, and "hawk.alertRead" — not SEEN_KEY and not "hawk.alertSeen",
+     which is taken above and is not a near miss: that key holds the list of
+     up to 500 alert keys HAWK has already fired, and a timestamp written
+     over it would make every past alert go off again. */
+  const READ_KEY = "hawk.alertRead";
+  const unread = () => {
+    const at = +loadPref(READ_KEY, 0) || 0;
+    return loadPref("hawk.alertLog", []).filter((a) => a && a.at > at).length;
+  };
+  const markRead = () => savePref(READ_KEY, Date.now());
+  // First run after this shipped: twenty remembered alerts are history, not
+  // news, and must not all arrive at once as a badge of twenty.
+  if (loadPref(READ_KEY, null) == null) markRead();
+
   const liveHref = (g) => `../live/?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}`;
   const matchHref = (g) => `../match/?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}`;
 
@@ -1104,11 +1127,15 @@
     if (!bell) return;
     // Always shown, because it is the master switch as well as the count —
     // a hidden bell is how you end up not knowing alerts are off.
-    const n = followedGames().size;
+    // The panel being open IS reading them, so nothing can arrive unread
+    // while you are looking at the list it would arrive in.
+    if (pop) markRead();
+    const n = unread(), f = followedGames().size;
     bell.classList.toggle("off", !G.on);
     bell.innerHTML = `🔔<em>${G.on && n ? n : ""}</em>`;
-    bell.title = !G.on ? "Alerts are off" : n
-      ? `${plural(n, "match")} followed — goals, red cards and your bet`
+    bell.title = !G.on ? "Alerts are off"
+      : n ? `${plural(n, "alert")} you haven't read`
+      : f ? `Nothing new · ${plural(f, "match")} followed`
       : "Alerts are on. A match you have a bet on is followed automatically.";
     if (pop) paintPop();
   }
@@ -1163,6 +1190,7 @@
       pop.className = "bellpop";
       paintPop();
       into.appendChild(pop);
+      paintBell();                 // opening it is reading them: the badge clears
       pop.onclick = async (ev) => {
         ev.stopPropagation();
         // the test buttons: a click is also the gesture that lets a browser
@@ -1185,6 +1213,7 @@
         if (b.dataset.al === "clear") {
           savePref("hawk.alertLog", []);
           paintPop();
+          paintBell();
           return;
         }
         if (b.dataset.al === "toggle") {

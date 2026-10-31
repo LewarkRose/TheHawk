@@ -26,7 +26,11 @@
     { key: "europe", name: "Europe", icon: "🏆", ids: { "Champions League": 572, "Europa League": 573, "Conference League": 7685 } },
     { key: "more", name: "More Europe", icon: "🌍", ids: { "Eredivisie": 57, "Liga Portugal": 73, "Scottish Premiership": 61, "Belgian Pro League": 98,
         "Süper Lig": 78, "Greek Super League": 84, "Austrian Bundesliga": 111, "Swiss Super League": 95, "Danish Superliga": 119, "Allsvenskan": 122 } },
-    { key: "second", name: "Second tier", icon: "🥈", ids: { "Championship": 1, "League One": 2, "2. Bundesliga": 26, "Serie B": 18, "LaLiga 2": 12, "Ligue 2": 36 } },
+    // The Championship alone. League One, 2. Bundesliga, Serie B, LaLiga 2 and
+    // Ligue 2 were removed on 2026-10-31 — HAWK is for the leagues it is used on.
+    // Those clubs still arrive through the domestic cups, which resolve them via
+    // _CUP_ONLY_SH in engine/sources.py; this list is only what HAWK SHOWS.
+    { key: "second", name: "Second tier", icon: "🥈", ids: { "Championship": 1 } },
     { key: "cups", name: "Cups", icon: "🏅", ids: { "FA Cup": 8, "EFL Cup": 9, "Copa del Rey": 13, "Coppa Italia": 20, "DFB-Pokal": 28, "Coupe de France": 37 } },
     { key: "world", name: "World", icon: "🌎", ids: { "MLS": 104, "Brasileirão": 113, "Argentina Primera": 72, "Liga MX": 141, "Saudi Pro League": 649,
         "Copa Libertadores": 102 } },
@@ -561,7 +565,7 @@
     "Champions League": "uefa.champions", "Europa League": "uefa.europa", "Conference League": "uefa.europa.conf",
     "Eredivisie": "ned.1", "Liga Portugal": "por.1", "Scottish Premiership": "sco.1", "Belgian Pro League": "bel.1", "Süper Lig": "tur.1",
     "Greek Super League": "gre.1", "Austrian Bundesliga": "aut.1", "Swiss Super League": "sui.1", "Danish Superliga": "den.1", "Allsvenskan": "swe.1",
-    "Championship": "eng.2", "League One": "eng.3", "2. Bundesliga": "ger.2", "Serie B": "ita.2", "LaLiga 2": "esp.2", "Ligue 2": "fra.2",
+    "Championship": "eng.2",
     "FA Cup": "eng.fa", "EFL Cup": "eng.league_cup", "Copa del Rey": "esp.copa_del_rey", "Coppa Italia": "ita.coppa_italia",
     "DFB-Pokal": "ger.dfb_pokal", "Coupe de France": "fra.coupe_de_france",
     "MLS": "usa.1", "Brasileirão": "bra.1", "Argentina Primera": "arg.1", "Liga MX": "mex.1", "Saudi Pro League": "ksa.1",
@@ -627,9 +631,9 @@
   // bookmaker's price for the leg, used where Bet365's isn't available.
   const KAMBI = "https://eu-offering-api.kambicdn.com/offering/v2018/ub", KAMBI_Q = "lang=en_GB&market=GB", REF_BOOK = "Unibet";
   const KAMBI_PATH = {
-    "Premier League": "england", "Championship": "england", "League One": "england", "FA Cup": "england", "EFL Cup": "england",
-    "La Liga": "spain", "LaLiga 2": "spain", "Copa del Rey": "spain", "Serie A": "italy", "Serie B": "italy", "Coppa Italia": "italy",
-    "Bundesliga": "germany", "2. Bundesliga": "germany", "DFB-Pokal": "germany", "Ligue 1": "france", "Ligue 2": "france", "Coupe de France": "france",
+    "Premier League": "england", "Championship": "england", "FA Cup": "england", "EFL Cup": "england",
+    "La Liga": "spain", "Copa del Rey": "spain", "Serie A": "italy", "Coppa Italia": "italy",
+    "Bundesliga": "germany", "DFB-Pokal": "germany", "Ligue 1": "france", "Coupe de France": "france",
     "Champions League": "champions_league", "Europa League": "europa_league", "Conference League": "conference_league",
     "Eredivisie": "netherlands", "Liga Portugal": "portugal", "Scottish Premiership": "scotland", "Belgian Pro League": "belgium",
     "Süper Lig": "turkey", "Greek Super League": "greece", "Austrian Bundesliga": "austria", "Swiss Super League": "switzerland",

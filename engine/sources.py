@@ -67,13 +67,12 @@ COMPETITIONS = {
     "Swiss Super League": dict(s365=95, fd="SWZ", sh=215, pm="12319"),
     "Danish Superliga": dict(s365=119, fd="DNK", sh=39, pm="10363"),
     "Allsvenskan": dict(s365=122, fd="SWE", sh=40, pm="11637"),
-    # Second tier
+    # Second tier — the Championship only. League One, 2. Bundesliga, Serie B,
+    # LaLiga 2 and Ligue 2 were removed on 2026-10-31: HAWK covers the leagues it
+    # is actually used on, and those five were roughly 110 clubs of the ~447
+    # squads a run fetches. Their clubs still arrive through the domestic cups,
+    # so their ids stay in _CUP_ONLY_SH below — read the note there first.
     "Championship": dict(s365=1, fd="E1", sh=18, pm="10355"),
-    "League One": dict(s365=2, fd="E2", sh=24, pm="11435"),
-    "2. Bundesliga": dict(s365=26, fd="D2", sh=44, pm="10670"),
-    "Serie B": dict(s365=18, fd="I2", sh=53, pm="10676"),
-    "LaLiga 2": dict(s365=12, fd="SP2", sh=54, pm="10672"),
-    "Ligue 2": dict(s365=36, fd="F2", sh=182, pm="10675"),
     # Domestic cups
     "FA Cup": dict(cup=True, s365=8, fd=("E0", "E1", "E2", "E3", "EC"), sh=19, sh_teams=_TOP_TIERS, pm="10307"),
     "EFL Cup": dict(cup=True, s365=9, fd=("E0", "E1", "E2", "E3"), sh=21, sh_teams=_TOP_TIERS, pm="10230"),
@@ -767,8 +766,17 @@ def sh_referee(home, away):
 
 
 # StatsHub's competition ids (the same numbering Sofascore uses).
-SH_TOURNAMENTS = {**{name: c["sh"] for name, c in COMPETITIONS.items()},
-                  "League Two": 25}   # not on the site, but its clubs play in the English cups
+# Leagues HAWK does not list but whose clubs play in competitions it does. Every
+# name here is named by some cup's `sh_teams`, which is how a cup tie resolves a
+# club that is in no league HAWK covers. League Two was never covered; the other
+# five were dropped on 2026-10-31 (see COMPETITIONS) and their ids HAVE to stay,
+# because sh_league_teams() reads SH_TOURNAMENTS and nothing else. Delete one and
+# the matching cup silently stops resolving half its draw: the FA Cup and EFL Cup
+# through _TOP_TIERS, and Coppa Italia, DFB-Pokal, Copa del Rey and Coupe de
+# France through their own sh_teams. No error, just "StatsHub teams not found".
+_CUP_ONLY_SH = {"League Two": 25, "League One": 24, "2. Bundesliga": 44,
+                "Serie B": 53, "LaLiga 2": 54, "Ligue 2": 182}
+SH_TOURNAMENTS = {**{name: c["sh"] for name, c in COMPETITIONS.items()}, **_CUP_ONLY_SH}
 
 
 def sh_league_teams(league):

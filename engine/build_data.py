@@ -20,9 +20,16 @@ results with the site:
 
 Last good data: every run starts from scratch, so when a source is down HAWK
 reuses what the previous run published (the live site's copy) instead of
-losing it — ratings up to 10 days old, player stats up to 4 days, and the
-fixtures of any league 365Scores didn't answer for. Each file keeps the time
-it was really built ("built"), so the site can say how fresh it is.
+losing it — ratings up to 10 days old, player stats up to 14 (see MAX_AGE),
+and the fixtures of any league 365Scores didn't answer for. Each file keeps
+the time it was really built ("built"), so the site can say how fresh it is.
+
+That cover is not total, and the gap is not in MAX_AGE. A squad is only
+fetched if its fixture carries StatsHub ids, and when sh_team_ids() can't
+answer those come from the fixture's previously published entry — so a match
+already in the window keeps its ids, and one entering it for the first time
+has none and never gets player stats at all. Reusing old files protects the
+squads HAWK already had; it does nothing for the fixtures arriving behind them.
 
 Run locally:  python build_data.py ../data
 """
@@ -42,7 +49,31 @@ import sources
 
 DAYS_AHEAD = 8
 LIVE_DATA = os.environ.get("HAWK_LIVE", "https://lewarkrose.github.io/TheHawk") + "/data/"
-MAX_AGE = {"profiles": dt.timedelta(days=10), "players": dt.timedelta(days=4), "results365": dt.timedelta(days=60),
+# How old a published file may be and still stand in for a fresh one. These are
+# not modelling choices: they decide when a dead source stops degrading HAWK and
+# starts emptying it.
+#
+# "players" was 4 days, and 4 days is a cliff rather than a decay, because
+# reuse() republishes the old file with its ORIGINAL `built` stamp — the clock
+# never resets, so the window runs from the last time StatsHub actually answered
+# and every squad crosses the line in the same run. StatsHub's /api/* began
+# returning HTTP 403 on 2026-10-29 12:51 UTC (the site itself still serves 200;
+# the JSON API is blocked, not down), and the 05:25 run on the 31st reported
+# 0 fresh, 442 reused, 5 missing — all 442 due to expire together at 12:51 on
+# the 2nd.
+#
+# Losing them is not a softer version of having them. The per-90 priors in
+# engine.js are pooled FROM these rows, and a player with no record has no
+# minutes against a MIN_AUTO_MINUTES of 270 — so the squads don't drop back to
+# position averages, they drop out, and with them the player legs. Two-week-old
+# real rows beat that in every case. 14 days is about four matchweeks; the honest
+# cost is that a player injured or transferred inside the window keeps his old
+# record, and the builder's 12-hour "Player stats are from ..." warning stops
+# being cosmetic and starts being the only thing that says so.
+#
+# A stopgap for a blocked source, not a new view on how fast player form moves.
+# Put it back to 4 once player stats have a source that answers.
+MAX_AGE = {"profiles": dt.timedelta(days=10), "players": dt.timedelta(days=14), "results365": dt.timedelta(days=60),
            "props": dt.timedelta(hours=12)}
 # Player-prop prices (PropLine, free key in PROPLINE_KEY): only matches kicking
 # off inside this window, and never more than this many requests in one run.

@@ -318,19 +318,23 @@
      keyed on a 365Scores competitor id now (meta.cid), because that one comes
      with the fixture instead of being looked up by name — which is what stopped
      working when StatsHub went behind a challenge on 29 Oct.
-     Both are tried, new first, because the two sets of files cannot cross over
-     in one deploy: the pipeline rebuilds each club's history from scratch a few
-     hundred matches per run, so for a day or two some clubs have a cid file and
-     the rest still only have their last StatsHub one. Without this fallback,
-     shipping the switch would empty most squads until the backfill caught up.
-     meta.sh also carries "intl_5029" for national squads, which engine/
-     intl_squads.py writes and which has no cid at all — so this is what keeps
-     internationals working too, and the fallback cannot be deleted until that
-     is moved over as well. */
+     The fallback is for national squads ONLY. engine/intl_squads.py runs after
+     build_data and writes players/intl_<competitorId>.json, setting meta.sh to
+     the string "intl_5029" for a fixture that has no cid at all — so that is
+     what keeps internationals working, and it cannot go until intl_squads moves
+     over too.
+     It deliberately does NOT fall back on a numeric sh. Those were StatsHub team
+     ids, and no StatsHub-keyed player file exists any more: build_data stopped
+     writing them and Pages replaces the whole data directory each deploy, so a
+     numeric fallback can only 404 — or, worse, hit a real file, because the two
+     id spaces overlap (29 of the sh ids in fixtures.json are also somebody's
+     competitor id). Serving another club's squad is far worse than serving none,
+     since a missing file degrades a market and a wrong one silently reprices it. */
   async function playerFile(meta, side) {
     const cid = meta && meta.cid && meta.cid[side];
     const sh = meta && meta.sh && meta.sh[side];
-    return (cid ? await data(`players/${cid}.json`) : null) || (sh ? await data(`players/${sh}.json`) : null);
+    const intl = typeof sh === "string" && sh.startsWith("intl_") ? sh : null;
+    return (cid ? await data(`players/${cid}.json`) : null) || (intl ? await data(`players/${intl}.json`) : null);
   }
 
   // ---------------------------------------------------------------------------

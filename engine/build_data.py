@@ -8,10 +8,11 @@ results with the site:
   data/meta.json              when the data was built, how each source did
                               (and when it last worked), and any problems
   data/fixtures.json          per upcoming fixture: football-data team names,
-                              StatsHub team ids, referee card average,
+                              365Scores competitor ids, referee card average,
                               Polymarket page, UK bookmaker odds snapshot
   data/profiles/<code>.json   team ratings for one league (model.build_profile)
-  data/players/<id>.json      per-player stats, last 20 matches, one team
+  data/players/<cid>.json     per-player stats, last 20 matches, one club, keyed
+                              on its 365Scores competitor id
   data/props/<game>.json      player-prop prices for one match: the median of the
                               books that price closest to Bet365 (PropLine)
   data/results365/<code>.json finished matches with team stats from 365Scores,
@@ -20,16 +21,16 @@ results with the site:
 
 Last good data: every run starts from scratch, so when a source is down HAWK
 reuses what the previous run published (the live site's copy) instead of
-losing it — ratings up to 10 days old, player stats up to 14 (see MAX_AGE),
-and the fixtures of any league 365Scores didn't answer for. Each file keeps
-the time it was really built ("built"), so the site can say how fresh it is.
+losing it — ratings up to 10 days old (MAX_AGE) and the fixtures of any league
+365Scores didn't answer for. Each file keeps the time it was really built
+("built"), so the site can say how fresh it is.
 
-That cover is not total, and the gap is not in MAX_AGE. A squad is only
-fetched if its fixture carries StatsHub ids, and when sh_team_ids() can't
-answer those come from the fixture's previously published entry — so a match
-already in the window keeps its ids, and one entering it for the first time
-has none and never gets player stats at all. Reusing old files protects the
-squads HAWK already had; it does nothing for the fixtures arriving behind them.
+Player stats work differently, and the difference is the point. They are
+ACCUMULATED: each run lists a club's recent finished matches, keeps every row
+the published file already holds, and fetches only what is new. So there is
+no window on them and nothing to expire — a stored row is a match that was
+played, and a failed run costs a club nothing but the matches it would have
+gained. The old all-or-nothing source needed a window, and a window is a cliff.
 
 Run locally:  python build_data.py ../data
 """
@@ -53,27 +54,18 @@ LIVE_DATA = os.environ.get("HAWK_LIVE", "https://lewarkrose.github.io/TheHawk") 
 # not modelling choices: they decide when a dead source stops degrading HAWK and
 # starts emptying it.
 #
-# "players" was 4 days, and 4 days is a cliff rather than a decay, because
-# reuse() republishes the old file with its ORIGINAL `built` stamp — the clock
-# never resets, so the window runs from the last time StatsHub actually answered
-# and every squad crosses the line in the same run. StatsHub's /api/* began
-# returning HTTP 403 on 2026-10-29 12:51 UTC (the site itself still serves 200;
-# the JSON API is blocked, not down), and the 05:25 run on the 31st reported
-# 0 fresh, 442 reused, 5 missing — all 442 due to expire together at 12:51 on
-# the 2nd.
+# There is deliberately no "players" entry. For two days at the end of October
+# there was: StatsHub went behind a Cloudflare challenge on the 29th, and because
+# it answered all-or-nothing — one request per club, its whole history or none —
+# a window was the only thing keeping squads alive, first 4 days and then 14.
+# A window is a cliff, too, since reuse() republishes a file with its ORIGINAL
+# `built` stamp, so every squad would have expired in the same run.
 #
-# Losing them is not a softer version of having them. The per-90 priors in
-# engine.js are pooled FROM these rows, and a player with no record has no
-# minutes against a MIN_AUTO_MINUTES of 270 — so the squads don't drop back to
-# position averages, they drop out, and with them the player legs. Two-week-old
-# real rows beat that in every case. 14 days is about four matchweeks; the honest
-# cost is that a player injured or transferred inside the window keeps his old
-# record, and the builder's 12-hour "Player stats are from ..." warning stops
-# being cosmetic and starts being the only thing that says so.
-#
-# A stopgap for a blocked source, not a new view on how fast player form moves.
-# Put it back to 4 once player stats have a source that answers.
-MAX_AGE = {"profiles": dt.timedelta(days=10), "players": dt.timedelta(days=14), "results365": dt.timedelta(days=60),
+# Step 3 accumulates instead. A stored row is a match that was played; it does
+# not go stale, it only gets older, so there is nothing to expire and no age at
+# which dropping it would be an improvement. A club's file now survives a failed
+# run untouched and simply gains nothing that run.
+MAX_AGE = {"profiles": dt.timedelta(days=10), "results365": dt.timedelta(days=60),
            "props": dt.timedelta(hours=12)}
 # Player-prop prices (PropLine, free key in PROPLINE_KEY): only matches kicking
 # off inside this window, and never more than this many requests in one run.
@@ -109,6 +101,15 @@ RUNS_PER_DAY = 12          # cron: "9 */2 * * *"
 S365_HISTORY_DAYS = 400
 S365_STATS_PER_RUN = 900
 S365_SECONDS = 300   # time this step may take per run (the Action has 30 minutes in all)
+# Player history: matches kept per player, and the per-run budget for filling it
+# in. 365Scores serves one MATCH at a time, so a club's 20 matches cost 20 `game`
+# calls the first time and about one a week after that — the budget exists for
+# the first fill, not the steady state. ~350 squads x 20, deduplicated where two
+# covered clubs met, is a few thousand; at 600 a run that settles inside a couple
+# of days, and PLAYER_SECONDS stops it eating the Action whatever happens.
+PLAYER_GAMES = 20
+PLAYER_FETCH_PER_RUN = 600
+PLAYER_SECONDS = 240
 FD_STALE_AFTER = dt.timedelta(days=3)
 # A source counts as working when at least this share of its requests did.
 SOURCE_OK_SHARE = 0.8
@@ -247,7 +248,11 @@ def main(out_dir):
         return fallback_names_cache[code]
 
     # 1. Upcoming fixtures, and what each one needs from the blocked sources.
-    fixtures, codes_needed, sh_teams = {}, set(), set()
+    # `cids` are 365Scores competitor ids, and they are what player stats are keyed
+    # on now. They come free with the fixture — unlike the StatsHub ids beside them,
+    # which had to be looked up by NAME and so stopped arriving entirely once that
+    # lookup went behind a challenge, leaving new fixtures with no squads at all.
+    fixtures, codes_needed, sh_teams, cids = {}, set(), set(), set()
     s365_ok = s365_failed = 0
     for league in sources.LEAGUES:
         games = sources.s365_fixtures(league)
@@ -260,6 +265,7 @@ def main(out_dir):
             for f in kept.values():
                 codes_needed |= {c[0] for c in (f["fd"]["home"], f["fd"]["away"]) if c}
                 sh_teams |= {i for i in (f.get("sh") or []) if i}
+                cids |= {i for i in (f.get("cid") or []) if i}
             problems.append(f"365Scores fixtures unavailable for {league}" + (f" — kept {len(kept)} from the last run" if kept else ""))
             continue
         s365_ok += 1
@@ -269,6 +275,7 @@ def main(out_dir):
             if not kickoff or not now - dt.timedelta(hours=3) < kickoff <= horizon:
                 continue
             home, away = g["homeCompetitor"]["name"], g["awayCompetitor"]["name"]
+            cid = [g["homeCompetitor"].get("id"), g["awayCompetitor"].get("id")]
             cup = sources.COMPETITIONS[league].get("cup")
             if cup and re.search(r"qualif|prelim", g.get("stageName") or "", re.I):
                 continue   # early rounds between amateur clubs: no data, no bet builders
@@ -289,13 +296,15 @@ def main(out_dir):
             fixtures[str(g["id"])] = {
                 "league": league, "home": home, "away": away, "kickoff": kickoff.isoformat(),
                 "fd": {"home": fd_home, "away": fd_away}, "sh": list(ids) if ids else None,
+                "cid": cid if all(cid) else (old.get("cid") or None),
                 "ref": referee or old.get("ref"), "pm_slug": (pm or {}).get("slug") or old.get("pm_slug"), "uk": uk or old.get("uk") or [],
             }
             codes_needed |= {c[0] for c in (fd_home, fd_away) if c}
             sh_teams |= {i for i in (ids or []) if i}
-            if not ids:
-                problems.append(f"StatsHub teams not found: {home} v {away}")
-    print(f"{len(fixtures)} fixtures, {len(codes_needed)} leagues to rate, {len(sh_teams)} squads to fetch")
+            cids |= {i for i in cid if i}
+            if not all(cid):
+                problems.append(f"365Scores gave no competitor ids: {home} v {away}")
+    print(f"{len(fixtures)} fixtures, {len(codes_needed)} leagues to rate, {len(cids)} squads to fetch")
 
     print(f"fixtures step done in {time.time() - started:.0f}s")
     stamp = now.isoformat()
@@ -436,34 +445,114 @@ def main(out_dir):
             rated["missing"] += 1
             problems.append(f"no football-data ratings for {code}")
 
-    # 3. Player stats per squad (throttled inside sources, so StatsHub isn't
-    # hammered; the last run's file if StatsHub fails for a squad).
-    def fetch(team_id):
-        data = sources.sh_players(team_id)
-        if data:
-            write(out_dir / "players" / f"{team_id}.json", players_json(team_id, data, stamp))
-            return "fresh", stamp
-        old = reuse("players", f"{team_id}.json")
-        if old:
-            write(out_dir / "players" / f"{team_id}.json", old)
-            return "reused", old["built"]
-        return "missing", None
-    with ThreadPoolExecutor(2) as ex:
-        results = list(ex.map(fetch, sorted(sh_teams)))
-    squads = {k: sum(1 for r, _ in results if r == k) for k in ("fresh", "reused", "missing")}
-    squads["oldest"] = min([b for _, b in results if b] or [stamp])
-    if squads["reused"]:
-        problems.append(f"StatsHub failed for {squads['reused']} squads — using their last stats (oldest {squads['oldest'][:16].replace('T', ' ')})")
+    # 3. Player stats per squad, from 365Scores.
+    #
+    # StatsHub answered this in ONE request per club — its last 20 matches, every
+    # player — and went behind a Cloudflare managed challenge on 2026-10-29 for
+    # good (see sources.s365_players). 365Scores holds the same numbers but serves
+    # them one MATCH at a time, so the file is built by ACCUMULATION instead: list
+    # a club's recent finished games, keep every row the published file already
+    # has, fetch only what is new.
+    #
+    # That retires MAX_AGE["players"] as the thing standing between HAWK and an
+    # empty squad, and deliberately. A row is a match that was played: it does not
+    # go stale, it only gets older. The 14-day window was a stopgap for a source
+    # that answered all-or-nothing — here a club's history survives a failed run
+    # untouched and simply gains nothing that run.
+    #
+    # `built` is only moved forward for a club that GAINED a match, so engine.js's
+    # "Player stats are from ..." warning keeps meaning something. Stamping every
+    # file with `now` would make a squad that has quietly stopped updating look
+    # as fresh as one playing twice a week.
+    def stored_matches(old):
+        """A published players file back into {name: {"position", "matches": {ts: row}}}."""
+        fields = (old or {}).get("fields") or PLAYER_MATCH_FIELDS
+        out = {}
+        for p in (old or {}).get("players") or []:
+            if not p.get("name"):
+                continue
+            rows = {}
+            for raw in p.get("m") or []:
+                row = dict(zip(fields, raw))
+                if row.get("ts"):
+                    rows[row["ts"]] = row
+            out[p["name"]] = {"position": p.get("position"), "matches": rows}
+        return out
+
+    squad_ids = sorted(i for i in cids if i)
+    # Both of these are one request per club — a few hundred each — so they run in
+    # parallel. Read sequentially they cost a minute apiece before any stats are
+    # fetched at all, and this step shares a 30-minute job with everything else.
+    with ThreadPoolExecutor(8) as ex:
+        prev_players = dict(zip(squad_ids, ex.map(lambda c: previous(f"players/{c}.json"), squad_ids)))
+    history = {cid: stored_matches(prev_players[cid]) for cid in squad_ids}
+    with ThreadPoolExecutor(4) as ex:
+        listed = dict(zip(squad_ids, ex.map(lambda c: sources.s365_club_games(c, PLAYER_GAMES), squad_ids)))
+    # Every game some covered club is missing. Keyed by game id, so a match two
+    # covered clubs played against each other is fetched once and written to both.
+    wanted = {}
+    for cid in squad_ids:
+        seen = {ts for pl in history[cid].values() for ts in pl["matches"]}
+        for gid, ts in listed.get(cid) or []:
+            if ts not in seen:
+                wanted.setdefault(gid, ts)
+    order = sorted(wanted, key=lambda g: wanted[g], reverse=True)     # newest first
+    batch, backlog = order[:PLAYER_FETCH_PER_RUN], max(0, len(order) - PLAYER_FETCH_PER_RUN)
+    deadline = time.time() + PLAYER_SECONDS
+    with ThreadPoolExecutor(4) as ex:
+        fetched = {gid: rows for gid, rows in
+                   zip(batch, ex.map(lambda g: None if time.time() > deadline else sources.s365_players(g), batch))
+                   if rows}
+    gained = set()
+    for rows in fetched.values():
+        for cid, players in rows.items():
+            if cid not in history:
+                continue   # the other side of the tie, not a club HAWK covers
+            for p in players:
+                rec = history[cid].setdefault(p["name"], {"position": p["position"], "matches": {}})
+                if p["position"]:
+                    rec["position"] = p["position"]
+                rec["matches"][p["match"]["ts"]] = p["match"]
+                gained.add(cid)
+
+    squads = {"fresh": 0, "reused": 0, "missing": 0, "fetched": len(fetched), "backlog": backlog}
+    for cid in squad_ids:
+        players = []
+        for name, rec in history[cid].items():
+            rows = sorted(rec["matches"].values(), key=lambda m: m["ts"], reverse=True)[:PLAYER_GAMES]
+            if rows:
+                players.append({"name": name, "position": rec["position"], "matches": rows})
+        if not players:
+            squads["missing"] += 1
+            continue
+        built = stamp if cid in gained else ((prev_players[cid] or {}).get("built") or stamp)
+        write(out_dir / "players" / f"{cid}.json", players_json(cid, {"players": players}, built))
+        squads["fresh" if cid in gained else "reused"] += 1
+    if backlog:
+        problems.append(f"player history still filling in — {backlog} matches not fetched this run "
+                        f"(budget {PLAYER_FETCH_PER_RUN}/run)")
+    if len(fetched) < len(batch):
+        problems.append(f"365Scores gave no player stats for {len(batch) - len(fetched)} of {len(batch)} matches asked for")
     if squads["missing"]:
-        problems.append(f"player stats missing for {squads['missing']} of {len(sh_teams)} squads (StatsHub)")
+        problems.append(f"no player stats at all for {squads['missing']} of {len(squad_ids)} squads")
 
     # 4. How each source did, and when it last worked (for the site's data
     # health line and the Action's alert).
     def share(ok, total):
         return total == 0 or ok / total >= SOURCE_OK_SHARE
+    # "player stats" replaced "StatsHub" on 2026-10-31. The squads come from
+    # 365Scores now, and StatsHub's one remaining use — sh_referee(), which reads
+    # the HTML homepage, not the challenged /api — still works. Keeping the old
+    # key would have failed the Action's alert job every two hours over a source
+    # HAWK no longer depends on, and an alarm that always sounds is one nobody
+    # reads: it hid two healthy builds on 31 Oct alone.
+    #
+    # Scored on HAVING a history, not on gaining one: most clubs play twice a
+    # week and the pipeline runs far more often than that, so `fresh` alone would
+    # read as a near-total failure on every run.
     worked = {"365Scores": share(s365_ok, s365_ok + s365_failed),
               "football-data": share(rated["fresh"], len(codes_needed)),
-              "StatsHub": share(squads["fresh"], len(sh_teams))}
+              "player stats": share(squads["fresh"] + squads["reused"], len(squad_ids))}
     prev_sources = prev_meta.get("sources") or {}
     status = {}
     for name, ok in worked.items():

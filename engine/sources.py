@@ -490,6 +490,177 @@ def s365_match_stats(game_id, home_id, away_id):
     return out   # keys match football-data's: hs/as, hst/ast, hc/ac, hy/ay, hr/ar, hxg/axg
 
 
+# ---------------------------------------------------------------------------
+# Per-player, per-match stats
+# ---------------------------------------------------------------------------
+# These used to come from StatsHub, one request per CLUB (sh_players: a team's
+# last 20 matches, every player, every field). On 2026-10-29 12:51 UTC Cloudflare
+# began answering every statshub.com /api/* request with a managed challenge —
+# HTTP 403, `cf-mitigated: challenge`, empty body — which is a setting somebody
+# turned on, not an outage, so that route is gone and will not come back.
+#
+# 365Scores carries the same numbers inside the `game` payload, under
+# {home,away}Competitor.lineups.members[].stats as {name, value} pairs.
+# builder/hawk-settle.js already reads this exact shape to settle real bets, so
+# after this the model and the settler rest on ONE feed and agree by
+# construction rather than by measurement.
+#
+# The win is not the fields, it is the KEY. A fixture already holds the
+# 365Scores game id and both competitorIds, so nothing is looked up by name.
+# That is what killed the StatsHub route twice over: once the challenge went up,
+# sh_team_ids() could no longer resolve a club, and fixtures entering the 8-day
+# window simply stopped having ids — no error, just "StatsHub teams not found",
+# 148 of them on 31 Oct and 152 one run later. Here there is nothing to resolve.
+#
+# ONE MEANING CHANGES, and it is not a rescaling. StatsHub counted challenges
+# MADE; 365Scores publishes "Tackles Won", and names a player's tackles only
+# once he has won one. Tackle rates built from this are a different quantity —
+# they have to be measured again, not converted. See engine/grade.mjs on why
+# FotMob is still read alongside: it is the second opinion for exactly this gap.
+
+# 365Scores position ids. 0 is Management, which is why members are filtered on
+# `status` below and never on position.
+_S365_POS = {1: "G", 2: "D", 3: "M", 4: "F"}
+# member.status: 1 starting, 2 substitute, 3 named but did not play, 4 staff.
+# So sub_in is read straight off the feed. Worth saying out loud, because the
+# StatsHub field it replaces meant the OPPOSITE of its name (substitutedIn was
+# a sub coming on FOR him, i.e. he went off) and read backwards for a month.
+_S365_STARTING, _S365_SUB = 1, 2
+# HAWK's field <- 365Scores' stat title.
+_S365_PLAYER_STATS = {"minutes": "Minutes", "shots": "Total Shots", "sot": "Shots On Target",
+                      "goals": "Goals", "xg": "Expected Goals", "assists": "Assists",
+                      "xa": "Expected Assists", "fouls": "Fouls Made", "fouled": "Was Fouled",
+                      "tackles": "Tackles Won", "offsides": "Offsides", "saves": "Goalkeeper Saves"}
+
+
+def _s365_count(value, total=False):
+    """A 365Scores stat value as a number: "90'" -> 90, "10/32 (31%)" -> 10
+    (32 with total=True), "" or None -> 0. Mirrors countOf() in
+    builder/hawk-settle.js, which settles real bets off the same strings."""
+    if value is None or value == "":
+        return 0
+    text = str(value).strip()
+    pair = re.match(r"^(\d+)\s*/\s*(\d+)", text)
+    if pair:
+        return int(pair.group(2) if total else pair.group(1))
+    num = re.match(r"^-?\d+(?:\.\d+)?", text)
+    if not num:
+        return 0
+    # Whole numbers come back as int, so a count reads 0 and 90 rather than 0.0
+    # and 90.0. Only xg and xa are ever fractional, and players_json rounds those
+    # to 2dp — every other field is a tally, and "0.0" is three characters of
+    # every row in a file that is published per club and fetched per match.
+    value = float(num.group(0))
+    return int(value) if value.is_integer() else value
+
+
+def _s365_ts(start_time):
+    """A fixture's startTime as unix seconds.
+
+    365Scores is asked in Europe/London (S365_PARAMS) and answers with a naive
+    local string, so it has to be READ as London. A plain .timestamp() on a naive
+    datetime uses the build machine's own zone — UTC in the Action, CET on the
+    laptop — which would move every match by an hour or two depending on where it
+    was built. StatsHub's ts was a true unix timestamp and engine.js subtracts it
+    from the kick-off to get days of rest, so the two have to mean the same thing.
+    """
+    kick = parse_kickoff(start_time)
+    if not kick:
+        return 0
+    if kick.tzinfo is None:
+        try:
+            from zoneinfo import ZoneInfo
+            kick = kick.replace(tzinfo=ZoneInfo(S365_PARAMS["timezoneName"]))
+        except Exception:
+            # No tz database (Windows without `tzdata`). UTC, not the machine's
+            # zone, so a local run and the Action still agree with each other.
+            kick = kick.replace(tzinfo=dt.timezone.utc)
+    return int(kick.timestamp())
+
+
+def s365_players(game_id):
+    """Per-player stats for one finished match, ready to append to each club's
+    history: {competitor_id: [{"name", "position", "match": {...}}, ...]}, where
+    `match` holds exactly build_data's PLAYER_MATCH_FIELDS.
+
+    None if 365Scores didn't answer or the match has no lineups — not every
+    competition publishes them, and an absent lineup is not an empty one."""
+    game = s365_game(game_id)
+    if not game:
+        return None
+    home, away = game.get("homeCompetitor") or {}, game.get("awayCompetitor") or {}
+    hid, aid = home.get("id"), away.get("id")
+    if not hid or not aid:
+        return None
+    hs, aws = _s365_score(home), _s365_score(away)
+    # Cards per player, from the EVENT list and not the stats block. The stats
+    # under-count: measured over 106 finished matches (16 Oct 2026) 17 disagreed,
+    # 16 of them with more cards in the events — see the note in hawk-settle.js.
+    # A second yellow is published as its own Red Card event, so a sent-off
+    # player ends with yellow 1 and red 1, which is what StatsHub gave too.
+    yellow, red = {}, {}
+    for e in game.get("events") or []:
+        label = ((e.get("eventType") or {}).get("name") or "").lower()
+        pid = e.get("playerId")
+        if pid is None:
+            continue
+        if "yellow" in label:
+            yellow[pid] = yellow.get(pid, 0) + 1
+        elif "red" in label:
+            red[pid] = red.get(pid, 0) + 1
+    names = {m.get("id"): m.get("name") for m in game.get("members") or []}
+    context = {"ts": _s365_ts(game.get("startTime")),
+               "score": f"{hs}-{aws}" if hs is not None and aws is not None else "",
+               "comp": game.get("competitionDisplayName") or ""}
+    out = {}
+    for side, team, opp in ((hid, home, away), (aid, away, home)):
+        rows = []
+        for m in ((team.get("lineups") or {}).get("members") or []):
+            status = m.get("status")
+            if status not in (_S365_STARTING, _S365_SUB):
+                continue
+            stats = {s.get("name"): s.get("value") for s in m.get("stats") or []}
+            minutes = _s365_count(stats.get("Minutes"))
+            if minutes <= 0:
+                continue   # named, came on for nothing, or no stats published
+            pid = m.get("id")
+            row = {k: _s365_count(stats.get(title)) for k, title in _S365_PLAYER_STATS.items()}
+            row.update(context, home=side == hid, opp=opp.get("name") or "?",
+                       minutes=minutes, sub_in=status == _S365_SUB,
+                       yellow=yellow.get(pid, 0), red=red.get(pid, 0))
+            rows.append({"name": names.get(pid) or m.get("name") or "",
+                         "position": _S365_POS.get((m.get("position") or {}).get("id")),
+                         "match": row})
+        out[side] = rows
+    return out if any(out.values()) else None
+
+
+def s365_club_games(competitor_id, limit=20):
+    """[(game_id, unix ts)] for one club's last `limit` finished matches, newest
+    first, across every competition — one request.
+
+    This is the list that drives the player history: the caller already knows the
+    kick-offs it has stored, so it fetches only the games it is missing. Rows are
+    filtered the way s365_form does, because a postponed or abandoned game has no
+    player stats to take and a friendly is not form."""
+    data = _s365("games/results", competitors=competitor_id)
+    if not data:
+        return None
+    out = []
+    for g in sorted(data.get("games") or [], key=lambda x: x.get("startTime") or "", reverse=True):
+        status = (g.get("statusText") or "").lower()
+        if g.get("statusGroup") != 4 or any(s in status for s in ("cancel", "postpon", "abandon")):
+            continue
+        if "friendl" in (g.get("competitionDisplayName") or "").lower():
+            continue
+        ts = _s365_ts(g.get("startTime"))
+        if g.get("id") is not None and ts:
+            out.append((g["id"], ts))
+        if len(out) >= limit:
+            break
+    return out
+
+
 def s365_odds(game_id):
     """Every bookmaker line 365Scores has for this game, as a list of
     quotes: {"book", "type" (lineTypeId), "market", "value" (line, e.g.

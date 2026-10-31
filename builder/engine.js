@@ -313,6 +313,26 @@
     getJSON(`${S365}/${path}/?${new URLSearchParams({ ...S365_PARAMS, ...params })}`, ttlMs);
   const data = (path) => getJSON(DATA_URL + path, 30 * 60 * 1000);
 
+  /* One side's player-stats file, during the move off StatsHub.
+     Player stats used to be keyed on a StatsHub team id (meta.sh); they are
+     keyed on a 365Scores competitor id now (meta.cid), because that one comes
+     with the fixture instead of being looked up by name — which is what stopped
+     working when StatsHub went behind a challenge on 29 Oct.
+     Both are tried, new first, because the two sets of files cannot cross over
+     in one deploy: the pipeline rebuilds each club's history from scratch a few
+     hundred matches per run, so for a day or two some clubs have a cid file and
+     the rest still only have their last StatsHub one. Without this fallback,
+     shipping the switch would empty most squads until the backfill caught up.
+     meta.sh also carries "intl_5029" for national squads, which engine/
+     intl_squads.py writes and which has no cid at all — so this is what keeps
+     internationals working too, and the fallback cannot be deleted until that
+     is moved over as well. */
+  async function playerFile(meta, side) {
+    const cid = meta && meta.cid && meta.cid[side];
+    const sh = meta && meta.sh && meta.sh[side];
+    return (cid ? await data(`players/${cid}.json`) : null) || (sh ? await data(`players/${sh}.json`) : null);
+  }
+
   // ---------------------------------------------------------------------------
   // Name matching (sources.py)
   // ---------------------------------------------------------------------------
@@ -894,8 +914,7 @@
       // players' club records and one side can resolve while the other doesn't, so
       // a fixture can carry ["intl_5029", null]. Asking for players/null.json would
       // just 404, but the guard says what is going on.
-      meta && meta.sh && meta.sh[0] ? data(`players/${meta.sh[0]}.json`) : null,
-      meta && meta.sh && meta.sh[1] ? data(`players/${meta.sh[1]}.json`) : null,
+      playerFile(meta, 0), playerFile(meta, 1),
       recentForm(hc.id), recentForm(ac.id),
       // ESPN's lineups only matter close to kick-off (they're published about an hour before).
       kickoff && kickoff.getTime() - Date.now() < 4 * 3600e3 ? espnLineups(league, home, away, kickoff).catch(() => null) : null,

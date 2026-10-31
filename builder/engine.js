@@ -3344,7 +3344,11 @@
       });
     }
     const meta = ((await data("fixtures.json")) || { fixtures: {} }).fixtures[id];
-    const files = meta && meta.sh ? await Promise.all(meta.sh.map((t) => (t ? data(`players/${t}.json`) : null))) : [null, null];
+    // Same resolution as the pre-match path: cid first, intl_ fallback, never a
+    // numeric sh. Reading meta.sh directly here meant the in-play priors fell
+    // back to DEFAULT_RATES for every club once the StatsHub files stopped being
+    // published — silently, because a missing file is a legal input to rates().
+    const files = await Promise.all([playerFile(meta, 0), playerFile(meta, 1)]);
     const history = { home: playerRows(files[0]), away: playerRows(files[1]) };
     const usual = (side, name, pos) => {
       const rows = history[side] || [], hit = rows.length ? bestMatch(name, rows.map((p) => p.name), 0.6) : null;

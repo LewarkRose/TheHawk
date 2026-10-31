@@ -110,6 +110,16 @@ S365_SECONDS = 300   # time this step may take per run (the Action has 30 minute
 PLAYER_GAMES = 20
 PLAYER_FETCH_PER_RUN = 600
 PLAYER_SECONDS = 240
+# How long a match that came back with no player stats is still worth re-asking.
+# Plenty of competitions 365Scores lists results for are not covered at player
+# level at all — National League N/S and Segunda RFEF return a full 36-man
+# lineup with no Minutes on anybody, and an FA Cup tie against a non-league side
+# is blank for BOTH clubs. Nothing is stored for those, so without a record of
+# the attempt they are re-asked every single run for ever: 115 of the 600 asked
+# on 31 Oct were already these. Stats for a covered match land within hours, so
+# after four days a blank match is blank for good.
+PLAYER_BLANK_RETRY = 4 * 86400
+PLAYER_BLANK_FILE = "players/_blank.json"
 FD_STALE_AFTER = dt.timedelta(days=3)
 # A source counts as working when at least this share of its requests did.
 SOURCE_OK_SHARE = 0.8
@@ -486,23 +496,39 @@ def main(out_dir):
     with ThreadPoolExecutor(8) as ex:
         prev_players = dict(zip(squad_ids, ex.map(lambda c: previous(f"players/{c}.json"), squad_ids)))
     history = {cid: stored_matches(prev_players[cid]) for cid in squad_ids}
+    # Matches already asked for and known blank, per club. One shared file rather
+    # than a field on each club's players file, because the clubs that need it
+    # most are exactly the ones with no players file to put it in — and because
+    # engine.js must never see it.
+    prev_blank = previous(PLAYER_BLANK_FILE) or {}
+    blank_seen = {int(c): {int(t) for t in ts} for c, ts in (prev_blank.get("clubs") or {}).items()}
     with ThreadPoolExecutor(4) as ex:
         listed = dict(zip(squad_ids, ex.map(lambda c: sources.s365_club_games(c, PLAYER_GAMES), squad_ids)))
     # Every game some covered club is missing. Keyed by game id, so a match two
     # covered clubs played against each other is fetched once and written to both.
-    wanted = {}
+    now_ts, wanted, listed_by = time.time(), {}, {}
     for cid in squad_ids:
         seen = {ts for pl in history[cid].values() for ts in pl["matches"]}
+        seen |= {t for t in blank_seen.get(cid, ()) if now_ts - t > PLAYER_BLANK_RETRY}
         for gid, ts in listed.get(cid) or []:
+            listed_by.setdefault(gid, []).append(cid)
             if ts not in seen:
                 wanted.setdefault(gid, ts)
     order = sorted(wanted, key=lambda g: wanted[g], reverse=True)     # newest first
     batch, backlog = order[:PLAYER_FETCH_PER_RUN], max(0, len(order) - PLAYER_FETCH_PER_RUN)
     deadline = time.time() + PLAYER_SECONDS
+    # SKIPPED and BLANK have to be told apart: a match the deadline cut off was
+    # never asked, so recording it as blank would lose it for four days.
+    SKIPPED, BLANK = object(), object()
+
+    def fetch_players(gid):
+        if time.time() > deadline:
+            return SKIPPED
+        return sources.s365_players(gid) or BLANK
+
     with ThreadPoolExecutor(4) as ex:
-        fetched = {gid: rows for gid, rows in
-                   zip(batch, ex.map(lambda g: None if time.time() > deadline else sources.s365_players(g), batch))
-                   if rows}
+        asked = dict(zip(batch, ex.map(fetch_players, batch)))
+    fetched = {g: r for g, r in asked.items() if r is not SKIPPED and r is not BLANK}
     gained = set()
     for rows in fetched.values():
         for cid, players in rows.items():
@@ -515,7 +541,28 @@ def main(out_dir):
                 rec["matches"][p["match"]["ts"]] = p["match"]
                 gained.add(cid)
 
-    squads = {"fresh": 0, "reused": 0, "missing": 0, "fetched": len(fetched), "backlog": backlog}
+    # Record the blanks only now, and per club rather than per game: a tie can
+    # come back with stats for one side and nothing for the other, which counts
+    # as fetched but leaves the other club's slot as empty as a blank match did.
+    # Asking "did this club actually gain this timestamp" catches both.
+    for gid, r in asked.items():
+        if r is SKIPPED:
+            continue
+        for cid in listed_by.get(gid, ()):
+            if not any(wanted[gid] in pl["matches"] for pl in history[cid].values()):
+                blank_seen.setdefault(cid, set()).add(wanted[gid])
+    # Drop remembered blanks that have aged out of the club's 20-match window, so
+    # the file cannot grow for ever. Only when the listing actually came back —
+    # on a failed request `listed` is None and every blank would look aged out.
+    for cid in squad_ids:
+        if listed.get(cid) is not None and cid in blank_seen:
+            blank_seen[cid] &= {ts for _, ts in listed[cid]}
+    write(out_dir / "players" / "_blank.json",
+          {"built": stamp, "clubs": {str(c): sorted(ts) for c, ts in sorted(blank_seen.items()) if ts}})
+
+    n_blank = sum(1 for r in asked.values() if r is BLANK)
+    squads = {"fresh": 0, "reused": 0, "missing": 0, "fetched": len(fetched), "backlog": backlog,
+              "blank": n_blank, "blank_known": sum(len(ts) for ts in blank_seen.values())}
     for cid in squad_ids:
         players = []
         for name, rec in history[cid].items():
@@ -531,8 +578,12 @@ def main(out_dir):
     if backlog:
         problems.append(f"player history still filling in — {backlog} matches not fetched this run "
                         f"(budget {PLAYER_FETCH_PER_RUN}/run)")
-    if len(fetched) < len(batch):
-        problems.append(f"365Scores gave no player stats for {len(batch) - len(fetched)} of {len(batch)} matches asked for")
+    if n_blank:
+        problems.append(f"365Scores gave no player stats for {n_blank} of {len(batch)} matches asked for "
+                        f"(not asked again after {PLAYER_BLANK_RETRY // 86400}d)")
+    if len(batch) - len(fetched) - n_blank:
+        problems.append(f"ran out of time before asking for {len(batch) - len(fetched) - n_blank} of "
+                        f"{len(batch)} matches (budget {PLAYER_SECONDS}s)")
     if squads["missing"]:
         problems.append(f"no player stats at all for {squads['missing']} of {len(squad_ids)} squads")
 

@@ -642,19 +642,28 @@ def s365_club_games(competitor_id, limit=20):
     This is the list that drives the player history: the caller already knows the
     kick-offs it has stored, so it fetches only the games it is missing. Rows are
     filtered the way s365_form does, because a postponed or abandoned game has no
-    player stats to take and a friendly is not form."""
+    player stats to take and a friendly is not form.
+
+    The extra guard the others don't need is the kick-off being in the past. A
+    match that has not been played cannot have player stats, but 365Scores leaves
+    a rescheduled one in statusGroup 4 with its NEW date and a statusText the
+    list above does not cover — "Suspended" put a 14 Nov Liga MX game into the
+    31 Oct fetch set. s365_form and s365_results survive that on their score
+    guard (both scores come back -1); this function reads no scores, so it needs
+    the time. Matching on more status words would not fix it: the list is open
+    and localised, while "a finished match kicked off already" always holds."""
     data = _s365("games/results", competitors=competitor_id)
     if not data:
         return None
-    out = []
+    now, out = time.time(), []
     for g in sorted(data.get("games") or [], key=lambda x: x.get("startTime") or "", reverse=True):
         status = (g.get("statusText") or "").lower()
-        if g.get("statusGroup") != 4 or any(s in status for s in ("cancel", "postpon", "abandon")):
+        if g.get("statusGroup") != 4 or any(s in status for s in ("cancel", "postpon", "abandon", "suspend")):
             continue
         if "friendl" in (g.get("competitionDisplayName") or "").lower():
             continue
         ts = _s365_ts(g.get("startTime"))
-        if g.get("id") is not None and ts:
+        if g.get("id") is not None and ts and ts < now:
             out.append((g["id"], ts))
         if len(out) >= limit:
             break

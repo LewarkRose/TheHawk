@@ -1,0 +1,26 @@
+# A one-off experiment, run by hand: Actions -> "Probe SofaScore" -> Run workflow.
+#
+# It is deliberately NOT on the schedule and NOT on push. It builds nothing,
+# writes nothing and publishes nothing — it reads a log and that is all. See the
+# long note at the top of engine/probe-sofascore.mjs for what it is asking and
+# the one thing it must never be changed to do.
+#
+# Delete this file and the script once the question is answered either way.
+name: Probe SofaScore
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - run: node engine/probe-sofascore.mjs

@@ -27,8 +27,9 @@ NO CORS, SO THIS IS PIPELINE-ONLY
 api.mfa.com.mt sends no Access-Control-Allow-Origin, so unlike ESPN — which
 builder/engine.js fetches live in the browser near kick-off — nothing here can
 reach the app directly. It arrives as a built data file, which is right for
-history (history is never fresh) and weak for a confirmed XI (the build runs
-every 2 hours; line-ups land about an hour before kick-off).
+history (history is never fresh) and awkward for a confirmed XI: line-ups land
+inside the last hour before kick-off, which is why the build went hourly on
+1 Nov 2026 and why `upcoming_xi` also reads matches already underway.
 """
 
 import datetime as dt
@@ -45,6 +46,15 @@ MALTA_FA_TROPHY = 58545        # "Meridianbet FA Trophy" — 365Scores 6248
 # has neither — see the Malta note in sources.py.
 XI_COMPETITIONS = (MALTA_PREMIER, MALTA_FA_TROPHY)
 HISTORY_PAGE = 200             # 64 matches so far in 26/27, back to 14 Aug
+
+# How long after kick-off a match may still have its XI read. A Maltese match
+# runs about two hours including the break, and the federation is slow to enter
+# a result — Gzira v Marsaxlokk was still SCHEDULED two and a half hours after
+# kick-off on 1 Nov 2026 — so an unsettled row says nothing about whether the
+# match is still being played. Three hours covers the game and leaves the stale
+# ones out: a fixture postponed in September and never settled must not come
+# back as a live line-up months later.
+LIVE_WINDOW = 3 * 3600
 
 # MFA competitor id -> 365Scores competitor id. Twelve clubs, mapped by hand and
 # checked one by one, because fuzzy matching is the wrong tool on this list:
@@ -225,7 +235,7 @@ def match_rows(match):
 
 
 def upcoming_xi(competitions=XI_COMPETITIONS, budget=None):
-    """Confirmed line-ups for Maltese matches that have not kicked off.
+    """Confirmed line-ups for Maltese matches about to kick off, or just underway.
 
     Keyed {(home_cid, away_cid): {...}}, with the kick-off carried inside so the
     caller can check it agrees. Not keyed by a date: a date has to be derived,
@@ -236,37 +246,55 @@ def upcoming_xi(competitions=XI_COMPETITIONS, budget=None):
     and only matches whose XI is already published get this far, so two of them
     between the same clubs at once cannot happen.
 
-    This is the half of Malta that cannot be good. api.mfa.com.mt sends no
-    Access-Control-Allow-Origin, so unlike ESPN — which engine.js fetches in the
-    browser within four hours of kick-off — this can only ride the 2-hourly
-    build, and line-ups land LATE. Measured 17:53 UTC on 1 Nov 2026, one read:
-    Gzira v Marsaxlokk (18:00) had its full XI, seven minutes out; Melita v
-    Sirens (19:00) had an empty list, 67 minutes out. So the XI appears
-    somewhere inside the last hour. The crons are at :09, two hours apart, so
-    for an 18:00 kick-off the only build that can catch it is 17:09 — before
-    the XI exists, more often than not. Expect to catch a minority, not half,
-    until this is allowed to read a match that has already kicked off (where
-    the XI is certainly up, and the page otherwise shows a guessed one).
-    `fetched` goes in the record for exactly that reason: the page must be able
-    to say how old this is rather than imply it is live.
+    api.mfa.com.mt sends no Access-Control-Allow-Origin, so unlike ESPN — which
+    engine.js fetches in the browser within four hours of kick-off — this can
+    only ride the build, and line-ups land LATE. Measured 17:53 UTC on 1 Nov
+    2026, one read: Gzira v Marsaxlokk (18:00) had its full XI, seven minutes
+    out; Melita v Sirens (19:00) had an empty list, 67 minutes out. So the XI
+    appears somewhere inside the last hour, which is why the build went hourly
+    — at two hours apart an 18:00 kick-off could only be reached by the 17:09
+    build, before the XI existed. Hourly puts the last build 21 to 51 minutes
+    out. `fetched` is in the record because of that spread: the page must be
+    able to say how old this is rather than imply it is live.
+
+    TWO ENDPOINTS, and it is not tidiness that needs both. A match LEAVES
+    upcomingMatches when it kicks off — measured on Gzira v Marsaxlokk, which
+    was the single row there at 17:53 and gone by 20:29 — while pastMatches
+    still carried it, marked SCHEDULED, two and a half hours after kick-off,
+    because the federation had not entered the result. So pastMatches is the
+    only place an in-play match can be found, and reading it is what lets a
+    match already underway show its real XI instead of HAWK's guessed one.
+    That same endpoint is also where a not-yet-started match appears, hence
+    the dedupe by id. Anything the federation has settled is skipped, and so is
+    anything older than LIVE_WINDOW, which is what keeps a match postponed
+    weeks ago and never settled from being read as live.
     """
     out = {}
     for competition in competitions:
         if budget and time.time() > budget:
             break
-        rows = sources.mfa_upcoming_matches(competition)
-        for match in rows or []:
+        rows, seen = [], set()
+        for row in (sources.mfa_upcoming_matches(competition) or []) + \
+                   (sources.mfa_past_matches(competition) or []):
+            # An id-less row would dedupe as None and then raise on match["id"],
+            # and build_data catches that into one message that loses every XI.
+            if row.get("id") and row["id"] not in seen:
+                seen.add(row["id"])
+                rows.append(row)
+        for match in rows:
             if budget and time.time() > budget:
                 break
             # NOT isLineupAvailable. That flag is dead: false on all 65 played
             # matches and false on Gzira v Marsaxlokk while /lineup was serving
             # its full XI, numbers and captain an hour before kick-off. Gating
             # on it is why malta_xi read 0 — no build could ever have caught one.
-            if match.get("status") != "SCHEDULED" or match.get("isLive"):
+            # And not isLive either: an in-play match is one HAWK WANTS, because
+            # its XI is certainly published by then.
+            if match.get("status") == "PLAYED":
                 continue
             cids = [TEAM_365.get((match.get(k) or {}).get("id")) for k in ("homeTeam", "awayTeam")]
             ts = _ts(match.get("startDate"))
-            if not all(cids) or not ts:
+            if not all(cids) or not ts or ts < time.time() - LIVE_WINDOW:
                 continue
             lineup = sources.mfa_lineup(match["id"])
             if not lineup:

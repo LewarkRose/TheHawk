@@ -78,15 +78,20 @@ MAX_AGE = {"profiles": dt.timedelta(days=10), "results365": dt.timedelta(days=60
 # one event lookup per league per run — and PropLine mailed on the 8th to say the
 # cap had been hit. Nothing broke, because a match whose props fail to fetch keeps
 # the file from an earlier run, but the newest matches stop getting fresh prices.
+# The workflow went hourly on 1 Nov 2026 (so a line-up published in the last hour
+# before kick-off can be reached at all), and this moved WITH it, same sum:
 #
-#   1,000 a day  /  12 runs  =  83 per run, including the event lookups
-#   less ~8 leagues of those =  75, and 55 leaves real headroom
+#   1,000 a day  /  24 runs  =  41 per run, including the event lookups
+#   less ~8 leagues of those =  33, and 30 leaves headroom:
+#   24 x 30 + 24 x 8  =  912 of 1,000
 #
-# Smaller batches cost nothing here: `soon` is sorted by kick-off so the nearest
-# matches are always served first, and with a 60-hour window and 12 runs a day
-# every match gets dozens of chances before it starts.
+# Halving the batch costs no coverage, and the day's total spend goes UP, not
+# down: 24 x 30 = 720 prop requests against 12 x 55 = 660 before. `soon` is
+# sorted by kick-off so the nearest matches are always served first, and with a
+# 60-hour window and 24 runs a day every match gets dozens of chances before it
+# starts.
 PROPS_HOURS = 60
-PROPS_PER_RUN = 55
+PROPS_PER_RUN = 30
 # Kept beside it so the sum above can be checked rather than remembered. If the
 # cron in .github/workflows/hawk.yml changes, change RUNS_PER_DAY to match and the
 # run will say whether the budget still works.
@@ -95,7 +100,7 @@ PROPS_PER_RUN = 55
 # props entirely (see push_run below) — otherwise a day of editing silently spends
 # the whole quota and the sum here stops meaning anything.
 PL_DAILY_LIMIT = 1000
-RUNS_PER_DAY = 12          # cron: "9 */2 * * *"
+RUNS_PER_DAY = 24          # cron: "9 * * * *"
 # 365Scores backup ratings: how far back to keep matches, how many match-stat
 # requests one run may make (one per match; the history fills in over several
 # runs), and how old football-data's last ratings may be before 365Scores' win.
@@ -655,10 +660,12 @@ def main(out_dir):
     # ...and the confirmed XI, for the fixtures 365Scores leaves blank.
     #
     # Attached to the fixture rather than fetched by the site, because
-    # api.mfa.com.mt sends no CORS header. That is the whole weakness of it: the
-    # build is 2-hourly, Maltese line-ups appear about an hour before kick-off,
-    # so a build has to land inside that window. `fetched` travels with the XI so
-    # the match page can say how old it is instead of implying it is live.
+    # api.mfa.com.mt sends no CORS header. That is the whole weakness of it:
+    # Maltese line-ups appear inside the last hour before kick-off, so a build
+    # has to land in that window — which is why the cron is hourly rather than
+    # 2-hourly, putting the last build 21 to 51 minutes out instead of up to
+    # 111. `fetched` travels with the XI so the match page can say how old it is
+    # instead of implying it is live.
     # Its own small budget — a line-up is the nicety here and the player history
     # above is the substance, so this must never be what runs the clock out.
     malta_xi = 0

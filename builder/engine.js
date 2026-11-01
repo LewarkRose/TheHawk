@@ -987,7 +987,7 @@
     // 365Scores carries a Maltese lineup for about one game in five and ESPN
     // dropped Malta after 2024/25, so these pages had no XI at all and fell back
     // to HAWK's own guess. The Malta FA publishes one; it cannot be fetched here
-    // (no CORS) so it rides the 2-hourly build inside the fixture, which is why
+    // (no CORS) so it rides the hourly build inside the fixture, which is why
     // it carries the time it was fetched and the card says so. Lowest of the
     // three in priority: it only speaks where 365Scores and ESPN are both silent.
     const mfaXi = {};

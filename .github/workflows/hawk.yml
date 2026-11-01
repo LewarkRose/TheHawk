@@ -1,9 +1,9 @@
 # Builds HAWK's data files and publishes the whole site to GitHub Pages.
 #
-# Runs roughly every 2 hours, whenever you upload/commit to main, and on demand
+# Runs hourly, whenever you upload/commit to main, and on demand
 # (Actions tab -> "HAWK data + site" -> Run workflow).
 #
-# Why every 2 and not every 3: GitHub treats scheduled runs as best effort and
+# Why hourly and not every 3: GitHub treats scheduled runs as best effort and
 # drops them under load. Measured 1-4 Oct 2026, the every-3-hours cron held to
 # 2.9-3.1 hours for two days and then started slipping — 5.6, 4.4, 7.3, and a
 # 7.1-hour gap on 4 Oct. A match that kicks off inside a gap longer than
@@ -13,13 +13,23 @@
 # on a public repo. The odd minute avoids the top of the hour, which is when
 # GitHub sheds the most scheduled work.
 #
+# Why hourly and not every 2, from 1 Nov 2026: a confirmed line-up is published
+# inside the last hour before kick-off, so every 2 hours could not reach one.
+# Measured — the Malta FA had an 18:00 match's XI at 17:53 and the 19:00 match's
+# still empty at the same moment — and the same lateness is why 365Scores line-ups
+# arrive close to kick-off too. At two hours apart the last build before an 18:00
+# kick-off was 16:09, 111 minutes out; hourly puts it 21 to 51 minutes out.
+# This doubles the scheduled runs, so build_data.py's PROPS_PER_RUN had to halve
+# to keep the PropLine daily cap sum true — RUNS_PER_DAY there must match this
+# cron, and the run says so out loud if it does not.
+#
 # One-time setup: Settings -> Pages -> Build and deployment -> Source:
 # "GitHub Actions".
 name: HAWK data + site
 
 on:
   schedule:
-    - cron: "9 */2 * * *"
+    - cron: "9 * * * *"
   push:
     branches: [main]
   workflow_dispatch:

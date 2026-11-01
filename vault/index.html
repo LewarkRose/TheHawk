@@ -1136,10 +1136,25 @@
         && (l.hawk.legs || []).some((h) => h.bookPrice);
       const needsMarks = (b, l) => b.status !== "PENDING" && due(l) && !l.hawk.marked && recent(l)
         && (l.hawk.legs || []).some((h) => !h.result);
+      /* A bet hawk-alerts.js settled as LOST during the match, read again now
+         the match is over. Its rule is "the same leg lost on two consecutive
+         checks", which stops a single bad frame of data — but not a figure the
+         feed later revises, because both of those reads were honest at the time.
+         Marseille v Toulouse, 1 Nov 2026: shots on target reached 11 in-play,
+         HAWK killed an Under 10.5 at 89 minutes, and the official full time was
+         10. The bet had won and the log said lost, with no way to correct it —
+         settle() below refuses anything that is not PENDING.
+         Measured over all 95 early settlements in the log: 39 can be re-judged
+         mechanically and 38 of them were right. Every goals and corners call was
+         correct, and the single failure was shots on target — a judged count,
+         which is the kind that gets re-graded. So early settling is kept, with
+         this as its safety net, rather than dropped. */
+      const needsRecheck = (b, l) => !!b.lostEarly && !b.earlyChecked
+        && b.status === "LOST" && due(l) && recent(l);
 
       // 1. the slow part: read every match that might have finished
       const games = [...new Set(S.bets.flatMap((b) => (b.legs || [])
-        .filter((l) => l && l.hawk && ((b.status === "PENDING" && due(l)) || needsClose(l) || needsMarks(b, l)))
+        .filter((l) => l && l.hawk && ((b.status === "PENDING" && due(l)) || needsClose(l) || needsMarks(b, l) || needsRecheck(b, l)))
         .map((l) => String(l.hawk.game))))];
       if (loud && games.length) say(out, `Reading ${plural(games.length, "match")}…`);
       for (const g of games) {
@@ -1170,7 +1185,50 @@
         l.hawk.marked = true;
       }
 
-      // 3. settle what can be settled
+      // 3. a bet settled early, re-judged on the official full-time figures.
+      // Only ever read once per bet (earlyChecked), and only flipped when EVERY
+      // leg reads won — an unresolvable leg leaves it lost rather than guessing
+      // in your favour. The one case worth saying out loud is the leg that
+      // killed the bet now reading won while another leg can't be judged: that
+      // is a ticket to look at by hand, not one to pay out.
+      const repaired = [];
+      for (const b of S.bets) {
+        if (!b.lostEarly || b.earlyChecked || b.status !== "LOST") continue;
+        const ls = (b.legs || []).filter((l) => l && l.hawk);
+        const fs = ls.map((l) => (due(l) ? facts[String(l.hawk.game)] : null));
+        if (!ls.length || fs.some((f) => !f || !f.finished || f.off)) continue;
+        const opts = settleOpts(b);
+        // A leg with no `hawk` block is one HAWK cannot follow, and ls has
+        // already dropped it — so start from false the way the settle below
+        // does, or a bet would be paid out on the legs that happen to be
+        // readable and the rest ignored.
+        let anyLost = false, allWon = (b.legs || []).every((l) => l && l.hawk), killerWon = false;
+        ls.forEach((l, i) => {
+          l.hawk.score = `${fs[i].ft[0]}-${fs[i].ft[1]}`;
+          for (const h of l.hawk.legs || []) {
+            h.result = h.userDone ? "won" : legResult(h, fs[i], opts);
+            if (h.result === "lost") anyLost = true;
+            else if (h.result !== "won") allWon = false;
+            if (h.label === b.lostEarly && h.result === "won") killerWon = true;
+          }
+        });
+        b.earlyChecked = true;
+        if (!anyLost && allWon) {
+          // Same credit as any other win: the stake came off when the bet was
+          // logged and a lost bet returned nothing, so the full return goes back.
+          b.status = "WON";
+          b.settledAt = new Date().toISOString();
+          b.settledBy = "HAWK";
+          b.earlyFixed = b.lostEarly;
+          delete b.lostEarly;
+          S.bank += (+b.potentialReturn || 0);
+          repaired.push(b);
+        } else if (killerWon) {
+          b.needsCheck = `${b.lostEarly} actually won at full time — HAWK settled this early on a live figure the feed then revised, and another leg can't be judged. Check it by hand.`;
+        }
+      }
+
+      // 4. settle what can be settled
       const done = [];
       let waiting = 0, checks = 0;
       for (const b of S.bets) {
@@ -1219,6 +1277,9 @@
       const bits = [];
       if (done.length) bits.push(`<b>Settled ${done.length}</b> — ${won.length} won${
         won.length ? ` (${money(paid)} in)` : ""}, ${done.length - won.length} lost.`);
+      if (repaired.length) bits.push(`<b>Put right: ${plural(repaired.length, "ticket")}</b> — settled as lost during
+        the match, won at full time once the figures were final. ${money(repaired.reduce(
+        (s, b) => s + (+b.potentialReturn || 0), 0))} back in.`);
       if (checks) bits.push(`${plural(checks, "ticket")} need${checks === 1 ? "s" : ""} a look — the feed couldn't answer a leg.`);
       if (waiting) bits.push(`${plural(waiting, "ticket")} still waiting on ${waiting === 1 ? "its match" : "their matches"}.`);
       if (bits.length || loud) say(out, `Results checked at ${at}. ${bits.join(" ") || "Nothing to settle."}`);

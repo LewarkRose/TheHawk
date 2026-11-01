@@ -25,7 +25,11 @@
     { key: "top5", name: "Top 5", icon: "👑", ids: { "Premier League": 7, "La Liga": 11, "Serie A": 17, "Bundesliga": 25, "Ligue 1": 35 } },
     { key: "europe", name: "Europe", icon: "🏆", ids: { "Champions League": 572, "Europa League": 573, "Conference League": 7685 } },
     { key: "more", name: "More Europe", icon: "🌍", ids: { "Eredivisie": 57, "Liga Portugal": 73, "Scottish Premiership": 61, "Belgian Pro League": 98,
-        "Süper Lig": 78, "Greek Super League": 84, "Austrian Bundesliga": 111, "Swiss Super League": 95, "Danish Superliga": 119, "Allsvenskan": 122 } },
+        "Süper Lig": 78, "Greek Super League": 84, "Austrian Bundesliga": 111, "Swiss Super League": 95, "Danish Superliga": 119, "Allsvenskan": 122,
+        // Added 2026-11-01. Team markets only — 365Scores publishes no lineups
+        // for Malta, so there is nothing to build a player prop from. See the
+        // note on the entry in engine/sources.py.
+        "Maltese Premier League": 5653 } },
     // The Championship alone. League One, 2. Bundesliga, Serie B, LaLiga 2 and
     // Ligue 2 were removed on 2026-10-31 — HAWK is for the leagues it is used on.
     // Those clubs still arrive through the domestic cups, which resolve them via
@@ -589,7 +593,7 @@
     "Champions League": "uefa.champions", "Europa League": "uefa.europa", "Conference League": "uefa.europa.conf",
     "Eredivisie": "ned.1", "Liga Portugal": "por.1", "Scottish Premiership": "sco.1", "Belgian Pro League": "bel.1", "Süper Lig": "tur.1",
     "Greek Super League": "gre.1", "Austrian Bundesliga": "aut.1", "Swiss Super League": "sui.1", "Danish Superliga": "den.1", "Allsvenskan": "swe.1",
-    "Championship": "eng.2",
+    "Championship": "eng.2", "Maltese Premier League": "mlt.1",
     "FA Cup": "eng.fa", "EFL Cup": "eng.league_cup", "Copa del Rey": "esp.copa_del_rey", "Coppa Italia": "ita.coppa_italia",
     "DFB-Pokal": "ger.dfb_pokal", "Coupe de France": "fra.coupe_de_france",
     "MLS": "usa.1", "Brasileirão": "bra.1", "Argentina Primera": "arg.1", "Liga MX": "mex.1", "Saudi Pro League": "ksa.1",

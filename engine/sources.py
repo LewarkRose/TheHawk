@@ -67,6 +67,25 @@ COMPETITIONS = {
     "Swiss Super League": dict(s365=95, fd="SWZ", sh=215, pm="12319"),
     "Danish Superliga": dict(s365=119, fd="DNK", sh=39, pm="10363"),
     "Allsvenskan": dict(s365=122, fd="SWE", sh=40, pm="11637"),
+    # Added 2026-11-01, on request. No football-data code, so its team ratings
+    # come from 365Scores results the way Saudi Pro League's do.
+    #
+    # TEAM MARKETS ONLY, and that is a property of the feed rather than a
+    # setting: 365Scores publishes no lineups for Malta at all — zero members,
+    # so no minutes, no player stats, nothing for s365_players to return. Its
+    # game/stats does carry the 12 that matter (Corners, Yellow and Red Cards,
+    # Total Shots, Shots On Target, Offsides), so goals, corners, cards and
+    # shots price normally and the player props simply never appear. Expect
+    # Maltese clubs in the "no player stats at all for N squads" line every
+    # run; that is the truth about Malta rather than a fault to chase.
+    #
+    # The Maltese CHALLENGE LEAGUE (the second tier) was asked for on the same
+    # day and cannot be added: 365Scores carries exactly four Maltese
+    # competitions — Premier League, Summer Cup, Super Cup, FA Trophy — and
+    # ESPN has no mlt.2 either. HAWK takes every fixture from 365Scores, so a
+    # league it does not carry cannot be switched on here. Re-check the country
+    # listing (countries=93) before concluding it is still missing.
+    "Maltese Premier League": dict(s365=5653, fd=None, sh=None, pm=None),
     # Second tier — the Championship only. League One, 2. Bundesliga, Serie B,
     # LaLiga 2 and Ligue 2 were removed on 2026-10-31: HAWK covers the leagues it
     # is actually used on, and those five were roughly 110 clubs of the ~447

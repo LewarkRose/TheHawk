@@ -331,6 +331,46 @@
         : `, <b>none beating it</b> — which is normal.`);
   }
 
+  /* The order of the lines INSIDE a market.
+
+     Sorted by chance alone they came out interleaved — Under 16.5, Under 15.5,
+     Under 14.5, Over 5.5, Under 13.5 — because the two sides of a total run in
+     opposite directions, so one list by probability is two lists shuffled
+     together. Overs ascending, then Unders ascending, is how a board reads.
+
+     The number comes off the leg ID, never the label: engine.js builds
+     `corners:o5.5` and `p:home:3:shots2`, while labels are prose ("Over 5.5
+     Corners (6+)") and get reworded. A market whose legs carry no line at all
+     — Double Chance, Both Teams to Score, To Score at Any Time — has nothing
+     to put in order, so it keeps the probability ranking it arrived with.
+
+     Player markets hold every player's lines at once, so ordering by threshold
+     alone would deal the names out like cards: all the 1+ legs, then all the
+     2+. They group by player instead, players ranked by their likeliest leg,
+     thresholds ascending within a name. */
+  const OU_LINE = /:([ou])(\d+(?:\.\d+)?)$/;              // goals:o2.5, tcorners:home:u4.5
+  const PROP_LINE = /^(p:(?:home|away):\d+):[a-z]+?(\d+)$/; // p:home:3:shots2
+  function lineOf(leg) {
+    const id = String((leg && leg.id) || "");
+    const ou = OU_LINE.exec(id);
+    if (ou) return { who: "", group: ou[1] === "o" ? 0 : 1, n: parseFloat(ou[2]) };
+    const pr = PROP_LINE.exec(id);
+    if (pr) return { who: pr[1], group: 0, n: parseFloat(pr[2]) };
+    return null;
+  }
+  function inLineOrder(legs) {
+    const info = legs.map((l) => [l, lineOf(l)]);
+    if (info.some(([, i]) => !i)) return legs;             // not a line market: leave it alone
+    const best = new Map();
+    for (const [l, i] of info) if (i.who) best.set(i.who, Math.max(best.get(i.who) ?? 0, l.p || 0));
+    return info.sort(([, a], [, b]) =>
+      (best.get(b.who) ?? 0) - (best.get(a.who) ?? 0)      // likeliest player first…
+      || String(a.who).localeCompare(String(b.who))        // …and never split across the list
+      || a.group - b.group                                 // Overs, then Unders
+      || a.n - b.n                                         // lowest line first
+    ).map(([l]) => l);
+  }
+
   /* --------------------------------------------------------- the markets */
   function markets() {
     const m = S.m, all = (m.legs || []).filter((l) => l && l.p > 0);
@@ -345,6 +385,7 @@
     const shown = all.filter((l) => S.cat === "All" || catOf(l.market) === S.cat);
     const by = {};
     for (const l of shown.sort((a, b) => b.p - a.p)) (by[l.market] ||= []).push(l);
+    for (const name of Object.keys(by)) by[name] = inLineOrder(by[name]);
     const rank = (g) => { const i = ORDER.indexOf(g); return i < 0 ? 999 : i; };
     const names = Object.keys(by).sort((a, b) => rank(a) - rank(b));
 
@@ -1132,6 +1173,40 @@
     abShow(out, abAt + 1);
     abRow();
   }
+  /* The ticket panel shows whatever is in the SLIP.
+
+     It used to show only what the builder had produced, so adding a selection
+     from the market list left the cards sitting at three legs while the slip
+     underneath said four — the panel looked like the ticket and wasn't, and
+     the figures on it described a bet you no longer had.
+
+     Only when a ticket is already on screen. Before you have built anything
+     there is nothing to contradict, and making one appear the moment you tap a
+     selection would be a different feature; the slip itself already lists the
+     picks. `.whys` is the test rather than abOpts, because abShow() draws a
+     ticket with no options behind it when the builder returns a single one. */
+  function abFollowSlip() {
+    const out = $("#abOut");
+    if (!S.m || !out || !out.querySelector(".whys")) return;
+    if (!S.slip.length) {                      // nothing left to describe
+      out.innerHTML = "";
+      $("#abN").textContent = "";
+      abOpts = []; abAt = 0; abControls();
+      return;
+    }
+    let t = null;
+    try { t = window.HAWK.evaluate({ id: String(S.id), legs: S.slip }); } catch { /* below */ }
+    if (!t || !t.legs || t.legs.length !== S.slip.length) {
+      abNote("Those legs can't all be priced together, so the ticket above still shows the last set that could.");
+      return;
+    }
+    // the alternatives were built for a set you have since edited, and swap and
+    // the line stepper work off abOpts[abAt] — so this becomes the one ticket
+    abOpts = [t]; abAt = 0;
+    abShow(t);                                 // no `nth`: "4 legs at 3.85", not "option 1 of 1"
+    abControls(); abRow();
+  }
+
   // one place for the "it didn't work" line under the ticket, so swap and the
   // stepper say it the same way and neither leaves one on screen
   function abNote(text) {
@@ -1436,6 +1511,7 @@
       leg.classList.toggle("on", i < 0);
       $(".add", leg).textContent = i < 0 ? "✓" : "+";
       slip();
+      abFollowSlip();
       return;
     }
 
@@ -1446,6 +1522,7 @@
       const b = document.querySelector(`.leg[data-leg="${CSS.escape(id)}"]`);
       if (b) { b.classList.remove("on"); $(".add", b).textContent = "+"; }
       slip();
+      abFollowSlip();
       return;
     }
 
@@ -1521,6 +1598,7 @@
         b.classList.remove("on"); $(".add", b).textContent = "+";
       });
       slip();
+      abFollowSlip();
     }
   });
 

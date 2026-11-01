@@ -617,7 +617,7 @@ def main(out_dir):
         if malta_cids and time.time() < deadline:
             known = {(cid, ts) for cid in malta_cids
                      for pl in history[cid].values() for ts in pl["matches"]}
-            mt, malta_got = malta.player_history(known=known, budget=deadline)
+            mt, malta_got = malta.player_history(known=known, clubs=set(malta_cids), budget=deadline)
             for cid, club in (mt or {}).items():
                 if cid not in history:
                     continue
@@ -631,9 +631,19 @@ def main(out_dir):
                 # So an MFA name joins an existing record when one is clearly
                 # his, and the EXISTING key wins — it is what 365Scores' lineup
                 # will say on the day, and what the rest of the pipeline keys on.
-                existing = list(history[cid])
                 for name, rec in club.items():
-                    key = sources.best_match(name, existing) or name
+                    # Match against every OTHER key, never against this name
+                    # itself. An earlier run published the MFA's spelling into
+                    # the file, so by now both keys are in `history` and
+                    # best_match(name, ...) scores the stale duplicate 1.0 and
+                    # keeps it forever — the first version of this fix worked
+                    # only on an empty slate, which is all the local test had.
+                    others = [k for k in history[cid] if k != name]
+                    key = sources.best_match(name, others) or name
+                    if key != name and name in history[cid]:
+                        # Fold the duplicate a previous run left behind, then
+                        # drop it. Without this the squad never heals.
+                        history[cid][key]["matches"].update(history[cid].pop(name)["matches"])
                     kept = history[cid].setdefault(key, {"position": rec["position"], "matches": {}})
                     for ts, row in rec["matches"].items():
                         kept["matches"][ts] = {f: row.get(f) for f in PLAYER_MATCH_FIELDS}

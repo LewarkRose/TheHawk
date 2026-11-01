@@ -282,7 +282,7 @@ def upcoming_xi(competitions=XI_COMPETITIONS, budget=None):
     return out
 
 
-def player_history(known=(), competition=MALTA_PREMIER, budget=None):
+def player_history(known=(), clubs=None, competition=MALTA_PREMIER, budget=None):
     """{365Scores cid: {name: {"position", "matches": {ts: row}}}} — build_data's
     own history shape, so it merges with what is already on disk.
 
@@ -308,6 +308,14 @@ def player_history(known=(), competition=MALTA_PREMIER, budget=None):
         ts = _ts(match.get("startDate"))
         sides = [(match.get(k) or {}).get("id") for k in ("homeTeam", "awayTeam")]
         cids = [TEAM_365.get(i) for i in sides]
+        # `clubs` is the set HAWK will actually write a file for — the Maltese
+        # sides with a fixture coming up, which is two or four of the twelve,
+        # not all of them. Without this the walk fetched a line-up for all 64
+        # matches every run and threw eight clubs' worth away: sixty requests at
+        # the federation and most of the time budget, for nothing. Measured on
+        # run #747 — malta=60 fetched against fresh=4 clubs written.
+        if clubs is not None and not any(c in clubs for c in cids if c):
+            continue
         # Nothing to learn from this one: both clubs already have it stored.
         if ts and all(c is None or (c, ts) in known for c in cids):
             continue

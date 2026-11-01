@@ -1092,21 +1092,57 @@
     return new Set(ts.slice(0, n));
   }
   const minutesIn = (matches, games) => (matches || []).reduce((s, m) => s + (games.has(m.ts) ? m.minutes : 0), 0);
+  // A missing number is null here, and `s + null` is `s + 0` — so every sum in
+  // this function has to say what it means by absent. A file that carries goals
+  // but no xG is not a player who generated no xG.
+  const nil = (v) => v === null || v === undefined;
   const totalsOf = (ms) => [
-    ms.reduce((s, m) => s + m.minutes, 0), ms.reduce((s, m) => s + m.shots, 0), ms.reduce((s, m) => s + m.sot, 0),
-    ms.reduce((s, m) => s + XG_WEIGHT * m.xg + (1 - XG_WEIGHT) * m.goals, 0), ms.reduce((s, m) => s + m.yellow + m.red, 0)];
+    ms.reduce((s, m) => s + m.minutes, 0),
+    ms.reduce((s, m) => s + (nil(m.shots) ? 0 : m.shots), 0),
+    ms.reduce((s, m) => s + (nil(m.sot) ? 0 : m.sot), 0),
+    // Blend with xG only where there IS xG. Without this guard a Maltese goal
+    // counted as (1 - XG_WEIGHT) of a goal, quietly shrinking every scorer rate
+    // in the league by the weight the model gives xG.
+    ms.reduce((s, m) => s + (nil(m.xg) ? m.goals : XG_WEIGHT * m.xg + (1 - XG_WEIGHT) * m.goals), 0),
+    ms.reduce((s, m) => s + m.yellow + m.red, 0)];
   function positionPriors(players) {
     const pooled = {};
     for (const p of players) {
       const t = totalsOf(p.matches);
-      if (t[0] >= 300 && DEFAULT_RATES[p.position]) { const acc = (pooled[p.position] ||= [0, 0, 0, 0, 0]); t.forEach((v, i) => { acc[i] += v; }); }
+      if (t[0] < 300 || !DEFAULT_RATES[p.position]) continue;
+      const acc = (pooled[p.position] ||= { mins: 0, shotMins: 0, shots: 0, sot: 0, goals: 0, cards: 0 });
+      acc.mins += t[0]; acc.goals += t[3]; acc.cards += t[4];
+      // Shots are pooled only over the minutes somebody actually counted them
+      // in. Pooling Malta's minutes with Malta's (absent) shots made the league
+      // prior exactly zero, which is the one value that turns "we don't know"
+      // into "he never shoots" — and it would have done it through the back
+      // door, after rates() had already been taught to fall back to the prior.
+      if (hasShotCounts(p.matches)) { acc.shotMins += t[0]; acc.shots += t[1]; acc.sot += t[2]; }
     }
     const priors = { ...DEFAULT_RATES };
-    for (const [pos, [mins, ...rest]] of Object.entries(pooled)) priors[pos] = rest.map((v) => (90 * v) / mins);
+    for (const [pos, a] of Object.entries(pooled)) {
+      const base = DEFAULT_RATES[pos];
+      priors[pos] = [
+        a.shotMins ? (90 * a.shots) / a.shotMins : base[0],
+        a.shotMins ? (90 * a.sot) / a.shotMins : base[1],
+        (90 * a.goals) / a.mins, (90 * a.cards) / a.mins];
+    }
     return priors;
   }
-  // Data files built before the extra stats were added don't have them.
-  const hasExtras = (matches) => matches.length > 0 && matches[0].fouls !== undefined;
+  // Data files built before the extra stats were added don't have them — those
+  // rows have no `fouls` key at all. Malta's DO have the key and hold null,
+  // because the field exists and nobody fills it, so this has to reject both:
+  // on `!== undefined` alone Malta passed as a file with extras and HAWK would
+  // have offered tackle and foul legs priced off nothing.
+  const hasExtras = (matches) => matches.length > 0 && !nil(matches[0].fouls);
+  // And a file can carry minutes, goals and cards while nobody ANYWHERE counts
+  // that league's shots — Malta, where the federation publishes the only
+  // per-player record there is and its own statistics endpoint is empty. Those
+  // rows hold null, which is an absence and not a zero. Every row is checked,
+  // not just the newest: one null row in twenty understates the total, and an
+  // understated shot count is the dangerous direction — it makes "under 0.5
+  // shots" look like value. A player with one gap gets no shot leg instead.
+  const hasShotCounts = (matches) => matches.length > 0 && matches.every((m) => m.shots !== null && m.shots !== undefined);
   const extraValue = (m, k) => (k === "assists" ? XG_WEIGHT * (m.xa || 0) + (1 - XG_WEIGHT) * (m.assists || 0) : m[k] || 0);
   function extraPriors(players) {
     const pooled = {};
@@ -1125,7 +1161,16 @@
   function rates(matches, prior, pos, xprior) {
     const [mins, shots, sot, goals, cards] = totalsOf(matches);
     const w = (mins + PRIOR_MINUTES) / 90, v = PRIOR_MINUTES / 90;
-    let [sh90, sot90, g90, c90] = [shots, sot, goals, cards].map((x, i) => (x + prior[i] * v) / w);
+    // Goals and cards are counted everywhere, so they shrink against the
+    // player's real minutes. Shots may be counted NOWHERE, and then his minutes
+    // must not dilute the prior: 900 minutes of uncounted shots would read as
+    // 900 minutes of taking none and price him as a man who never shoots. With
+    // no counts he falls back to the position average exactly, and the shot
+    // legs are withheld altogether (shot_data, read where the legs are made).
+    const shotData = hasShotCounts(matches);
+    const sw = shotData ? w : v;
+    let [sh90, sot90] = [shots, sot].map((x, i) => ((shotData ? x : 0) + prior[i] * v) / sw);
+    let [g90, c90] = [goals, cards].map((x, i) => (x + prior[i + 2] * v) / w);
     sot90 = Math.max(sot90, g90 * 1.05);
     sh90 = Math.max(sh90, sot90 * 1.1);
     const starts = matches.filter((m) => !m.sub_in).map((m) => m.minutes);
@@ -1136,7 +1181,7 @@
     const x = xprior && (!matches.length || hasExtras(matches))
       ? Object.fromEntries(EXTRA_STATS.map((k) => [k, (matches.reduce((s, m) => s + extraValue(m, k), 0) + xprior[k] * v) / w])) : null;
     const sv90 = x && mins > 0 ? (90 * matches.reduce((s, m) => s + (m.saves || 0), 0)) / mins : null;
-    return { sh90, sot90, g90, c90, x, sv90, start_min: startMin, minutes: mins, apps: matches.length };
+    return { sh90, sot90, g90, c90, x, sv90, shot_data: shotData, start_min: startMin, minutes: mins, apps: matches.length };
   }
   function buildSquads(an) {
     const members = Object.fromEntries((an.detail.members || []).map((m) => [m.id, m]));
@@ -1702,7 +1747,11 @@
       const [basisGames, basis] = p.recent_starts.length >= 3 ? [p.recent_starts, "starts"] : [p.recent, "games"];
       const hist = (stat, k) => {
         const vals = basisGames.map((m) => (typeof stat === "function" ? stat(m) : m[stat]));
-        if (vals.some((v) => v === undefined)) return {}; // not in this data file yet
+        // undefined = the field predates this data file; null = the field exists
+        // and this league's source never fills it (Malta's saves, shots, tackles).
+        // Either way there is no record to show, and a null counted as "0 in all
+        // 10 games" would print a false hit rate under a leg priced elsewhere.
+        if (vals.some((v) => nil(v))) return {};
         return { recent: vals, hits: vals.filter((v) => v >= k).length, games: vals.length, threshold: k, basis };
       };
       if (p.pos === "G") {
@@ -1712,8 +1761,14 @@
               { ...common, low_data: false, ...hist("saves", k) });
         continue;
       }
-      for (const k of [1, 2, 3]) add(`${pid}:shots${k}`, `${p.name}: ${k}+ Shots`, "Player Shots", `${pid}:shots`, mask(n, (s) => a.shots[s] >= k), { ...common, ...hist("shots", k) });
-      for (const k of [1, 2]) add(`${pid}:sot${k}`, `${p.name}: ${k}+ Shots on Target`, "Player Shots on Target", `${pid}:sot`, mask(n, (s) => a.sot[s] >= k), { ...common, ...hist("sot", k) });
+      // Shots and shots on target only where somebody counts them. Goals and
+      // cards come next and are NOT inside this gate on purpose: they are
+      // counted in every league HAWK carries, Malta included, so a league
+      // without shot data still prices a scorer and a booking.
+      if (p.shot_data) {
+        for (const k of [1, 2, 3]) add(`${pid}:shots${k}`, `${p.name}: ${k}+ Shots`, "Player Shots", `${pid}:shots`, mask(n, (s) => a.shots[s] >= k), { ...common, ...hist("shots", k) });
+        for (const k of [1, 2]) add(`${pid}:sot${k}`, `${p.name}: ${k}+ Shots on Target`, "Player Shots on Target", `${pid}:sot`, mask(n, (s) => a.sot[s] >= k), { ...common, ...hist("sot", k) });
+      }
       add(`${pid}:score`, `${p.name} to Score`, "To Score at Any Time", `${pid}:score`, mask(n, (s) => a.goals[s] >= 1), { ...common, ...hist("goals", 1) });
       add(`${pid}:booked`, `${p.name} to be Booked`, "Player to be Booked", `${pid}:booked`, mask(n, (s) => a.cards[s] >= 1), { ...common, ...hist("yellow", 1) });
       if (!p.x) continue; // this team's data file doesn't have the extra stats yet

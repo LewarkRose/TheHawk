@@ -1198,6 +1198,45 @@ def _sh_team_averages(home, away, league):
 
 
 # ---------------------------------------------------------------------------
+# Malta FA — the federation's own match centre, and the only open source of
+# Maltese per-player data that exists. Plain JSON, no key, no bot wall. It is
+# the ONLY thing standing between Malta and team-markets-only; see engine/malta.py
+# for what it can and cannot give, and why the gap is permanent rather than a
+# to-do. No Access-Control-Allow-Origin, so it is pipeline-only.
+# ---------------------------------------------------------------------------
+MFA_BASE = "https://api.mfa.com.mt/api"
+
+
+def mfa_past_matches(competition, limit=200):
+    """Finished matches for an MFA competitionTypeId, or None if unreachable."""
+    rows = _get_json(f"{MFA_BASE}/competitions/{competition}/pastMatches", {"pageSize": limit})
+    return rows if isinstance(rows, list) else None
+
+
+def mfa_lineup(match_id):
+    """{homeTeam: {players: [...]}, awayTeam: {...}} — the complete record.
+
+    Read from /lineup and never from /result. /result looks like the same event
+    list and silently drops EVERY plain yellow: across three matches it returned
+    0 of 2, 0 of 3 and 0 of 6. A card model built on it would have found that
+    nobody in Malta is ever booked. /lineup attaches each substitution to BOTH
+    players, so it carries twice the substitution rows /result does; that is
+    correct here, because each player needs his own.
+    """
+    return _get_json(f"{MFA_BASE}/matches/{match_id}/lineup")
+
+
+def mfa_match(match_id):
+    """Teams, referees, venue, status, isLineupAvailable."""
+    return _get_json(f"{MFA_BASE}/matches/{match_id}")
+
+
+def check_malta_fa():
+    ok = mfa_past_matches(58539, limit=1) is not None
+    return ok, "Maltese Premier League past matches"
+
+
+# ---------------------------------------------------------------------------
 # Pipeline health checks for the status panel: (ok, detail)
 # ---------------------------------------------------------------------------
 def check_365scores():

@@ -45,6 +45,7 @@ from pathlib import Path
 
 import requests
 
+import malta
 import model
 import sources
 
@@ -159,7 +160,11 @@ def profile_json(profile, built):
 def players_json(team_id, data, built):
     out = []
     for p in data["players"]:
-        rows = [[round(m[f], 2) if f in ROUNDED else m[f] for f in PLAYER_MATCH_FIELDS] for m in p["matches"]]
+        # `is not None` rather than a truth test: a field a source does not
+        # publish stays None all the way into the file, and round(None) throws.
+        # A real 0.0 still rounds, because it is a measurement.
+        rows = [[round(m[f], 2) if f in ROUNDED and m[f] is not None else m[f]
+                 for f in PLAYER_MATCH_FIELDS] for m in p["matches"]]
         out.append({"name": p["name"], "position": p["position"], "m": rows})
     return {"team": team_id, "built": built, "fields": PLAYER_MATCH_FIELDS, "players": out}
 
@@ -590,6 +595,41 @@ def main(out_dir):
     n_blank = sum(1 for r in asked.values() if r is BLANK)
     squads = {"fresh": 0, "reused": 0, "missing": 0, "fetched": len(fetched), "backlog": backlog,
               "blank": n_blank, "blank_known": sum(len(ts) for ts in blank_seen.values())}
+
+    # Malta, from the federation rather than 365Scores.
+    #
+    # 365Scores publishes no player stats for the Maltese Premier League at all,
+    # so its twelve clubs sat in the "no player stats for N squads" line every
+    # run and the league shipped as team markets only. The Malta FA's own match
+    # centre does publish a per-player record. It gives minutes, goals and cards
+    # and NOTHING else — nobody counts Maltese shots or tackles, and the MFA's
+    # own /statistics endpoint comes back empty on every finished match — so the
+    # fields it cannot fill are written as None here and NOT as 0. A 0 would be a
+    # measurement; this is an absence, and builder/engine.js reads the difference
+    # to decide whether a shot leg may be offered at all.
+    #
+    # Only clubs already in squad_ids are touched: a club with no upcoming
+    # fixture needs no file, and inventing one would walk off the end of
+    # prev_players. Fails soft and shares the player budget's deadline.
+    malta_got = 0
+    try:
+        malta_cids = [c for c in malta.TEAM_365.values() if c in history]
+        if malta_cids and time.time() < deadline:
+            known = {(cid, ts) for cid in malta_cids
+                     for pl in history[cid].values() for ts in pl["matches"]}
+            mt, malta_got = malta.player_history(known=known, budget=deadline)
+            for cid, club in (mt or {}).items():
+                if cid not in history:
+                    continue
+                for name, rec in club.items():
+                    kept = history[cid].setdefault(name, {"position": rec["position"], "matches": {}})
+                    for ts, row in rec["matches"].items():
+                        kept["matches"][ts] = {f: row.get(f) for f in PLAYER_MATCH_FIELDS}
+                        gained.add(cid)   # so the file is stamped with this run, not the last
+    except Exception as e:                                   # noqa: BLE001
+        problems.append(f"Malta FA player history failed ({e}) — Malta falls back to team markets")
+    squads["malta"] = malta_got
+
     for cid in squad_ids:
         players = []
         for name, rec in history[cid].items():

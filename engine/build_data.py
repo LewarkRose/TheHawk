@@ -621,8 +621,20 @@ def main(out_dir):
             for cid, club in (mt or {}).items():
                 if cid not in history:
                     continue
+                # The same man under two names. Maltese clubs play European
+                # qualifiers, which 365Scores DOES cover in full, so a Floriana
+                # file already held "Owen Spiteri" with three real ties in it
+                # while the MFA calls him "Owen SPITERI" and knows ten league
+                # games. Inserted blind that is two players: a 39-man squad, his
+                # European form severed from his domestic form, and shot legs
+                # offered against three July matches under one of the two names.
+                # So an MFA name joins an existing record when one is clearly
+                # his, and the EXISTING key wins — it is what 365Scores' lineup
+                # will say on the day, and what the rest of the pipeline keys on.
+                existing = list(history[cid])
                 for name, rec in club.items():
-                    kept = history[cid].setdefault(name, {"position": rec["position"], "matches": {}})
+                    key = sources.best_match(name, existing) or name
+                    kept = history[cid].setdefault(key, {"position": rec["position"], "matches": {}})
                     for ts, row in rec["matches"].items():
                         kept["matches"][ts] = {f: row.get(f) for f in PLAYER_MATCH_FIELDS}
                         gained.add(cid)   # so the file is stamped with this run, not the last

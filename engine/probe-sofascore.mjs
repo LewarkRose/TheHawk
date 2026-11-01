@@ -39,8 +39,25 @@
 // in the app as a built data file, hours old. A confirmed XI that is six hours
 // stale is worth less than it sounds, so read the stats result first.
 
+// HOW THE ANSWER GETS OUT
+// GitHub now requires a sign-in to read a job log, even on a public repo, and
+// the logs API answers 403 without a token — so the run's own output is not
+// readable from here. Check-run ANNOTATIONS are: they render on the public
+// summary and /check-runs/{id}/annotations serves them unauthenticated. So
+// every line below goes to the log AND into one ::notice:: at the end. That is
+// the only reason this file bothers with a report array.
 const MALTA = 629;            // SofaScore's unique-tournament id for Malta's Premier League
 const HOSTS = ["https://api.sofascore.com", "https://api.sofascore.app"];
+
+const report = [];
+const say = (line) => { console.log(`[probe] ${line}`); report.push(line); };
+
+// One annotation carrying the whole report. Newlines and % have to be escaped
+// or the workflow command swallows everything after the first line.
+function publish() {
+  const body = report.join("\n").replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+  console.log(`::notice title=SofaScore probe::${body}`);
+}
 
 // The stat keys HAWK actually prices on. Anything else SofaScore returns is a
 // bonus; these are the ones whose absence makes the whole exercise pointless.
@@ -65,7 +82,7 @@ async function get(host, path) {
 async function pickHost() {
   for (const host of HOSTS) {
     const r = await get(host, `/api/v1/unique-tournament/${MALTA}/seasons`);
-    console.log(`[probe] ${host} -> ${r.ok ? "OK" : r.why}`);
+    say(`${host} -> ${r.ok ? "OK" : r.why}`);
     if (r.ok) return { host, seasons: r.json };
   }
   return null;
@@ -74,55 +91,62 @@ async function pickHost() {
 const main = async () => {
   const hit = await pickHost();
   if (!hit) {
-    console.log("[probe] VERDICT: SofaScore refuses the runner too. Malta stays team markets only.");
-    console.log("[probe] Do not retry with headers. Delete this file.");
+    say("VERDICT: BLOCKED — SofaScore refuses the runner too. Malta stays team markets only.");
+    say("Do not retry with headers. Delete this file.");
     return;
   }
   const { host } = hit;
 
   const seasons = hit.seasons.seasons || [];
-  console.log(`[probe] seasons listed: ${seasons.length}` +
-              (seasons.length ? ` — newest ${seasons[0].year} (id ${seasons[0].id})` : ""));
-  if (!seasons.length) return console.log("[probe] no seasons, nothing to look at");
+  say(`seasons listed: ${seasons.length}` +
+      (seasons.length ? ` — newest ${seasons[0].year} (id ${seasons[0].id})` : ""));
+  if (!seasons.length) return say("no seasons, nothing to look at");
   const season = seasons[0].id;
 
   // Finished matches, newest first. This is also the id-mapping test: whatever
   // comes back has to carry enough to tie a row to a 365Scores fixture.
   const ev = await get(host, `/api/v1/unique-tournament/${MALTA}/season/${season}/events/last/0`);
-  if (!ev.ok) return console.log(`[probe] events: ${ev.why}`);
-  const events = (ev.json.events || []).slice(-5).reverse();
-  console.log(`[probe] finished matches available: ${(ev.json.events || []).length}`);
+  if (!ev.ok) return say(`events: ${ev.why}`);
+  const all = ev.json.events || [];
+  const events = all.slice(-5).reverse();
+  say(`finished matches on this page: ${all.length}`);
   for (const e of events) {
-    console.log(`[probe]   ${e.id}  ${new Date(e.startTimestamp * 1000).toISOString().slice(0, 10)}  ` +
-                `${e.homeTeam?.name} v ${e.awayTeam?.name}`);
+    say(`  ${e.id}  ${new Date(e.startTimestamp * 1000).toISOString().slice(0, 10)}  ` +
+        `${e.homeTeam?.name} v ${e.awayTeam?.name}`);
   }
-  if (!events.length) return console.log("[probe] no finished matches to inspect");
+  if (!events.length) return say("no finished matches to inspect");
 
   // The question that decides everything: does a Maltese match carry per-player
   // numbers, or only a name and a shirt?
   const game = events[0];
   const lu = await get(host, `/api/v1/event/${game.id}/lineups`);
-  if (!lu.ok) return console.log(`[probe] lineups for ${game.id}: ${lu.why}`);
-  console.log(`[probe] lineups confirmed flag: ${lu.json.confirmed}`);
+  if (!lu.ok) return say(`lineups for ${game.id}: ${lu.why}`);
+  say(`lineups confirmed flag: ${lu.json.confirmed}`);
 
+  let anyStats = false;
   for (const side of ["home", "away"]) {
     const players = lu.json[side]?.players || [];
     const withStats = players.filter((p) => p.statistics && Object.keys(p.statistics).length);
-    console.log(`[probe] ${side}: ${players.length} players, ${withStats.length} with a statistics object`);
+    say(`${side}: ${players.length} players, ${withStats.length} with a statistics object`);
     if (!withStats.length) continue;
+    anyStats = true;
     const keys = new Set();
     for (const p of withStats) for (const k of Object.keys(p.statistics)) keys.add(k);
-    console.log(`[probe]   ${keys.size} distinct stat keys`);
-    console.log(`[probe]   HAWK needs: ` + WANTED.map((w) => `${w}=${keys.has(w) ? "YES" : "no"}`).join("  "));
+    say(`  ${keys.size} distinct stat keys`);
+    say(`  HAWK needs: ` + WANTED.map((w) => `${w}=${keys.has(w) ? "YES" : "no"}`).join("  "));
     const sample = withStats[0];
-    console.log(`[probe]   e.g. ${sample.player?.name}: ` +
-                Object.entries(sample.statistics).slice(0, 14).map(([k, v]) => `${k}=${v}`).join(" "));
+    say(`  e.g. ${sample.player?.name}: ` +
+        Object.entries(sample.statistics).slice(0, 14).map(([k, v]) => `${k}=${v}`).join(" "));
   }
 
+  say(anyStats
+    ? "VERDICT: REACHABLE WITH STATS — read the 'HAWK needs' line before celebrating."
+    : "VERDICT: REACHABLE BUT EMPTY — SofaScore answers the runner and has no per-player numbers here.");
   // History depth: per-90 rates need roughly six matches per player, so one
   // match carrying stats is necessary and nowhere near sufficient.
-  console.log("[probe] NOTE: one match with stats is not enough. HAWK needs ~6 per player.");
-  console.log("[probe] If the keys above are YES, the next question is how far back events/last goes.");
+  say("NOTE: one match with stats is not enough. HAWK needs ~6 per player.");
 };
 
-main().catch((e) => console.log(`[probe] died: ${e.message}`));
+main()
+  .catch((e) => say(`died: ${e.message}`))
+  .finally(publish);

@@ -1852,33 +1852,43 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
    whether the row is worth pressing before you press it. */
 .filt{display:flex;gap:8px;flex-wrap:wrap;align-items:center;
   padding-bottom:16px;border-bottom:1px solid var(--rule)}
-.filt button{appearance:none;border:0;background:none;cursor:pointer;
+/* A chip you can press is a solid object; one with nothing behind it is only an
+   outline. That split carries the row — you read it without reading the counts,
+   which is what eight identical outlines never let you do.
+
+   None of this uses --faint. At 9.5px, bold, uppercase and tracked to .14em,
+   #55555f on #080809 is about 2.8:1, and the count inside it was that again at
+   opacity .5 — near 1.6:1, which is why "MORE EUROPE 38" read as a black box
+   with something in it. 4.5:1 is the floor for text this size, so all three
+   states were under it. They are set by measured contrast now: live ~9.8:1,
+   empty ~3.8:1 against its own fainter ring, gold for the one you are on.
+   --faint keeps its value, because half the site leans on it. */
+.filt button{appearance:none;border:0;cursor:pointer;
   display:inline-flex;align-items:center;gap:7px;padding:7px 12px;
-  font:700 9.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
-  box-shadow:inset 0 0 0 1px var(--rule);
-  transition:color .35s var(--film),box-shadow .35s var(--film)}
+  font:700 9.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#b4b4bf;
+  background:rgba(242,242,242,.045);box-shadow:inset 0 0 0 1px rgba(242,242,242,.1);
+  transition:color .35s var(--film),box-shadow .35s var(--film),background .35s var(--film)}
 .filt button:hover{color:var(--text);box-shadow:inset 0 0 0 1px var(--rule-2)}
-.filt button[aria-pressed="true"]{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
-.filt button i{font-style:normal;font-size:10px;letter-spacing:.04em;opacity:.5;
+.filt button[aria-pressed="true"]{color:var(--gold-hi);background:rgba(212,169,78,.1);
+  box-shadow:inset 0 0 0 1px var(--gold)}
+.filt button i{font-style:normal;font-size:10px;letter-spacing:.04em;opacity:.8;
   font-variant-numeric:tabular-nums}
 .filt button[aria-pressed="true"] i{opacity:.9}
 /* in colour, like the quick chips — the gold ring says which one is on */
 .filt button .ic{font-size:11px;letter-spacing:0;opacity:.85}
 .filt button[aria-pressed="true"] .ic{opacity:1}
-/* a competition with nothing on today still shows, so the shape of the day is
-   visible — but it is plainly not worth pressing.
-
-   It was opacity .3, which on a black surface left "SECOND TIER 0" barely
-   readable: the point is that you can SEE a group is empty, and at .3 you
-   mostly saw that something was there. The dimming now happens through colour
-   rather than opacity, so the label keeps its contrast while the border and
-   count recede — unpressable without being unreadable. */
-.filt button[disabled]{cursor:default;color:color-mix(in srgb,var(--faint) 78%,transparent);
-  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rule) 55%,transparent)}
+/* A competition with nothing on today still shows, so the shape of the day is
+   visible — but it is plainly not worth pressing. It loses the fill rather than
+   the light: hollow against the live chips' surface, still a legible label at
+   ~3.8:1 on its own ring. Dimming an already dim colour was what went wrong
+   twice before — opacity .3, then a translucent --faint — and both times
+   "SECOND TIER 0" told you only that something was there. */
+.filt button[disabled]{cursor:default;color:#6f6f7b;background:none;
+  box-shadow:inset 0 0 0 1px rgba(242,242,242,.07)}
 .filt button[disabled] .ic{opacity:.5}
-.filt button[disabled] i{opacity:.6}
-.filt button[disabled]:hover{color:color-mix(in srgb,var(--faint) 78%,transparent);
-  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rule) 55%,transparent)}
+.filt button[disabled] i{opacity:.7}
+.filt button[disabled]:hover{color:#6f6f7b;background:none;
+  box-shadow:inset 0 0 0 1px rgba(242,242,242,.07)}
 .filt button .lv{width:6px;height:6px;border-radius:50%;background:var(--live);flex:none}
 /* the third row, when you have narrowed to one group: quieter than the two
    above it, because it is a refinement and not a choice you have to make */

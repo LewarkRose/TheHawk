@@ -596,7 +596,13 @@
     "Champions League": "uefa.champions", "Europa League": "uefa.europa", "Conference League": "uefa.europa.conf",
     "Eredivisie": "ned.1", "Liga Portugal": "por.1", "Scottish Premiership": "sco.1", "Belgian Pro League": "bel.1", "Süper Lig": "tur.1",
     "Greek Super League": "gre.1", "Austrian Bundesliga": "aut.1", "Swiss Super League": "sui.1", "Danish Superliga": "den.1", "Allsvenskan": "swe.1",
-    "Championship": "eng.2", "Maltese Premier League": "mlt.1",
+    "Championship": "eng.2",
+    // No mlt.1. It was added on 1 Nov 2026 and taken out the same day: the slug
+    // resolves and the scoreboard answers, which is what "verified live" wrongly
+    // meant — but ESPN's last Maltese season is 2024/25 (seasons list ends at
+    // 2024; its idea of the current game is Birkirkara at Hamrun, 10 May 2025)
+    // and every recent date returns zero events. A slug that answers is not a
+    // slug that covers. Check the seasons list, not the response code.
     "FA Cup": "eng.fa", "EFL Cup": "eng.league_cup", "Copa del Rey": "esp.copa_del_rey", "Coppa Italia": "ita.coppa_italia",
     "DFB-Pokal": "ger.dfb_pokal", "Coupe de France": "fra.coupe_de_france",
     "MLS": "usa.1", "Brasileirão": "bra.1", "Argentina Primera": "arg.1", "Liga MX": "mex.1", "Saudi Pro League": "ksa.1",

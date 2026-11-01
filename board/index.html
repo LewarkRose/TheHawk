@@ -46,8 +46,8 @@
 <section class="calm">
   <div class="wrap">
     <div class="bd-key">
-      <span><i class="p"></i>Real — more often than HAWK said</span>
-      <span><i class="m"></i>Real — less often than HAWK said</span>
+      <span><i class="pos"></i>Real — more often than HAWK said</span>
+      <span><i class="neg"></i>Real — less often than HAWK said</span>
       <span><i></i>Too small to call, or down to chance</span>
     </div>
     <p class="note">A grey bar is not a pass or a fail. It means this much evidence cannot tell that
@@ -113,7 +113,7 @@
     const pts = 100 * s.gap, w = Math.min(50, Math.abs(pts) * (50 / full));
     const sig = trusted && Math.abs(s.z) >= 1.96 && Math.abs(pts) >= 1;
     const bar = Math.abs(pts) < 0.05 ? ""
-      : `<i class="${pts > 0 ? "p" : "m"}${sig ? " sig" : ""}" style="width:${w.toFixed(1)}%"></i>`;
+      : `<i class="${pts > 0 ? "pos" : "neg"}${sig ? " sig" : ""}" style="width:${w.toFixed(1)}%"></i>`;
     // The sentence is worked out from the two figures printed beside it, not the
     // raw gap: 42.1 -> 42.7 reading "0.5 more often" is the kind of thing that
     // makes a reader distrust the whole page. The bar and the colour test stay

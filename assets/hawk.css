@@ -695,7 +695,12 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
 .grid{clip-path:inset(0)}
 .grid > .wide{grid-column:1/-1}
 
-/* a match, quietly */
+/* a match, quietly.
+   This is a bare class in a flat namespace, so its padding belongs to every
+   element on the site that calls itself m. It reached the loss half of the
+   Vault's competition bar and the board's calibration bar — 5px-tall absolute
+   rectangles that took 22px of padding and became 44px slabs running into the
+   rows above and below. Those two now say neg, not m. Nothing else may. */
 .m{display:block;padding:22px 20px;text-decoration:none;color:inherit;
   transition:background .45s var(--film)}
 .m:hover{background:var(--raise)}
@@ -1562,18 +1567,18 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
 .bd-bar::before{content:"";position:absolute;left:50%;top:-1px;bottom:-1px;width:1px;
   background:rgba(242,242,242,.22)}
 .bd-bar i{position:absolute;top:3px;height:7px;background:#43434f}
-.bd-bar i.p{left:50%}
-.bd-bar i.m{right:50%}
-.bd-bar i.p.sig{background:var(--up)}
-.bd-bar i.m.sig{background:var(--down)}
+.bd-bar i.pos{left:50%}
+.bd-bar i.neg{right:50%}
+.bd-bar i.pos.sig{background:var(--up)}
+.bd-bar i.neg.sig{background:var(--down)}
 .bd-row .say{font-size:11.5px;line-height:1.4;color:var(--muted)}
 .bd-row .say b{font-family:var(--mono);font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
 .bd-row .nn{text-align:right;font:400 10.5px/1 var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
 .bd-key{display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-top:26px;padding-top:20px;
   border-top:1px solid var(--rule-2);font-size:11.5px;color:var(--muted)}
 .bd-key i{display:inline-block;width:20px;height:7px;background:#43434f;vertical-align:1px;margin-right:8px}
-.bd-key i.p{background:var(--up)}
-.bd-key i.m{background:var(--down)}
+.bd-key i.pos{background:var(--up)}
+.bd-key i.neg{background:var(--down)}
 .bchip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;margin:0 7px 7px 0;
   font:400 12px/1 var(--mono);color:var(--muted);box-shadow:inset 0 0 0 1px var(--rule-2)}
 .bchip b{font-variant-numeric:tabular-nums}
@@ -2253,8 +2258,8 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
 .lgt .bar{position:relative;height:5px;background:rgba(242,242,242,.06);min-width:70px}
 .lgt .bar::before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--rule-2)}
 .lgt .bar i{position:absolute;top:0;height:100%}
-.lgt .bar i.p{left:50%;background:var(--up)}
-.lgt .bar i.m{right:50%;background:var(--down)}
+.lgt .bar i.pos{left:50%;background:var(--up)}
+.lgt .bar i.neg{right:50%;background:var(--down)}
 
 @media (max-width:760px){
   .bt{grid-template-columns:minmax(0,1fr) 80px 86px;gap:10px}

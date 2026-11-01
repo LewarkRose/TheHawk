@@ -543,6 +543,27 @@
   }
 
   /* ------------------------------------------------------- by competition */
+
+  /* One competition, two names. A ticket built off a fixture whose id HAWK
+     knows is filed under HAWK's own name; one built off a tie it does not —
+     a qualifier, a round under a season-specific id — keeps 365Scores' full
+     name instead, and the table showed 32 Champions League tickets and 26
+     UEFA Champions League tickets as two different competitions you could
+     draw two different conclusions from.
+
+     Folded on the way into the table, not rewritten in storage. A saved
+     ticket is the record of a bet that was actually placed and nothing
+     should edit it afterwards — and this way a name that turns out to be
+     its own competition is one line to put back. */
+  const SAME_COMP = {
+    "UEFA Champions League": "Champions League",
+    "UEFA Europa League": "Europa League",
+    "UEFA Conference League": "Conference League",
+    "UEFA Europa Conference League": "Conference League",
+    "UEFA Nations League": "Nations League",
+  };
+  const oneName = (s) => SAME_COMP[s] || s;
+
   function leagues(f) {
     const by = new Map();
     for (const b of f.s) {
@@ -551,7 +572,7 @@
          the Bundesliga half of it lost. A ticket that spans leagues gets its
          own bucket instead: it is a different kind of bet and it is not
          evidence about any single competition. */
-      const names = [...new Set((b.legs || []).map((l) => l && l.league).filter(Boolean))];
+      const names = [...new Set((b.legs || []).map((l) => l && oneName(l.league)).filter(Boolean))];
       const k = names.length > 1 ? "Across competitions" : (names[0] || "Other");
       if (!by.has(k)) by.set(k, []);
       by.get(k).push(b);
@@ -578,7 +599,7 @@
           r.n < 5 ? ` <span style="color:var(--faint);font-size:11px">· thin</span>` : ""}</td>
         <td>${r.n}</td>
         <td>${(100 * r.hit).toFixed(0)}%</td>
-        <td><div class="bar"><i class="${r.roi >= 0 ? "p" : "m"}"
+        <td><div class="bar"><i class="${r.roi >= 0 ? "pos" : "neg"}"
           style="width:${Math.min(50, 50 * Math.abs(r.roi) / cap).toFixed(1)}%"></i></div></td>
         <td class="${r.pl > 0 ? "up" : r.pl < 0 ? "dn" : ""}">${r.pl > 0 ? "+" : ""}${money(r.pl)}</td>
         <td class="${r.roi > 0 ? "up" : r.roi < 0 ? "dn" : ""}">${r.roi > 0 ? "+" : ""}${r.roi.toFixed(1)}%</td></tr>`).join("")}</tbody>`;
@@ -1432,7 +1453,7 @@
       G.bands.filter((b) => b.n).map((b) => {
         const said = b.p / b.n, got = b.won / b.n, gap = 100 * (got - said);
         return `<tr><td>${esc(band(b))}</td><td>${b.n.toLocaleString()}</td><td>${pc(said)}</td>
-          <td><div class="bar"><i class="${gap >= 0 ? "p" : "m"}"
+          <td><div class="bar"><i class="${gap >= 0 ? "pos" : "neg"}"
             style="width:${Math.min(50, 50 * Math.abs(gap) / cap).toFixed(1)}%"></i></div></td>
           <td>${pc(got)}</td>
           <td class="${Math.abs(gap) < 1 ? "" : gap > 0 ? "up" : "dn"}">${gap > 0 ? "+" : ""}${gap.toFixed(1)}</td></tr>`;
@@ -1456,7 +1477,7 @@
       ? `<thead><tr><th>Market</th><th>Legs</th><th>Said</th><th></th><th>Landed</th><th>Gap</th></tr></thead>
          <tbody>${rows.map((r) => `<tr><td>${esc(r.k)}${r.ver ? ` <span style="color:var(--faint)">v${r.ver}</span>` : ""}</td>
            <td>${r.n.toLocaleString()}</td><td>${pc(r.said)}</td>
-           <td><div class="bar"><i class="${r.gap >= 0 ? "p" : "m"}"
+           <td><div class="bar"><i class="${r.gap >= 0 ? "pos" : "neg"}"
              style="width:${Math.min(50, 50 * Math.abs(r.gap) / mcap).toFixed(1)}%"></i></div></td>
            <td>${pc(r.got)}</td>
            <td class="${Math.abs(r.gap) < 1 ? "" : r.gap > 0 ? "up" : "dn"}">${r.gap > 0 ? "+" : ""}${r.gap.toFixed(1)}</td></tr>`).join("")}</tbody>`

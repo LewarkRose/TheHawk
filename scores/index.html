@@ -118,6 +118,29 @@
     for (const gr of GROUPS) for (const l of gr.leagues || []) m[l] = gr.key;
     return (league) => m[league] || "other";
   })();
+  /* Where a competition sits in the list, and its badge.
+
+     The engine already orders its groups the way they matter — Top 5, Europe,
+     More Europe, then the rest — so the board reads that order rather than
+     inventing one. A competition the engine doesn't group sorts last. */
+  const GROUP_RANK = (() => {
+    const m = {};
+    GROUPS.forEach((gr, i) => (gr.leagues || []).forEach((l) => { m[l] = i; }));
+    return (league) => (league in m ? m[league] : GROUPS.length);
+  })();
+  const LEAGUE_ID = (() => {
+    const m = {};
+    for (const gr of GROUPS) Object.assign(m, gr.ids || {});
+    return (league) => m[league] || null;
+  })();
+  // 365Scores' own competition badge. onerror removes it rather than leaving a
+  // broken frame, so a competition it has no image for just shows its name.
+  const leagueBadge = (league) => {
+    const id = LEAGUE_ID(league);
+    return id
+      ? `<img class="lg-b" src="https://imagecache.365scores.com/image/upload/f_png,w_68,h_68,c_limit,q_auto:eco,dpr_2,d_Competitions:default.png/v3/Competitions/${encodeURIComponent(id)}" alt="" loading="lazy" onerror="this.remove()">`
+      : "";
+  };
 
   const S = { day: dayFrom(0), games: [], preds: null, group: "all", band: "all", comp: "all", timer: 0 };
 
@@ -382,13 +405,18 @@
       by.get(k).push(g);
     }
     const rank = (l) => Math.min(...l.map((g) => order[band(g)] * 1e13 + (ko(g) || 1e12)));
+    /* Top 5 first, then the engine's group order, and only THEN whatever is
+       happening soonest. Sorted by soonest alone the board opened on whichever
+       competition happened to have a live game — the Süper Lig above the
+       Premier League because one match was at 89 minutes. The LIVE band above
+       is the way to ask "what is on now"; this row answers "what is on". */
     const groups = [...by.entries()].map(([name, l]) => ({ name, l: l.sort((a, b) => ko(a) - ko(b)) }))
-      .sort((a, b) => rank(a.l) - rank(b.l));
+      .sort((a, b) => GROUP_RANK(a.name) - GROUP_RANK(b.name) || rank(a.l) - rank(b.l));
 
     // a cup has no table — the same panel draws its bracket, so the button says so
     const cups = ((window.HAWK.LEAGUE_GROUPS || []).find((g) => g.key === "cups") || {}).leagues || [];
     $("#board").innerHTML = groups.map((gr) => `<section class="lg-sec">
-      <div class="lg-h"><h3>${esc(gr.name)}</h3><span class="n">${gr.l.length}</span>
+      <div class="lg-h">${leagueBadge(gr.name)}<h3>${esc(gr.name)}</h3><span class="n">${gr.l.length}</span>
         <button class="tbtn" type="button" data-table="${esc(gr.name)}">${
           cups.includes(gr.name) ? "Bracket" : "Table"}</button></div>
       ${gr.l.map(row).join("")}</section>`).join("");

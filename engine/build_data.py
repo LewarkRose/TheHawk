@@ -120,6 +120,10 @@ PLAYER_SECONDS = 240
 # after four days a blank match is blank for good.
 PLAYER_BLANK_RETRY = 4 * 86400
 PLAYER_BLANK_FILE = "players/_blank.json"
+# Finished games a club needs on 365Scores before a cup tie with no football-data
+# codes is worth pricing. Six separates cleanly: a Maltese top-flight club has
+# the full twenty, a Challenge League or amateur side has two or three.
+CUP_MIN_HISTORY = 6
 FD_STALE_AFTER = dt.timedelta(days=3)
 # A source counts as working when at least this share of its requests did.
 SOURCE_OK_SHARE = 0.8
@@ -262,6 +266,17 @@ def main(out_dir):
     # on now. They come free with the fixture — unlike the StatsHub ids beside them,
     # which had to be looked up by NAME and so stopped arriving entirely once that
     # lookup went behind a challenge, leaving new fixtures with no squads at all.
+    # Memoised: one request per club, and only for cups that have no football-data
+    # codes, so in practice only Malta's. A club HAWK already covers answers from
+    # its own league's listing anyway, so the cost is a handful of calls a run.
+    rated_cache = {}
+
+    def rated_enough(competitor_id):
+        if competitor_id not in rated_cache:
+            games = sources.s365_club_games(competitor_id, CUP_MIN_HISTORY)
+            rated_cache[competitor_id] = len(games or []) >= CUP_MIN_HISTORY
+        return rated_cache[competitor_id]
+
     fixtures, codes_needed, sh_teams, cids = {}, set(), set(), set()
     s365_ok = s365_failed = 0
     for league in sources.LEAGUES:
@@ -294,8 +309,20 @@ def main(out_dir):
             old = prev_fixtures.get(str(g["id"])) or {}
             old_fd = old.get("fd") or {}
             fd_home, fd_away = fd_home or old_fd.get("home"), fd_away or old_fd.get("away")
-            if cup and not (fd_home or fd_away):
+            if cup and codes and not (fd_home or fd_away):
                 continue   # two clubs from outside the leagues HAWK rates
+            # The same question for a cup with no football-data codes, where the
+            # test above has nothing to read and would skip EVERY tie. What it
+            # really asks is whether HAWK can rate a club at all, so ask that of
+            # 365Scores directly: a Maltese top-flight side has a full history,
+            # while a Challenge League or amateur side in the same cup has two
+            # or three games, and a price built on two games is a confident
+            # number made of nothing. Measured on the FA Trophy's 38 ties
+            # (2026-11-01): 13 were between two such clubs, 16 had one, 9 had
+            # neither. "Either side" matches the fd test above — HAWK prices a
+            # top club against a minnow, it just will not price minnow v minnow.
+            if cup and not codes and not any(rated_enough(c) for c in cid if c):
+                continue
             ids = sources.sh_team_ids(home, away, league)
             referee = sources.sh_referee(home, away)
             pm = sources.pm_match(league, home, away, kickoff)

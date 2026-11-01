@@ -35,7 +35,10 @@
     // Those clubs still arrive through the domestic cups, which resolve them via
     // _CUP_ONLY_SH in engine/sources.py; this list is only what HAWK SHOWS.
     { key: "second", name: "Second tier", icon: "🥈", ids: { "Championship": 1 } },
-    { key: "cups", name: "Cups", icon: "🏅", ids: { "FA Cup": 8, "EFL Cup": 9, "Copa del Rey": 13, "Coppa Italia": 20, "DFB-Pokal": 28, "Coupe de France": 37 } },
+    { key: "cups", name: "Cups", icon: "🏅", ids: { "FA Cup": 8, "EFL Cup": 9, "Copa del Rey": 13, "Coppa Italia": 20, "DFB-Pokal": 28, "Coupe de France": 37,
+        // Malta's cup, added 2026-11-01 — the one place the Challenge League
+        // clubs are reachable, since that league is not in the feed at all.
+        "Maltese FA Trophy": 6248 } },
     { key: "world", name: "World", icon: "🌎", ids: { "MLS": 104, "Brasileirão": 113, "Argentina Primera": 72, "Liga MX": 141, "Saudi Pro League": 649,
         "Copa Libertadores": 102 } },
     // National teams. HAWK has no ratings or player files for them — those are

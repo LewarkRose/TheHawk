@@ -86,6 +86,11 @@ COMPETITIONS = {
     # league it does not carry cannot be switched on here. Re-check the country
     # listing (countries=93) before concluding it is still missing.
     "Maltese Premier League": dict(s365=5653, fd=None, sh=None, pm=None),
+    # Malta's cup, added 2026-11-01. It is where the Challenge League clubs are
+    # reachable: Sirens, Swieqi, Żebbuġ Rangers and Vittoriosa Stars all play in
+    # it even though their league is not in the feed. Same 12 team stats as the
+    # Premier League and the same absence of lineups, so team markets only.
+    "Maltese FA Trophy": dict(cup=True, s365=6248, fd=None, sh=None, pm=None),
     # Second tier — the Championship only. League One, 2. Bundesliga, Serie B,
     # LaLiga 2 and Ligue 2 were removed on 2026-10-31: HAWK covers the leagues it
     # is actually used on, and those five were roughly 110 clubs of the ~447

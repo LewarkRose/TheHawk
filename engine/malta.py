@@ -239,8 +239,14 @@ def upcoming_xi(competitions=XI_COMPETITIONS, budget=None):
     This is the half of Malta that cannot be good. api.mfa.com.mt sends no
     Access-Control-Allow-Origin, so unlike ESPN — which engine.js fetches in the
     browser within four hours of kick-off — this can only ride the 2-hourly
-    build. Line-ups land about an hour before kick-off, so a build has to happen
-    inside that window or the XI is not there yet. Expect to catch roughly half.
+    build, and line-ups land LATE. Measured 17:53 UTC on 1 Nov 2026, one read:
+    Gzira v Marsaxlokk (18:00) had its full XI, seven minutes out; Melita v
+    Sirens (19:00) had an empty list, 67 minutes out. So the XI appears
+    somewhere inside the last hour. The crons are at :09, two hours apart, so
+    for an 18:00 kick-off the only build that can catch it is 17:09 — before
+    the XI exists, more often than not. Expect to catch a minority, not half,
+    until this is allowed to read a match that has already kicked off (where
+    the XI is certainly up, and the page otherwise shows a guessed one).
     `fetched` goes in the record for exactly that reason: the page must be able
     to say how old this is rather than imply it is live.
     """
@@ -252,7 +258,11 @@ def upcoming_xi(competitions=XI_COMPETITIONS, budget=None):
         for match in rows or []:
             if budget and time.time() > budget:
                 break
-            if not match.get("isLineupAvailable"):
+            # NOT isLineupAvailable. That flag is dead: false on all 65 played
+            # matches and false on Gzira v Marsaxlokk while /lineup was serving
+            # its full XI, numbers and captain an hour before kick-off. Gating
+            # on it is why malta_xi read 0 — no build could ever have caught one.
+            if match.get("status") != "SCHEDULED" or match.get("isLive"):
                 continue
             cids = [TEAM_365.get((match.get(k) or {}).get("id")) for k in ("homeTeam", "awayTeam")]
             ts = _ts(match.get("startDate"))
@@ -270,7 +280,13 @@ def upcoming_xi(competitions=XI_COMPETITIONS, budget=None):
                          for p in players if (p.get("name") or "").strip()]
                 # Eleven starters or it is not a line-up. The same bar engine.js
                 # puts on ESPN: a half-published XI is worse than none, because
-                # the page would present it with the same confidence.
+                # the page would present it with the same confidence. With the
+                # flag gone this is the ONLY gate, and it is enough: a match
+                # whose XI is not out yet returns an EMPTY players list — 0
+                # listed, 0 starting, measured on 25 fixtures from today to the
+                # 29th — never a provisional or carried-over side. Tonight's
+                # proves it from the other end: two changes per side against
+                # each club's last match, in both directions, independently.
                 if sum(1 for p in named if p["start"]) != 11:
                     ok = False
                     break

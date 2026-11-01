@@ -982,11 +982,35 @@
         lineups[side].source = "365Scores + ESPN";
       }
     }
+    // Malta's XI, from the federation that publishes it.
+    //
+    // 365Scores carries a Maltese lineup for about one game in five and ESPN
+    // dropped Malta after 2024/25, so these pages had no XI at all and fell back
+    // to HAWK's own guess. The Malta FA publishes one; it cannot be fetched here
+    // (no CORS) so it rides the 2-hourly build inside the fixture, which is why
+    // it carries the time it was fetched and the card says so. Lowest of the
+    // three in priority: it only speaks where 365Scores and ESPN are both silent.
+    const mfaXi = {};
+    for (const side of ["home", "away"]) {
+      const xi = meta && meta.xi && meta.xi[side];
+      if (!xi || lineups[side].status === "Confirmed") continue;
+      const starters = xi.filter((p) => p.start);
+      if (starters.length !== 11) continue;
+      mfaXi[side] = xi;
+      lineups[side] = { status: "Confirmed", formation: lineups[side].formation, source: "Malta FA",
+                        fetched: (meta.xi.fetched) || null };
+    }
+
     const confirmed = lineups.home.status === "Confirmed" && lineups.away.status === "Confirmed";
     // (If they still name someone different, HAWK goes with 365Scores' XI — the lineup card says so quietly.)
     if (!confirmed) warnings.push("Lineups not confirmed yet — HAWK rule: don't lock the ticket until they are.");
 
-    let refName = ((detail.officials || [])[0] || {}).name || null, refAvg = null, refGames = null, refSource = null;
+    // 365Scores names no official for a Maltese game; the federation does. The
+    // name alone, with no average beside it — HAWK has no card history for any
+    // Maltese referee, so refFactor stays neutral and the card model is unmoved.
+    let refName = ((detail.officials || [])[0] || {}).name
+      || (meta && meta.xi && (meta.xi.referees || [])[0]) || null;
+    let refAvg = null, refGames = null, refSource = null;
     if (meta && meta.ref && meta.ref.avg_cards) { refName = meta.ref.name; refAvg = meta.ref.avg_cards; refGames = meta.ref.games; refSource = "StatsHub"; }
     else if (refName) { const r = refereeFromProfile(refName, profH); if (r) { [refAvg, refGames] = r; refSource = "football-data"; } }
     const refFactor = refereeFactor(refAvg, refGames, profH && profH.avg_cards_total);
@@ -1038,7 +1062,7 @@
     }
     return {
       id, league, home, away, homeComp: hc, awayComp: ac, kickoff, inPlay: !!(kickoff && kickoff < new Date()),
-      quotes, cons, polymarket: pm, lineups, confirmed, espn, lineupCheck, detail, table, form: { home: formH, away: formA }, recentForm: { home: recentH, away: recentA },
+      quotes, cons, polymarket: pm, lineups, confirmed, espn, mfaXi, lineupCheck, detail, table, form: { home: formH, away: formA }, recentForm: { home: recentH, away: recentA },
       referee: { name: refName, avg: refAvg, games: refGames, source: refSource, factor: refFactor },
       // The fixture's name when it is a derby, else null. Carried so the card can
       // say why the card lines moved, and so grading can score derby matches apart.
@@ -1193,6 +1217,7 @@
     for (const [side, key] of [["home", "homeCompetitor"], ["away", "awayCompetitor"]]) {
       const lineup = (an.detail[key] || {}).lineups || {};
       const fromEspn = an.lineups[side].source === "ESPN", confirmed = an.lineups[side].status === "Confirmed";
+      const fromMfa = an.lineups[side].source === "Malta FA" && (an.mfaXi || {})[side];
       const byName = Object.fromEntries(sh[side].filter((p) => p.name).map((p) => [p.name, p]));
       const teamHasExtras = sh[side].some((p) => hasExtras(p.matches));
       // Team news: 365Scores lists injured/suspended ("Missing") and doubtful players.
@@ -1220,6 +1245,13 @@
         const e = an.espn[side];
         entries = [...e.starters.map((p) => [p.name, "Starting", p.pos, photo365(p.name) || p.photo, null, p.num, null]),
                    ...e.subs.map((p) => [p.name, "Substitute", p.pos, photo365(p.name) || p.photo, null, p.num, null])];
+      } else if (fromMfa) {
+        // Malta's XI, from the federation. It publishes whether a man is a
+        // keeper and nothing else about where he plays, so everyone else goes
+        // in without a position and picks one up from his own record below —
+        // which is the same place a 365Scores entry without a position lands.
+        entries = (an.mfaXi[side] || []).map((p) =>
+          [p.name, p.start ? "Starting" : "Substitute", p.gk ? "G" : null, photo365(p.name), null, shirt(p.num), null]);
       } else if (!entries.some((e) => e[1] === "Starting") && sh[side].length) {
         // No lineup from 365Scores: the most-used players in the team's last 5
         // games (minus the injured and suspended) in a real shape — a keeper,

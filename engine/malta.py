@@ -38,6 +38,12 @@ import time
 import sources
 
 MALTA_PREMIER = 58539          # competitionTypeId: "VBET Malta Premier"
+MALTA_FA_TROPHY = 58545        # "Meridianbet FA Trophy" — 365Scores 6248
+# Also published here and deliberately not used: BOV Challenge League (2601248).
+# Malta's second tier does exist, at the federation. HAWK still cannot carry it,
+# because a match page is built on a 365Scores fixture and a Bet365 price and it
+# has neither — see the Malta note in sources.py.
+XI_COMPETITIONS = (MALTA_PREMIER, MALTA_FA_TROPHY)
 HISTORY_PAGE = 200             # 64 matches so far in 26/27, back to 14 Aug
 
 # MFA competitor id -> 365Scores competitor id. Twelve clubs, mapped by hand and
@@ -216,6 +222,64 @@ def match_rows(match):
         if rows:
             out[cid] = rows
     return out or None
+
+
+def upcoming_xi(competitions=XI_COMPETITIONS, budget=None):
+    """Confirmed line-ups for Maltese matches that have not kicked off.
+
+    Keyed {(home_cid, away_cid): {...}}, with the kick-off carried inside so the
+    caller can check it agrees. Not keyed by a date: a date has to be derived,
+    and the two feeds hold their times differently — the MFA stamps explicit UTC
+    while fixtures.json holds 365Scores' naive Europe/London — so deriving one
+    would read the fixture in the build machine's zone and the key would match on
+    the runner and miss on the laptop, or the reverse. The club pair is exact,
+    and only matches whose XI is already published get this far, so two of them
+    between the same clubs at once cannot happen.
+
+    This is the half of Malta that cannot be good. api.mfa.com.mt sends no
+    Access-Control-Allow-Origin, so unlike ESPN — which engine.js fetches in the
+    browser within four hours of kick-off — this can only ride the 2-hourly
+    build. Line-ups land about an hour before kick-off, so a build has to happen
+    inside that window or the XI is not there yet. Expect to catch roughly half.
+    `fetched` goes in the record for exactly that reason: the page must be able
+    to say how old this is rather than imply it is live.
+    """
+    out = {}
+    for competition in competitions:
+        if budget and time.time() > budget:
+            break
+        rows = sources.mfa_upcoming_matches(competition)
+        for match in rows or []:
+            if budget and time.time() > budget:
+                break
+            if not match.get("isLineupAvailable"):
+                continue
+            cids = [TEAM_365.get((match.get(k) or {}).get("id")) for k in ("homeTeam", "awayTeam")]
+            ts = _ts(match.get("startDate"))
+            if not all(cids) or not ts:
+                continue
+            lineup = sources.mfa_lineup(match["id"])
+            if not lineup:
+                continue
+            sides, ok = {}, True
+            for side, key in (("home", "homeTeam"), ("away", "awayTeam")):
+                players = (lineup.get(key) or {}).get("players") or []
+                named = [{"name": canonical_name(p.get("name")), "num": p.get("number"),
+                          "start": bool(p.get("startingLineup")), "gk": bool(p.get("isGoalkeeper")),
+                          "cap": bool(p.get("isCaptain"))}
+                         for p in players if (p.get("name") or "").strip()]
+                # Eleven starters or it is not a line-up. The same bar engine.js
+                # puts on ESPN: a half-published XI is worse than none, because
+                # the page would present it with the same confidence.
+                if sum(1 for p in named if p["start"]) != 11:
+                    ok = False
+                    break
+                sides[side] = named
+            if ok:
+                out[(cids[0], cids[1])] = {**sides, "kickoff": ts, "fetched": int(time.time()),
+                            "referees": [r.get("name") for r in (match.get("referees") or [])
+                                         if (r.get("role") or "") == "Referee"]}
+    return out
 
 
 def player_history(known=(), competition=MALTA_PREMIER, budget=None):

@@ -630,6 +630,35 @@ def main(out_dir):
         problems.append(f"Malta FA player history failed ({e}) — Malta falls back to team markets")
     squads["malta"] = malta_got
 
+    # ...and the confirmed XI, for the fixtures 365Scores leaves blank.
+    #
+    # Attached to the fixture rather than fetched by the site, because
+    # api.mfa.com.mt sends no CORS header. That is the whole weakness of it: the
+    # build is 2-hourly, Maltese line-ups appear about an hour before kick-off,
+    # so a build has to land inside that window. `fetched` travels with the XI so
+    # the match page can say how old it is instead of implying it is live.
+    # Its own small budget — a line-up is the nicety here and the player history
+    # above is the substance, so this must never be what runs the clock out.
+    malta_xi = 0
+    try:
+        xis = malta.upcoming_xi(budget=time.time() + 45)
+        for fixture in fixtures.values():
+            cid = tuple(fixture.get("cid") or ())
+            if len(cid) != 2 or not all(cid):
+                continue
+            found = xis.get((cid[0], cid[1]))
+            # Same two clubs is nearly enough on its own, but "nearly" is how a
+            # reverse fixture's XI ends up on the wrong page. Twelve hours is
+            # loose on purpose: the two feeds' kick-off times need not agree to
+            # the minute, and nothing else these clubs play is within half a day.
+            when = sources.kickoff_ts(fixture.get("kickoff"))
+            if found and when and abs(found["kickoff"] - when) <= 12 * 3600:
+                fixture["xi"] = found
+                malta_xi += 1
+    except Exception as e:                                   # noqa: BLE001
+        problems.append(f"Malta FA line-ups failed ({e}) — those pages fall back to HAWK's guessed XI")
+    squads["malta_xi"] = malta_xi
+
     for cid in squad_ids:
         players = []
         for name, rec in history[cid].items():

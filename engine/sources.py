@@ -602,6 +602,17 @@ def _s365_ts(start_time):
     return int(kick.timestamp())
 
 
+def kickoff_ts(start_time):
+    """A stored fixture's kickoff string as unix seconds.
+
+    fixtures.json holds 365Scores' naive Europe/London time, so it cannot be
+    compared with another source's instant by calling .timestamp() on it — that
+    reads it in the build machine's own zone, UTC in the Action and CET on the
+    laptop. This is the one correct reading, shared so nothing invents a second.
+    """
+    return _s365_ts(start_time)
+
+
 def s365_players(game_id):
     """Per-player stats for one finished match, ready to append to each club's
     history: {competitor_id: [{"name", "position", "match": {...}}, ...]}, where
@@ -1210,6 +1221,12 @@ MFA_BASE = "https://api.mfa.com.mt/api"
 def mfa_past_matches(competition, limit=200):
     """Finished matches for an MFA competitionTypeId, or None if unreachable."""
     rows = _get_json(f"{MFA_BASE}/competitions/{competition}/pastMatches", {"pageSize": limit})
+    return rows if isinstance(rows, list) else None
+
+
+def mfa_upcoming_matches(competition, limit=50):
+    """Fixtures not yet played, for an MFA competitionTypeId."""
+    rows = _get_json(f"{MFA_BASE}/competitions/{competition}/upcomingMatches", {"pageSize": limit})
     return rows if isinstance(rows, list) else None
 
 

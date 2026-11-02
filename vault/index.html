@@ -1976,7 +1976,22 @@
     if (k === "ep" && window.HAWK && window.HAWK.setEarlyPayout) window.HAWK.setEarlyPayout(now);
     paintRules();
   });
-  if (S.bets.some((b) => b && b.status === "PENDING")) autoSettle(false);
+  /* A running bet is not the only reason to check. A bet HAWK settled as LOST
+     during the match has to be re-read once the match is over — and that
+     re-read lives inside autoSettle, so a log with nothing pending never ran
+     it and a wrongly-killed ticket stayed wrong for ever. Found the only way
+     this gets found: the ticket still said LOST after the fix shipped.
+
+     It carries the same fortnight bound autoSettle's own needsRecheck uses, or
+     it never stops being true: a bet older than that is never fetched, so it
+     never gets earlyChecked, so this would fire on every single load for ever.
+     93 of those are sitting in the log right now. */
+  const FRESH_ENOUGH = 14 * 86400000;        // the `recent` window in autoSettle
+  const wantsSettle = (b) => b && (b.status === "PENDING"
+    || (b.lostEarly && !b.earlyChecked && b.status === "LOST"
+        && (b.legs || []).some((l) => l && l.hawk
+            && Date.now() - Date.parse(l.hawk.kickoff || 0) < FRESH_ENOUGH)));
+  if (S.bets.some(wantsSettle)) autoSettle(false);
 })();
 </script>
 </body>

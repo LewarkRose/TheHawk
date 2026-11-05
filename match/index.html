@@ -1078,7 +1078,24 @@
     try {
       const n = Math.max(2, Math.min(8, +AB.options || 5));
       const r = window.HAWK.buildOptions({ ...body, options: n }, n);
-      abOpts = (r && r.options) || [];
+      /* Likeliest first. The chip numbers now run down the chance to land,
+         which is the figure the panel underneath shows, so option 1 is the
+         one the "26.4% LANDS" bar reads highest for.
+
+         This orders the list; it does not choose it. The engine ranks by what
+         a build is worth at Bet365 and that ranking still decides WHICH builds
+         reach this array, along with the no-arguing rule that stops two
+         options contradicting each other — sorting here rather than in
+         autoOptions leaves both alone. The cost is that option 1 is no longer
+         the best-value one, which is what the engine's comment means by "the
+         one you'd actually want"; the ✓ on a chip still marks those.
+
+         Ties break on the bigger price, so two builds that land equally often
+         keep a stable order instead of swapping places between rebuilds. */
+      const abChance = (t) => (t && t.p) || 0;
+      const abPrice = (t) => (t && (t.b365 || t.price || t.fair)) || 0;
+      abOpts = ((r && r.options) || []).slice()
+        .sort((a, b) => abChance(b) - abChance(a) || abPrice(b) - abPrice(a));
       // Nothing at all: fall back to the single build, which gives the honest
       // "couldn't make one at that price" rather than an empty row.
       if (!abOpts.length) { abShow(window.HAWK.build(body)); abRow(); return; }

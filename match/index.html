@@ -40,6 +40,10 @@
   font:700 9.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--faint);
   transition:color .4s var(--film);animation:rise .8s .05s var(--film) both}
 .back:hover{color:var(--gold-hi)}
+/* Where the page lands when you press Build. The nav is sticky and its height
+   is measured into --navh by hawk-nav.js (a phone bar is not the desktop one),
+   so the offset follows it rather than hardcoding the 88px the rail uses. */
+#abOut{scroll-margin-top:calc(var(--navh,91px) + 18px)}
 </style>
 </head>
 <body>
@@ -1071,6 +1075,31 @@
     priced: !!AB.priced,
   });
 
+  /* Press Build and the page travels to the ticket.
+     Without this, pressing Build looked like it did nothing: measured on the
+     live page, the button sits at y 824 on a 768px viewport — already below the
+     fold — and the ticket it writes lands at top 1789 and stands 1501px tall,
+     a screen and a half below your eyes, with no scroll. The engine takes
+     150-320ms, so there was never anything to wait for; the result was simply
+     somewhere you could not see.
+
+     `block: "start"`, not "center": the ticket is twice the height of the
+     viewport, so centring it would put its top — the chance, the price and the
+     bar, the whole argument — above the top of the screen. It lands under the
+     nav instead, offset by the scroll-margin declared above.
+
+     Called from abBuild only, which is reached only by pressing the gold
+     button. Picking another option, swapping a leg and stepping a line all
+     redraw the same panel through abShow, and none of them should yank the
+     page out from under you. */
+  function abReveal() {
+    const out = $("#abOut");
+    if (!out || !out.firstChild) return;
+    const still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    try { out.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" }); }
+    catch { out.scrollIntoView(); }     // older Safari: no options object
+  }
+
   function abBuild() {
     if (!S.m) return;
     abBanned = [];
@@ -1098,15 +1127,20 @@
         .sort((a, b) => abChance(b) - abChance(a) || abPrice(b) - abPrice(a));
       // Nothing at all: fall back to the single build, which gives the honest
       // "couldn't make one at that price" rather than an empty row.
-      if (!abOpts.length) { abShow(window.HAWK.build(body)); abRow(); return; }
+      if (!abOpts.length) { abShow(window.HAWK.build(body)); abRow(); abReveal(); return; }
       abAt = 0;
       abShow(abOpts[0], 1);
       abRow();
+      abReveal();
       return;
     } catch (err) {
       $("#abOut").innerHTML = `<p class="note" style="margin:22px 0 0">Couldn't build it
         (${esc(err.message || "")}).</p>`;
       $("#abOpts").hidden = true;
+      // The failure needs the trip even more than the ticket does: an error
+      // message a screen and a half down is indistinguishable from nothing
+      // happening, which is the whole complaint this change answers.
+      abReveal();
     }
   }
 

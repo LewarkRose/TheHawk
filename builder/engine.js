@@ -2120,7 +2120,44 @@
     for (const l of t.legs || []) { const m = OU_LINE.exec((l && l.id) || ""); if (m) out.push([m[1], m[2], +m[3]]); }
     return out;
   };
-  const argues = (t, c) => {
+  // ...and then the same question put to the simulation, which needs no list of
+  // which markets fight.
+  //
+  // The rule above only ever compares an Over with an Under of the SAME
+  // quantity — `q !== q2` and it moves on — so it could not see the pair Lewzu
+  // found on 7 Nov 2026: "Under 2.5 Goals" offered beside "1st Half Over 0.5 +
+  // Both Teams to Score". That is goals against h1goals and btts, three
+  // different quantities and one of them not an over/under at all. No list of
+  // market pairs was ever going to be complete, and the last two attempts at
+  // this were both lists.
+  //
+  // So ask the sim. It is the ratio evaluate() already reports as `agree` —
+  // the chance of both sets landing against the chance if they were
+  // independent — only asked ACROSS two tickets rather than within one, and
+  // only of the legs they do not share.
+  //
+  // Measured over 108 option pairs on 14 matches: the median pair is 0.99,
+  // near independent, and the tail is tiny and unmistakable. The Tottenham pair
+  // came out at 0.49 — landing both is half as likely as chance would give you
+  // — beside 0.45 and 0.48 of the same Under-against-BTTS shape. The worst was
+  // 0.00: Wrexham v Wolves, "Under 3.5 + Away Clean Sheet" against "Both Teams
+  // to Score", which cannot both happen and was being offered as two ways to
+  // bet the same game. A floor of 0.55 blocks 4 of those 108 and leaves the
+  // rest alone.
+  const AGREE_FLOOR = 0.55;
+  // One mask per leg-set per match, because sweep() asks about the same sets
+  // over and over and each pass is N_SIMS long.
+  const jointCache = new WeakMap();
+  const pOf = (legs, ids) => {
+    let seen = jointCache.get(legs);
+    if (!seen) jointCache.set(legs, (seen = new Map()));
+    const key = ids.join("|");
+    if (seen.has(key)) return seen.get(key);
+    const p = mean(maskOf(legs, ids, legs[ids[0]].arr.length));
+    seen.set(key, p);
+    return p;
+  };
+  const argues = (t, c, legs, floor = AGREE_FLOOR) => {
     for (const [q, side, line] of ouLines(t)) {
       for (const [q2, side2, line2] of ouLines(c)) {
         if (q !== q2 || side === side2) continue;
@@ -2128,7 +2165,17 @@
         if (under - over <= 1) return true;
       }
     }
-    return false;
+    if (!legs) return false;
+    const idsOf = (x) => [...new Set((x.legs || []).map((l) => l && l.id))]
+      .filter((id) => legs[id] && legs[id].arr).sort();
+    const A = idsOf(t), B = idsOf(c);
+    // Only the legs they differ on. Shared legs are in both tickets either way,
+    // and leaving them in would drag every comparison toward "they agree".
+    const a = A.filter((id) => !B.includes(id)), b = B.filter((id) => !A.includes(id));
+    if (!a.length || !b.length) return false;
+    const pa = pOf(legs, a), pb = pOf(legs, b);
+    if (!(pa > 0 && pb > 0)) return false;
+    return pOf(legs, [...a, ...b].sort()) / (pa * pb) < floor;
   };
   // Compare two scores item by item: the first difference decides.
   const isBetter = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
@@ -2640,12 +2687,12 @@
     // only take a near-copy once nothing better is left.
     const shared = (t, c) => t.legs.filter((l) => c.legs.some((x) => x.id === l.id)).length;
     const chosen = [];
-    const sweep = (limit, allowArguing = false) => {
+    const sweep = (limit, floor = AGREE_FLOOR) => {
       for (const t of pool) {
         if (chosen.length >= count) break;
         if (chosen.includes(t)) continue;
         if (limit != null && chosen.some((c) => shared(t, c) >= limit)) continue;
-        if (!allowArguing && chosen.some((c) => argues(t, c))) continue;
+        if (floor > 0 && chosen.some((c) => argues(t, c, e.legs, floor))) continue;
         chosen.push(t);
       }
     };
@@ -2653,9 +2700,18 @@
     sweep(Math.max(2, (pool[0].legs.length || 2) - 1) + 1);   // differ by at least one
     sweep(null);                                           // rather than return fewer than asked
     // Returning four options that agree with each other beats six that don't, so the
-    // no-arguing rule outlives the diversity one. It is dropped only to avoid handing
-    // back an empty list, which would be worse than an awkward pair.
-    if (!chosen.length) sweep(null, true);
+    // no-arguing rule outlives the diversity one.
+    //
+    // But it must not leave you with ONE. Measured over the same 14 matches the
+    // floor was set on, the strict rule alone took Westerlo v Charleroi from
+    // four options to one — and at one the row hides itself, so a rule meant to
+    // make the choice honest removed the choice. So when fewer than two
+    // survive, the floor is loosened rather than dropped: a mildly opposed
+    // pair is allowed back, an impossible one (Under 3.5 against Both Teams to
+    // Score, ratio 0.00) never is. Only an otherwise empty list drops it
+    // altogether, which is the old behaviour and still better than nothing.
+    if (chosen.length < 2) sweep(null, 0.3);
+    if (!chosen.length) sweep(null, 0);
     return chosen.map((t) => ({ ...t, worth: +worthOf(t).toFixed(3) }));
   }
   // 🎯 Auto: no target odds to pick. HAWK tries a few targets (about 2, 2.75 and
@@ -2720,7 +2776,7 @@
     const chosen = [];
     for (const t of ranked) {
       if (chosen.length >= count) break;
-      if (chosen.some((c) => argues(t, c))) continue;
+      if (chosen.some((c) => argues(t, c, e.legs))) continue;
       chosen.push(t);
     }
     return chosen.length ? chosen : ranked.slice(0, count);
@@ -2793,7 +2849,7 @@
       // the result leg and going a different way after it is.
       if (chosen.some((c) => t.legs.filter((l) => c.legs.some((x) => x.id === l.id)).length
                              >= Math.max(2, Math.min(t.legs.length, c.legs.length)))) continue;
-      if (chosen.some((c) => argues(t, c))) continue;   // see argues(): Auto contradicted too
+      if (chosen.some((c) => argues(t, c, e.legs))) continue;   // see argues(): Auto contradicted too
       chosen.push(t);
     }
     return chosen.map(({ rank, ...t }) => t);

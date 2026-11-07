@@ -285,7 +285,7 @@
     $("#cH").src = m.homeCrest || ""; $("#cA").src = m.awayCrest || "";
     $("#nH").textContent = m.home;    $("#nA").textContent = m.away;
     $("#mH").textContent = place("home"); $("#mA").textContent = place("away");
-    $("#kT").textContent = m.started ? "Live" : (hhmm(m.kickoff) || "TBC");
+    $("#kT").textContent = m.finished ? "FT" : m.started ? "Live" : (hhmm(m.kickoff) || "TBC");
     $("#kK").textContent = m.derby ? "Derby" : (m.league || "");
     $("#fx").hidden = false;
 

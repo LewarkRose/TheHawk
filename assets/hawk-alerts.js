@@ -85,6 +85,17 @@
      lag it was written to ignore. The feed is recorded now and the guard
      only fires across feeds, which is the only case it was ever for. */
   const GOAL_OFF_CONFIRM_MS = 3 * 60e3, GOAL_SAID_MS = 10 * 60e3;
+  /* How long a leg must READ lost before the Vault is written to.
+     "Two consecutive checks" is ten to thirty seconds, and a VAR review is
+     minutes. PSG v Troyes, 7 Nov 2026: Troyes scored at 84', the feed showed
+     1-1, a Both Teams to Score: No leg read lost, HAWK settled the ticket --
+     and at 84' the goal was disallowed. Final 1-0, so the leg had won and the
+     log said lost. Same shape as the shots-on-target case two days earlier:
+     the reading was honest when taken and the feed revised it afterwards.
+     Three minutes is this file's own VAR window, already used for a goal
+     coming off. It costs nothing: the bet is dead either way, and the only
+     thing the wait delays is the alert going quiet. */
+  const LOST_HELD_MS = 3 * 60e3;
   const scoreKey = (s) => `${s[0]}-${s[1]}`;
 
   const G = {
@@ -964,13 +975,18 @@
         rememberP(mine);
         for (const t of mine) {
           const rows = t.parts.filter((pt) => pt.live).flatMap((pt) => pt.live.legs);
-          const was = states[t.id];
-          states[t.id] = Object.fromEntries(rows.map((r) => [r.id, r.state]));
+          const was = states[t.id], now = Date.now();
+          // Each leg's state AND when it started reading that way, so a loss can
+          // be required to hold rather than merely to repeat.
+          states[t.id] = Object.fromEntries(rows.map((r) => [r.id,
+            { state: r.state, since: was && was[r.id] && was[r.id].state === r.state ? was[r.id].since : now }]));
           if (!was) continue;                     // first look at this bet: just remember it
-          // A leg lost on two checks in a row (10 s or more apart, so a data
-          // blip cannot do it): the bet is settled as lost in the Vault now,
-          // and its alerts stop.
-          const gone = rows.find((r) => r.state === "lost" && was[r.id] === "lost");
+          // A leg lost on two checks in a row AND still lost LOST_HELD_MS later:
+          // the bet is settled as lost in the Vault, and its alerts stop. The
+          // repeat stops a single bad frame; the hold stops a goal that is about
+          // to be disallowed, which the repeat never could.
+          const gone = rows.find((r) => r.state === "lost" && was[r.id] && was[r.id].state === "lost"
+            && now - states[t.id][r.id].since >= LOST_HELD_MS);
           if (gone && settleLost(t.id, gone.label, g.id, rows)) {
             delete states[t.id];
             card({ tone: "bad", icon: "❌", word: "BET LOST", g, href: "../vault/",
@@ -979,13 +995,13 @@
             continue;
           }
           for (const r of rows) {
-            if (was[r.id] === r.state) continue;
+            if (was[r.id] && was[r.id].state === r.state) continue;
             if (r.state === "won" && firstTime(`leg|${t.id}|${r.id}|won`))
               card({ tone: "good", icon: "✅", word: "LEG LANDED", g, body: esc(r.label), bet: t });
             if (r.state === "lost" && firstTime(`leg|${t.id}|${r.id}|lost`))
               card({ tone: "bad", icon: "❌", word: "LEG LOST", g,
-                     body: `${esc(r.label)} <span>· the bet can't land now. HAWK settles it as lost
-                            once the next check says the same.</span>` });
+                     body: `${esc(r.label)} <span>· the bet can't land now. HAWK waits a few minutes
+                            before settling it, in case the goal comes back off.</span>` });
           }
           const open = rows.filter((r) => r.state !== "won");
           const others = t.parts.filter((pt) => !pt.live && pt.other !== "won");

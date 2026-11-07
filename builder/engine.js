@@ -1062,6 +1062,11 @@
     }
     return {
       id, league, home, away, homeComp: hc, awayComp: ac, kickoff, inPlay: !!(kickoff && kickoff < new Date()),
+      // inPlay only means the kick-off has passed, and now that a finished match
+      // can be opened at all that is no longer enough to label one: the hero read
+      // "Live" on a game that ended three hours ago. statusGroup 4 is 365Scores'
+      // own word for finished. inPlay is left alone because other callers read it.
+      finished: game.statusGroup === 4,
       quotes, cons, polymarket: pm, lineups, confirmed, espn, mfaXi, lineupCheck, detail, table, form: { home: formH, away: formA }, recentForm: { home: recentH, away: recentA },
       referee: { name: refName, avg: refAvg, games: refGames, source: refSource, factor: refFactor },
       // The fixture's name when it is a derby, else null. Carried so the card can
@@ -2369,7 +2374,28 @@
 
   async function gameFor(league, id) {
     if (!rawFixtures.has(String(id))) await fixtures(league);
-    const hit = rawFixtures.get(String(id));
+    let hit = rawFixtures.get(String(id));
+    /* A finished match was never in there to find. games/fixtures returns only
+       statusGroup 2 — measured on the Premier League, 96 games and every one of
+       them upcoming, against 24 in games/results and every one finished. So the
+       `statusGroup !== 4` filter in fixtures() has never had anything to drop,
+       and the fixture list simply does not contain a finished match.
+
+       That made every FT row on Scores a dead link: Scores points `done` rows
+       at this page, this page asked the fixture list, and the list said no. The
+       Live page closed the loop — open a finished match there and it tells you
+       "this match has finished. Open the match page."
+
+       So ask for the one game instead. It works for a finished match, for one
+       beyond the fixture window, and for a deep link into a league the list
+       does not cover. analyse() fetches the same game a moment later and
+       getJSON only caches when it is given a TTL, so this costs one extra
+       request, and only on the path that used to fail outright. */
+    if (!hit) {
+      const d = await s365("game", { gameId: id });
+      const g = d && d.game;
+      if (g && g.homeCompetitor && g.awayCompetitor) rawFixtures.set(String(id), (hit = { league, game: g }));
+    }
     if (!hit) throw new Error("fixture not found — reload the fixture list");
     return hit.game;
   }
@@ -2591,7 +2617,7 @@
       // the club ids, so the page can ask for each side's last games without
       // first re-fetching the fixture to find out who is playing
       homeId: String((an.homeComp || {}).id || ""), awayId: String((an.awayComp || {}).id || ""),
-      kickoff: an.kickoff ? an.kickoff.toISOString() : null, started: an.inPlay, referee: an.referee,
+      kickoff: an.kickoff ? an.kickoff.toISOString() : null, started: an.inPlay, finished: !!an.finished, referee: an.referee,
       // the fixture's name when it is a derby, so the card can explain the lifted
       // card lines and grade.mjs can score derby matches as their own block
       derby: an.derby, derbyFactor: an.derbyFactor,

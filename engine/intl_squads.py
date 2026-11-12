@@ -154,7 +154,11 @@ def intl_fixtures(now):
     out = {}
     horizon = now + dt.timedelta(days=DAYS_AHEAD)
     for league, cid in INTL_COMPS.items():
-        games = (sources._s365("games/fixtures", competitions=cid) or {}).get("games") or []
+        # Paged. games/fixtures returns one block of matchdays and a nextPage
+        # link; during an international break round one fills it and round two
+        # falls off. On 12 Nov 2026 that lost Gibraltar v Malta on the 16th —
+        # four days inside this horizon — along with 17 other fixtures.
+        games = sources.s365_competition_games(cid, DAYS_AHEAD) or []
         for g in games:
             ko = sources.parse_kickoff(g.get("startTime"))
             home = (g.get("homeCompetitor") or {}).get("name")

@@ -23,6 +23,7 @@ import unicodedata
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from difflib import SequenceMatcher
+from urllib.parse import urljoin
 
 import requests
 
@@ -361,12 +362,71 @@ def _s365(path, **params):
     return _get_json(f"{S365_BASE}/{path}/", dict(S365_PARAMS, **params))
 
 
-def s365_fixtures(league):
-    data = _s365("games/fixtures", competitions=S365_COMPETITIONS[league])
+# How far ahead fixtures are wanted, and how many pages that may take. The
+# window matches build_data's DAYS_AHEAD; it is repeated rather than imported
+# because sources.py is the lower layer and must not depend upwards.
+S365_FIXTURE_DAYS = 8
+S365_FIXTURE_PAGES = 6
+
+
+def s365_fixtures(league, days=S365_FIXTURE_DAYS, max_pages=S365_FIXTURE_PAGES):
+    """Upcoming games for one of HAWK's club leagues. See s365_competition_games."""
+    return s365_competition_games(S365_COMPETITIONS[league], days, max_pages)
+
+
+def s365_competition_games(competition_id, days=S365_FIXTURE_DAYS, max_pages=S365_FIXTURE_PAGES):
+    """Upcoming games for one 365Scores competition, following its paging.
+
+    `games/fixtures` returns ONE page -- the next block of matchdays -- and a
+    `paging.nextPage` link. Nothing here followed it, and nothing noticed,
+    because for most leagues one page already covers eight days: a club plays
+    once or twice a week, so a page of 30-odd games runs past the horizon.
+
+    It breaks wherever a competition has a dense round. Measured 12 Nov 2026 on
+    the Nations League (7016) during the international break: page one held 34
+    games across 12-15 Nov and stopped there, while page two held 18 more on
+    16-17 Nov -- including Gibraltar v Malta, a fixture four days inside HAWK's
+    own window that the site simply did not have. Passing startDate/endDate does
+    not help; 365Scores ignores them and returns the same page.
+
+    Taken by competition id rather than league name because the national-team
+    competitions (intl_squads.INTL_COMPS) are not in COMPETITIONS at all, and
+    Gibraltar v Malta came in through that side.
+
+    Paging is followed until a page starts beyond the horizon, the link runs
+    out, or max_pages is reached -- that last one so a feed that always offers
+    another page cannot spin the build. Games are de-duplicated by id, because
+    an unchanged `aftergame` cursor would otherwise repeat a page for ever.
+    """
+    data = _s365("games/fixtures", competitions=competition_id)
     if data is None:
         return None
-    games = [g for g in data.get("games", []) if g.get("statusGroup") != 4]
-    return sorted(games, key=lambda g: g.get("startTime", ""))
+    horizon = dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=days)
+    out, seen = {}, set()
+    for _ in range(max_pages):
+        for g in data.get("games", []):
+            if g.get("statusGroup") != 4:
+                out.setdefault(g.get("id"), g)
+        nxt = (data.get("paging") or {}).get("nextPage")
+        if not nxt or nxt in seen:
+            break
+        seen.add(nxt)
+        # This page already runs past the horizon, and pages come in kick-off
+        # order, so everything after it is further away still. Tested on the
+        # LAST game of the page, not the first: a league playing this weekend
+        # has a page spanning the horizon, whose first game is inside it, and
+        # testing the first would fetch a second page nobody wants — one wasted
+        # request per league per run, about thirty a run.
+        starts = [t for t in (_s365_ts(g.get("startTime")) for g in data.get("games", [])) if t]
+        if starts and max(starts) > horizon.timestamp():
+            break
+        # nextPage is an absolute path that ALREADY carries the /web prefix
+        # S365_BASE ends with, so concatenating gives /web/web/ and a 404.
+        # urljoin against the base replaces the path instead of appending.
+        data = _get_json(urljoin(S365_BASE, nxt))
+        if data is None:
+            break
+    return sorted(out.values(), key=lambda g: g.get("startTime", ""))
 
 
 def s365_crest(competitor):

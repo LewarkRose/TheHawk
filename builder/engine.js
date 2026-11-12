@@ -658,6 +658,81 @@
     }
     return null;
   }
+  /* ======================================================= MALTA'S XI, LIVE
+     The Malta FA publishes a confirmed eleven for every Maltese league match.
+     365Scores carries one for about one game in five and ESPN dropped Malta
+     after 2024/25, so without this a Maltese page falls back to HAWK's guessed
+     XI -- which also prices the goalscorer and booking legs on the wrong men.
+
+     This used to ride the build, because a comment in engine/malta.py said
+     api.mfa.com.mt sends no CORS header. That was wrong. Measured 12 Nov 2026:
+     `Access-Control-Allow-Origin: *` on both endpoints, a 204 preflight with
+     `Access-Control-Allow-Methods: GET`, and a browser on the live origin
+     fetched an 11+11 line-up. One wrong fact had cost four decisions -- XI into
+     the pipeline, pipeline needs a build near kick-off, cron to hourly, prop
+     budget halved to pay for it -- and the feature never once fired in eleven
+     days, because GitHub delivers about four scheduled runs a day whatever the
+     cron says. Fetched here it does not care about any of that: the page asks
+     when you open it, so the XI is as fresh as the page.
+
+     Window matches ESPN's in spirit but runs past kick-off as well: the XI goes
+     up about an hour before, and an in-play page wants the real eleven too. */
+  const MFA = "https://api.mfa.com.mt/api";
+  const MFA_COMPETITIONS = { "Maltese Premier League": 58539, "Maltese FA Trophy": 58545 };
+  // MFA competitor id -> 365Scores competitor id. Hand-checked; see TEAM_365 in
+  // engine/malta.py, which this mirrors. Fuzzy matching is the wrong tool on
+  // this list: Balzan/Balzan Youths FC and Zabbar St.Patrick/Zabbar SP read as
+  // different, while Birkirkara and Birzebbuga St.Peter's read as the same.
+  const MFA_TEAM_365 = { 39612: 14611, 39636: 14610, 40417: 16528, 39637: 8489, 39615: 14800,
+    39639: 14989, 39640: 12820, 39617: 5647, 39606: 14607, 39646: 5973, 39648: 5590, 40419: 28173 };
+  /* The MFA prints the HOME side "Diego CAMARA CALLEJA" and the AWAY side
+     "MARCHEGIANI Gabriele" -- given name first at home, surname first away, the
+     same player in the same competition. The capitals are the rule: the surname
+     is upper-cased in both layouts. engine/malta.py keys its history by this
+     spelling, so matching it here is what lets a starter find his own record. */
+  const mfaName = (name) => {
+    const words = String(name || "").split(/\s+/).filter(Boolean);
+    if (!words.length) return "";
+    const caps = words.filter((w) => w === w.toUpperCase() && w !== w.toLowerCase());
+    const rest = words.filter((w) => !(w === w.toUpperCase() && w !== w.toLowerCase()));
+    return caps.length && rest.length ? `${rest.join(" ")} ${caps.join(" ")}` : words.join(" ");
+  };
+  const mfaJSON = (url, ttl) => getJSON(url, ttl).catch(() => null);
+  async function mfaLineups(league, homeId, awayId, kickoff) {
+    const comp = MFA_COMPETITIONS[league];
+    if (!comp || !kickoff || !homeId || !awayId) return null;
+    const t = kickoff.getTime();
+    // A match LEAVES upcomingMatches the moment it kicks off, while pastMatches
+    // still carries it marked SCHEDULED for hours -- the federation is slow to
+    // enter a result. So in-play lives in the second list, not the first.
+    const rows = [];
+    for (const [path, ttl] of [["upcomingMatches?pageSize=50", 10 * 60e3], ["pastMatches?pageSize=50", 5 * 60e3]]) {
+      const got = await mfaJSON(`${MFA}/competitions/${comp}/${path}`, ttl);
+      if (Array.isArray(got)) rows.push(...got);
+    }
+    const hit = rows.find((m) => {
+      if (!m || m.status === "PLAYED") return false;
+      const h = MFA_TEAM_365[(m.homeTeam || {}).id], a = MFA_TEAM_365[(m.awayTeam || {}).id];
+      return String(h) === String(homeId) && String(a) === String(awayId)
+        && Math.abs(Date.parse(m.startDate) - t) < 6 * 3600e3;
+    });
+    if (!hit) return null;
+    const lu = await mfaJSON(`${MFA}/matches/${hit.id}/lineup`, 60e3);
+    if (!lu) return null;
+    const out = { id: String(hit.id), fetched: Date.now(),
+                  referees: (hit.referees || []).filter((r) => (r.role || "") === "Referee").map((r) => r.name) };
+    for (const [side, key] of [["home", "homeTeam"], ["away", "awayTeam"]]) {
+      const players = ((lu[key] || {}).players || []).filter((p) => (p.name || "").trim());
+      out[side] = players.map((p) => ({ name: mfaName(p.name), num: shirt(p.number),
+        start: !!p.startingLineup, gk: !!p.isGoalkeeper, cap: !!p.isCaptain }));
+    }
+    // Eleven starters a side or it is not a line-up. The same bar engine.js puts
+    // on ESPN, and it is sufficient on its own: a match whose XI is not out yet
+    // returns an EMPTY players list, never a provisional or carried-over side.
+    out.confirmed = ["home", "away"].every((sd) => out[sd].filter((p) => p.start).length === 11);
+    return out.confirmed ? out : null;
+  }
+
   // Same player in both sources? ("Carl Rushworth" / "C. Rushworth" / accents.)
   const lastName = (n) => norm(n).split(" ").filter(Boolean).pop() || "";
   const samePlayer = (a, b) => nameSimilarity(a, b) >= 0.75 || (lastName(a).length > 2 && lastName(a) === lastName(b));
@@ -923,7 +998,7 @@
       if (fresh && fresh.fixtures) { cache.set(DATA_URL + "fixtures.json", { t: Date.now(), v: fresh }); meta = fresh.fixtures[id] || null; }
     }
     const fd = (meta && meta.fd) || {};
-    const [quotes365, detailResp, table, formH, formA, pm, profH, profA, playersH, playersA, recentH, recentA, espn] = await Promise.all([
+    const [quotes365, detailResp, table, formH, formA, pm, profH, profA, playersH, playersA, recentH, recentA, espn, mfa] = await Promise.all([
       odds365(id), s365("game", { gameId: id }), standings(league), form(hc.id), form(ac.id),
       meta && meta.pm_slug ? polymarket(meta.pm_slug, home, away) : null,
       fd.home ? data(`profiles/${fd.home[0]}.json`) : null, fd.away ? data(`profiles/${fd.away[0]}.json`) : null,
@@ -935,6 +1010,10 @@
       recentForm(hc.id), recentForm(ac.id),
       // ESPN's lineups only matter close to kick-off (they're published about an hour before).
       kickoff && kickoff.getTime() - Date.now() < 4 * 3600e3 ? espnLineups(league, home, away, kickoff).catch(() => null) : null,
+      // Malta's own federation, in the browser. Runs from four hours before
+      // kick-off until three after, so an in-play page gets the real eleven too.
+      kickoff && kickoff.getTime() - Date.now() < 4 * 3600e3 && Date.now() - kickoff.getTime() < 3 * 3600e3
+        ? mfaLineups(league, hc.id, ac.id, kickoff).catch(() => null) : null,
     ]);
     const detail = (detailResp && detailResp.game) || {};
     const fdH = fd.home && fd.home[1], fdA = fd.away && fd.away[1];
@@ -982,23 +1061,21 @@
         lineups[side].source = "365Scores + ESPN";
       }
     }
-    // Malta's XI, from the federation that publishes it.
-    //
-    // 365Scores carries a Maltese lineup for about one game in five and ESPN
-    // dropped Malta after 2024/25, so these pages had no XI at all and fell back
-    // to HAWK's own guess. The Malta FA publishes one; it cannot be fetched here
-    // (no CORS) so it rides the hourly build inside the fixture, which is why
-    // it carries the time it was fetched and the card says so. Lowest of the
-    // three in priority: it only speaks where 365Scores and ESPN are both silent.
+    // Malta's XI, from the federation that publishes it — fetched right here,
+    // in the browser, the same way ESPN's is. Lowest of the three in priority:
+    // it only speaks where 365Scores and ESPN are both silent, which on a
+    // Maltese match is four games in five.
     const mfaXi = {};
     for (const side of ["home", "away"]) {
-      const xi = meta && meta.xi && meta.xi[side];
+      const xi = mfa && mfa[side];
       if (!xi || lineups[side].status === "Confirmed") continue;
-      const starters = xi.filter((p) => p.start);
-      if (starters.length !== 11) continue;
+      if (xi.filter((p) => p.start).length !== 11) continue;
       mfaXi[side] = xi;
+      // `fetched` is now "a moment ago" rather than "whenever the build last
+      // ran", but it is kept because the card prints it and an honest stamp
+      // costs nothing.
       lineups[side] = { status: "Confirmed", formation: lineups[side].formation, source: "Malta FA",
-                        fetched: (meta.xi.fetched) || null };
+                        fetched: mfa.fetched || null };
     }
 
     const confirmed = lineups.home.status === "Confirmed" && lineups.away.status === "Confirmed";
@@ -1009,7 +1086,7 @@
     // name alone, with no average beside it — HAWK has no card history for any
     // Maltese referee, so refFactor stays neutral and the card model is unmoved.
     let refName = ((detail.officials || [])[0] || {}).name
-      || (meta && meta.xi && (meta.xi.referees || [])[0]) || null;
+      || (mfa && (mfa.referees || [])[0]) || null;
     let refAvg = null, refGames = null, refSource = null;
     if (meta && meta.ref && meta.ref.avg_cards) { refName = meta.ref.name; refAvg = meta.ref.avg_cards; refGames = meta.ref.games; refSource = "StatsHub"; }
     else if (refName) { const r = refereeFromProfile(refName, profH); if (r) { [refAvg, refGames] = r; refSource = "football-data"; } }
@@ -3849,7 +3926,7 @@
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   meta: () => data("meta.json"),
                   form, cupRounds,
-                  _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas, espnLineups, matchPlayer, playerRows,
+                  _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas, espnLineups, mfaLineups, mfaName, matchPlayer, playerRows,
                                 selectionModel, priceRows, entry: (id) => matches.get(String(id)), liveState, finalMatrix,
                                 fitTotalLambda, scoreMatrix, nameSimilarity, bestMatch } };
 })(window);

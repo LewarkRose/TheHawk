@@ -143,7 +143,15 @@ SOURCE_OK_SHARE = 0.8
 # PLAYER_ASK_MIN matches asked there is nothing to judge, so it passes: a run
 # that reused every file asked for none, and that is not a failure.
 PLAYER_OK_SHARE = 0.35
-PLAYER_ASK_MIN = 5
+# And it needs a batch worth judging. The batch is whatever has not been asked
+# about since the last run, so it tracks the GAP between runs, not the health of
+# anything: run #794 came 8 hours after its predecessor and asked about 48
+# matches, while #796 came 23 minutes after a push and asked about 5 — and got
+# none of them, which at a floor of 5 would have alarmed on a feed that was
+# fine. Twenty is comfortably above a quiet gap and far below a normal
+# scheduled run's 40-50, so an outage still shows: those 48 would all come back
+# empty and read zero.
+PLAYER_ASK_MIN = 20
 ALERT_AFTER = dt.timedelta(hours=24)
 # Player rows are stored as arrays to keep the files small; the website reads
 # them in this order.

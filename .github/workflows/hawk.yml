@@ -1,6 +1,7 @@
 # Builds HAWK's data files and publishes the whole site to GitHub Pages.
 #
-# Runs hourly, whenever you upload/commit to main, and on demand
+# Runs roughly every 2 hours (GitHub delivers about 4 a day), whenever you
+# upload/commit to main, and on demand
 # (Actions tab -> "HAWK data + site" -> Run workflow).
 #
 # Why hourly and not every 3: GitHub treats scheduled runs as best effort and
@@ -13,15 +14,18 @@
 # on a public repo. The odd minute avoids the top of the hour, which is when
 # GitHub sheds the most scheduled work.
 #
-# Why hourly and not every 2, from 1 Nov 2026: a confirmed line-up is published
-# inside the last hour before kick-off, so every 2 hours could not reach one.
-# Measured — the Malta FA had an 18:00 match's XI at 17:53 and the 19:00 match's
-# still empty at the same moment — and the same lateness is why 365Scores line-ups
-# arrive close to kick-off too. At two hours apart the last build before an 18:00
-# kick-off was 16:09, 111 minutes out; hourly puts it 21 to 51 minutes out.
-# This doubles the scheduled runs, so build_data.py's PROPS_PER_RUN had to halve
-# to keep the PropLine daily cap sum true — RUNS_PER_DAY there must match this
-# cron, and the run says so out loud if it does not.
+# It went HOURLY on 1 Nov 2026 to catch a confirmed line-up, which is published
+# inside the last hour before kick-off, and that was reverted on 12 Nov because
+# GitHub never delivered it. Measured over 62 scheduled runs and 399 hours: 16%
+# of the hourly runs ever started, median gap 6.7 hours, shortest in a fortnight
+# 3.2 hours, and not one gap under 1.5. Hourly gave 3.6 runs a day against 4.2
+# on this cron — asking for twice as many produced slightly fewer. The arithmetic
+# in that change was right and the premise was not: you cannot schedule your way
+# to a build in a particular hour here. Catching a line-up needs something that
+# runs when the match is near, not a faster heartbeat.
+#
+# The cost of believing it: PROPS_PER_RUN was halved to pay for runs that never
+# happened, so prop fetching ran at about half speed for eleven days.
 #
 # One-time setup: Settings -> Pages -> Build and deployment -> Source:
 # "GitHub Actions".
@@ -29,7 +33,7 @@ name: HAWK data + site
 
 on:
   schedule:
-    - cron: "9 * * * *"
+    - cron: "9 */2 * * *"
   push:
     branches: [main]
   workflow_dispatch:

@@ -78,20 +78,24 @@ MAX_AGE = {"profiles": dt.timedelta(days=10), "results365": dt.timedelta(days=60
 # one event lookup per league per run — and PropLine mailed on the 8th to say the
 # cap had been hit. Nothing broke, because a match whose props fail to fetch keeps
 # the file from an earlier run, but the newest matches stop getting fresh prices.
-# The workflow went hourly on 1 Nov 2026 (so a line-up published in the last hour
-# before kick-off can be reached at all), and this moved WITH it, same sum:
+# It went hourly on 1 Nov 2026 and this was halved to 30 to match, on the
+# arithmetic that 24 runs x 30 would spend MORE than 12 x 55. Both halves of
+# that were wrong, because GitHub does not deliver the cron it is given.
+# Measured 12 Nov 2026 over 62 scheduled runs and 399 hours: 16% of hourly runs
+# ever start, the median gap is 6.7 hours and the shortest in a fortnight is
+# 3.2. Asking hourly changed nothing -- 3.6 runs a day against 4.2 on the
+# two-hourly cron, which is noise -- so the halved batch was spending
+# ~4 x 30 = 120 prop requests a day where ~4 x 55 = 230 used to go out, for a
+# benefit that never existed. Back to 55, and the cron back to every two hours.
 #
-#   1,000 a day  /  24 runs  =  41 per run, including the event lookups
-#   less ~8 leagues of those =  33, and 30 leaves headroom:
-#   24 x 30 + 24 x 8  =  912 of 1,000
+#   1,000 a day  /  12 runs  =  83 per run, including the event lookups
+#   less ~8 leagues of those =  75, and 55 leaves real headroom
 #
-# Halving the batch costs no coverage, and the day's total spend goes UP, not
-# down: 24 x 30 = 720 prop requests against 12 x 55 = 660 before. `soon` is
-# sorted by kick-off so the nearest matches are always served first, and with a
-# 60-hour window and 24 runs a day every match gets dozens of chances before it
-# starts.
+# RUNS_PER_DAY stays at the CRON's rate, not the measured 4: it is a ceiling for
+# the cap sum, and sizing it to today's throttling would blow the quota the day
+# GitHub starts delivering what it is asked for.
 PROPS_HOURS = 60
-PROPS_PER_RUN = 30
+PROPS_PER_RUN = 55
 # Kept beside it so the sum above can be checked rather than remembered. If the
 # cron in .github/workflows/hawk.yml changes, change RUNS_PER_DAY to match and the
 # run will say whether the budget still works.
@@ -100,7 +104,7 @@ PROPS_PER_RUN = 30
 # props entirely (see push_run below) — otherwise a day of editing silently spends
 # the whole quota and the sum here stops meaning anything.
 PL_DAILY_LIMIT = 1000
-RUNS_PER_DAY = 24          # cron: "9 * * * *"
+RUNS_PER_DAY = 12          # cron: "9 */2 * * *"
 # 365Scores backup ratings: how far back to keep matches, how many match-stat
 # requests one run may make (one per match; the history fills in over several
 # runs), and how old football-data's last ratings may be before 365Scores' win.

@@ -137,6 +137,13 @@ CUP_MIN_HISTORY = 6
 FD_STALE_AFTER = dt.timedelta(days=3)
 # A source counts as working when at least this share of its requests did.
 SOURCE_OK_SHARE = 0.8
+# "player stats" is scored differently (see where `worked` is built): the share
+# of ASKED matches that came back with any. 0.35 is a collapse, not a quiet
+# week -- a normal run sits near 0.8 and an outage sits at 0. Below
+# PLAYER_ASK_MIN matches asked there is nothing to judge, so it passes: a run
+# that reused every file asked for none, and that is not a failure.
+PLAYER_OK_SHARE = 0.35
+PLAYER_ASK_MIN = 5
 ALERT_AFTER = dt.timedelta(hours=24)
 # Player rows are stored as arrays to keep the files small; the website reads
 # them in this order.
@@ -661,36 +668,17 @@ def main(out_dir):
         problems.append(f"Malta FA player history failed ({e}) — Malta falls back to team markets")
     squads["malta"] = malta_got
 
-    # ...and the confirmed XI, for the fixtures 365Scores leaves blank.
-    #
-    # Attached to the fixture rather than fetched by the site, because
-    # api.mfa.com.mt sends no CORS header. That is the whole weakness of it:
-    # Maltese line-ups appear inside the last hour before kick-off, so a build
-    # has to land in that window — which is why the cron is hourly rather than
-    # 2-hourly, putting the last build 21 to 51 minutes out instead of up to
-    # 111. `fetched` travels with the XI so the match page can say how old it is
-    # instead of implying it is live.
-    # Its own small budget — a line-up is the nicety here and the player history
-    # above is the substance, so this must never be what runs the clock out.
-    malta_xi = 0
-    try:
-        xis = malta.upcoming_xi(budget=time.time() + 45)
-        for fixture in fixtures.values():
-            cid = tuple(fixture.get("cid") or ())
-            if len(cid) != 2 or not all(cid):
-                continue
-            found = xis.get((cid[0], cid[1]))
-            # Same two clubs is nearly enough on its own, but "nearly" is how a
-            # reverse fixture's XI ends up on the wrong page. Twelve hours is
-            # loose on purpose: the two feeds' kick-off times need not agree to
-            # the minute, and nothing else these clubs play is within half a day.
-            when = sources.kickoff_ts(fixture.get("kickoff"))
-            if found and when and abs(found["kickoff"] - when) <= 12 * 3600:
-                fixture["xi"] = found
-                malta_xi += 1
-    except Exception as e:                                   # noqa: BLE001
-        problems.append(f"Malta FA line-ups failed ({e}) — those pages fall back to HAWK's guessed XI")
-    squads["malta_xi"] = malta_xi
+    # The confirmed XI is NOT built here. It used to be, because a comment in
+    # malta.py said api.mfa.com.mt sends no CORS header; it does, and
+    # builder/engine.js now fetches the eleven in the browser the way it fetches
+    # ESPN's. Removed 12 Nov 2026 after eleven days in which it produced
+    # malta_xi: 0 on every single run, and could not have produced anything
+    # else: a Maltese line-up goes up inside the last hour before kick-off, a
+    # build has to land in that hour, and GitHub delivers about four scheduled
+    # runs a day whatever the cron asks for. The half meant to cover that --
+    # reading a match already under way -- could never attach either, because
+    # games/fixtures drops a match the moment it kicks off, so there was no
+    # fixture left to hang it on.
 
     for cid in squad_ids:
         players = []
@@ -730,9 +718,38 @@ def main(out_dir):
     # Scored on HAVING a history, not on gaining one: most clubs play twice a
     # week and the pipeline runs far more often than that, so `fresh` alone would
     # read as a near-total failure on every run.
+    # "player stats" is judged on what the source RETURNS WHEN ASKED, not on how
+    # many squads happen to hold a file.
+    #
+    # The old test was `squads with a history / squads wanted` at
+    # SOURCE_OK_SHARE. That measures the FIXTURE MIX, not the source. On
+    # 9 Nov 2026 it failed the Action and went on failing it every run for
+    # three days: the international break had filled the window with national
+    # teams and amateur Coupe de France clubs -- 57 of 106 fixtures were
+    # national sides -- and HAWK was never going to have club files for them.
+    # 62 of 96 squads is 65%, under the 80% bar, so a healthy build was marked
+    # a dead source. An alarm that fires every international break is one
+    # nobody reads, which is the same lesson StatsHub taught on 31 Oct.
+    #
+    # Asked-and-answered separates the two cleanly. On the same run it read
+    # 39 of 48 matches returned, 81%, while the squad test read 65%. In a real
+    # outage every request comes back empty and it goes to zero.
+    #
+    # SKIPPED matches are excluded: those are the deadline cutting the batch
+    # short, which is HAWK running out of time, not 365Scores failing.
+    #
+    # Its own floor, well below SOURCE_OK_SHARE, because the two numbers mean
+    # different things. A fifth of asked matches coming back blank is ordinary
+    # -- plenty of competitions publish no line-ups at all, and those stop
+    # being asked only after PLAYER_BLANK_RETRY. Nothing short of a collapse
+    # should wake anyone.
+    # Not `asked`: that name is the dict of fetch results higher up this
+    # function, and shadowing it here would read as the same thing.
+    asked_matches = len(fetched) + n_blank
     worked = {"365Scores": share(s365_ok, s365_ok + s365_failed),
               "football-data": share(rated["fresh"], len(codes_needed)),
-              "player stats": share(squads["fresh"] + squads["reused"], len(squad_ids))}
+              "player stats": asked_matches < PLAYER_ASK_MIN
+                              or len(fetched) / asked_matches >= PLAYER_OK_SHARE}
     prev_sources = prev_meta.get("sources") or {}
     status = {}
     for name, ok in worked.items():

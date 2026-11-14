@@ -40,6 +40,14 @@
     <p class="note">Where the board says HAWK runs high or low, its chances are shifted by this much
       <b>before you ever see them</b>. A gap above is therefore not money leaking — it is the
       measurement the correction is made from.</p>
+    <div id="heldWrap" hidden>
+      <div class="lede"><h3><span class="emj">⏳</span>Measured, not trusted</h3><span class="n" id="heldN"></span></div>
+      <div id="held"></div>
+      <p class="note">A market only gets its correction once HAWK has graded every leg twice — once
+        raw, once corrected — and the corrected one has actually scored better. These haven't earned
+        it: either too few legs yet, or the correction <b>made them worse</b> and was withheld.
+        The figure is the legs so far, or the Brier units the shift lost.</p>
+    </div>
   </div>
 </section>
 
@@ -143,48 +151,34 @@
   };
 
   /* ----------------------------------------------------- the corrections
-     Not a stored file: the builder computes these from the graded record plus
-     your own settled legs, and shifts a chance by this much before you ever
-     see it. Replicated here with the same constants and the same logit shrink,
-     because a correction quoted differently on two pages is worse than one not
-     quoted at all. */
-  const LEARN_MIN = 30, LEARN_SHRINK = 60, LEARN_CAP = 0.6;
+     Read from data/learn.json — the same file the engine prices with, not a
+     second opinion computed here. This page used to work the shifts out for
+     itself from byKey plus your own settled legs, and the heading said "in
+     force". Both halves were wrong: nothing called setLearning, so no
+     correction was in force at all, and the number quoted was one the app
+     would not have used even if it had been.
+     A market's shift reaches this file only once its own walk-forward A/B has
+     watched that shift help (grade.mjs, LIVE_MIN_N / LIVE_MIN_GAIN), so `held`
+     is the more interesting half: measured, and not trusted yet. */
   const lg = (p) => Math.log(p / (1 - p));
   const ilg = (x) => 1 / (1 + Math.exp(-x));
 
-  function corrections(g, bets) {
-    if (!(window.HAWK && window.HAWK.learnKey)) return [];
-    const by = {};
-    for (const b of bets) {
-      for (const l of b.legs || []) {
-        for (const h of (l.hawk && l.hawk.legs) || []) {
-          const p = h.pRaw != null ? h.pRaw : h.p;
-          const key = window.HAWK.learnKey(h.id, h.market);
-          if ((h.result !== "won" && h.result !== "lost") || !(p > 0 && p < 1) || !key) continue;
-          const t = (by[key] ||= { n: 0, said: 0, won: 0 });
-          t.n++; t.said += p; if (h.result === "won") t.won++;
-        }
-      }
-    }
-    // plus HAWK's graded predictions on every match
-    for (const [key, v] of Object.entries(g.byKey || {})) {
-      const t = (by[key] ||= { n: 0, said: 0, won: 0 });
-      t.n += v.n; t.said += v.p; t.won += v.won;
-    }
+  // A log-odds shift means nothing on its own, so show it where it lands: the
+  // market's own graded `said` moved by this many points.
+  function appliedRows(g, L) {
     const out = [];
-    for (const [market, t] of Object.entries(by)) {
-      if (t.n < LEARN_MIN) continue;
-      const said = t.said / t.n, got = Math.min(Math.max(t.won / t.n, 0.02), 0.98);
-      const shift = Math.max(-LEARN_CAP, Math.min(LEARN_CAP,
-        (t.n / (t.n + LEARN_SHRINK)) * (lg(got) - lg(said))));
-      if (Math.abs(shift) < 0.02) continue;
-      out.push({ market, n: t.n, pts: 100 * (ilg(lg(said) + shift) - said) });
+    for (const [market, shift] of Object.entries((L && L.shifts) || {})) {
+      const v = (g.byKey || {})[market];
+      if (!v || !v.n) continue;
+      const said = v.p / v.n;
+      if (!(said > 0 && said < 1) || !shift) continue;
+      out.push({ market, n: v.n, pts: 100 * (ilg(lg(said) + shift) - said) });
     }
     return out.sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts));
   }
 
   /* -------------------------------------------------------------- render */
-  function render(g) {
+  function render(g, L) {
     const bands = g.bands || [];
     const all = bands.length ? stat(bands.reduce((a, b) => a + b.n, 0),
       bands.reduce((a, b) => a + b.p, 0), bands.reduce((a, b) => a + b.won, 0)) : null;
@@ -312,28 +306,43 @@
     $("#blocks").innerHTML = out;
     if (window.HAWKFold) window.HAWKFold.restore();
 
-    // corrections already applied — computed, not stored, exactly as the old
-    // builder's computeLearning() does it
-    const ch = corrections(g, bets);
-    if (ch.length) {
-      $("#corrN").textContent = plural(ch.length, "market");
-      $("#corr").innerHTML = ch.map((c) => `<span class="bchip ${c.pts >= 0 ? "up" : "dn"}">${
-        esc(c.market)} <b>${c.pts >= 0 ? "+" : ""}${(+c.pts).toFixed(1)}</b></span>`).join("");
+    // What the engine is actually pricing with, straight from learn.json.
+    const ch = appliedRows(g, L);
+    const held = ((L && L.held) || []).filter((h) => h && h.n);
+    if (ch.length || held.length) {
+      $("#corrN").textContent = ch.length ? plural(ch.length, "market") : "none yet";
+      $("#corr").innerHTML = ch.length
+        ? ch.map((c) => `<span class="bchip ${c.pts >= 0 ? "up" : "dn"}">${
+            esc(c.market)} <b>${c.pts >= 0 ? "+" : ""}${(+c.pts).toFixed(1)}</b></span>`).join("")
+        : `<p class="note">No market has earned one yet.</p>`;
+      if (held.length) {
+        $("#heldN").textContent = plural(held.length, "market");
+        // Why each one is out: too little evidence, or evidence that it hurts.
+        $("#held").innerHTML = held.map((h) => `<span class="bchip">${esc(h.market || h.key)} <b>${
+          h.n < ((L && L.minN) || 500) ? `${h.n.toLocaleString()} legs` : `${h.gain >= 0 ? "+" : ""}${h.gain}`
+        }</b></span>`).join("");
+        $("#heldWrap").hidden = false;
+      }
       $("#corrWrap").hidden = false;
     }
   }
 
   /* ---------------------------------------------------------------- load */
   (async () => {
-    let g = null;
+    let g = null, L = null;
     try { const r = await fetch("../data/graded.json", { cache: "no-store" }); if (r.ok) g = await r.json(); }
+    catch { /* not built yet */ }
+    // The live correction table. Its own fetch and its own failure: the board is
+    // still worth reading without it, so a missing learn.json shows no
+    // corrections rather than no board.
+    try { const r = await fetch("../data/learn.json", { cache: "no-store" }); if (r.ok) L = await r.json(); }
     catch { /* not built yet */ }
     if (!g || !g.bands) {
       $("#tag").innerHTML = `<span class="dot off"></span>Board`;
       $("#said").textContent = "HAWK's graded board hasn't loaded. The site builds it every couple of hours.";
       return;
     }
-    render(g);
+    render(g, L);
   })();
 })();
 </script>

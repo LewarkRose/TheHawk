@@ -998,7 +998,7 @@
       if (fresh && fresh.fixtures) { cache.set(DATA_URL + "fixtures.json", { t: Date.now(), v: fresh }); meta = fresh.fixtures[id] || null; }
     }
     const fd = (meta && meta.fd) || {};
-    const [quotes365, detailResp, table, formH, formA, pm, profH, profA, playersH, playersA, recentH, recentA, espn, mfa] = await Promise.all([
+    const [quotes365, detailResp, table, formH, formA, pm, profH, profA, playersH, playersA, recentH, recentA, espn, mfa, learnFile] = await Promise.all([
       odds365(id), s365("game", { gameId: id }), standings(league), form(hc.id), form(ac.id),
       meta && meta.pm_slug ? polymarket(meta.pm_slug, home, away) : null,
       fd.home ? data(`profiles/${fd.home[0]}.json`) : null, fd.away ? data(`profiles/${fd.away[0]}.json`) : null,
@@ -1014,7 +1014,25 @@
       // kick-off until three after, so an in-play page gets the real eleven too.
       kickoff && kickoff.getTime() - Date.now() < 4 * 3600e3 && Date.now() - kickoff.getTime() < 3 * 3600e3
         ? mfaLineups(league, hc.id, ac.id, kickoff).catch(() => null) : null,
+      // The corrections the record has EARNED — data/learn.json, written by
+      // engine/grade.mjs, which publishes a market's shift only once its own
+      // walk-forward A/B has watched that shift help. Fetched here, with the
+      // other data files and on their 30-minute cache, because this has to be in
+      // hand before a single leg is priced: legsOf() reads `learning` and the
+      // first thing to price anything in this page comes out of this function.
+      // Missing or 404 (an old deploy, a page opened offline) leaves the table
+      // empty, which is exactly how HAWK priced before this existed.
+      //
+      // Skipped entirely once a table is set, which also keeps it out of node:
+      // grade.mjs sets {} up front, so this never fires there. It mattered —
+      // getJSON retries three times with backoff and caches only successes, so
+      // on a box with nothing on 127.0.0.1:8000 this would have burned about
+      // two seconds and three warnings on EVERY graded match.
+      learningSet ? null : data("learn.json"),
     ]);
+    // Only a table that actually arrived counts, so a transient 404 leaves the
+    // engine uncorrected (today's behaviour) and lets the next match retry.
+    if (!learningSet && learnFile && learnFile.shifts) setLearning(learnFile.shifts);
     const detail = (detailResp && detailResp.game) || {};
     const fdH = fd.home && fd.home[1], fdA = fd.away && fd.away[1];
     const warnings = [];
@@ -1914,8 +1932,20 @@
 
   // Per-market shifts in log-odds, worked out by the page from your settled
   // HAWK bets (see "learning" in index.html). Empty = no adjustment.
-  let learning = {};
-  function setLearning(shifts) { learning = shifts && typeof shifts === "object" ? shifts : {}; }
+  // `learningSet` records that a HOST set the table explicitly, and an explicit
+  // table always wins over the file analyse() would otherwise load for itself.
+  // That is what keeps the graded record raw: engine/grade.mjs calls
+  // setLearning({}) before it grades anything, precisely so the board measures
+  // the model and not model-plus-correction — and grade.mjs grades by calling
+  // HAWK.match(), which runs analyse(). Without this flag the auto-load would
+  // overwrite that {} on the first match, and the record would start grading
+  // corrected chances against outcomes while still being the thing the
+  // corrections are computed FROM.
+  let learning = {}, learningSet = false;
+  function setLearning(shifts) {
+    learning = shifts && typeof shifts === "object" ? shifts : {};
+    learningSet = true;
+  }
   // Trusted markets: {learnKey: factor} from HAWK's graded predictions (worked
   // out by the page). A factor under 1 marks a market where HAWK's chances
   // have landed less often than it said; auto-builds then prefer a similar

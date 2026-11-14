@@ -279,6 +279,42 @@ function learnShifts() {
   }
   return out;
 }
+// ---------- WHICH CORRECTIONS ARE ALLOWED OUT ----------
+// learnShifts() above is the MEASUREMENT: every key the record can shift, ungated.
+// That is deliberately what abTally grades, so evidence keeps accruing for keys
+// that are NOT live — gate the measurement too and an excluded market would stop
+// collecting the very number that could let it back in, and be frozen out forever.
+//
+// liveShifts() is the CORRECTION: only the keys whose own walk-forward A/B has
+// watched the shift actually help. Nothing is hand-listed. A market earns its
+// correction and loses it again on the same number, which is the point — the
+// record decides, not a constant somebody tuned.
+//
+// Why gate at all: over 385,914 graded legs the ungated correction is worth
+// +1.71 per 10k, but that is +70.05 Brier units from the markets it helps NET OF
+// -3.90 from markets where it is pure thrash. Two examples of the thrash:
+// Player Tackles is -6.39 on its own (its input is known wrong — 365Scores' field
+// is challenges MADE, not won), and Match Shots on Target is -3.58 across the
+// pair. Gated, the same record reads +1.98 per 10k.
+//
+// Do NOT read "two-sided markets can't be miscalibrated" into this. Each side is
+// separately learnable and learnKey splits them for exactly that reason; it is
+// only the PAIR'S SUM that is 0.00 by construction, because Over and Under are
+// mirrors. Match SoT Over really is low. The shift fitted to it still loses, and
+// the only honest reason to withhold it is that measurement, not a story.
+const LIVE_MIN_N = 500, LIVE_MIN_GAIN = 0.5;
+function liveShifts(shifts) {
+  const ab = (T.ab || {}).byKey || {};
+  const live = {}, held = [];
+  for (const [key, s] of Object.entries(shifts)) {
+    const c = ab[key];
+    const gain = c ? +(c.raw - c.adj).toFixed(2) : 0;
+    if (c && c.n >= LIVE_MIN_N && gain >= LIVE_MIN_GAIN) live[key] = +s.toFixed(4);
+    else held.push({ key, n: c ? c.n : 0, gain });
+  }
+  held.sort((a, b) => b.n - a.n);
+  return { live, held };
+}
 function abTally(shifts, leg, w) {
   const p = leg.p;
   if (!(p > 0 && p < 1)) return;
@@ -865,6 +901,18 @@ state.builderSeen = (state.builderSeen || 0) + builtTickets;
 if (!state.builderSince && builtTickets) state.builderSince = new Date().toISOString();
 await mkdir(path.dirname(STATE_FILE), { recursive: true });
 await writeFile(STATE_FILE, JSON.stringify(state));
+// The corrections the app actually applies, in its own small file. Separate from
+// graded.json on purpose: a page has to have this before it prices anything, and
+// making every page pull the whole 96KB record to get a few hundred bytes of
+// shifts would be the wrong trade. `held` is published alongside so the Board can
+// show what is being withheld and why, instead of recomputing a second opinion
+// that disagrees with what is live.
+const LIVE = liveShifts(learnShifts());
+await writeFile(path.join(ROOT, "data", "learn.json"), JSON.stringify({
+  updated: new Date().toISOString(), ver: AB_VERSION,
+  minN: LIVE_MIN_N, minGain: LIVE_MIN_GAIN,
+  shifts: LIVE.live, held: LIVE.held,
+}));
 await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   updated: new Date().toISOString(), matches: T.matches, legs: T.legs, waiting: Object.keys(state.pending).length,
   byMarket: T.byMarket, byKey: T.byKey, byLeague: T.byLeague || {}, bands: T.bands,
@@ -923,6 +971,17 @@ console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predict
       console.log(`[grade]   ${k.padEnd(32)} n=${String(c.n).padStart(6)}  `
         + `said ${(100 * c.said / c.n).toFixed(1)}% -> ${(100 * c.adjSaid / c.n).toFixed(1)}%  `
         + `landed ${(100 * c.won / c.n).toFixed(1)}%  Brier ${d > 0 ? "better" : "WORSE"} by ${(Math.abs(d) * 1e4).toFixed(1)} per 10k`);
+    }
+    // What of that actually reaches the app. The gap between these two lines is
+    // the gate doing its job; if they ever converge, every market has earned it.
+    const gatedGain = Object.entries(A.byKey)
+      .filter(([k]) => LIVE.live[k] !== undefined)
+      .reduce((s, [, c]) => s + (c.raw - c.adj), 0);
+    console.log(`[grade] LIVE CORRECTIONS: ${Object.keys(LIVE.live).length} market(s) applied, `
+      + `${LIVE.held.length} withheld (need n>=${LIVE_MIN_N} and gain>=${LIVE_MIN_GAIN})  — `
+      + `gated worth ${(gatedGain / A.n * 1e4).toFixed(2)} per 10k vs ${(better * 1e4).toFixed(2)} ungated`);
+    for (const h of LIVE.held.slice(0, 6)) {
+      console.log(`[grade]   withheld ${h.key.padEnd(32)} n=${String(h.n).padStart(6)}  gain ${h.gain >= 0 ? "+" : ""}${h.gain}`);
     }
   }
 }

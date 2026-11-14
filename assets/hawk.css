@@ -2573,17 +2573,39 @@ a.btr:hover{background:rgba(242,242,242,.04)}
 .alerts{position:fixed;right:clamp(14px,3vw,30px);bottom:24px;z-index:400;
   width:min(372px,calc(100vw - 28px));display:flex;flex-direction:column;gap:9px;
   pointer-events:none}
-.ac{pointer-events:auto;position:relative;overflow:hidden;cursor:pointer;
-  background:var(--raise);box-shadow:inset 0 0 0 1px var(--rule-2),0 26px 60px -24px #000;
-  padding:13px 15px 0;animation:acIn .38s var(--film) both}
+/* An alert is a slip torn off the ticket it is about, so it is built the way
+   .rcpt is: teeth cut out of the paper with two conic gradients, black paper
+   (#17171d) rather than the page's own black so the edge can be seen at all,
+   and drop-shadow rather than box-shadow because drop-shadow follows the
+   MASK's alpha and therefore traces the teeth. A border cannot: past the mask
+   there is no border left to draw.
+   The tone is a printed bar under the top teeth (::before), which the teeth
+   serrate, and the word stays white — one element per job. It used to tint the
+   ring, the word and the countdown all at once, so nothing led. */
+.ac{--z:9px;pointer-events:auto;position:relative;cursor:pointer;background:#17171d;
+  padding:calc(var(--z) + 7px) 15px calc(var(--z) + 2px);
+  animation:acIn .38s var(--film) both;
+  -webkit-mask:
+    conic-gradient(from 135deg at top,#0000,#000 1deg 89deg,#0000 90deg) top/var(--z) var(--z) repeat-x,
+    conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) bottom/var(--z) var(--z) repeat-x,
+    linear-gradient(#000 0 0) center/100% calc(100% - 2*var(--z)) no-repeat;
+  mask:
+    conic-gradient(from 135deg at top,#0000,#000 1deg 89deg,#0000 90deg) top/var(--z) var(--z) repeat-x,
+    conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) bottom/var(--z) var(--z) repeat-x,
+    linear-gradient(#000 0 0) center/100% calc(100% - 2*var(--z)) no-repeat;
+  filter:drop-shadow(0 0 .6px rgba(242,242,242,.5)) drop-shadow(0 10px 26px rgba(0,0,0,.9))}
+.ac::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--tone)}
 @keyframes acIn{from{opacity:0;transform:translateY(14px) scale(.985)}}
 .ac.bye{animation:acOut .5s var(--film) both}
 @keyframes acOut{to{opacity:0;transform:translateY(8px) scale(.99)}}
-.ac .x{position:absolute;top:0;right:0;width:34px;height:34px;border:0;background:none;
+.ac .x{position:absolute;top:var(--z);right:0;width:34px;height:34px;border:0;background:none;
   color:var(--faint);font:400 13px/1 var(--sans);cursor:pointer;transition:color .2s}
 .ac .x:hover{color:var(--text)}
 .ac .t{display:flex;align-items:center;gap:9px;padding-right:22px}
-.ac .t .i{font-size:16px;line-height:1}
+/* The glyph is an inline SVG now (see GLYPH in hawk-alerts.js), so it needs a
+   box rather than a font size, and it takes the tone through currentColor. */
+.ac .t .i{display:flex;align-items:center;line-height:1;color:var(--tone)}
+.ac .t .i svg{display:block;width:15px;height:15px}
 .ac .t .w{font:700 13px/1 var(--disp);letter-spacing:.11em;text-transform:uppercase}
 .ac .t .m{margin-left:auto;font:400 10px/1 var(--mono);color:var(--faint);
   letter-spacing:.08em}
@@ -2603,26 +2625,24 @@ a.btr:hover{background:rgba(242,242,242,.04)}
 .ac .mine{margin:10px -15px 0;padding:10px 15px;border-top:1px solid var(--rule);
   font:400 11.5px/1.5 var(--sans);color:var(--muted)}
 .ac .mine b{color:var(--text);font-weight:600}
-.ac .bar{height:2px;margin:11px -15px 0;background:rgba(242,242,242,.07)}
+/* Inset, not bled: a full-width bar at the very bottom would be chewed by the
+   teeth, which is the one thing the mask changes about everything inside. */
+.ac .bar{height:2px;margin:11px 0 0;background:rgba(242,242,242,.07)}
 .ac .bar i{display:block;height:100%;width:100%;transform-origin:left;
-  animation:acRun var(--acms,15s) linear both}
+  background:var(--tone);animation:acRun var(--acms,15s) linear both}
 @keyframes acRun{to{transform:scaleX(0)}}
 
-.ac.t-good .t .w,.ac.t-good .b b{color:var(--up)}
-.ac.t-good{box-shadow:inset 0 0 0 1px rgba(79,212,134,.34),0 26px 60px -24px #000}
-.ac.t-good .bar i{background:var(--up)}
-.ac.t-bad .t .w,.ac.t-bad .b b{color:var(--down)}
-.ac.t-bad{box-shadow:inset 0 0 0 1px rgba(255,107,127,.34),0 26px 60px -24px #000}
-.ac.t-bad .bar i{background:var(--down)}
-.ac.t-warn .t .w{color:var(--gold-hi)}
-.ac.t-warn{box-shadow:inset 0 0 0 1px rgba(212,169,78,.4),0 26px 60px -24px #000}
-.ac.t-warn .bar i{background:var(--gold)}
-.ac.t-info .t .w{color:var(--navy-hi)}
-.ac.t-info{box-shadow:inset 0 0 0 1px rgba(107,143,224,.34),0 26px 60px -24px #000}
-.ac.t-info .bar i{background:var(--navy)}
-.ac.t-goal .t .w{color:#fff}
-.ac.t-goal{box-shadow:inset 0 0 0 1px rgba(229,56,79,.5),0 26px 60px -24px #000}
-.ac.t-goal .bar i{background:var(--live)}
+/* One declaration per tone now. The bar, the glyph and the countdown all read
+   --tone; the word is white in every one of them. */
+.ac{--tone:var(--gold)}
+.ac.t-good{--tone:var(--up)}
+.ac.t-bad{--tone:var(--down)}
+.ac.t-warn{--tone:var(--gold)}
+.ac.t-info{--tone:var(--navy)}
+.ac.t-goal{--tone:var(--live)}
+.ac .t .w{color:var(--text)}
+.ac.t-good .b b{color:var(--up)}
+.ac.t-bad .b b{color:var(--down)}
 .ac.t-goal .t .i{animation:acBall .6s var(--film) both}
 @keyframes acBall{from{transform:scale(0) rotate(-120deg)}}
 

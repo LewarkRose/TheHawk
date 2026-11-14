@@ -444,6 +444,31 @@
   const liveHref = (g) => `../live/?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}`;
   const matchHref = (g) => `../match/?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}`;
 
+  /* ===================================================== THE GLYPHS
+     Drawn here, not taken from the font. An emoji is the operating system's
+     picture, not HAWK's: the bell renders flat yellow on Windows, grey on
+     macOS and different again on Android — and yellow is the one colour
+     reserved for a club, never for HAWK. These take `currentColor`, which the
+     card sets to the tone.
+
+     The emoji stays the key, and stays in `icon`, because the page title and
+     the system notification still need a character rather than a drawing.
+     Anything unmapped falls through as the emoji it always was. */
+  const GLYPH = {
+    "⚽": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7.5l3.8 2.8-1.5 4.5h-4.6L8.2 10.3z" fill="currentColor" stroke="none"/></svg>',
+    "❌⚽": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7.5l3.8 2.8-1.5 4.5h-4.6L8.2 10.3z" fill="currentColor" stroke="none"/><path d="M4 20L20 4" stroke-width="2.4"/></svg>',
+    "🔔": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+    "🔕": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/><path d="M3.5 3.5l17 17"/></svg>',
+    "🟥": '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="3" width="11" height="18" rx="1.5" transform="rotate(10 12 12)"/></svg>',
+    "✅": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.2 5.2L20 7"/></svg>',
+    "❌": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.5 5.5l13 13M18.5 5.5l-13 13"/></svg>',
+    "🎉": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2.6 5.6 6 .8-4.4 4.2 1.1 6L12 16.8 6.7 19.6l1.1-6L3.4 9.4l6-.8z" fill="currentColor"/></svg>',
+    "🔥": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2.5s5.5 4.6 5.5 9.4a5.5 5.5 0 0 1-11 0c0-2 1-3.4 1.9-4.4.3 1.3 1.2 2.2 2.1 2.2 1.3 0 1.5-1.9 1.5-7.2z"/></svg>',
+    "⚠️": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5L22 20H2z"/><path d="M12 9.5v4.2"/><path d="M12 17h.01"/></svg>',
+    "⏸": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="14" r="5"/><path d="M14 12h7M14 9l5-2"/></svg>',
+  };
+  const glyph = (icon) => GLYPH[icon] || esc(icon || "");
+
   function card({ tone = "good", icon, word, g, clock, body, bet, href, hit, voice }) {
     const el = document.createElement("div");
     el.className = `ac t-${tone}`;
@@ -452,7 +477,7 @@
       ? `<img src="${esc(g[k + "Crest"])}" alt="" onerror="this.style.visibility='hidden'">` : "");
     const score = g && g.score && g.score[0] != null ? `${g.score[0]}<i>–</i>${g.score[1]}` : "<i>·</i>";
     el.innerHTML = `<button class="x" aria-label="Close">✕</button>
-      <div class="t"><span class="i">${icon}</span><span class="w">${esc(word)}</span>
+      <div class="t"><span class="i">${glyph(icon)}</span><span class="w">${esc(word)}</span>
         <span class="m">${esc(clock || (g && g.clock) || "")}</span></div>
       ${g ? `<div class="s">
         <span class="tm${hit === "home" ? " hit" : ""}">${crest("home")}<span>${esc(g.home)}</span></span>

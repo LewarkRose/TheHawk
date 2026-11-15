@@ -18,7 +18,7 @@ import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import * as FotMob from "./fotmob.mjs";
-import { closingChanceFor } from "./grade-demargin.mjs";
+import { closingChanceFor, closingChancesAll } from "./grade-demargin.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOCAL = process.env.HAWK_LOCAL || "http://127.0.0.1:8000";
@@ -97,7 +97,13 @@ function sampleBuilders(id) {
 }
 const newBands = () => BANDS.map(([lo, hi]) => ({ lo, hi, n: 0, p: 0, won: 0 }));
 const newTotals = () => ({ matches: 0, legs: 0, byMarket: {}, byKey: {}, byLeague: {}, keyBands: {},
-                           recent: [], bands: newBands(), clv: {}, builders: newBuilders() });
+                           recent: [], bands: newBands(), clv: {}, demargin: newDemargin(), builders: newBuilders() });
+// Which way of reading a closing price predicts the result best. Three reads of the
+// SAME leg (see grade-demargin.mjs) scored against the same outcome, so the only
+// difference between the columns is the method. Nothing here changes a price: this
+// is the evidence a switch would have to earn, not the switch.
+const newDemargin = () => ({ ver: 1, n: 0, skipped: 0, prop: 0, power: 0, shin: 0, byMarket: {} });
+const newDmCell = () => ({ n: 0, won: 0, prop: 0, power: 0, shin: 0, qProp: 0, qPower: 0, qShin: 0 });
 
 // ---------- PHASE 1b: GRADING THE TICKET, NOT THE LEG ----------
 // Every other block here grades LEGS. Nothing grades a TICKET, which is the only
@@ -195,7 +201,11 @@ function closingChance(leg, f) {
   if (!opts) return null;
   const q = closingChanceFor(b[0], opts, b[2]);
   if (q == null) return null;
-  return { q, demargined: Object.values(opts).filter((v) => v > 1).length >= 2 };
+  // `all` carries the same prices read the other two ways, or null where they
+  // cannot be compared fairly. q itself is untouched — the live read is the one
+  // this function has always returned.
+  return { q, demargined: Object.values(opts).filter((v) => v > 1).length >= 2,
+           all: closingChancesAll(b[0], opts, b[2]) };
 }
 // Upset radar record, per level (Low … Very high): how often the favourite
 // really failed to win / the underdog won, against what the radar said.
@@ -680,6 +690,20 @@ for (const [id, pr] of Object.entries(state.pending)) {
         c.hawk += (leg.p - o) ** 2;
         c.market += (cc.q - o) ** 2;
       }
+      // Same leg, same outcome, three reads of the price. Scored only when all
+      // three answered, so the columns are always over identical legs — a method
+      // that quietly declined the hard lines would otherwise look like the best one.
+      const D = (T.demargin ||= newDemargin());
+      if (!cc.all) D.skipped++;
+      else {
+        const o = w ? 1 : 0, cell = (D.byMarket[leg.market] ||= newDmCell());
+        D.n++; cell.n++; cell.won += o;
+        for (const k of ["prop", "power", "shin"]) {
+          const e = (cc.all[k] - o) ** 2;
+          D[k] += e; cell[k] += e;
+        }
+        cell.qProp += cc.all.prop; cell.qPower += cc.all.power; cell.qShin += cc.all.shin;
+      }
     }
     const key = HAWK.learnKey(leg.id, leg.market);
     if (key) {
@@ -907,11 +931,11 @@ await writeFile(STATE_FILE, JSON.stringify(state));
 // shifts would be the wrong trade. `held` is published alongside so the Board can
 // show what is being withheld and why, instead of recomputing a second opinion
 // that disagrees with what is live.
-const LIVE = liveShifts(learnShifts());
+const CORR = liveShifts(learnShifts());
 await writeFile(path.join(ROOT, "data", "learn.json"), JSON.stringify({
   updated: new Date().toISOString(), ver: AB_VERSION,
   minN: LIVE_MIN_N, minGain: LIVE_MIN_GAIN,
-  shifts: LIVE.live, held: LIVE.held,
+  shifts: CORR.live, held: CORR.held,
 }));
 await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   updated: new Date().toISOString(), matches: T.matches, legs: T.legs, waiting: Object.keys(state.pending).length,
@@ -923,7 +947,7 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   byLine: publishedLines(), weeks: T.weeks || {},
   // HAWK's Brier against the closing line's, on the same legs. `hawk` lower than
   // `market` means HAWK forecast that market better than the price did.
-  clv: T.clv || {},
+  clv: T.clv || {}, demargin: T.demargin || newDemargin(),
   // 1a's counters: what the sampler is recording right now. `stored` is a QUEUE,
   // not a stockpile — a match's tickets are deleted with its pending entry the
   // moment it grades, which is why 1b has to grade them in the same pass.
@@ -975,12 +999,12 @@ console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predict
     // What of that actually reaches the app. The gap between these two lines is
     // the gate doing its job; if they ever converge, every market has earned it.
     const gatedGain = Object.entries(A.byKey)
-      .filter(([k]) => LIVE.live[k] !== undefined)
+      .filter(([k]) => CORR.live[k] !== undefined)
       .reduce((s, [, c]) => s + (c.raw - c.adj), 0);
-    console.log(`[grade] LIVE CORRECTIONS: ${Object.keys(LIVE.live).length} market(s) applied, `
-      + `${LIVE.held.length} withheld (need n>=${LIVE_MIN_N} and gain>=${LIVE_MIN_GAIN})  — `
+    console.log(`[grade] LIVE CORRECTIONS: ${Object.keys(CORR.live).length} market(s) applied, `
+      + `${CORR.held.length} withheld (need n>=${LIVE_MIN_N} and gain>=${LIVE_MIN_GAIN})  — `
       + `gated worth ${(gatedGain / A.n * 1e4).toFixed(2)} per 10k vs ${(better * 1e4).toFixed(2)} ungated`);
-    for (const h of LIVE.held.slice(0, 6)) {
+    for (const h of CORR.held.slice(0, 6)) {
       console.log(`[grade]   withheld ${h.key.padEnd(32)} n=${String(h.n).padStart(6)}  gain ${h.gain >= 0 ? "+" : ""}${h.gain}`);
     }
   }
@@ -1043,6 +1067,29 @@ console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predict
       console.log(`[grade]   ${m.padEnd(30)} ${String(n).padStart(6)} legs   ${edge >= 0 ? "+" : ""}${(1000 * edge).toFixed(2)} per 1000`);
   } else {
     console.log(`[grade] closing line: no market has 200 two-sided legs yet (${Object.keys(T.clv || {}).length} started)`);
+  }
+}
+// Which read of a closing price predicts best. Proportional is what HAWK uses
+// everywhere today; the other two correct the lean it has towards long prices.
+// A switch needs this to be decided, not leading — see grade-demargin.mjs.
+{
+  const D = T.demargin || newDemargin();
+  if (D.n >= 200) {
+    const per = (x) => `${(1000 * x / D.n).toFixed(2)}`;
+    const best = ["prop", "power", "shin"].reduce((a, k) => (D[k] < D[a] ? k : a), "prop");
+    console.log(`[grade] DE-MARGINING over ${D.n} leg(s) (Brier per 1000, lower is better; `
+      + `${D.skipped} skipped as not comparable):`);
+    console.log(`[grade]   proportional ${per(D.prop)}   power ${per(D.power)}   shin ${per(D.shin)}`
+      + `   — best: ${best}${best === "prop" ? " (what HAWK uses — nothing to change)" : ""}`);
+    // Where it would actually bite: the draw is the long price in most matches.
+    const r = D.byMarket["Full Time Result"];
+    if (r && r.n) {
+      console.log(`[grade]   Full Time Result ${r.n} legs: landed ${(100 * r.won / r.n).toFixed(1)}% · `
+        + `proportional said ${(100 * r.qProp / r.n).toFixed(1)}% · power ${(100 * r.qPower / r.n).toFixed(1)}% · `
+        + `shin ${(100 * r.qShin / r.n).toFixed(1)}%`);
+    }
+  } else {
+    console.log(`[grade] de-margining: ${D.n} comparable leg(s) so far, need 200 (${D.skipped} not comparable)`);
   }
 }
 process.exit(0);   // the engine's timers shouldn't keep the job alive

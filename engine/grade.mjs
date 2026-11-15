@@ -482,6 +482,42 @@ function slopeTally(fits, leg, w) {
   c.said = +(c.said + p).toFixed(4);
   c.slope = f.slope ?? 1;   // the slope in force when this leg was graded
 }
+// WHICH MARKETS THE BUILDER SHOULD PREFER, which is a different question from
+// which get corrected. setTrust has existed since the rebuild, is exported, and
+// nothing has ever called it — so `trust` was permanently {} and the scoring
+// line `t = trust[...] || 1` weighed a market HAWK is reliably wrong about
+// exactly the same as one it is reliably right about. Lewzu spotted it from the
+// outside, watching the builder offer legs it had no business trusting.
+//
+// It must NOT be "how wrong is this market": the shift above already corrects
+// that, and demoting a market as well would charge it twice for one sin. What
+// is left after the correction is the useful signal — markets where we have
+// plenty of evidence and the correction makes them WORSE. Something is wrong
+// there that we cannot yet describe, so the builder should reach for them last.
+//
+// The threshold is not a new one. A market is distrusted exactly when it fails
+// the correction gate FOR BEING HARMFUL rather than for being unproven: the
+// same n and the same half Brier unit, with the sign flipped. On today's record
+// that is Player Tackles, both Match SoT sides, both Total Cards sides and
+// Player to be Booked — six, all of them markets the board already flags.
+//
+// A nudge, not a ban, per the builder's own note about form: the weight
+// multiplies the joint chance in the default score and is subtracted in value
+// mode, demoting a leg behind an equal rival without removing it from the card.
+//
+// 0.8 rather than 0.9, and the reason is a measurement rather than a taste.
+// Built against Croatia v Czechia at four target prices, 0.9 changed NOTHING —
+// the same legs, the same distrusted Match SoT leg still in the ticket. A nudge
+// that cannot change a decision is not a nudge, it is decoration, and shipping
+// it would have told the ledger nothing in a fortnight's time. 0.8 is the first
+// weight that actually re-orders a real card, and it is still not a ban: at a
+// target of 10.0 the distrusted leg survives even at 0.25, because nothing else
+// reaches the price, which is exactly what should happen.
+//
+// That rationale is weak and worth saying so — it is the smallest value that
+// satisfies the design intent on one card, not a fitted constant. The money
+// ledger is the judge, and if it says this hurts, the number goes back to 1.
+const TRUST_WEIGHT = 0.8;
 function liveShifts(fits) {
   const ab = (T.ab || {}).byKey || {};
   const sab = ((T.slopeAB || {}).byKey) || {};
@@ -501,7 +537,10 @@ function liveShifts(fits) {
     } else held.push({ key, n: c ? c.n : 0, gain });
   }
   held.sort((a, b) => b.n - a.n);
-  return { live, held };
+  // Distrusted = enough evidence, and the correction demonstrably hurts.
+  const trust = {};
+  for (const h of held) if (h.n >= LIVE_MIN_N && h.gain <= -LIVE_MIN_GAIN) trust[h.key] = TRUST_WEIGHT;
+  return { live, held, trust };
 }
 function abTally(shifts, leg, w) {
   const p = leg.p;
@@ -1159,6 +1198,9 @@ await writeFile(path.join(ROOT, "data", "learn.json"), JSON.stringify({
   updated: new Date().toISOString(), ver: AB_VERSION,
   minN: LIVE_MIN_N, minGain: LIVE_MIN_GAIN,
   shifts: CORR.live, held: CORR.held,
+  // What the auto-builder should reach for last. Separate from `shifts` because
+  // it answers a different question — see TRUST_WEIGHT.
+  trust: CORR.trust, trustWeight: TRUST_WEIGHT,
 }));
 await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   updated: new Date().toISOString(), matches: T.matches, legs: T.legs, waiting: Object.keys(state.pending).length,

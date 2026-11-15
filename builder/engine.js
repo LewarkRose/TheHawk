@@ -1033,6 +1033,13 @@
     // Only a table that actually arrived counts, so a transient 404 leaves the
     // engine uncorrected (today's behaviour) and lets the next match retry.
     if (!learningSet && learnFile && learnFile.shifts) setLearning(learnFile.shifts);
+    // The same file carries which markets the builder should reach for LAST.
+    // setTrust had existed since the rebuild with no caller at all, so `trust`
+    // was always {} and every market scored alike — a market whose correction
+    // is measured to make things WORSE was picked as readily as one HAWK has
+    // never been wrong about. Guarded the same way: an absent table leaves the
+    // builder choosing exactly as it did before.
+    if (learnFile && learnFile.trust) setTrust(learnFile.trust);
     const detail = (detailResp && detailResp.game) || {};
     const fdH = fd.home && fd.home[1], fdA = fd.away && fd.away[1];
     const warnings = [];

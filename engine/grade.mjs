@@ -115,6 +115,34 @@ const newDemargin = () => ({ ver: 2, n: 0, skipped: 0, prop: 0, power: 0, shin: 
                              bands: newDmBands(), byMarket: {} });
 const newDmCell = () => ({ n: 0, won: 0, prop: 0, power: 0, shin: 0, qProp: 0, qPower: 0, qShin: 0 });
 
+// ---------- 💷 THE ONLY BLOCK ON THIS BOARD THAT IS ABOUT MONEY ----------
+// Everything else here measures ACCURACY — Brier, calibration, points of
+// probability. None of it answers the question the Vault is for: would backing
+// this have paid? Those are different. HAWK can beat the market's forecast and
+// still lose, because profit has to clear the margin, not the rival forecast.
+//
+// So: for every leg that closed with a price, what a flat 1 unit on it would
+// have returned, binned by the edge HAWK claimed at that price. The question it
+// answers is "when HAWK said this was 5% value, was it?" — and nothing in the
+// record has ever been able to form that question before.
+//
+// Two limits, both deliberate, both of which make this HARDER than real life:
+//   · it is the CLOSING price, the sharpest number of the day. A price taken
+//     hours earlier is usually looser, so a market that pays here is a market
+//     that would have paid more. A market that fails here might still have.
+//   · these are SINGLE legs. A single carries maybe 5-7% margin where a builder
+//     compounds to 12-38%, so this is the kindest possible shape. If no market
+//     clears here, no builder built from it can.
+// Neither can be fixed by trying harder: closing prices are deleted when the
+// fixture drops out, which is why this has to accrue forward and cannot be
+// backfilled. Same trap as the corner lines.
+const EV_BANDS = [[-9, -0.10], [-0.10, -0.05], [-0.05, -0.02], [-0.02, 0.02],
+                  [0.02, 0.05], [0.05, 0.10], [0.10, 9]];
+const newEvCell = () => ({ n: 0, won: 0, stake: 0, back: 0, said: 0, q: 0 });
+const newEv = () => ({ ver: 1, n: 0, minEdge: 0.02,
+                       bands: EV_BANDS.map(([lo, hi]) => ({ lo, hi, ...newEvCell() })),
+                       byMarket: {} });
+
 // ---------- PHASE 1b: GRADING THE TICKET, NOT THE LEG ----------
 // Every other block here grades LEGS. Nothing grades a TICKET, which is the only
 // thing anyone actually bets. HAWK can be perfect on every leg and still wrong
@@ -215,6 +243,7 @@ function closingChance(leg, f) {
   // cannot be compared fairly. q itself is untouched — the live read is the one
   // this function has always returned.
   return { q, demargined: Object.values(opts).filter((v) => v > 1).length >= 2,
+           price: opts[b[2]],
            all: closingChancesAll(b[0], opts, b[2]) };
 }
 // Upset radar record, per level (Low … Very high): how often the favourite
@@ -597,6 +626,12 @@ if ((T.demargin || {}).ver !== DEMARGIN_VERSION) {
   T.demargin = newDemargin();
   console.log(`[grade] de-margining: v${DEMARGIN_VERSION} — comparison starting over (discarded ${had} leg(s))`);
 }
+const EV_VERSION = 1;
+if ((T.ev || {}).ver !== EV_VERSION) {
+  const had = (T.ev || {}).n || 0;
+  T.ev = newEv();
+  console.log(`[grade] money ledger: v${EV_VERSION} — starting over (discarded ${had} leg(s))`);
+}
 if (!state.resultSeeded) {
   let seeded = 0;
   for (const d of Object.values(state.done || {})) { tallyResult(d.probs, d.ft); seeded++; }
@@ -728,6 +763,23 @@ for (const [id, pr] of Object.entries(state.pending)) {
           band.n++; band.won += o;
           band.qProp += cc.all.prop; band.qPower += cc.all.power; band.qShin += cc.all.shin;
         }
+      }
+      // The money ledger (see EV_BANDS). Same legs as the closing-line block, so
+      // the two can be read against each other: one says whether HAWK forecast
+      // better, this says whether that was worth anything.
+      if (cc.demargined && cc.price > 1) {
+        const o = w ? 1 : 0, edge = leg.p * cc.price - 1;
+        const E = (T.ev ||= newEv());
+        const put = (cell) => {
+          cell.n++; cell.won += o; cell.stake++; cell.said += leg.p; cell.q += cc.q;
+          if (o) cell.back = +(cell.back + cc.price).toFixed(3);
+        };
+        E.n++;
+        const eb = E.bands.find((b) => edge >= b.lo && edge < b.hi);
+        if (eb) put(eb);
+        const mk = (E.byMarket[leg.market] ||= { all: newEvCell(), pos: newEvCell() });
+        put(mk.all);
+        if (edge >= E.minEdge) put(mk.pos);
       }
     }
     const key = HAWK.learnKey(leg.id, leg.market);
@@ -972,7 +1024,7 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   byLine: publishedLines(), weeks: T.weeks || {},
   // HAWK's Brier against the closing line's, on the same legs. `hawk` lower than
   // `market` means HAWK forecast that market better than the price did.
-  clv: T.clv || {}, demargin: T.demargin || newDemargin(),
+  clv: T.clv || {}, demargin: T.demargin || newDemargin(), ev: T.ev || newEv(),
   // 1a's counters: what the sampler is recording right now. `stored` is a QUEUE,
   // not a stockpile — a match's tickets are deleted with its pending entry the
   // moment it grades, which is why 1b has to grade them in the same pass.
@@ -1117,6 +1169,34 @@ console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predict
     }
   } else {
     console.log(`[grade] de-margining: ${D.n} comparable leg(s) so far, need 200 (${D.skipped} not comparable)`);
+  }
+}
+// The money ledger. Flat 1 unit a leg at the closing price, by the edge HAWK
+// claimed. The question is whether the right-hand bands pay: if HAWK calling
+// something 5% value does not return more than HAWK calling it 5% bad, the
+// claim is decoration. Read it slowly — 500 legs in a band is still noise.
+{
+  const E = T.ev || newEv();
+  const roi = (c) => (c.stake ? `${((c.back - c.stake) / c.stake * 100 >= 0 ? "+" : "")}${((c.back - c.stake) / c.stake * 100).toFixed(1)}%` : "—");
+  if (E.n >= 200) {
+    console.log(`[grade] MONEY LEDGER over ${E.n} leg(s) — flat 1u at the closing price, by HAWK's claimed edge:`);
+    for (const b of E.bands.filter((x) => x.n)) {
+      const lbl = `${b.lo <= -9 ? "   <" : (100 * b.lo).toFixed(0)}${b.lo <= -9 ? "" : "%"} to ${b.hi >= 9 ? "+∞" : `${(100 * b.hi).toFixed(0)}%`}`;
+      console.log(`[grade]   edge ${lbl.padStart(14)}  ${String(b.n).padStart(6)} legs   `
+        + `won ${String(b.won).padStart(5)} vs ${b.said.toFixed(1).padStart(7)} expected   returns ${roi(b).padStart(7)}`);
+    }
+    // Which markets pay WHEN HAWK SAYS SO — the cell a selection rule would use.
+    const rows = Object.entries(E.byMarket).filter(([, m]) => m.pos.n >= 100)
+      .sort((a, b) => (b[1].pos.back - b[1].pos.stake) / b[1].pos.stake - (a[1].pos.back - a[1].pos.stake) / a[1].pos.stake);
+    if (rows.length) {
+      console.log(`[grade]   markets where HAWK claimed ${(100 * E.minEdge).toFixed(0)}%+ edge (100+ legs), best first:`);
+      for (const [m, c] of rows)
+        console.log(`[grade]     ${m.padEnd(26)} ${String(c.pos.n).padStart(5)} legs  ${roi(c.pos).padStart(7)}   (all legs in this market: ${roi(c.all)})`);
+    } else {
+      console.log(`[grade]   no market has 100 legs at ${(100 * E.minEdge).toFixed(0)}%+ claimed edge yet`);
+    }
+  } else {
+    console.log(`[grade] money ledger: ${E.n} priced leg(s) so far, need 200`);
   }
 }
 process.exit(0);   // the engine's timers shouldn't keep the job alive

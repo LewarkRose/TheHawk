@@ -51,6 +51,51 @@
   </div>
 </section>
 
+<!-- Every other block on this page measures whether HAWK was RIGHT. This one is
+     the only one that measures whether being right was worth anything, and they
+     are not the same question: HAWK can forecast better than the market and
+     still lose, because a bet has to clear the margin, not the rival forecast.
+     Hidden until 200 legs because a return figure is the most tempting number
+     here and the easiest to read far too early. -->
+<section class="calm" id="evWrap" hidden>
+  <div class="wrap">
+    <div class="lede"><h3><span class="emj">💷</span>Would it have paid?</h3><span class="n" id="evN"></span></div>
+    <div class="bd-recs" id="ev"></div>
+    <p class="note">A flat 1 unit on every leg that closed with a price, sorted by how much value
+      HAWK claimed at that price. <b>The right-hand cards are the test</b> — if backing what HAWK
+      calls value doesn't return more than backing what it calls bad, the claim is decoration.
+      These are <b>single legs at the closing price</b>, which is the kindest case on both counts:
+      a single carries far less margin than a builder, and the closing price is the sharpest
+      number of the day. Nothing clearing here can be rescued by putting it in a builder.</p>
+    <div id="evMkWrap" hidden>
+      <div class="lede"><h3><span class="emj">🎯</span>Where it paid</h3><span class="n" id="evMkN"></span></div>
+      <div id="evMk"></div>
+      <p class="note">The same ledger per market, counting only legs HAWK priced at 2%+ value.
+        This is the cell a selection rule would read. The figure in brackets is every leg in that
+        market, valued or not — a market that pays only when HAWK picks it is worth something,
+        one that pays either way is just a loose market.</p>
+    </div>
+  </div>
+</section>
+
+<!-- The same closing prices read three ways. Nothing here changes a price: it is
+     the evidence a switch would have to earn. See engine/grade-demargin.mjs. -->
+<section class="calm" id="dmWrap" hidden>
+  <div class="wrap">
+    <div class="lede"><h3><span class="emj">⚖️</span>Reading the price</h3><span class="n" id="dmN"></span></div>
+    <div class="bd-recs" id="dm"></div>
+    <div id="dmLad"></div>
+    <p class="note">Stripping a bookmaker's margin by dividing each chance by their sum is the
+      simple way, and it is what HAWK does everywhere. It leans: too much probability left on the
+      long price, too little on the short one — HAWK's own result record has the draw landing
+      2.2 points under what it said. <b>Power</b> and <b>Shin</b> are two reads that correct for
+      it, scored here against the same legs and the same outcomes. The ladder is the part that
+      matters, because a per-market average can't show a difference: both sides of a market are
+      graded, so they average to exactly half whatever the prices were. Long prices sit in the
+      bottom band. <b>If the three agree there, there is nothing to switch for.</b></p>
+  </div>
+</section>
+
 <section class="calm">
   <div class="wrap">
     <div class="bd-key">
@@ -325,6 +370,72 @@
       }
       $("#corrWrap").hidden = false;
     }
+
+    renderEv(g.ev);
+    renderDemargin(g.demargin);
+  }
+
+  /* The money ledger. Colour is withheld under 500 legs on purpose: a return
+     figure swings wildly on a handful of legs and a green card would be read
+     as a result long before it is one. */
+  const pct = (c) => (c.stake ? (c.back - c.stake) / c.stake * 100 : null);
+  const edgeLabel = (b) => `${b.lo <= -9 ? "worse than " : `${(100 * b.lo).toFixed(0)}%`}${
+    b.lo <= -9 ? `${(100 * b.hi).toFixed(0)}%` : b.hi >= 9 ? "+" : ` to ${(100 * b.hi).toFixed(0)}%`}`;
+  function renderEv(E) {
+    if (!E || !E.n || E.n < 200) return;
+    $("#evN").textContent = `${E.n.toLocaleString()} legs`;
+    $("#ev").innerHTML = (E.bands || []).filter((b) => b.n).map((b) => {
+      const r = pct(b), sure = b.n >= 500;
+      return `<div><div class="k">edge ${esc(edgeLabel(b))}</div>
+        <div class="n ${sure && r != null ? (r >= 0 ? "up" : "dn") : ""}">${
+          r == null ? "—" : `${r >= 0 ? "+" : ""}${r.toFixed(1)}%`}</div>
+        <div class="sub">${b.n.toLocaleString()} legs · won ${b.won.toLocaleString()} vs ${
+          Math.round(b.said).toLocaleString()} expected</div>
+        ${sure ? "" : `<div class="ask">too few legs to colour</div>`}</div>`;
+    }).join("");
+    const mk = Object.entries(E.byMarket || {}).filter(([, m]) => m.pos && m.pos.n >= 100)
+      .sort((a, b) => (pct(b[1].pos) || 0) - (pct(a[1].pos) || 0));
+    if (mk.length) {
+      $("#evMkN").textContent = plural(mk.length, "market");
+      $("#evMk").innerHTML = mk.map(([m, c]) => {
+        const r = pct(c.pos), all = pct(c.all);
+        return `<span class="bchip ${c.pos.n >= 500 && r != null ? (r >= 0 ? "up" : "dn") : ""}">${
+          esc(m)} <b>${r == null ? "—" : `${r >= 0 ? "+" : ""}${r.toFixed(1)}%`}</b> <i>${
+          c.pos.n} legs${all == null ? "" : ` · all ${all >= 0 ? "+" : ""}${all.toFixed(1)}%`}</i></span>`;
+      }).join("");
+      $("#evMkWrap").hidden = false;
+    }
+    $("#evWrap").hidden = false;
+  }
+
+  /* The three reads of a closing price. No colour at all here — the leader is
+     named in words below, because "lowest Brier" on a few hundred legs is not
+     a verdict and a green card would say it was. */
+  function renderDemargin(D) {
+    if (!D || !D.n || D.n < 200) return;
+    const per = (k) => 1000 * D[k] / D.n;
+    const NAME = { prop: "Proportional", power: "Power", shin: "Shin" };
+    // "Lowest Brier" is not a verdict. Whichever is in front has to be in front
+    // by something, over enough legs, before this page says so in words — the
+    // first real run had the three within 0.08 of each other and calling that a
+    // winner would be the same mistake as reading a return off forty bets.
+    const lead = ["prop", "power", "shin"].reduce((a, k) => (D[k] < D[a] ? k : a), "prop");
+    const best = (D.n >= 2000 && per("prop") - per(lead) >= 0.25) ? lead : null;
+    $("#dmN").textContent = `${D.n.toLocaleString()} legs${D.skipped ? ` · ${D.skipped.toLocaleString()} not comparable` : ""}`;
+    $("#dm").innerHTML = ["prop", "power", "shin"].map((k) => `<div>
+      <div class="k">${NAME[k]}${k === "prop" ? " — in use" : ""}</div>
+      <div class="n">${per(k).toFixed(2)}</div>
+      <div class="sub">Brier per 1,000 legs · lower is better</div>
+      ${best && k === best ? `<div class="ask">ahead of proportional by ${(per("prop") - per(best)).toFixed(2)}</div>`
+        : (!best && k === "prop") ? `<div class="ask">no read is clearly ahead yet</div>` : ""}
+    </div>`).join("");
+    // The ladder, binned on the proportional read so all three describe the same legs.
+    $("#dmLad").innerHTML = (D.bands || []).filter((b) => b.n >= 50).map((b) => {
+      const q = (s) => `${(100 * s / b.n).toFixed(1)}`;
+      return `<span class="bchip">${Math.round(100 * b.lo)}–${Math.round(100 * Math.min(1, b.hi))}% <b>${
+        q(b.won)}% landed</b> <i>prop ${q(b.qProp)} · pow ${q(b.qPower)} · shin ${q(b.qShin)}</i></span>`;
+    }).join("");
+    $("#dmWrap").hidden = false;
   }
 
   /* ---------------------------------------------------------------- load */

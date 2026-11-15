@@ -125,7 +125,7 @@ jobs:
         if: always()
         run: |
           python - <<'EOF'
-          import json, os
+          import json, os, datetime
           try:
               m = json.load(open("data/meta.json", encoding="utf-8"))
           except Exception as e:
@@ -168,11 +168,37 @@ jobs:
                   lines.append("  - under the Vault's rules: not started — no ticket has graded since the split shipped")
           except Exception as e:
               lines.append(f"- Builder tickets: no reading ({e})")
+          # Did grade.mjs actually run? Nothing else writes these three, data/ is
+          # rebuilt from scratch every run and the cache holds only data/grading,
+          # so a missing file here means grade.mjs did not finish. That was
+          # invisible until now: its step is continue-on-error, so a crash shows
+          # as a tick, and the alert job below only ever watched FEED staleness.
+          # On 14-15 Nov a duplicate const made the file a SyntaxError and three
+          # runs published a site with no record on it at all, every one green.
+          grading = []
+          for fn in ("graded.json", "predictions.json", "learn.json"):
+              try:
+                  d = json.load(open("data/" + fn, encoding="utf-8"))
+              except Exception as e:
+                  grading.append(f"grading ({fn} missing - grade.mjs did not finish)")
+                  continue
+              try:
+                  age = (datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(
+                      str(d.get("updated")).replace("Z", "+00:00"))).total_seconds() / 60
+              except Exception:
+                  grading.append(f"grading ({fn} has no readable 'updated')")
+                  continue
+              # Every completed run rewrites all three, so anything older than an
+              # hour was left by an earlier run and this one wrote nothing.
+              if age > 60:
+                  grading.append(f"grading ({fn} is {age:.0f} min old - this run did not rewrite it)")
+          lines.append(("- ⚠️ **Grading**: " + "; ".join(grading)) if grading
+                       else "- ✅ **Grading**: graded.json, predictions.json and learn.json all written this run")
           lines += ["", *[f"- {x}" for x in m.get("problems", [])[:30]]]
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
               f.write("\n".join(lines) + "\n")
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
-              f.write(f"alerts={', '.join(m.get('alerts') or [])}\n")
+              f.write(f"alerts={', '.join((m.get('alerts') or []) + grading)}\n")
           EOF
 
       - uses: actions/configure-pages@v6
@@ -200,5 +226,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo "::error::HAWK data source down for 24h+: ${{ needs.build.outputs.alerts }}. The site is running on the last good data — see the run summary."
+          echo "::error::HAWK is degraded: ${{ needs.build.outputs.alerts }}. The site still published — see the run summary. (A 'grading' alert means engine/grade.mjs did not finish and nothing was recorded or graded this run; anything else is a data source that has not worked for 24h+.)"
           exit 1

@@ -102,7 +102,17 @@ const newTotals = () => ({ matches: 0, legs: 0, byMarket: {}, byKey: {}, byLeagu
 // SAME leg (see grade-demargin.mjs) scored against the same outcome, so the only
 // difference between the columns is the method. Nothing here changes a price: this
 // is the evidence a switch would have to earn, not the switch.
-const newDemargin = () => ({ ver: 1, n: 0, skipped: 0, prop: 0, power: 0, shin: 0, byMarket: {} });
+// The BANDS are the only honest way to read these per market. A mean cannot do it:
+// both sides of a two-sided market are graded, so said and landed are each forced
+// to 1/k — Over and Under average to exactly 50%, home/draw/away to exactly 33.3%,
+// whatever the prices were. Run #811 printed six markets reading 50.0/50.0/50.0
+// and it was arithmetic, not agreement. Inside a band the mirroring is broken:
+// legs the method called 20% are a real set, and what share of them landed is a
+// real answer. Binned on the PROPORTIONAL read so all three columns describe the
+// same legs; the draw lives in the low bands, which is where they should diverge.
+const newDmBands = () => BANDS.map(([lo, hi]) => ({ lo, hi, n: 0, won: 0, qProp: 0, qPower: 0, qShin: 0 }));
+const newDemargin = () => ({ ver: 2, n: 0, skipped: 0, prop: 0, power: 0, shin: 0,
+                             bands: newDmBands(), byMarket: {} });
 const newDmCell = () => ({ n: 0, won: 0, prop: 0, power: 0, shin: 0, qProp: 0, qPower: 0, qShin: 0 });
 
 // ---------- PHASE 1b: GRADING THE TICKET, NOT THE LEG ----------
@@ -577,6 +587,16 @@ if ((state.clvVer || 1) !== CLV_VERSION) {
   state.clvVer = CLV_VERSION;
   console.log(`[grade] clv: v${CLV_VERSION} — closing-line record starting over (discarded ${had} leg(s) read the old way)`);
 }
+// Same rule for the de-margining comparison: v1 kept no bands, so its legs cannot
+// be pooled with v2's without the ladder covering fewer legs than the Brier totals.
+// 124 legs is nothing to restart, and a block that half-answers is worse than one
+// that says it is empty. Bump whenever the cells change shape.
+const DEMARGIN_VERSION = 2;
+if ((T.demargin || {}).ver !== DEMARGIN_VERSION) {
+  const had = (T.demargin || {}).n || 0;
+  T.demargin = newDemargin();
+  console.log(`[grade] de-margining: v${DEMARGIN_VERSION} — comparison starting over (discarded ${had} leg(s))`);
+}
 if (!state.resultSeeded) {
   let seeded = 0;
   for (const d of Object.values(state.done || {})) { tallyResult(d.probs, d.ft); seeded++; }
@@ -703,6 +723,11 @@ for (const [id, pr] of Object.entries(state.pending)) {
           D[k] += e; cell[k] += e;
         }
         cell.qProp += cc.all.prop; cell.qPower += cc.all.power; cell.qShin += cc.all.shin;
+        const band = (D.bands ||= newDmBands()).find((b) => cc.all.prop >= b.lo && cc.all.prop < b.hi);
+        if (band) {
+          band.n++; band.won += o;
+          band.qProp += cc.all.prop; band.qPower += cc.all.power; band.qShin += cc.all.shin;
+        }
       }
     }
     const key = HAWK.learnKey(leg.id, leg.market);
@@ -1081,12 +1106,14 @@ console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predict
       + `${D.skipped} skipped as not comparable):`);
     console.log(`[grade]   proportional ${per(D.prop)}   power ${per(D.power)}   shin ${per(D.shin)}`
       + `   — best: ${best}${best === "prop" ? " (what HAWK uses — nothing to change)" : ""}`);
-    // Where it would actually bite: the draw is the long price in most matches.
-    const r = D.byMarket["Full Time Result"];
-    if (r && r.n) {
-      console.log(`[grade]   Full Time Result ${r.n} legs: landed ${(100 * r.won / r.n).toFixed(1)}% · `
-        + `proportional said ${(100 * r.qProp / r.n).toFixed(1)}% · power ${(100 * r.qPower / r.n).toFixed(1)}% · `
-        + `shin ${(100 * r.qShin / r.n).toFixed(1)}%`);
+    // The ladder, not a per-market mean: see newDmBands. The long prices sit in
+    // the bottom band, so that row is where the three reads have to disagree —
+    // if they do not, there is nothing here worth switching for.
+    for (const b of (D.bands || []).filter((x) => x.n >= 50)) {
+      const q = (s) => `${(100 * s / b.n).toFixed(1)}%`;
+      console.log(`[grade]   ${String(Math.round(100 * b.lo)).padStart(3)}-${String(Math.round(100 * b.hi))}%`
+        + ` ${String(b.n).padStart(6)} legs   landed ${q(b.won).padStart(6)}`
+        + `   prop ${q(b.qProp)} · power ${q(b.qPower)} · shin ${q(b.qShin)}`);
     }
   } else {
     console.log(`[grade] de-margining: ${D.n} comparable leg(s) so far, need 200 (${D.skipped} not comparable)`);

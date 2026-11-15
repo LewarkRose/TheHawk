@@ -78,6 +78,25 @@
   </div>
 </section>
 
+<!-- Whether HAWK is right about how much football VARIES, which is a different
+     question from whether its averages are right and the one every other block
+     here is silent on. See newSpread in engine/grade.mjs. -->
+<section class="calm" id="spWrap" hidden>
+  <div class="wrap">
+    <div class="lede"><h3><span class="emj">🎲</span>How much it varies</h3><span class="n" id="spN"></span></div>
+    <div class="bd-recs" id="sp"></div>
+    <p class="note">Every other block on this page asks whether HAWK's <b>average</b> was right.
+      This one asks whether it is right about the <b>spread</b> — and a market whose ladder bends
+      is wrong about exactly that. Two causes look identical everywhere else:
+      <b>separation</b> is whether HAWK is right to say 7 shots for one game and 12 for another
+      (under 100% it is over-confident telling matches apart, and the figure is what its numbers
+      should be pulled toward the average by); <b>randomness</b> is whether football is messier
+      than its simulation thinks (over 1.00 means real matches scatter wider than the model draws,
+      and the figure is the dispersion the stat is missing). They need different fixes, which is
+      why both are shown rather than one summary.</p>
+  </div>
+</section>
+
 <!-- The same closing prices read three ways. Nothing here changes a price: it is
      the evidence a switch would have to earn. See engine/grade-demargin.mjs. -->
 <section class="calm" id="dmWrap" hidden>
@@ -385,6 +404,44 @@
 
     renderEv(g.ev);
     renderDemargin(g.demargin);
+    renderSpread(g.statFit);
+  }
+
+  /* The variance decomposition — see newSpread in grade.mjs. Deliberately two
+     numbers rather than one: they point at different fixes, and averaging them
+     into a single "how wrong" score would hide which lever to pull. */
+  const NICE = { sot: "Shots on target", corners: "Corners", cards: "Cards", tackles: "Tackles" };
+  function spreadFit(v) {
+    if (!v || !v.n || v.n < 500) return null;
+    const n = v.n, mExp = v.exp / n, mAct = v.act / n;
+    const varExp = v.exp2 / n - mExp * mExp, varAct = v.act2 / n - mAct * mAct;
+    const cov = ((v.act2 + v.exp2 - v.sq) / 2) / n - mExp * mAct;
+    if (!(varExp > 1e-9) || !(mAct > 0)) return null;
+    const beta = cov / varExp, resid = varAct - (cov * cov) / varExp;
+    // Separation is a regression slope and it is noisy — a planted 0.847 read
+    // back as 0.93 on 900 matches. Publishing the figure without its error bar
+    // would invite a constant being tuned to sampling noise.
+    const se = resid > 0 ? Math.sqrt(resid / (n * varExp)) : 0;
+    return { n, mExp, mAct, beta, se, v: resid / mAct, sure: Math.abs(beta - 1) > 2 * se };
+  }
+  function renderSpread(sf) {
+    const all = (sf && sf.ALL) || {};
+    const rows = Object.entries(all).map(([k, s]) => [k, spreadFit(s && s.spread)]).filter(([, f]) => f);
+    if (!rows.length) return;
+    $("#spN").textContent = plural(rows.length, "stat");
+    $("#sp").innerHTML = rows.map(([k, f]) => {
+      const sep = !f.sure ? "not yet distinguishable from right"
+                : f.beta < 1 ? "over-confident telling matches apart"
+                : "too cautious telling matches apart";
+      const dis = f.v > 1.12 ? `real matches scatter ${f.v.toFixed(2)}× wider than it draws`
+                : f.v < 0.9 ? "scatters less than the model — check the inputs" : "about right";
+      return `<div><div class="k">${esc(NICE[k] || k)}</div>
+        <div class="n">${(100 * f.beta).toFixed(0)}%<small> ±${(100 * f.se).toFixed(0)}</small></div>
+        <div class="sub">separation · ${esc(sep)}</div>
+        <div class="ask">randomness ${f.v.toFixed(2)} — ${esc(dis)}<br>
+          ${f.n.toLocaleString()} matches · expected ${f.mExp.toFixed(1)}, got ${f.mAct.toFixed(1)}</div></div>`;
+    }).join("");
+    $("#spWrap").hidden = false;
   }
 
   /* The money ledger. Colour is withheld under 500 legs on purpose: a return

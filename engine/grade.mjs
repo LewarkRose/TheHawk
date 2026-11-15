@@ -281,14 +281,68 @@ const newUpsetNet = () => NET_BANDS.map(([lo, hi, label]) => ({ lo, hi, label, n
 // here says what it should be, measured on the legs actually being graded. Rates are
 // applied to the minutes each player REALLY played, so this tests the rate alone and
 // never HAWK's guess at who would start.
-const newStat = () => ({ n: 0, exp: 0, act: 0 });
+// `spread` is the second half of the question, and the half sums alone can never
+// answer. n/exp/act say whether the AVERAGE is right; they are silent on whether
+// HAWK is right about how much football VARIES — and a ladder that rotates, like
+// Match Shots on Target's, has exactly two possible causes that look identical
+// from every other block on this board:
+//
+//   1. the spread WITHIN a match is too tight — the simulation draws shots on
+//      target from a plain Poisson (engine.js:1612) while corners and cards get
+//      a dispersion multiplier, so football may simply be messier than it thinks;
+//   2. HAWK SEPARATES matches too much — saying 7 for one game and 12 for
+//      another when both were really near 9.4.
+//
+// Three more sums split them, because together they give the variance of what
+// HAWK said, the variance of what happened, and the covariance:
+//
+//   beta = cov / var(exp)            under 1 means HAWK over-separates, and beta
+//                                    IS the factor to shrink its means by
+//   v    = resid / mean(act)         over 1 means real over-dispersion, and v IS
+//                                    the OVERDISP term the stat is missing
+//
+// Kept in its own counter rather than bumping a version: n/exp/act already hold
+// 1,705 matches of level evidence that took months to gather and is still true.
+// This starts at zero beside it and costs that record nothing.
+const newSpread = () => ({ n: 0, exp: 0, act: 0, exp2: 0, act2: 0, sq: 0 });
+const newStat = () => ({ n: 0, exp: 0, act: 0, spread: newSpread() });
 const fitStat = (league, stat, exp, act) => {
   if (!(exp > 0) || !(act >= 0)) return;
   for (const key of [league, "ALL"]) {
     const b = ((T.statFit ||= {})[key] ||= {});
     const s = (b[stat] ||= newStat());
     s.n++; s.exp = +(s.exp + exp).toFixed(3); s.act = +(s.act + act).toFixed(3);
+    const v = (s.spread ||= newSpread());
+    v.n++;
+    v.exp = +(v.exp + exp).toFixed(3); v.act = +(v.act + act).toFixed(3);
+    v.exp2 = +(v.exp2 + exp * exp).toFixed(3); v.act2 = +(v.act2 + act * act).toFixed(3);
+    v.sq = +(v.sq + (act - exp) * (act - exp)).toFixed(3);
   }
+};
+// 500 matches, not 200. Beta is a regression slope and it is NOISY: a test that
+// planted 0.847 read it back as 0.93 on 900 matches, which is about 1.7 standard
+// errors and perfectly ordinary. Its error bar is published with it for the same
+// reason — at this sample "93%" and "100%" are frequently the same reading, and
+// a bare number invites a constant being tuned to noise. That has already cost
+// this project once, in TACKLE_SCALE.
+const SPREAD_MIN = 500;
+/** The decomposition, or null while there is too little to read. */
+const spreadFit = (v) => {
+  if (!v || v.n < SPREAD_MIN) return null;
+  const n = v.n, mExp = v.exp / n, mAct = v.act / n;
+  const varExp = v.exp2 / n - mExp * mExp;
+  const varAct = v.act2 / n - mAct * mAct;
+  // Sum(act*exp) falls out of the three sums already held.
+  const cov = ((v.act2 + v.exp2 - v.sq) / 2) / n - mExp * mAct;
+  if (!(varExp > 1e-9) || !(mAct > 0)) return null;
+  const beta = cov / varExp;
+  const resid = varAct - (cov * cov) / varExp;   // what HAWK's means cannot explain
+  const se = resid > 0 ? Math.sqrt(resid / (n * varExp)) : 0;
+  return { n, mExp: +mExp.toFixed(2), mAct: +mAct.toFixed(2),
+           beta: +beta.toFixed(3), se: +se.toFixed(3), v: +(resid / mAct).toFixed(3),
+           // Only call separation wrong when it is wrong by more than it is uncertain.
+           sure: Math.abs(beta - 1) > 2 * se,
+           ratio: +((v.sq / n) / mAct).toFixed(3) };
 };
 // 365Scores writes a tackle count as "2/3 (66.7%)": won out of made. The lines settle
 // on made, so that is the denominator — the same reading hawk-settle.js uses.
@@ -1192,6 +1246,28 @@ console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predict
     } else {
       console.log(`[grade] slope A/B: ${S.n} leg(s) so far, no key has 200 yet`);
     }
+  }
+}
+// Is HAWK wrong about how much football varies, or about how much matches
+// differ from each other? Two causes of the same rotated ladder, two different
+// fixes, and until now nothing could tell them apart. See newSpread.
+{
+  const all = (T.statFit || {}).ALL || {};
+  const rows = Object.entries(all).map(([stat, s]) => [stat, spreadFit(s.spread)]).filter(([, f]) => f);
+  if (rows.length) {
+    console.log(`[grade] SPREAD — what HAWK gets wrong about variation:`);
+    for (const [stat, f] of rows) {
+      const sep = !f.sure ? "separation not distinguishable from right"
+                : f.beta < 1 ? `separates ${((1 - f.beta) * 100).toFixed(0)}% too much`
+                : `separates ${((f.beta - 1) * 100).toFixed(0)}% too little`;
+      const dis = f.v > 1.12 ? `needs OVERDISP ≈ ${f.v.toFixed(2)}`
+                : f.v < 0.9 ? `less random than Poisson (check the inputs)` : "Poisson spread is about right";
+      console.log(`[grade]   ${stat.padEnd(9)} ${String(f.n).padStart(5)} matches  expected ${f.mExp} got ${f.mAct}  `
+        + `beta ${f.beta.toFixed(3)} ±${f.se.toFixed(3)} (${sep})  ·  v ${f.v.toFixed(2)} (${dis})`);
+    }
+  } else {
+    const have = Object.values(all).reduce((a, s) => Math.max(a, (s.spread || {}).n || 0), 0);
+    console.log(`[grade] spread: ${have} match(es) recorded, need 200 before it can be read`);
   }
 }
 {

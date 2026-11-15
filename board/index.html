@@ -210,14 +210,25 @@
 
   // A log-odds shift means nothing on its own, so show it where it lands: the
   // market's own graded `said` moved by this many points.
+  /* A correction is {shift, slope, pivot}: the level and the steepness of the
+     market's curve. A bare number is the older shift-only table and still reads.
+     The points figure is what the correction does AT THIS MARKET'S OWN AVERAGE,
+     which is the whole story for a shift and only part of it for a slope — a
+     rotation can be worth nothing at the middle and several points at the ends,
+     so `slope` is carried through and shown separately rather than folded in. */
   function appliedRows(g, L) {
     const out = [];
-    for (const [market, shift] of Object.entries((L && L.shifts) || {})) {
+    for (const [market, fit] of Object.entries((L && L.shifts) || {})) {
       const v = (g.byKey || {})[market];
-      if (!v || !v.n) continue;
+      if (!v || !v.n || !fit) continue;
       const said = v.p / v.n;
-      if (!(said > 0 && said < 1) || !shift) continue;
-      out.push({ market, n: v.n, pts: 100 * (ilg(lg(said) + shift) - said) });
+      if (!(said > 0 && said < 1)) continue;
+      const shift = typeof fit === "number" ? fit : (fit.shift || 0);
+      const slope = typeof fit === "number" ? 1 : (fit.slope == null ? 1 : fit.slope);
+      const pivot = typeof fit === "number" ? 0 : (fit.pivot || 0);
+      if (!shift && slope === 1) continue;
+      const moved = ilg(slope * (lg(said) - pivot) + pivot + shift);
+      out.push({ market, n: v.n, pts: 100 * (moved - said), slope });
     }
     return out.sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts));
   }
@@ -358,7 +369,8 @@
       $("#corrN").textContent = ch.length ? plural(ch.length, "market") : "none yet";
       $("#corr").innerHTML = ch.length
         ? ch.map((c) => `<span class="bchip ${c.pts >= 0 ? "up" : "dn"}">${
-            esc(c.market)} <b>${c.pts >= 0 ? "+" : ""}${(+c.pts).toFixed(1)}</b></span>`).join("")
+            esc(c.market)} <b>${c.pts >= 0 ? "+" : ""}${(+c.pts).toFixed(1)}</b>${
+            c.slope !== 1 ? ` <i>×${c.slope.toFixed(2)} steepness</i>` : ""}</span>`).join("")
         : `<p class="note">No market has earned one yet.</p>`;
       if (held.length) {
         $("#heldN").textContent = plural(held.length, "market");

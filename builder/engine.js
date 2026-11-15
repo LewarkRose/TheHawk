@@ -1921,10 +1921,21 @@
       // Learning: shift a market's chances by what your settled bets showed.
       // The simulation is untouched; `adj` rescales this leg in ticket maths.
       leg.pRaw = leg.p;
-      const key = learnKey(leg.id, leg.market), shift = key && learning[key];
-      if (shift) {
-        const p = 1 / (1 + Math.exp(-(logit(leg.p) + shift)));
-        leg.adj = p / leg.p; leg.p = p; leg.fair = 1 / p;
+      // A correction is {shift, slope, pivot} — the level and the steepness of
+      // the market's curve, rotated about its own mean log-odds so the two do
+      // not fight. slope 1 is a pure shift, which is what every correction was
+      // until the Match SoT ladder showed a market that rotates rather than
+      // leans. A bare number is still read as a shift, so an older learn.json
+      // from a cached deploy keeps working exactly as it did.
+      const key = learnKey(leg.id, leg.market), fit = key && learning[key];
+      if (fit) {
+        const shift = typeof fit === "number" ? fit : (fit.shift || 0);
+        const slope = typeof fit === "number" ? 1 : (fit.slope ?? 1);
+        const pivot = typeof fit === "number" ? 0 : (fit.pivot || 0);
+        if (shift || slope !== 1) {
+          const p = 1 / (1 + Math.exp(-(slope * (logit(leg.p) - pivot) + pivot + shift)));
+          leg.adj = p / leg.p; leg.p = p; leg.fair = 1 / p;
+        }
       }
     }
     return legs;

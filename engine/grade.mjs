@@ -316,6 +316,57 @@ const lgit = (p) => Math.log(p / (1 - p));
 const ilgit = (x) => 1 / (1 + Math.exp(-x));
 const newAB = () => ({ ver: AB_VERSION, n: 0, shifted: 0, rawBrier: 0, adjBrier: 0, byKey: {} });
 // The same formula computeLearning uses, read off the record in hand.
+// A shift is ONE number, so it can only move a market's whole curve up or down.
+// Against a market whose ladder ROTATES it fixes the middle and makes both ends
+// worse — which is not a theory, it is Match Shots on Target. 14,611 legs
+// reading +4.81 at the bottom of the ladder and -3.43 at the top, every total
+// line inside ±1.5, and Under mirroring it. That is a curve too STEEP, not one
+// too high, and the A/B refused the shift for it (-1.85 Over, -1.97 Under). The
+// gate was right. It had been handed the wrong tool.
+//
+// So: a slope as well, fitted on that market's own ladder and pivoted on its own
+// mean log-odds, which keeps the two orthogonal — the shift moves the level, the
+// slope changes the steepness, and slope = 1 is exactly what shipped before.
+//
+// This does NOT claim to know WHY a market rotates. A count distribution that is
+// too narrow and a per-match mean that is too spread out look identical from
+// here, and statFit cannot separate them because it keeps only sums. That
+// question is still open and its answer belongs in the model, not in this table.
+// What this does is stop the correction layer being structurally unable to
+// describe the error it can already see.
+const SLOPE_MIN_BANDS = 4, SLOPE_MIN_N = 200, SLOPE_SHRINK = 4000, SLOPE_CAP = 0.3;
+function fitSlope(key, pivot) {
+  const rows = (T.keyBands || {})[key];
+  if (!Array.isArray(rows)) return 1;
+  const pts = [];
+  let N = 0;
+  for (const b of rows) {
+    if (!b || !(b.n >= SLOPE_MIN_N)) continue;
+    const said = b.p / b.n, got = Math.min(Math.max(b.won / b.n, 0.02), 0.98);
+    if (!(said > 0.001 && said < 0.999)) continue;
+    pts.push([lgit(said), lgit(got), b.n]); N += b.n;
+  }
+  // Fewer than four usable rungs is not a ladder, it is two points and a hope.
+  if (pts.length < SLOPE_MIN_BANDS) return 1;
+  // Weighted least squares FORCED through (pivot, pivot): a one-parameter fit,
+  // because the level is the shift's job. Fitting an intercept here as well
+  // would have the two corrections quietly arguing about the same number.
+  let sxx = 0, sxy = 0;
+  for (const [x, y, w] of pts) { const dx = x - pivot; sxx += w * dx * dx; sxy += w * dx * (y - pivot); }
+  if (!(sxx > 0)) return 1;
+  const raw = sxy / sxx;
+  if (!isFinite(raw)) return 1;
+  const shrunk = 1 + (N / (N + SLOPE_SHRINK)) * (raw - 1);
+  return Math.max(1 - SLOPE_CAP, Math.min(1 + SLOPE_CAP, shrunk));
+}
+/** Rotate about the market's own mean, then shift. A bare number is the old
+ *  shift-only table and still works, so nothing breaks on an older deploy. */
+const applyFit = (p, f) => {
+  if (!f) return p;
+  if (typeof f === "number") return ilgit(lgit(p) + f);
+  const pivot = f.pivot || 0;
+  return ilgit((f.slope ?? 1) * (lgit(p) - pivot) + pivot + (f.shift || 0));
+};
 function learnShifts() {
   const out = {};
   for (const [key, g] of Object.entries(T.byKey || {})) {
@@ -323,8 +374,11 @@ function learnShifts() {
     const said = g.p / g.n;
     if (!(said > 0 && said < 1)) continue;
     const got = Math.min(Math.max(g.won / g.n, 0.02), 0.98);
-    const s = Math.max(-LEARN_CAP, Math.min(LEARN_CAP, (g.n / (g.n + LEARN_SHRINK)) * (lgit(got) - lgit(said))));
-    if (Math.abs(s) >= 0.02) out[key] = s;
+    const pivot = lgit(said);
+    const s = Math.max(-LEARN_CAP, Math.min(LEARN_CAP, (g.n / (g.n + LEARN_SHRINK)) * (lgit(got) - pivot)));
+    const slope = fitSlope(key, pivot);
+    if (Math.abs(s) >= 0.02 || Math.abs(slope - 1) >= 0.02)
+      out[key] = { shift: +s.toFixed(4), slope: +slope.toFixed(4), pivot: +pivot.toFixed(4) };
   }
   return out;
 }
@@ -352,14 +406,45 @@ function learnShifts() {
 // mirrors. Match SoT Over really is low. The shift fitted to it still loses, and
 // the only honest reason to withhold it is that measurement, not a story.
 const LIVE_MIN_N = 500, LIVE_MIN_GAIN = 0.5;
-function liveShifts(shifts) {
+// Does the SLOPE help, on top of the shift that is already out? Graded in its
+// own block so the shift's 385,914 legs of evidence survive untouched. Three
+// readings of the same leg: raw, shift only, shift and slope.
+const newSlopeAB = () => ({ ver: 1, n: 0, byKey: {} });
+function slopeTally(fits, leg, w) {
+  const p = leg.p;
+  if (!(p > 0 && p < 1)) return;
+  const key = (HAWK.learnKey && HAWK.learnKey(leg.id, leg.market)) || "";
+  const f = key && fits[key];
+  if (!f || typeof f !== "object") return;
+  const S = (T.slopeAB ||= newSlopeAB());
+  const o = w ? 1 : 0;
+  const qs = ilgit(lgit(p) + (f.shift || 0)), qb = applyFit(p, f);
+  S.n++;
+  const c = (S.byKey[key] ||= { n: 0, raw: 0, shift: 0, both: 0, won: 0, said: 0, slope: 1 });
+  c.n++; if (w) c.won++;
+  c.raw = +(c.raw + (p - o) ** 2).toFixed(4);
+  c.shift = +(c.shift + (qs - o) ** 2).toFixed(4);
+  c.both = +(c.both + (qb - o) ** 2).toFixed(4);
+  c.said = +(c.said + p).toFixed(4);
+  c.slope = f.slope ?? 1;   // the slope in force when this leg was graded
+}
+function liveShifts(fits) {
   const ab = (T.ab || {}).byKey || {};
+  const sab = ((T.slopeAB || {}).byKey) || {};
   const live = {}, held = [];
-  for (const [key, s] of Object.entries(shifts)) {
+  for (const [key, f] of Object.entries(fits)) {
     const c = ab[key];
     const gain = c ? +(c.raw - c.adj).toFixed(2) : 0;
-    if (c && c.n >= LIVE_MIN_N && gain >= LIVE_MIN_GAIN) live[key] = +s.toFixed(4);
-    else held.push({ key, n: c ? c.n : 0, gain });
+    if (c && c.n >= LIVE_MIN_N && gain >= LIVE_MIN_GAIN) {
+      // The slope rides out only on its own evidence — the same bar again, read
+      // off the block that grades it against the shift it would replace. Until
+      // then the published slope is 1, which is exactly today's correction.
+      const s = sab[key];
+      const sGain = s ? +(s.shift - s.both).toFixed(2) : 0;
+      const slopeOk = !!(s && s.n >= LIVE_MIN_N && sGain >= LIVE_MIN_GAIN);
+      live[key] = { shift: f.shift, slope: slopeOk ? f.slope : 1, pivot: f.pivot,
+                    ...(slopeOk ? {} : { slopeHeld: f.slope, slopeN: s ? s.n : 0, slopeGain: sGain }) };
+    } else held.push({ key, n: c ? c.n : 0, gain });
   }
   held.sort((a, b) => b.n - a.n);
   return { live, held };
@@ -371,7 +456,13 @@ function abTally(shifts, leg, w) {
   if ((A.ver || 1) !== AB_VERSION) Object.assign(A, newAB());
   const key = (HAWK.learnKey && HAWK.learnKey(leg.id, leg.market)) || leg.market;
   const sh = shifts[(HAWK.learnKey && HAWK.learnKey(leg.id, leg.market)) || ""];
-  const q = sh ? ilgit(lgit(p) + sh) : p;
+  // SHIFT ONLY, deliberately, now that learnShifts also returns a slope. This
+  // block holds 385,914 legs of evidence and it is what gates the nine live
+  // corrections; change what "adjusted" means here and all of it has to be
+  // thrown away and every correction goes dark until it refills. The slope is
+  // graded in its own block (slopeTally) against this same shift, so it earns
+  // its way out on its own number without disturbing anything already working.
+  const q = sh ? ilgit(lgit(p) + (typeof sh === "number" ? sh : sh.shift || 0)) : p;
   const o = w ? 1 : 0;
   A.n++; if (sh) A.shifted++;
   A.rawBrier = +(A.rawBrier + (p - o) ** 2).toFixed(4);
@@ -725,6 +816,7 @@ for (const [id, pr] of Object.entries(state.pending)) {
     const rv = HawkSettle.legResult(leg, f, { earlyPayout: true, subOn: true });
     legOutEP.set(leg.id, rv === "won" ? true : rv === "lost" ? false : w);
     abTally(shiftsNow, leg, w);
+    slopeTally(shiftsNow, leg, w);
     // Tackles legs that DID grade, over the same matches as the discarded ones.
     if (/^p:(home|away):\d+:tackles\d*$/.test(leg.id || "") && leg.p > 0 && leg.p < 1) {
       const R = ((T.sources ||= newSources()).rescue);
@@ -1025,6 +1117,7 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   // HAWK's Brier against the closing line's, on the same legs. `hawk` lower than
   // `market` means HAWK forecast that market better than the price did.
   clv: T.clv || {}, demargin: T.demargin || newDemargin(), ev: T.ev || newEv(),
+  slopeAB: T.slopeAB || newSlopeAB(),
   // 1a's counters: what the sampler is recording right now. `stored` is a QUEUE,
   // not a stockpile — a match's tickets are deleted with its pending entry the
   // moment it grades, which is why 1b has to grade them in the same pass.
@@ -1083,6 +1176,21 @@ console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predict
       + `gated worth ${(gatedGain / A.n * 1e4).toFixed(2)} per 10k vs ${(better * 1e4).toFixed(2)} ungated`);
     for (const h of CORR.held.slice(0, 6)) {
       console.log(`[grade]   withheld ${h.key.padEnd(32)} n=${String(h.n).padStart(6)}  gain ${h.gain >= 0 ? "+" : ""}${h.gain}`);
+    }
+    // The slope, graded against the shift it would replace. A market only ever
+    // rotates live once this says so; everything else publishes slope = 1.
+    const S = T.slopeAB || newSlopeAB();
+    const sRows = Object.entries(S.byKey || {}).filter(([, c]) => c.n >= 200)
+      .map(([k, c]) => [k, c, +(c.shift - c.both).toFixed(2)])
+      .sort((a, b) => b[2] - a[2]);
+    if (sRows.length) {
+      console.log(`[grade] SLOPE A/B over ${S.n} leg(s) — does rotating the curve beat shifting it?`);
+      for (const [k, c, gain] of sRows.slice(0, 8))
+        console.log(`[grade]   ${k.padEnd(32)} n=${String(c.n).padStart(6)}  slope ${(c.slope ?? 1).toFixed(3)}  `
+          + `shift ${c.shift.toFixed(1)} vs both ${c.both.toFixed(1)}  ${gain >= 0 ? "+" : ""}${gain}`
+          + `${c.n >= LIVE_MIN_N && gain >= LIVE_MIN_GAIN ? "  ← LIVE" : ""}`);
+    } else {
+      console.log(`[grade] slope A/B: ${S.n} leg(s) so far, no key has 200 yet`);
     }
   }
 }

@@ -78,6 +78,28 @@
   </div>
 </section>
 
+<!-- HOW MANY LEGS. HAWK has graded its own builder tickets since phase 1b, and
+     this table has never been shown anywhere — you could only read it by opening
+     graded.json by hand. It is the one table that decides how to BET, because it
+     is the only place the cost of an extra leg is measured rather than quoted:
+     the builder's price for a fourth leg is a forecast, this is what came back.
+     Asked for on 17 Nov 2026, after choosing three legs over two on a four-point
+     estimate off the bet log that this table puts nearer eight.
+     See the tickets block in engine/grade.mjs. -->
+<section class="calm" id="lgWrap" hidden>
+  <div class="wrap">
+    <div class="lede"><h3><span class="emj">🧱</span>What a leg costs</h3><span class="n" id="lgN"></span></div>
+    <div class="bd-recs" id="lg"></div>
+    <p class="note">Every ticket the builder has made, graded, grouped by how many legs it had.
+      <b>The big figure is what came back</b> — a flat stake on every ticket of that shape, not a
+      forecast. HAWK's own chance sits beside it so the two questions stay apart: whether it was
+      <b>right</b> about the ticket landing, and whether the ticket was <b>worth taking</b>. It is
+      usually right and the ticket is usually not worth taking, and each extra leg makes the second
+      worse far faster than the first. <b>Tickets are not independent</b> — one match's result leg
+      can sit in a hundred of them, so read the count as far less evidence than it looks.</p>
+  </div>
+</section>
+
 <!-- Whether HAWK is right about how much football VARIES, which is a different
      question from whether its averages are right and the one every other block
      here is silent on. See newSpread in engine/grade.mjs. -->
@@ -403,6 +425,7 @@
     }
 
     renderEv(g.ev);
+    renderLegs(g.tickets);
     renderDemargin(g.demargin);
     renderSpread(g.statFit);
   }
@@ -475,6 +498,30 @@
       $("#evMkWrap").hidden = false;
     }
     $("#evWrap").hidden = false;
+  }
+
+  /* HOW MANY LEGS. The cost of an extra leg, measured rather than quoted.
+     Colour from 500 tickets, the same bar the money ledger uses. The
+     not-independent warning lives in the note under the cards rather than on
+     every card: it applies to all of them equally and repeating it four times
+     would read as four separate doubts. */
+  function renderLegs(T) {
+    const by = (T && T.byLegs) || {};
+    const rows = Object.keys(by).map(Number).filter((k) => k >= 2 && by[k] && by[k].n)
+      .sort((a, b) => a - b);
+    if (!rows.length) return;
+    $("#lgN").textContent = `${(T.n || 0).toLocaleString()} tickets · ${plural(T.matches || 0, "match")}`;
+    $("#lg").innerHTML = rows.map((k) => {
+      const c = by[k], r = c.stake ? (c.back - c.stake) / c.stake * 100 : null,
+            said = 100 * c.p / c.n, land = 100 * c.won / c.n, sure = c.n >= 500;
+      return `<div><div class="k">${plural(k, "leg")}</div>
+        <div class="n ${sure && r != null ? (r >= 0 ? "up" : "dn") : ""}">${
+          r == null ? "—" : `${r >= 0 ? "+" : ""}${r.toFixed(1)}%`}</div>
+        <div class="sub">${c.n.toLocaleString()} tickets · landed ${land.toFixed(1)}% vs ${
+          said.toFixed(1)}% said</div>
+        ${sure ? "" : `<div class="ask">too few tickets to colour</div>`}</div>`;
+    }).join("");
+    $("#lgWrap").hidden = false;
   }
 
   /* The three reads of a closing price. No colour at all here — the leader is

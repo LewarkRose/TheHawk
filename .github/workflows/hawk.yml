@@ -166,6 +166,20 @@ jobs:
                   lines.append(f"  - under the Vault's rules: {v.get('n', 0)} tickets, {v.get('won', 0)} won vs {round(v.get('p', 0), 1)} expected")
               else:
                   lines.append("  - under the Vault's rules: not started — no ticket has graded since the split shipped")
+              # The third source: whether 365Scores' silence is really a zero.
+              # hawk-settle scores a missing player row as 0, so a silent row that
+              # is NOT zero is a leg settled as a loss on absent data, in the Vault
+              # as well as in grading. Printed here for the same reason as the two
+              # lines above: both of those degraded unnoticed while the only way to
+              # read them was fetching graded.json by hand.
+              e3 = g.get("espn") or {}
+              if e3.get("matches"):
+                  sil = sum((f.get("silentZero", 0) + f.get("silentNonZero", 0)) for f in (e3.get("fields") or {}).values())
+                  nz = sum(f.get("silentNonZero", 0) for f in (e3.get("fields") or {}).values())
+                  lines.append(f"- Third source (ESPN, recording only): {e3.get('resolved', 0)}/{e3.get('matches', 0)} matches resolved, "
+                               f"{e3.get('players', 0)} players compared")
+                  lines.append(f"  - 365Scores silent on {sil} player-fields, {nz} of them NOT zero on ESPN"
+                               + (f" ({100.0 * nz / sil:.2f}%)" if sil else " (nothing to read yet)"))
           except Exception as e:
               lines.append(f"- Builder tickets: no reading ({e})")
           # Did grade.mjs actually run? Nothing else writes these three, data/ is

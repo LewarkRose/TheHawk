@@ -18,6 +18,7 @@ import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import * as FotMob from "./fotmob.mjs";
+import * as ESPN from "./espn.mjs";
 import { closingChanceFor, closingChancesAll } from "./grade-demargin.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -703,6 +704,99 @@ async function crossCheck(pr, f, unknownTackles) {
     }
   }
 }
+// ---------- THE THIRD SOURCE: IS 365SCORES' SILENCE ACTUALLY A ZERO? ----------
+// A different question from the FotMob block above, and a sharper one.
+//
+// FotMob is carried because of tackles, where 365Scores' silence is handled: the
+// leg settles "unknown" and goes ungraded rather than wrongly lost. For every
+// OTHER player stat there is no escape. `countOf(null)` is 0 in hawk-settle.js, so
+// a player 365Scores publishes no shots row for is settled as having taken none —
+// and the leg LOSES. That is not a coverage gap, it is an assumption, it runs in
+// the same code the Vault settles real bets with, and it has never been checked.
+//
+// ESPN is the source that can check it because its payload is DENSE: it states a
+// zero for every player in every field where 365Scores simply says nothing (40 of
+// 40 players on shots, SoT, goals, assists and fouls in the match measured on
+// 18 Nov 2026). So the counter that matters is not `differ` — FotMob already
+// showed these feeds agree where both speak — it is `silentNonZero`: 365Scores
+// silent, ESPN not zero. Every one of those is a leg HAWK scored as a loss that
+// may have won.
+//
+// Separate from T.sources on purpose. Folding a third source into those counters
+// would put two different sets of matches, two coverages and two field lists on
+// one denominator, which is the single mistake the FotMob block above has had to
+// be reset for four times. They share nothing but the player-name index.
+//
+// NOT compared, both deliberately:
+//  * tackles — ESPN publishes none per player. FotMob stays wired for it.
+//  * cards — 365Scores' stats block under-counts them (hawk-settle reads cards from
+//    game.events instead), so comparing it would invent a disagreement that is an
+//    artefact of the reader, exactly like comparing the numerator of "2/3 (66.7%)".
+//
+// Recorded, never applied. If `silentNonZero` comes back near zero then the
+// assumption is sound, over far more matches than FotMob's 93 SoT cases, and the
+// matter is closed with evidence. If it is material, the next build is leg-level:
+// which legs, what HAWK said, and what they were settled as.
+const ESPN_VERSION = 1;
+const ESPN_FIELDS = ["shots", "sot", "goals", "assists", "fouls", "fouled", "offsides", "saves"];
+const newEspn = () => ({
+  ver: ESPN_VERSION, matches: 0, noSlug: 0, resolved: 0, unresolved: 0, players: 0, unmatched: 0, unused: 0,
+  // `silentGap` is the total ESPN credits silent 365Scores players with. Counting
+  // only how OFTEN they differ cannot tell one missed shot from five.
+  fields: Object.fromEntries(ESPN_FIELDS.map((k) => [k,
+    { n: 0, differ: 0, gap: 0, only365: 0, onlyEspn: 0, silentZero: 0, silentNonZero: 0, silentGap: 0 }])),
+});
+// 365Scores' own names for the same numbers. Read through readS365 so the parsing
+// is identical to the FotMob block's; none of these is the "2/3 (66.7%)" shape.
+const ESPN_S365 = {
+  shots: "Total Shots", sot: "Shots On Target", goals: "Goals", assists: "Assists",
+  fouls: "Fouls Made", fouled: "Was Fouled", offsides: "Offsides", saves: "Goalkeeper Saves",
+};
+async function espnCheck(pr, f) {
+  const E = (T.espn ||= newEspn());
+  if ((E.ver || 1) !== ESPN_VERSION) Object.assign(E, newEspn());
+  E.matches++;
+  // One slug map, in builder/engine.js, where the production line-up path already
+  // reads it. A second copy here would be a second thing to forget to update.
+  const slug = HAWK._internals.espnSlug(pr.league);
+  if (!slug) { E.noSlug++; return; }
+  // The same club test the production line-up path uses, injected rather than
+  // rewritten: one club-matching rule for ESPN, so one set of club-matching bugs.
+  const ev = await ESPN.findEvent(slug, pr.kickoff, pr.home, pr.away, HAWK._internals.nameSimilarity);
+  if (!ev) { E.unresolved++; return; }
+  const ep = await ESPN.playerStats(slug, ev);
+  if (!ep) { E.unresolved++; return; }
+  E.resolved++;
+  for (const side of ["home", "away"]) {
+    // An unused substitute's zeros are not observations. At the book an absent
+    // player VOIDS a leg rather than losing it, and counting those zeros as real
+    // is what made the FotMob tackles rescue read 14% against a 57% price.
+    const all = ep[side] || [], played = all.filter((r) => r.played);
+    E.unused += all.length - played.length;
+    const index = FotMob.byLastName(played);
+    for (const p of (f.players || {})[side] || []) {
+      if (!(p.minutes > 0)) continue;
+      const q = index.get(FotMob.lastName(p.name));
+      if (!q) { E.unmatched++; continue; }
+      E.players++;
+      for (const key of ESPN_FIELDS) {
+        const a = readS365(key, (p.stats || {})[ESPN_S365[key]]);
+        const b = q.stats[key];
+        const c = E.fields[key];
+        // A zero from ESPN is a reading, not a gap — that density is the point of
+        // this block, so it must never be collapsed into "missing".
+        if (b == null) { if (a != null) c.only365++; continue; }
+        if (a == null) {
+          c.onlyEspn++;
+          if (b > 0) { c.silentNonZero++; c.silentGap = +(c.silentGap + b).toFixed(3); } else c.silentZero++;
+          continue;
+        }
+        c.n++;
+        if (Math.abs(a - b) > 1e-9) { c.differ++; c.gap = +(c.gap + Math.abs(a - b)).toFixed(3); }
+      }
+    }
+  }
+}
 const pairSum = (p) => (Array.isArray(p) && p[0] != null && p[1] != null ? p[0] + p[1] : null);
 const r3 = (v) => (typeof v === "number" && Number.isFinite(v) ? +v.toFixed(3) : null);
 // Every league-and-market cell is kept in state.json so it keeps accumulating, but a
@@ -1119,6 +1213,10 @@ for (const [id, pr] of Object.entries(state.pending)) {
   if ((f.players || {}).home) {
     try { await crossCheck(pr, f, unknownTackles); }
     catch (e) { console.log(`[grade] cross-check skipped for ${id}: ${e.message}`); }
+    // Third source, its own try/catch for the same reason: a reader may never cost
+    // a match its grade, and one source being down must not take the other with it.
+    try { await espnCheck(pr, f); }
+    catch (e) { console.log(`[grade] espn check skipped for ${id}: ${e.message}`); }
   }
 }
 
@@ -1224,6 +1322,9 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   tickets: T.builders || null,
   // The second source's running report. Recorded, never applied — see crossCheck.
   sources: T.sources || null,
+  // The third source: whether 365Scores' silence is really a zero. Recorded, never
+  // applied — see espnCheck.
+  espn: T.espn || null,
   // Raw chances against corrected ones, by Brier score: does the learning help?
   ab: T.ab || null,
 }));
@@ -1310,6 +1411,37 @@ console.log(`[grade] recorded ${builtTickets} builder ticket(s) across ${predict
   } else {
     const have = Object.values(all).reduce((a, s) => Math.max(a, (s.spread || {}).n || 0), 0);
     console.log(`[grade] spread: ${have} match(es) recorded, need 200 before it can be read`);
+  }
+}
+{
+  const E = T.espn;
+  if (E && E.matches) {
+    console.log(`[grade] THIRD SOURCE (ESPN): ${E.resolved}/${E.matches} matches resolved `
+      + `(${E.unresolved} unresolved, ${E.noSlug} no ESPN slug), ${E.players} players compared, `
+      + `${E.unmatched} unmatched, ${E.unused} unused subs dropped`);
+    let silent = 0, nonZero = 0, missed = 0;
+    for (const k of ESPN_FIELDS) {
+      const c = E.fields[k];
+      if (!c || (!c.n && !c.onlyEspn && !c.only365)) continue;
+      const sil = c.silentZero + c.silentNonZero;
+      silent += sil; nonZero += c.silentNonZero; missed += c.silentGap;
+      console.log(`[grade]   ${k.padEnd(9)} ${String(c.n).padStart(6)} compared`
+        + (c.n ? `, ${(100 * c.differ / c.n).toFixed(1)}% differ` : "")
+        + `, 365-only ${c.only365}, espn-only ${c.onlyEspn}`
+        + (sil ? `  |  365Scores silent ${sil}, of which ${c.silentNonZero} NOT zero on ESPN`
+            + (c.silentNonZero ? ` (${(100 * c.silentNonZero / sil).toFixed(1)}%, ${c.silentGap} total unseen)` : "") : ""));
+    }
+    // The verdict. hawk-settle scores a silent row as zero, so a silent row that is
+    // not zero is a leg settled wrongly — in the Vault as well as here.
+    if (silent) {
+      const rate = 100 * nonZero / silent;
+      console.log(`[grade]   VERDICT: 365Scores was silent on ${silent} player-fields; `
+        + `${nonZero} (${rate.toFixed(2)}%) were not zero on ESPN, ${missed.toFixed(0)} unseen in total.`);
+      console.log(rate < 1
+        ? `[grade]   ^ silence is a zero. The assumption hawk-settle already makes holds.`
+        : `[grade]   ^ silence is NOT reliably a zero. Every one of those is a leg settled as a `
+          + `loss on a missing row, in the Vault too. Next step is leg-level, not field-level.`);
+    }
   }
 }
 {

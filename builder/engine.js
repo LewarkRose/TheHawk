@@ -3974,7 +3974,7 @@
                   startScan, scanStatus: () => jobStatus(scan), stopScan: () => { scan.stop = true; return jobStatus(scan); },
                   meta: () => data("meta.json"),
                   form, cupRounds,
-                  _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas, espnLineups, mfaLineups, mfaName, matchPlayer, playerRows,
+                  _internals: { analyse, buildSquads, simulate, catalogue, autoBuild, evaluate, consensus, fitGoalLambdas, espnLineups, espnSlug: (lg) => ESPN_SLUGS[lg] || null, mfaLineups, mfaName, matchPlayer, playerRows,
                                 selectionModel, priceRows, entry: (id) => matches.get(String(id)), liveState, finalMatrix,
                                 fitTotalLambda, scoreMatrix, nameSimilarity, bestMatch } };
 })(window);

@@ -172,6 +172,16 @@ jobs:
               # as well as in grading. Printed here for the same reason as the two
               # lines above: both of those degraded unnoticed while the only way to
               # read them was fetching graded.json by hand.
+              # One row per graded match, kept for ever (engine/archive.mjs). `refused`
+              # is a REFUSAL to overwrite a month whose file read back short of what
+              # the state remembers — the archive is intact, but this run could not
+              # see it, and it alerts because the thing it guards cannot be rebuilt.
+              ar = g.get("archive") or {}
+              if ar:
+                  lines.append(f"- Match archive: {ar.get('rows', 0)} rows across {len(ar.get('months') or [])} month(s) at {ar.get('at')}")
+                  if ar.get("refused"):
+                      lines.append(f"  - ⚠️ **{ar['refused']} month(s) REFUSED** — a month file read back short; nothing overwritten, this run's rows for it are lost")
+                      m.setdefault("alerts", []).append("archive truncation refused")
               e3 = g.get("espn") or {}
               if e3.get("matches"):
                   sil = sum((f.get("silentZero", 0) + f.get("silentNonZero", 0)) for f in (e3.get("fields") or {}).values())

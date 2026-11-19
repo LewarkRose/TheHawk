@@ -19,6 +19,7 @@ import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import * as FotMob from "./fotmob.mjs";
 import * as ESPN from "./espn.mjs";
+import * as Archive from "./archive.mjs";
 import { closingChanceFor, closingChancesAll } from "./grade-demargin.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -37,6 +38,11 @@ const LIVE = process.env.HAWK_LIVE || "https://lewarkrose.github.io/TheHawk";
 const PREDICT_AHEAD_H = 14, GRADE_AFTER_H = 2.5, GIVE_UP_AFTER_D = 4, KEEP_RECENT = 40;
 const BANDS = [[0, 0.2], [0.2, 0.35], [0.35, 0.5], [0.5, 0.65], [0.65, 0.8], [0.8, 0.9], [0.9, 1.01]];
 const STATE_FILE = path.join(ROOT, "data", "grading", "state.json");
+// One row per graded match, kept for ever — see engine/archive.mjs for why a
+// running sum cannot replace it. Same directory as the state above, so it
+// inherits the same two recoveries: the Action cache, then the published site.
+const ARCHIVE_DIR = path.join(ROOT, "data", "grading", "archive");
+const archiveRows = [];
 
 // The browser engine and the settle module, run as they are.
 globalThis.window = globalThis;
@@ -972,6 +978,11 @@ for (const [id, pr] of Object.entries(state.pending)) {
     if (exp > 0) fitStat(pr.league, "tackles", exp, act);
   }
   let n = 0, won = 0, said = 0;
+  // This match's own closing-line contribution. T.clv keeps the running sum; these
+  // three carry the same numbers for THIS match into the archive row, which is the
+  // only form in which the comparison can ever be re-cut by league, by month or by
+  // anything else not decided in advance.
+  let ccN = 0, ccHawk = 0, ccMkt = 0;
   // id -> outcome, so a builder ticket can be resolved from the same settlements
   // rather than re-settling its legs. A leg that returned "unknown" is simply
   // absent, which is what makes a ticket containing it countable as skipped.
@@ -1023,6 +1034,7 @@ for (const [id, pr] of Object.entries(state.pending)) {
         c.n++; c.won += o; c.p += leg.p; c.q += cc.q;
         c.hawk += (leg.p - o) ** 2;
         c.market += (cc.q - o) ** 2;
+        ccN++; ccHawk += (leg.p - o) ** 2; ccMkt += (cc.q - o) ** 2;
       }
       // Same leg, same outcome, three reads of the price. Scored only when all
       // three answered, so the columns are always over identical legs — a method
@@ -1207,6 +1219,30 @@ for (const [id, pr] of Object.entries(state.pending)) {
   T.recent.unshift({ id, league: pr.league, home: pr.home, away: pr.away, kickoff: pr.kickoff, score: f.ft.join("-"),
                      n, said: +(said / n).toFixed(3), got: +(won / n).toFixed(3), upset });
   T.recent = T.recent.slice(0, KEEP_RECENT);
+  // THE ARCHIVE ROW. Written now because none of it can be recovered later: the
+  // fixture leaves fixtures.json, 365Scores deletes its odds lines, and HAWK's
+  // expectation for this match stops being computable the moment either happens.
+  //
+  // `expected` against `actual` is the pair statFit adds into a total and loses.
+  // Holding both per match is what makes over-separation distinguishable from
+  // over-dispersion, which grade.mjs:388 says is structurally impossible from sums.
+  // `probs` is here for the draw lean: -2.24 points over 1,605 matches is currently
+  // a single number that cannot be split by league, by book or by month.
+  // Keys are spelled out rather than shortened. This file exists to be read months
+  // from now by someone who has forgotten what it holds, and 30 bytes a row is a
+  // cheaper price than a guess about what "k" meant.
+  archiveRows.push({
+    id, league: pr.league || null, ko: pr.kickoff, ft: f.ft,
+    probs: pr.probs ? { home: r3(pr.probs.home), draw: r3(pr.probs.draw), away: r3(pr.probs.away) } : null,
+    expected: pr.expected ? { corners: r3(pr.expected.corners), cards: r3(pairSum(pr.expected.cards)),
+                              sot: r3(pairSum(pr.expected.sot)) } : null,
+    actual: { corners: pairSum(f.corners), cards: pairSum(f.cards), sot: pairSum(f.sot) },
+    legs: { n, said: r3(said), won },
+    // Absent rather than zeroed when no leg had a two-sided closing price: a zero
+    // here would read as "the market and HAWK tied", which is a different claim.
+    clv: ccN ? { n: ccN, hawk: r3(ccHawk), market: r3(ccMkt) } : null,
+    upset: upset && upset.level ? upset.level : null,
+  });
   // Last, and in its own try/catch: the second source is a reader, and nothing it
   // does may cost a match its grade. Only for matches with player legs — a match
   // with none has nothing to cross-check and the fetch would be wasted.
@@ -1283,6 +1319,42 @@ const pendingBuilders = Object.values(state.pending || {}).filter((p) => (p.buil
 const storedTickets = pendingBuilders.reduce((a, p) => a + p.builders.length, 0);
 state.builderSeen = (state.builderSeen || 0) + builtTickets;
 if (!state.builderSince && builtTickets) state.builderSince = new Date().toISOString();
+// The archive, written BEFORE the state so that the row counts it updates are the
+// ones saved. `counts` is this run's only defence against silently truncating the
+// file — see engine/archive.mjs.
+const arch = { months: [], rows: 0, refused: 0 };
+try {
+  const counts = ((state.archive ||= {}).counts ||= {});
+  const byMonth = {};
+  // A row with no readable kick-off would file itself under month "" and be written
+  // to ".jsonl", which months() then skips by regex — the rows would be on disk and
+  // invisible, which is worse than dropping them. Counted out loud instead.
+  let undated = 0;
+  for (const row of archiveRows) {
+    const mo = Archive.monthOf(row.ko);
+    if (!/^\d{4}-\d{2}$/.test(mo)) { undated++; continue; }
+    (byMonth[mo] ||= []).push(row);
+  }
+  if (undated) console.log(`[grade] ARCHIVE: ${undated} row(s) dropped — no readable kick-off`);
+  const rep = await Archive.save(ARCHIVE_DIR, LIVE, byMonth, counts);
+  arch.months = Object.keys(counts).sort();
+  arch.rows = Object.values(counts).reduce((a, b) => a + b, 0);
+  arch.refused = rep.refused.length;
+  const added = rep.written.reduce((a, w) => a + w.added, 0);
+  console.log(`[grade] ARCHIVE: ${arch.rows} match rows across ${arch.months.length} month(s), `
+    + `${added} added this run (${archiveRows.length} graded)`);
+  // A refusal means this run could not see the real file. Said loudly on purpose:
+  // the failure mode it prevents is a green run that deletes months of evidence.
+  for (const r of rep.refused) {
+    console.log(`[grade]   ⚠️ REFUSED to write ${r.month}: loaded ${r.found} rows (${r.source}) `
+      + `but state remembers ${r.expected}. Nothing overwritten — the archive is intact, `
+      + `this run's rows for that month are lost.`);
+  }
+} catch (e) {
+  // Never let the archive cost a run its state. A missed run is recoverable; a
+  // state file that was not written is the whole grading record.
+  console.log(`[grade] ARCHIVE: skipped (${e.message})`);
+}
 await mkdir(path.dirname(STATE_FILE), { recursive: true });
 await writeFile(STATE_FILE, JSON.stringify(state));
 // The corrections the app actually applies, in its own small file. Separate from
@@ -1306,6 +1378,13 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   keyBands: T.keyBands || {},
   recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets, upsetNet: T.upsetNet || [],
   statFit: T.statFit || {}, byLeagueKey: publishedLeagueKeys(),
+  // Where the per-match rows are, and how many. The rows themselves are NOT here —
+  // the builder downloads this file on every visit. See engine/archive.mjs.
+  // `refused` is published so the Action can ALERT on it. A guard nobody is told
+  // about is half a guard, and this is the class of failure that has bitten this
+  // repo most: the run goes green and something quietly stops happening.
+  archive: { months: arch.months, rows: arch.rows, refused: arch.refused,
+             at: "data/grading/archive/<month>.jsonl" },
   result: T.result || newResult(), drawBands: T.drawBands || newDrawBands(),
   byLine: publishedLines(), weeks: T.weeks || {},
   // HAWK's Brier against the closing line's, on the same legs. `hawk` lower than

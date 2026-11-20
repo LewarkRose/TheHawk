@@ -710,11 +710,24 @@
     const comp = MFA_COMPETITIONS[league];
     if (!comp || !kickoff || !homeId || !awayId) return null;
     const t = kickoff.getTime();
-    // A match LEAVES upcomingMatches the moment it kicks off, while pastMatches
-    // still carries it marked SCHEDULED for hours -- the federation is slow to
-    // enter a result. So in-play lives in the second list, not the first.
+    // THREE lists, because a match in play is in neither of the obvious two.
+    // It leaves upcomingMatches the moment it kicks off, and it does not enter
+    // pastMatches until the federation enters a RESULT -- which is not the same
+    // as the final whistle and can be a long time after it. This code used to
+    // say pastMatches carried it meanwhile, marked SCHEDULED. It does not.
+    // Measured 20 Nov 2026, 20:05 UTC, twenty minutes into Balzan v Mosta: the
+    // fixture was absent from both lists while /matches/<id>/lineup was still
+    // serving all eleven. So the window that was written to run three hours PAST
+    // kick-off, precisely so an in-play page gets the real XI, could never once
+    // have fired in play -- the lineup was there and the id was unfindable.
+    //
+    // `matches` is that third list: the competition's matches in play, status
+    // RUNNING. Short cache, since it is the one that turns over in minutes. It
+    // is additive -- the hit filter below is unchanged and still demands both
+    // team ids and a six-hour window, so an extra list can only find a fixture,
+    // never mis-match one.
     const rows = [];
-    for (const [path, ttl] of [["upcomingMatches?pageSize=50", 10 * 60e3], ["pastMatches?pageSize=50", 5 * 60e3]]) {
+    for (const [path, ttl] of [["matches?pageSize=50", 60e3], ["upcomingMatches?pageSize=50", 10 * 60e3], ["pastMatches?pageSize=50", 5 * 60e3]]) {
       const got = await mfaJSON(`${MFA}/competitions/${comp}/${path}`, ttl);
       if (Array.isArray(got)) rows.push(...got);
     }

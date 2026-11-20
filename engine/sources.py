@@ -71,14 +71,20 @@ COMPETITIONS = {
     # Added 2026-11-01, on request. No football-data code, so its team ratings
     # come from 365Scores results the way Saudi Pro League's do.
     #
-    # TEAM MARKETS ONLY, and that is a property of the feed rather than a
-    # setting: 365Scores publishes no lineups for Malta at all — zero members,
-    # so no minutes, no player stats, nothing for s365_players to return. Its
+    # 365Scores publishes no lineups for Malta at all — zero members, so no
+    # minutes, no player stats, nothing for s365_players to return. Its
     # game/stats does carry the 12 that matter (Corners, Yellow and Red Cards,
     # Total Shots, Shots On Target, Offsides), so goals, corners, cards and
-    # shots price normally and the player props simply never appear. Expect
-    # Maltese clubs in the "no player stats at all for N squads" line every
-    # run; that is the truth about Malta rather than a fault to chase.
+    # shots price normally. Expect Maltese clubs in the "no player stats at all
+    # for N squads" line every run; that is the truth about this feed rather
+    # than a fault to chase.
+    #
+    # It no longer means team markets only. engine/malta.py builds minutes,
+    # goals and cards per player from the federation's own match centre, and
+    # builder/engine.js fetches the confirmed XI from it near kick-off, so a
+    # scorer and a booking price off the real eleven. Shots, tackles, fouls and
+    # offsides stay absent — nobody collects them — and malta.py writes them as
+    # None so the builder's gates can tell an absence from a zero.
     #
     # The Maltese CHALLENGE LEAGUE (the second tier) was asked for on the same
     # day and cannot be added: 365Scores carries exactly four Maltese

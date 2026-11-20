@@ -26,9 +26,17 @@
     { key: "europe", name: "Europe", icon: "🏆", ids: { "Champions League": 572, "Europa League": 573, "Conference League": 7685 } },
     { key: "more", name: "More Europe", icon: "🌍", ids: { "Eredivisie": 57, "Liga Portugal": 73, "Scottish Premiership": 61, "Belgian Pro League": 98,
         "Süper Lig": 78, "Greek Super League": 84, "Austrian Bundesliga": 111, "Swiss Super League": 95, "Danish Superliga": 119, "Allsvenskan": 122,
-        // Added 2026-11-01. Team markets only — 365Scores publishes no lineups
-        // for Malta, so there is nothing to build a player prop from. See the
-        // note on the entry in engine/sources.py.
+        // Added 2026-11-01. 365Scores publishes no lineups and no player stats
+        // for Malta, so this shipped as team markets only — and stopped being
+        // team markets only on 12 Nov 2026, when the Malta FA turned out to send
+        // CORS. The federation's XI is fetched below (MALTA'S XI, LIVE) and its
+        // per-player history is built by engine/malta.py, so a Maltese page
+        // prices a scorer and a booking off the right eleven.
+        //
+        // What it will never price is a shot, a tackle, a foul or an offside:
+        // nobody in Malta counts them, the MFA's own /statistics endpoint is
+        // empty on every finished match, and those rows hold null rather than
+        // zero. hasShotCounts and hasExtras are what keep a null out of a leg.
         "Maltese Premier League": 5653 } },
     // The Championship alone. League One, 2. Bundesliga, Serie B, LaLiga 2 and
     // Ligue 2 were removed on 2026-10-31 — HAWK is for the leagues it is used on.

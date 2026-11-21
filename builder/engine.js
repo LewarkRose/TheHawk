@@ -2360,7 +2360,10 @@
   // Compare two scores item by item: the first difference decides.
   const isBetter = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
   function maskOf(legs, ids, n) { const m = new Uint8Array(n).fill(1); for (const id of ids) { const a = legs[id].arr; for (let s = 0; s < n; s++) m[s] &= a[s]; } return m; }
-  function evaluate(legs, ids) {
+  // `why` is {legId: reason} from autoBuild, and only autoBuild has it: a
+  // hand-built slip was not chosen by anything, so its legs carry null and the
+  // card prints nothing rather than inventing a motive for your own pick.
+  function evaluate(legs, ids, why = null) {
     const chosen = ids.filter((i) => legs[i]);
     if (!chosen.length) return { p: null, fair: null, legs: [] };
     const n = legs[chosen[0]].arr.length, m = new Uint8Array(n).fill(1), rows = [];
@@ -2369,7 +2372,8 @@
       const before = mean(m) * adj, a = legs[id].arr;
       for (let s = 0; s < n; s++) m[s] &= a[s];
       adj *= legs[id].adj || 1;
-      rows.push({ id, p: legs[id].p, cond: before ? Math.min(1, (mean(m) * adj) / before) : 0 });
+      rows.push({ id, p: legs[id].p, cond: before ? Math.min(1, (mean(m) * adj) / before) : 0,
+                  ...(why && why[id] ? { why: why[id] } : {}) });
     }
     const p = Math.min(1, mean(m) * adj, ...chosen.map((id) => legs[id].p));
     const raw = b365Raw(legs, chosen, p);
@@ -2419,6 +2423,13 @@
     const n = all[0].arr.length;
     const noResult = NO_RESULT.has(focus);
     let chosen = locked.filter((i) => legs[i]);
+    // WHY EACH LEG IS ON THE TICKET — the selection reason, not a description
+    // of the leg. The card has always been able to say what a leg IS (its
+    // chance, its price, which way the money moved); it has never been able to
+    // say why THIS one and not one of the forty others, because autoBuild threw
+    // that away the moment it picked. Every field below is a number the loop
+    // already computes and drops on the floor.
+    const whyById = {};
     // The result leg the builder opens with. It used to take the side HAWK rates
     // higher to WIN and consider nothing else, so in a match the upset radar had
     // at High or Very high it still started from the favourite every time.
@@ -2439,7 +2450,14 @@
       const alt = pick(`dc:${dog}`, DOG_DC_P);
       if (seed && alt && legs[alt].bookPrice > 1 && legs[seed].bookPrice > 1
           && valueScore(legs[alt]) >= valueScore(legs[seed]) + DOG_DC_EDGE) seed = alt;
-      if (seed) chosen.unshift(seed);
+      if (seed) {
+        chosen.unshift(seed);
+        whyById[seed] = { role: "seed", seed: seed === alt ? "underdog" : "favourite",
+                          ...(seed === alt && legs[`res:${fav}`]
+                              ? { over: legs[`res:${fav}`].label || null,
+                                  edge: +(valueScore(legs[alt]) - valueScore(legs[`res:${fav}`])).toFixed(3) }
+                              : {}) };
+      }
     }
     const keep = new Set(chosen);
     let m = maskOf(legs, chosen, n);
@@ -2451,7 +2469,7 @@
       const nPlayers = Object.values(perPlayer).reduce((s, x) => s + x, 0), nMatch = chosen.length - nPlayers;
       let want = nPlayers < minPlayers || nMatch >= maxMatch ? "player" : null;
       if (focus === "Match") want = "match";
-      let best = null, bestScore = null;
+      let best = null, bestScore = null, bestWhy = null;
       // Each candidate is judged by the chance the WHOLE ticket lands at your price:
       // a leg that reaches the target now counts at its own chance; one that doesn't
       // counts as if the rest were made of typical safe legs (about 1.35 at Bet365,
@@ -2469,6 +2487,9 @@
       let bestPass = -1;
       for (const allowed of passes) {
         bestPass++;
+        // Reset per pass: only the pass that actually produced the pick says
+        // anything true about how hard the choice was.
+        let considered = 0, second = null;
         for (const leg of all) {
           if (chosen.includes(leg.id) || banned.has(leg.id) || groups.has(leg.group) || leg.low_data || (leg.extra && !extras)) continue;
           if (noResult && leg.group === "result") continue;   // Stats: the match has to carry it
@@ -2516,9 +2537,20 @@
           const fPen = formPenalty(leg);
           const score = picks === "value" ? [reaches ? 1 : 0, valueScore(leg) * fPen - (1 - t), cond]
             : feasible ? [1, joint * t * fPen * SAFE_P ** need] : [0, step];
-          if (!bestScore || isBetter(score, bestScore)) { best = leg.id; bestScore = score; }
+          considered++;
+          if (!bestScore || isBetter(score, bestScore)) {
+            if (best) second = { id: best, score: bestScore };
+            best = leg.id; bestScore = score;
+            bestWhy = { trust: +t.toFixed(3), form: +fPen.toFixed(3), cond: +cond.toFixed(4), reaches };
+          } else if (!second || isBetter(score, second.score)) second = { id: leg.id, score };
         }
-        if (best) break;
+        if (best) {
+          bestWhy = { role: "picked", criterion: picks, pass: bestPass, considered, ...bestWhy,
+                      // The leg it displaced, by name. "Ranked first of 23" is a
+                      // claim about a list you cannot see; "beat X" is checkable.
+                      ...(second && legs[second.id] ? { over: legs[second.id].label || null } : {}) };
+          break;
+        }
       }
       // A Mix build that could only get its next player leg as a 2nd guessed
       // price: fewer player legs instead (a priced match leg next).
@@ -2532,6 +2564,7 @@
         break;
       }
       chosen.push(best);
+      if (bestWhy) whyById[best] = bestWhy;
       chosen = pruneImplied(legs, chosen, keep, n);
       m = maskOf(legs, chosen, n);
       // A leg the prune throws straight back out — one the ticket already implies,
@@ -2539,7 +2572,7 @@
       // for ever (the page would hang). Leave it out of this build for good.
       if (!chosen.includes(best)) banned = new Set([...banned, best]);
     }
-    return evaluate(legs, chosen);
+    return evaluate(legs, chosen, whyById);
   }
 
   // ---------------------------------------------------------------------------

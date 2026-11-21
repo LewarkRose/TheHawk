@@ -907,7 +907,14 @@
       return;
     }
     const byId = new Map((S.m.legs || []).map((l) => [l.id, l]));
-    const legs = t.legs.map((l) => byId.get(l.id)).filter(Boolean);
+    // The ticket row carries WHY the builder took this leg; byId carries what
+    // the leg IS. The card needs both, and mapping straight to byId threw the
+    // first away — which is why it could only ever describe a leg, never
+    // justify it.
+    const legs = t.legs.map((l) => {
+      const g = byId.get(l.id);
+      return g ? { ...g, why: l.why || null, cond: l.cond } : null;
+    }).filter(Boolean);
     // put it straight in the slip — the slip is what prices it
     S.slip = legs.map((l) => l.id);
     markets();
@@ -987,6 +994,84 @@
     $("#abN").textContent = nth ? `option ${nth} of ${abOpts.length || 1}` : `${plural(legs.length, "leg")} at ${odds(t.fair)}`;
   }
 
+  /* WHY THE FOOTBALL SAYS SO — the model's own numbers for this leg, not the
+     market's. Everything here comes off m.expected, which the simulation
+     produces before any price is looked at: goals, shots, shots on target,
+     corners and cards per side. The leg card could already say what a leg is
+     worth and which way the money moved; it could not say the one thing HAWK
+     is actually for, which is what it thinks will HAPPEN.
+
+     Returns null when there is nothing true to say for that market, and the
+     line is left out rather than padded. */
+  function abReason(l) {
+    const m = S.m || {}, X = m.expected || {};
+    if (!X.goals) return null;
+    const n1 = (x) => (Math.round(x * 10) / 10).toFixed(1);
+    const sum = (v) => (Array.isArray(v) ? v[0] + v[1] : v);
+    const nm = (side) => esc(side === "home" ? m.home : m.away);
+    const side = l.side === "away" ? 1 : 0, foe = side ? 0 : 1;
+    const mk = String(l.market || "");
+
+    if (l.kind === "player") {
+      const bits = [];
+      // His own record at THIS threshold, which is the thing the chance is
+      // shrunk towards — 6 games is the floor the builder's form penalty uses.
+      if (l.games >= 3)
+        bits.push(`<b>${l.hits} of his last ${l.games}</b> ${l.basis === "starts" ? "starts" : "games"}`);
+      // and the volume he is working from in THIS match
+      if (/Saves/.test(mk) && X.sot) bits.push(`HAWK expects ${n1(X.sot[foe])} on target against him`);
+      else if (/Shots on Target/.test(mk) && X.sot) bits.push(`HAWK expects ${n1(X.sot[side])} on target from ${nm(l.side)}`);
+      else if (/Shots/.test(mk) && X.shots) bits.push(`HAWK expects ${n1(X.shots[side])} shots from ${nm(l.side)}`);
+      else if (/Score|Assist/.test(mk) && X.goals) bits.push(`HAWK expects ${n1(X.goals[side])} goals from ${nm(l.side)}`);
+      else if (/Booked|Card/.test(mk) && X.cards) bits.push(`HAWK expects ${n1(X.cards[side])} cards for ${nm(l.side)}`);
+      return bits.length ? bits.join(", and ") + "." : null;
+    }
+
+    // A team-stat line: the expectation against the number the leg needs. The
+    // id carries the line and the direction (corners:o5.5), so this does not
+    // have to parse the label.
+    const hit = /:([ou])(\d+(?:\.\d+)?)/.exec(String(l.id || ""));
+    const pool = /Team Corners|Most Corners/.test(mk) ? (X.cornersTeam || [])[side]
+      : /Corners/.test(mk) ? X.corners
+      : /Team Cards/.test(mk) ? (X.cards || [])[side]
+      : /Cards/.test(mk) ? sum(X.cards)
+      : /Shots on Target/.test(mk) ? sum(X.sot)
+      : /Team Goals/.test(mk) ? X.goals[side]
+      : /Total Goals|Goals/.test(mk) && !/1st Half|2nd Half/.test(mk) ? sum(X.goals) : null;
+    if (hit && pool != null) {
+      const line = +hit[2], over = hit[1] === "o", gap = over ? pool - line : line - pool;
+      const what = /Cards/.test(mk) ? "cards" : /Corners/.test(mk) ? "corners"
+        : /Shots on Target/.test(mk) ? "shots on target" : "goals";
+      // The COUNT it needs, not the line it is quoted on. "Under 3.5 — needs
+      // 3.5 or fewer" is how a price is written, not how a match is counted,
+      // and this whole line exists to talk about the match. Half lines only;
+      // a whole line can push, so it keeps the literal phrasing.
+      const half = Math.abs(line % 1 - 0.5) < 1e-9;
+      const needs = half ? (over ? `<b>${Math.floor(line) + 1} or more</b>` : `<b>${Math.ceil(line) - 1} or fewer</b>`)
+                         : (over ? `more than ${line}` : `${line} or fewer`);
+      return `HAWK expects <b>${n1(pool)}</b> ${what} here; this needs ${needs} \u2014 ${
+        gap >= 0 ? `<b>${n1(Math.abs(gap))} the right side</b> of the line`
+                 : `${n1(Math.abs(gap))} the wrong side, so it is leaning on the spread`}.`;
+    }
+
+    // Half markets. `expected` carries the MATCH totals only, so there is no
+    // half-time expectation to quote and inventing one by halving the match is
+    // simply wrong — goals are not spread evenly across the two halves. What is
+    // true, and worth saying, is where the number does come from.
+    if (/1st Half|2nd Half/.test(mk) && X.goals)
+      return `HAWK expects <b>${n1(sum(X.goals))}</b> goals in the match; the half is taken from the
+        simulation of it, not from a line of its own.`;
+
+    // The result family, and anything else decided by goals.
+    if (/Result|Double Chance|Draw No Bet|Both Teams|Clean Sheet|Win to Nil|Handicap|Correct Score|Winning Margin|First Team to Score|To Qualify/.test(mk)) {
+      const f = m.form || {};
+      return `HAWK's goals model: <b>${n1(X.goals[0])}</b> ${esc(m.home)} \u2014
+        <b>${n1(X.goals[1])}</b> ${esc(m.away)}${
+        f.home && f.away ? `, on recent form ${esc(f.home)} v ${esc(f.away)}` : ""}.`;
+    }
+    return null;
+  }
+
   /* One leg, and the reasons it is on the ticket. Four lines at most, and
      each one is left out when there is nothing true to say — a leg with no
      bookmaker price gets no price line rather than a row of dashes. */
@@ -1000,11 +1085,49 @@
       epAdds ? `, plus ${pct(epAdds, 1)} from Early Payout (paid once that side goes two goals up)
                 = <b>${pct(l.p, 0)}</b>` : ""}.</span></li>`);
 
-    // 2. why it is in this position
-    lines.push(`<li><i>🔗</i><span>${i === 0
-      ? "The first leg — the others are picked to go with it."
-      : `Picked to sit with ${n === 2 ? "the other one" : "the legs above"}: HAWK prices them together,
-         not one after another.`}</span></li>`);
+    // 1b. what HAWK thinks will happen. Before the price, before the move:
+    //     this is the model's own read, and it is the reason the chance above
+    //     is what it is.
+    const reason = abReason(l);
+    if (reason) lines.push(`<li><i>🧠</i><span>${reason}</span></li>`);
+
+    // 2. why it is in this position, and — when autoBuild recorded it — why
+    //    THIS leg rather than one of the other forty. Every other line on this
+    //    card describes the leg; a description is not a reason, and the build
+    //    knew the reason and dropped it. A hand-picked leg carries no `why` at
+    //    all and gets the old line, because nothing chose it but you.
+    const w = l.why;
+    if (w && w.role === "seed") {
+      lines.push(`<li><i>🥇</i><span>${w.seed === "underdog"
+        ? `Opened on the <b>underdog</b>: the upset radar is live on this match, and ${esc(S.book)}
+           pays enough more for this than for ${w.over ? `\u201c${esc(w.over)}\u201d` : "the favourite's leg"}${
+           w.edge ? ` (${(w.edge * 100).toFixed(0)} points better on value)` : ""}
+           that HAWK started from it instead.`
+        : `Opened on the <b>favourite</b> — the build starts from the result leg and fits the rest
+           around it.`}</span></li>`);
+    } else {
+      lines.push(`<li><i>🔗</i><span>${i === 0
+        ? "The first leg — the others are picked to go with it."
+        : `Picked to sit with ${n === 2 ? "the other one" : "the legs above"}: HAWK prices them together,
+           not one after another.${l.cond != null && l.p > 0 && Math.abs(l.cond - l.p) >= 0.02
+             ? ` <b>${pct(l.p, 0)}</b> on its own, <b>${pct(l.cond, 0)}</b> once they land \u2014 they
+                 ${l.cond > l.p ? "pull together" : "pull against each other"}.` : ""}`}</span></li>`);
+    }
+    // 2b. the choice itself
+    if (w && w.role === "picked") {
+      // "likely" is a statement about the football — the chance the whole
+      // ticket lands. Only "value" is a statement about the bookmaker, and it
+      // says so rather than dressing itself up as analysis.
+      const how = w.criterion === "value" ? `how far ${esc(S.book)}'s price sits above what it is worth`
+                                          : "how likely it leaves the whole ticket to land";
+      lines.push(`<li><i>🥇</i><span>${w.considered <= 1
+        ? `The only leg that still fitted at this point in the ticket.`
+        : `Picked ${w.over ? `over \u201c${esc(w.over)}\u201d ` : ""}from <b>${w.considered}</b> legs that
+           fitted here, on ${how}.`}${
+        w.pass > 0 ? ` It has no ${esc(S.book)} price of its own, so it took the ticket's one estimated-price slot.` : ""}${
+        w.trust < 1 ? ` HAWK's record in this market has been shaky lately (trust ${w.trust}) and it won the slot anyway.` : ""}${
+        w.form < 1 ? ` His own recent record counted against it and it still came first.` : ""}</span></li>`);
+    }
 
     // 3. the price against what HAWK thinks it is worth
     if (l.bookPrice > 1 && fair > 1) {

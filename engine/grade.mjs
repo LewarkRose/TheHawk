@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import * as FotMob from "./fotmob.mjs";
 import * as ESPN from "./espn.mjs";
 import * as Archive from "./archive.mjs";
+import * as BookDepth from "./bookdepth.mjs";
 import { closingChanceFor, closingChancesAll } from "./grade-demargin.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -1256,6 +1257,13 @@ for (const [id, pr] of Object.entries(state.pending)) {
   }
 }
 
+// The per-league record of which markets the price book prices. Kept in state
+// beside everything else, so it inherits the cache-then-live recovery; the
+// derived table is published separately for the browser to read.
+const depth = (state.bookDepth && state.bookDepth.ver === BookDepth.DEPTH_VERSION)
+  ? state.bookDepth : BookDepth.newDepth();
+let depthFolded = 0;
+
 // 2. Save HAWK's chances for matches kicking off soon (the latest run before
 // kick-off wins, so lineups and prices are as fresh as possible).
 for (const league of HAWK.LEAGUES) {
@@ -1272,6 +1280,13 @@ for (const league of HAWK.LEAGUES) {
       try { builders = sampleBuilders(f.id); }
       catch (e) { console.warn(`[grade] builders skipped for ${f.home} v ${f.away}: ${e.message}`); }
       builtTickets += builders.length;
+      // Which markets the price book actually priced on this fixture. Free:
+      // m.legs already carries the bookPrice odds365() found, so this counts
+      // what is in hand rather than asking for anything. See
+      // engine/bookdepth.mjs for why a market absent in one league is not the
+      // same fact as a market the feed cannot see anywhere.
+      try { if (BookDepth.fold(depth, league, m.legs)) depthFolded++; }
+      catch (e) { console.warn(`[grade] bookdepth skipped for ${f.home} v ${f.away}: ${e.message}`); }
       state.pending[String(f.id)] = {
         league, home: f.home, away: f.away, kickoff: f.kickoff, at: new Date().toISOString(),
         // The derby flag HAWK priced this match with. Recorded so the card total
@@ -1319,6 +1334,25 @@ const pendingBuilders = Object.values(state.pending || {}).filter((p) => (p.buil
 const storedTickets = pendingBuilders.reduce((a, p) => a + p.builders.length, 0);
 state.builderSeen = (state.builderSeen || 0) + builtTickets;
 if (!state.builderSince && builtTickets) state.builderSince = new Date().toISOString();
+// The market-depth table, written before the state for the same reason the
+// archive is: the tally it updates has to be the one that gets saved.
+state.bookDepth = depth;
+const depthReport = BookDepth.report(depth);
+try {
+  await mkdir(path.join(ROOT, "data"), { recursive: true });
+  await writeFile(path.join(ROOT, "data", "bookdepth.json"),
+    JSON.stringify({ ver: depthReport.ver, updated: new Date().toISOString(),
+                     minFixtures: BookDepth.MIN_FIXTURES, absent: depthReport.absent }));
+  console.log(`[grade] BOOKDEPTH: ${depthFolded} fixture(s) counted this run, `
+    + `${depthReport.cells} league/market cells, up to ${depthReport.maxSeen} fixtures each, `
+    + `${depthReport.absentCount} market(s) confirmed unpriced in `
+    + `${Object.keys(depthReport.absent).length} league(s)`);
+  for (const [lg, ms] of Object.entries(depthReport.absent))
+    console.log(`[grade]   ${lg}: no ${ms.join(", ")}`);
+} catch (e) {
+  console.log(`[grade] BOOKDEPTH: skipped (${e.message})`);
+}
+
 // The archive, written BEFORE the state so that the row counts it updates are the
 // ones saved. `counts` is this run's only defence against silently truncating the
 // file — see engine/archive.mjs.
@@ -1378,6 +1412,12 @@ await writeFile(path.join(ROOT, "data", "graded.json"), JSON.stringify({
   keyBands: T.keyBands || {},
   recent: T.recent.slice(0, KEEP_RECENT), upsets: T.upsets, upsetNet: T.upsetNet || [],
   statFit: T.statFit || {}, byLeagueKey: publishedLeagueKeys(),
+  // Which markets the price book does not price, per league. The builder reads
+  // data/bookdepth.json rather than this; this is so the Board can show the
+  // evidence behind it — how many fixtures each verdict rests on.
+  bookDepth: { ver: depthReport.ver, leagues: depthReport.leagues, cells: depthReport.cells,
+               maxSeen: depthReport.maxSeen, minFixtures: BookDepth.MIN_FIXTURES,
+               absent: depthReport.absent, at: "data/bookdepth.json" },
   // Where the per-match rows are, and how many. The rows themselves are NOT here —
   // the builder downloads this file on every visit. See engine/archive.mjs.
   // `refused` is published so the Action can ALERT on it. A guard nobody is told

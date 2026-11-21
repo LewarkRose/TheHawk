@@ -1019,7 +1019,7 @@
       if (fresh && fresh.fixtures) { cache.set(DATA_URL + "fixtures.json", { t: Date.now(), v: fresh }); meta = fresh.fixtures[id] || null; }
     }
     const fd = (meta && meta.fd) || {};
-    const [quotes365, detailResp, table, formH, formA, pm, profH, profA, playersH, playersA, recentH, recentA, espn, mfa, learnFile] = await Promise.all([
+    const [quotes365, detailResp, table, formH, formA, pm, profH, profA, playersH, playersA, recentH, recentA, espn, mfa, learnFile, depthFile] = await Promise.all([
       odds365(id), s365("game", { gameId: id }), standings(league), form(hc.id), form(ac.id),
       meta && meta.pm_slug ? polymarket(meta.pm_slug, home, away) : null,
       fd.home ? data(`profiles/${fd.home[0]}.json`) : null, fd.away ? data(`profiles/${fd.away[0]}.json`) : null,
@@ -1050,10 +1050,17 @@
       // on a box with nothing on 127.0.0.1:8000 this would have burned about
       // two seconds and three warnings on EVERY graded match.
       learningSet ? null : data("learn.json"),
+      // Measured per league, so it must be in hand before a single leg is
+      // priced -- the same reason learn.json is fetched here, on the same
+      // 30-minute cache. Unlike learn.json this is NOT skipped under
+      // learningSet: grade.mjs wants it too, because a leg it cannot price is
+      // a leg it should not be recording builds for either.
+      data("bookdepth.json"),
     ]);
     // Only a table that actually arrived counts, so a transient 404 leaves the
     // engine uncorrected (today's behaviour) and lets the next match retry.
     if (!learningSet && learnFile && learnFile.shifts) setLearning(learnFile.shifts);
+    if (depthFile && depthFile.absent) setBookDepth(depthFile.absent);
     // The same file carries which markets the builder should reach for LAST.
     // setTrust had existed since the rebuild with no caller at all, so `trust`
     // was always {} and every market scored alike — a market whose correction
@@ -1076,6 +1083,12 @@
     if (pm) quotes.push({ book: "Polymarket", type: 1, market: "Full Time Result", value: "", source: "Polymarket",
                           prices: { 1: 1 / pm.home, X: 1 / pm.draw, 2: 1 / pm.away } });
     const cons = consensus(quotes);
+    // priceBookMissing only ever asked whether the book is in the feed AT ALL,
+    // which is yes for every league HAWK carries. This is the other half of the
+    // question: it is here, and it does not price some of what HAWK models.
+    const offBookHere = bookDepth[league] || [];
+    if (offBookHere.length)
+      warnings.push(`${PRICE_BOOK} doesn't price ${offBookHere.join(", ").toLowerCase()} in this league — HAWK still works those out, but there is no price to back them at, so they are kept out of builds.`);
     if (!quotes.length) warnings.push("No odds found for this game on any source yet.");
     else if (priceBookMissing(quotes))
       warnings.push(`${PRICE_BOOK} isn't in the odds feed for this game — other bookmakers are, so the chances are fine, but anything that needs ${PRICE_BOOK}'s own price (the value rows, the pick, single bets) will be empty.`);
@@ -1985,6 +1998,20 @@
     learning = shifts && typeof shifts === "object" ? shifts : {};
     learningSet = true;
   }
+  // {league: [markets the price book does not price there]}, from
+  // data/bookdepth.json and measured by engine/bookdepth.mjs over real
+  // fixtures. It exists because this file charges an unpriced non-prop leg only
+  // UNPRICED_CUT, on the belief that Bet365 prices it and the feed merely
+  // missed it -- true in the Premier League, false in Malta, where Bet365
+  // carries seven markets and corners, cards and shots on target are not among
+  // them. Without this HAWK invents a price for those and builds a slip that
+  // cannot be placed anywhere. An empty table means every market is unknown,
+  // which is exactly the old behaviour -- and is also what a 404, an old deploy
+  // or a page opened offline gives.
+  let bookDepth = {};
+  function setBookDepth(table) { bookDepth = table && typeof table === "object" ? table : {}; }
+  const marketAbsent = (league, market) =>
+    !!(league && market && (bookDepth[league] || []).includes(market));
   // Trusted markets: {learnKey: factor} from HAWK's graded predictions (worked
   // out by the page). A factor under 1 marks a market where HAWK's chances
   // have landed less often than it said; auto-builds then prefer a similar
@@ -2215,6 +2242,8 @@
   // A leg Bet365 pays this little for adds nothing to the builder's price but can still lose it.
   const DEAD_PRICE = 1.03, FILLER_PRICE = 1.10;
   const valueScore = (leg) => {
+    // Unbackable, so it cannot be the best value on the board however it prices.
+    if (leg.offBook) return -1;
     const est = leg.bookPrice > 1 ? null : propEstimate(leg);
     return (leg.bookPrice > 1 ? leg.bookPrice * leg.p - 1 : est ? est * leg.p - 1 : UNPRICED_EDGE) + (leg.agree === true ? 0.015 : leg.agree === false ? -0.015 : 0);
   };
@@ -2381,7 +2410,11 @@
     // room for the opening result leg — and only ever downwards, so Mix's floor of
     // two is untouched at any size it was already reachable at.
     minPlayers = Math.max(1, Math.min(minPlayers, maxLegs - 1));
-    const all = Object.values(legs);
+    // Legs the price book does not offer in this league are not candidates: a
+    // build is a thing you go and place. Locking one still works, because
+    // `chosen` takes locked legs by id below -- asking for one explicitly is a
+    // choice, having one chosen for you is a bug.
+    const all = Object.values(legs).filter((l) => !l.offBook);
     if (!all.length) return evaluate(legs, []);
     const n = all[0].arr.length;
     const noResult = NO_RESULT.has(focus);
@@ -2753,6 +2786,10 @@
     for (const [id, leg] of Object.entries(legs)) {
       leg.bookPrice = prices[id] || null; leg.bookOpen = opens[id] || null;
       leg.agree = marketAgrees(leg);
+      // No price, AND the book is measured not to price this market in this
+      // league. The leg is real and HAWK's number for it is real; what does not
+      // exist is anywhere to back it. Shown, never built on.
+      if (!leg.bookPrice && marketAbsent(an.league, leg.market)) leg.offBook = true;
     }
     const legJSON = Object.values(legs).map(({ arr, ...rest }) => rest);
     const value = legJSON.filter((l) => l.bookPrice && l.bookPrice > l.fair * 1.02)
@@ -4009,7 +4046,7 @@
   // edge this app's own record says does not predict. priceRows stays on _internals,
   // where it is a debugging handle rather than something the pages read.
 
-  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, INTL: [...INTL], MODEL_VERSION, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, refOff, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
+  global.HAWK = { LEAGUES, LEAGUE_GROUPS, COMPETITIONS, INTL: [...INTL], MODEL_VERSION, fixtures, match, build, buildOptions, evaluate: evaluateBody, lineups, livePrices, legPrices, setLearning, setTrust, setBookDepth, setEarlyPayout, setPropBook, setAim, propEstimate, propKey, refOff, DEAD_PRICE, REF_TO_B365, h2h, learnKey, liveMatch,
                   // one definition of "his form disagrees with the chance", shared
                   // by the builder's leg score and the card's verdict
                   formZ, formPenalty, FORM_SOFT_Z, FORM_HARD_Z,

@@ -182,6 +182,22 @@ jobs:
                   if ar.get("refused"):
                       lines.append(f"  - ⚠️ **{ar['refused']} month(s) REFUSED** — a month file read back short; nothing overwritten, this run's rows for it are lost")
                       m.setdefault("alerts", []).append("archive truncation refused")
+              # Which markets the price book does not price, per league
+              # (engine/bookdepth.mjs). A market only lands here after
+              # minFixtures sightings with no price AND having been seen priced
+              # in some other league, so a growing list is a measurement, not a
+              # fault. Worth reading because it silently REMOVES legs from
+              # builds: if it ever named a market HAWK should be building, this
+              # line is where that would show up first.
+              bd = g.get("bookDepth") or {}
+              if bd.get("cells"):
+                  lines.append(f"- Book depth: {bd.get('cells', 0)} league/market cells, "
+                               f"up to {bd.get('maxSeen', 0)} fixtures each "
+                               f"(confirmed at {bd.get('minFixtures', 0)}); "
+                               f"{sum(len(v) for v in (bd.get('absent') or {}).values())} market(s) unpriced "
+                               f"in {len(bd.get('absent') or {})} league(s)")
+                  for lg, ms in sorted((bd.get("absent") or {}).items()):
+                      lines.append(f"  - {lg}: no {', '.join(ms)}")
               e3 = g.get("espn") or {}
               if e3.get("matches"):
                   sil = sum((f.get("silentZero", 0) + f.get("silentNonZero", 0)) for f in (e3.get("fields") or {}).values())

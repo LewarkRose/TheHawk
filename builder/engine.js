@@ -3113,6 +3113,31 @@
       const e = await espnLineups(LEAGUE_OF[g.competitionId], g.homeCompetitor.name, g.awayCompetitor.name, new Date(g.startTime)).catch(() => null);
       if (e && e.confirmed) { confirmed = true; source = "ESPN"; }
     }
+    // Still nothing, and it is Malta? Then ask the federation, which is the ONLY
+    // source that has it: 365Scores carries about one Maltese game in five and
+    // ESPN dropped Malta after 2024/25, so neither branch above can ever fire
+    // there. match() has fetched the MFA since 12 Nov and this did not, so the
+    // two disagreed about the same fixture: the match page showed all eleven
+    // from the federation while the Scores page's XI mark sat dim, captioned
+    // "Lineups not out yet". Measured 21 Nov 13:25 UTC, 35 minutes before
+    // Valletta v Floriana -- lineups() returned confirmed:false and xi 0+0
+    // against the MFA's 11+11, and the row sat with the five unconfirmed ones.
+    let mfaXi = null;
+    if (!confirmed && g.startTime && g.homeCompetitor && g.awayCompetitor
+        && MFA_COMPETITIONS[LEAGUE_OF[g.competitionId]]) {
+      const ko = new Date(g.startTime), now = Date.now();
+      // Same window match() uses: from four hours before kick-off to three
+      // after, because an in-play page wants the real eleven too.
+      if (ko.getTime() - now < 4 * 3600e3 && now - ko.getTime() < 3 * 3600e3) {
+        const mm = await mfaLineups(LEAGUE_OF[g.competitionId], g.homeCompetitor.id, g.awayCompetitor.id, ko).catch(() => null);
+        if (mm) {
+          confirmed = true; source = "Malta FA";
+          st.home = st.away = "Confirmed";    // keep the object coherent with `confirmed`
+          mfaXi = { home: (mm.home || []).filter((p) => p.start).map((p) => p.name),
+                    away: (mm.away || []).filter((p) => p.start).map((p) => p.name) };
+        }
+      }
+    }
     // The starting names as well as the status. Comparing a confirmed XI against
     // the players already on your slip costs nothing — no simulation, no second
     // request — so the page can say WHICH leg just died the instant the lineups
@@ -3129,6 +3154,10 @@
         .filter((p) => String(p.statusText) === "Starting")
         .map((p) => names[p.id] || names[p.athleteId] || "")
         .filter(Boolean);
+    // The federation's names when they are the ones that confirmed it. Without
+    // this the caller is told "confirmed" and handed an empty XI, so the alert
+    // that says WHICH leg just died has nothing to compare a slip against.
+    if (mfaXi) { xi.home = mfaXi.home; xi.away = mfaXi.away; }
     // The kick-off goes back with it. 365Scores reports lineups as a STATUS and
     // never says when they were confirmed, so nothing downstream can honestly
     // print "confirmed 20 minutes ago" — it only knows when it looked. What it

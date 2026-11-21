@@ -31,14 +31,26 @@
     return xs[xs.length - 1] === ys[ys.length - 1] && xs[0][0] === ys[0][0];
   };
 
-  /* Every outfielder in one line means nobody published where they play. The
-     Malta FA says only whether a man is a keeper, so engine/malta.py writes
-     every other man "M" and all ten arrive in the midfield bucket. Tested on the
-     shape of the XI rather than on the league: any source without positions
-     lands here, and a real 5-4-1 never puts eight men in a line. */
-  const noPositions = (list) => {
-    const out = (list || []).filter((p) => p.status === "Starting" && !p.field && p.pos !== "G");
-    return out.length >= 8 && out.every((p) => p.pos === "M");
+  /* A line holding more than five men is not a line. It is everyone HAWK could
+     not place, piled at one depth, and ten markers on one rank overlap their
+     own names.
+
+     This was first written to test that EVERY outfielder read "M" — the pure
+     Malta case, where the federation publishes only who keeps goal and
+     engine/malta.py writes every other man "M". That predicate was wrong, and
+     Valletta v Floriana on 21 Nov is why: one defender, one forward and EIGHT
+     midfielders, because eleven of Valletta's squad carry a NULL position that
+     falls through to "M" in engine.js. Two men with a real position were enough
+     to defeat `every`, and the pile-up went straight through the guard.
+
+     So test the symptom, not the cause. A genuine 5-4-1 has five in a line and
+     passes; nothing real has six. */
+  const OVERFULL = 5;
+  const overloaded = (list) => {
+    const n = { G: 0, D: 0, M: 0, F: 0 };
+    for (const p of (list || []).filter((x) => x.status === "Starting" && !x.field))
+      n[n[p.pos] === undefined ? "M" : p.pos]++;
+    return Object.values(n).some((c) => c > OVERFULL);
   };
 
   /* where each starter stands. A player with a `field` position from the feed
@@ -51,22 +63,18 @@
       else (byLine[p.pos] || byLine.M).push(p);
     }
     const depthOf = { G: 0, D: 28, M: 58, F: 88 };
-    if (noPositions(list)) {
-      // Ten markers on one rank overlap their own names, so they go in two.
-      // Deliberately NOT a formation: HAWK does not know who defends here, and
-      // a 4-3-3 invented to fill the pitch would be read off the card as fact.
-      // A block straddling halfway says "eleven men, positions unpublished",
-      // which is the true claim. Shirt order, the only order the feed gives.
-      const ps = byLine.M, front = Math.ceil(ps.length / 2);
-      ps.forEach((p, i) => {
-        const back = i >= front, j = back ? i - front : i, n = back ? ps.length - front : front;
-        out.push({ p, depth: back ? 72 : 44, side: n === 1 ? 50 : 10 + (80 * j) / (n - 1) });
-      });
-      byLine.M = [];
-    }
+    const rank = (ps, depth) => ps.forEach((p, i) => out.push({ p, depth,
+      side: ps.length === 1 ? 50 : 10 + (80 * i) / (ps.length - 1) }));
     for (const [pos, ps] of Object.entries(byLine)) {
-      ps.forEach((p, i) => out.push({ p, depth: depthOf[pos],
-        side: ps.length === 1 ? 50 : 10 + (80 * i) / (ps.length - 1) }));
+      if (ps.length <= OVERFULL) { rank(ps, depthOf[pos]); continue; }
+      // Split across two ranks straddling that line's own depth. Deliberately
+      // NOT a formation: HAWK does not know which of these defends, and a shape
+      // invented to fill the pitch is read off the card as fact. Two even ranks
+      // say "these men, positions unknown", which is the true claim. Shirt
+      // order, because it is the only order the feed gives.
+      const front = Math.ceil(ps.length / 2);
+      rank(ps.slice(0, front), Math.max(4, depthOf[pos] - 14));
+      rank(ps.slice(front), Math.min(96, depthOf[pos] + 14));
     }
     return out;
   }
@@ -256,10 +264,10 @@
         live ? `<span class="d"></span>` : ""}${esc(status)}</div>
       ${diffNote && !live ? `<p class="note" style="margin:14px 0 0">ESPN names someone else:
         ${diffNote} — HAWK went with 365Scores.</p>` : ""}
-      ${["home", "away"].some((s) => noPositions(m.players[s] || [])) ? `<p class="note" style="margin:14px 0 0">
-        Nobody publishes outfield positions in this competition — only who keeps goal. The eleven is
-        right; where they stand is not a formation, and HAWK prices each man off the average
-        outfielder here plus his own record.</p>` : ""}
+      ${["home", "away"].some((s) => overloaded(m.players[s] || [])) ? `<p class="note" style="margin:14px 0 0">
+        Some of these players have no published position, so HAWK has grouped them rather than placed
+        them — that block is not a formation. The eleven itself is right, and a man HAWK cannot place
+        is priced off the average outfielder in this match plus his own record.</p>` : ""}
       <div class="stage3d${flat ? "" : " p3d"}" style="--rx:${view.rx}deg;--rz:${view.rz}deg">
         <div class="pitch">
           <svg class="pl-h" viewBox="0 0 160 100" preserveAspectRatio="none"><rect x="1" y="1" width="158" height="98"/>

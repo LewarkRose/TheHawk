@@ -1013,23 +1013,39 @@
     const mk = String(l.market || "");
 
     if (l.kind === "player") {
+      // His own numbers, not the market's. `has_data` is the gate: without it
+      // sh90 and friends are the POSITION prior, and printing a league average
+      // as "he averages" would be the card inventing a record for a man who
+      // has none.
+      const P = ((m.players || {})[l.side === "away" ? "away" : "home"] || [])
+        .find((x) => x && x.name === l.player) || null;
+      const rate = P && P.has_data
+        ? (/Saves/.test(mk) ? P.sv90 : /Shots on Target/.test(mk) ? P.sot90
+          : /Shots/.test(mk) ? P.sh90 : /Score|Assist/.test(mk) ? P.g90
+          : /Booked|Card/.test(mk) ? P.c90 : null) : null;
+      const unit = /Saves/.test(mk) ? "saves" : /Shots on Target/.test(mk) ? "on target"
+        : /Shots/.test(mk) ? "shots" : /Score|Assist/.test(mk) ? "goals" : "cards";
       const bits = [];
-      // His own record at THIS threshold, which is the thing the chance is
-      // shrunk towards — 6 games is the floor the builder's form penalty uses.
-      if (l.games >= 3)
-        bits.push(`<b>${l.hits} of his last ${l.games}</b> ${l.basis === "starts" ? "starts" : "games"}`);
+      if (rate) bits.push(`<b>${n1(rate)}</b> ${unit} per 90${
+        P.minutes ? ` over ${Math.round(P.minutes)} minutes` : ""}`);
+      if (l.games >= 3) bits.push(`<b>${l.hits} of his last ${l.games}</b> ${
+        l.basis === "starts" ? "starts" : "games"}`);
+      if (!bits.length && P && !P.has_data)
+        bits.push(`no record for him yet, so this is the average for a ${
+          P.pos === "G" ? "keeper" : P.pos === "D" ? "defender" : P.pos === "F" ? "forward" : "midfielder"}`);
       // and the volume he is working from in THIS match
       if (/Saves/.test(mk) && X.sot) bits.push(`HAWK expects ${n1(X.sot[foe])} on target against him`);
       else if (/Shots on Target/.test(mk) && X.sot) bits.push(`HAWK expects ${n1(X.sot[side])} on target from ${nm(l.side)}`);
       else if (/Shots/.test(mk) && X.shots) bits.push(`HAWK expects ${n1(X.shots[side])} shots from ${nm(l.side)}`);
       else if (/Score|Assist/.test(mk) && X.goals) bits.push(`HAWK expects ${n1(X.goals[side])} goals from ${nm(l.side)}`);
       else if (/Booked|Card/.test(mk) && X.cards) bits.push(`HAWK expects ${n1(X.cards[side])} cards for ${nm(l.side)}`);
-      return bits.length ? bits.join(", and ") + "." : null;
+      // "a, and b, and c" reads like a list that forgot it was a sentence.
+      // Commas between, one "and" before the last.
+      return bits.length
+        ? (bits.length > 1 ? bits.slice(0, -1).join(", ") + " and " + bits[bits.length - 1] : bits[0]) + "."
+        : null;
     }
 
-    // A team-stat line: the expectation against the number the leg needs. The
-    // id carries the line and the direction (corners:o5.5), so this does not
-    // have to parse the label.
     const hit = /:([ou])(\d+(?:\.\d+)?)/.exec(String(l.id || ""));
     const pool = /Team Corners|Most Corners/.test(mk) ? (X.cornersTeam || [])[side]
       : /Corners/.test(mk) ? X.corners
@@ -1042,35 +1058,55 @@
       const line = +hit[2], over = hit[1] === "o", gap = over ? pool - line : line - pool;
       const what = /Cards/.test(mk) ? "cards" : /Corners/.test(mk) ? "corners"
         : /Shots on Target/.test(mk) ? "shots on target" : "goals";
-      // The COUNT it needs, not the line it is quoted on. "Under 3.5 — needs
-      // 3.5 or fewer" is how a price is written, not how a match is counted,
-      // and this whole line exists to talk about the match. Half lines only;
-      // a whole line can push, so it keeps the literal phrasing.
       const half = Math.abs(line % 1 - 0.5) < 1e-9;
       const needs = half ? (over ? `<b>${Math.floor(line) + 1} or more</b>` : `<b>${Math.ceil(line) - 1} or fewer</b>`)
                          : (over ? `more than ${line}` : `${line} or fewer`);
-      return `HAWK expects <b>${n1(pool)}</b> ${what} here; this needs ${needs} \u2014 ${
+      // WHAT MOVES THAT NUMBER. A total on its own is a number; the thing that
+      // sets it is the reason. Cards are the referee's before they are anyone
+      // else's, and corners split unevenly between the sides.
+      const extra = [];
+      const ref = m.referee || {};
+      if (/Cards/.test(mk) && ref.avg != null && ref.name)
+        extra.push(`${esc(ref.name)} averages <b>${n1(ref.avg)}</b>${
+          ref.games ? ` over ${ref.games} games` : ""}`);
+      if (/Cards/.test(mk) && m.derby) extra.push(`a derby, which lifts the card total`);
+      if (/Corners/.test(mk) && !/Team|Most/.test(mk) && (X.cornersTeam || []).length === 2)
+        extra.push(`${nm("home")} ${n1(X.cornersTeam[0])}, ${nm("away")} ${n1(X.cornersTeam[1])}`);
+      return `HAWK expects <b>${n1(pool)}</b> ${what} here${extra.length ? ` (${extra.join("; ")})` : ""};
+        this needs ${needs} \u2014 ${
         gap >= 0 ? `<b>${n1(Math.abs(gap))} the right side</b> of the line`
                  : `${n1(Math.abs(gap))} the wrong side, so it is leaning on the spread`}.`;
     }
 
-    // Half markets. `expected` carries the MATCH totals only, so there is no
-    // half-time expectation to quote and inventing one by halving the match is
-    // simply wrong — goals are not spread evenly across the two halves. What is
-    // true, and worth saying, is where the number does come from.
     if (/1st Half|2nd Half/.test(mk) && X.goals)
       return `HAWK expects <b>${n1(sum(X.goals))}</b> goals in the match; the half is taken from the
         simulation of it, not from a line of its own.`;
 
-    // The result family, and anything else decided by goals.
     if (/Result|Double Chance|Draw No Bet|Both Teams|Clean Sheet|Win to Nil|Handicap|Correct Score|Winning Margin|First Team to Score|To Qualify/.test(mk)) {
-      const f = m.form || {};
-      return `HAWK's goals model: <b>${n1(X.goals[0])}</b> ${esc(m.home)} \u2014
-        <b>${n1(X.goals[1])}</b> ${esc(m.away)}${
-        f.home && f.away ? `, on recent form ${esc(f.home)} v ${esc(f.away)}` : ""}.`;
+      const f = m.form || {}, T = m.table || {};
+      const place = (k, side2) => (T[k] && T[k].position
+        ? `${nm(side2)} ${T[k].position}${["th","st","nd","rd"][(T[k].position % 100 - 20) % 10] || ["th","st","nd","rd"][T[k].position % 100] || "th"} on ${T[k].points}` : null);
+      const standings = (() => {
+        const ps = [place("home", "home"), place("away", "away")].filter(Boolean);
+        // "17th on 9, 8th on 16 on points" hung the unit off the end of the
+        // sentence. It belongs on the first figure, where it explains both.
+        return ps.length === 2 ? ps[0] + " points, " + ps[1] : ps[0] || "";
+      })();
+      // HOW MUCH OF THIS IS HAWK. mix.market is the weight given to the
+      // bookmakers' prices: at 1 the goals number is theirs outright and
+      // calling it "HAWK's model" would be the card taking credit for the book.
+      const mw = ((m.probs || {}).mix || {}).market;
+      const whose = mw == null ? ""
+        : mw >= 0.999 ? ` \u2014 all of it from the bookmakers' prices${
+            ((m.probs || {}).mix || {}).ignored ? `, because HAWK's own ratings disagreed too far to use` : `, HAWK having no usable ratings here`}`
+        : ` \u2014 ${Math.round((1 - mw) * 100)}% of it HAWK's own ratings, the rest the bookmakers' prices`;
+      return `${standings ? standings + ". " : ""}Expected goals
+        <b>${n1(X.goals[0])}</b> ${esc(m.home)} \u2014 <b>${n1(X.goals[1])}</b> ${esc(m.away)}${whose}${
+        f.home && f.away ? `. Recent form ${esc(f.home)} v ${esc(f.away)}` : ""}.`;
     }
     return null;
   }
+
 
   /* One leg, and the reasons it is on the ticket. Four lines at most, and
      each one is left out when there is nothing true to say — a leg with no

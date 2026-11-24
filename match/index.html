@@ -1098,12 +1098,19 @@
     //    all and gets the old line, because nothing chose it but you.
     const w = l.why;
     if (w && w.role === "seed") {
+      // The underdog swap is decided on PRICE, not on the upset radar. The
+      // radar is why the rule was built -- over 411 matches a "Very high"
+      // favourite fails 57.9% of the time while the underdog only wins 23.7%,
+      // so the live leg is the draw-inclusive one -- but the shipped condition
+      // never reads it. This line claimed it did. San Jose v Houston on 25 Nov
+      // had the radar at its LOWEST reading, level 0, and the card still said
+      // it was live. Say what the code actually does.
       lines.push(`<li><i>🥇</i><span>${w.seed === "underdog"
-        ? `Opened on the <b>underdog</b>: the upset radar is live on this match, and ${esc(S.book)}
-           pays enough more for this than for ${w.over ? `\u201c${esc(w.over)}\u201d` : "the favourite's leg"}${
-           w.edge ? ` (${(w.edge * 100).toFixed(0)} points better on value)` : ""}
-           that HAWK started from it instead.`
-        : `Opened on the <b>favourite</b> — the build starts from the result leg and fits the rest
+        ? `Opened on the <b>underdog</b>: better than even money on its own, and ${esc(S.book)}
+           prices it${w.edge ? ` <b>${(w.edge * 100).toFixed(1)} points</b>` : ""} closer to what HAWK
+           thinks it is worth than ${w.over ? `\u201c${esc(w.over)}\u201d` : "the favourite's leg"} —
+           enough that the build starts there instead.`
+        : `Opened on the <b>favourite's side</b> — the build starts there and fits the rest
            around it.`}</span></li>`);
     } else {
       lines.push(`<li><i>🔗</i><span>${i === 0

@@ -2462,14 +2462,22 @@
       const pick = (id, floor) => (legs[id] && !banned.has(id) && legs[id].p >= floor ? id : null);
       let seed = pick(`res:${fav}`, 0.5) || pick(`dc:${fav}`, 0.6);
       const alt = pick(`dc:${dog}`, DOG_DC_P);
+      // What the swap actually displaced. This used to report `res:fav`, which
+      // is only the seed when the favourite is better than even money to WIN.
+      // San Jose v Houston, 25 Nov: San Jose's win leg read 49%, missed the 0.5
+      // floor, and the seed fell through to "San Jose or Draw" -- so the card
+      // named a leg that was never in the running and measured the margin
+      // against it too. Capture the loser instead of re-deriving it.
+      const first = seed;
       if (seed && alt && legs[alt].bookPrice > 1 && legs[seed].bookPrice > 1
           && valueScore(legs[alt]) >= valueScore(legs[seed]) + DOG_DC_EDGE) seed = alt;
       if (seed) {
         chosen.unshift(seed);
-        whyById[seed] = { role: "seed", seed: seed === alt ? "underdog" : "favourite",
-                          ...(seed === alt && legs[`res:${fav}`]
-                              ? { over: legs[`res:${fav}`].label || null,
-                                  edge: +(valueScore(legs[alt]) - valueScore(legs[`res:${fav}`])).toFixed(3) }
+        const swapped = seed === alt && first && first !== alt;
+        whyById[seed] = { role: "seed", seed: swapped ? "underdog" : "favourite",
+                          ...(swapped && legs[first]
+                              ? { over: legs[first].label || null,
+                                  edge: +(valueScore(legs[alt]) - valueScore(legs[first])).toFixed(3) }
                               : {}) };
       }
     }

@@ -2404,6 +2404,20 @@
   }
   // known: legs in markets you've already found on Bet365 in this league (from builders you checked or logged).
   const SAFE_STEP = Math.log(1.35), SAFE_P = 0.72;
+  // COHERENCE. A leg whose chance FALLS once the legs above it land is betting
+  // against the ticket it is being added to. "Over 2.5 Goals" and "Both Teams
+  // to Score" and then "1st Half Under 2.5" is the shape: the goals come, but
+  // not early. It prices correctly -- joint already carries the correlation --
+  // and it reads as nonsense, because it is. The builder took it anyway: at 86%
+  // on its own it still scored well after the drag, and it lifted the price
+  // 1.39x, which is exactly what a leg picked to fill a gap looks like.
+  //
+  // FILLER_PRICE already throws out legs that add nothing. This throws out legs
+  // that add something by contradicting the rest. Set from the measured spread:
+  // over 44 legs in 12 builds only two fell this far, so it fires on the
+  // genuinely contradictory and leaves ordinary mild negative correlation --
+  // a favourite plus overs, say -- completely alone.
+  const COHERENCE_DROP = 0.05;
   function autoBuild(legs, target, style = "Balanced", maxLegs = 10, locked = [], banned = new Set(), favourite = true, focus = "Mix", extras = false, picks = "likely", known = new Set()) {
     const [lo, hi] = STYLES[style] || STYLES.Balanced;
     let [minPlayers, maxMatch] = FOCUS[focus] || FOCUS.Mix;
@@ -2514,6 +2528,8 @@
           for (let s = 0; s < n; s++) c += m[s] & a[s];
           const joint = (c / n) * adjNow * (leg.adj || 1), cond = joint / pNow;
           if (cond < lo || cond > hi) continue;
+          // and it must not argue with what is already on the slip
+          if (cond < leg.p - COHERENCE_DROP) continue;
           // trust is keyed on learnKey so a two-sided market is weighted per side;
           // falls back to the market name for props, where the two are the same.
           const pr = joint > 0 ? priceOf(legs, [...chosen, leg.id], joint) : 0, reaches = pr >= target,

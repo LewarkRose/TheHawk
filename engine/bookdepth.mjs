@@ -38,7 +38,12 @@
 // Absent everywhere means unknown, and unknown always means "carry on as before".
 
 export const MIN_FIXTURES = 8;          // evidence before a market is called absent
-export const DEPTH_VERSION = 1;
+// 2: the tally asks whether the BOOK carries the market, not whether HAWK's
+// own line matched. v1 answered the second question and published the first,
+// which is why it called Handicap absent in the Premier League. The bump is
+// load-bearing -- grade.mjs starts a fresh tally on a version it does not
+// recognise, and the v1 counts are contaminated by exactly this.
+export const DEPTH_VERSION = 2;
 
 export const newDepth = () => ({ ver: DEPTH_VERSION, leagues: {} });
 
@@ -52,8 +57,15 @@ export function fold(depth, league, legs) {
   for (const leg of legs) {
     // Props are the feed's known blind spot, never the book's. See above.
     if (!leg || !leg.market || leg.player || String(leg.id || "").startsWith("p:")) continue;
+    // bookMarketSeen, not just bookPrice. HAWK builds handicaps at 1.5 and
+    // 2.5; Bet365's Asian lines are -0.25, -0.5, -0.75. The market is right
+    // there and no HAWK leg can ever match a value, so counting prices alone
+    // read "Bet365 does not price handicaps in the Premier League" -- which
+    // it plainly does. Same for 2nd Half Result, absent in all 17 leagues
+    // that had any absence at all. A market the feed quotes at any line is a
+    // market the book offers.
     const had = byMarket.get(leg.market) || false;
-    byMarket.set(leg.market, had || leg.bookPrice > 1);
+    byMarket.set(leg.market, had || leg.bookPrice > 1 || leg.bookMarketSeen === true);
   }
   if (!byMarket.size) return 0;
   const lg = (depth.leagues[league] ||= {});

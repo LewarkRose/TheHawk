@@ -17,8 +17,17 @@
   --ink:#080809;            /* fighterready.com sits at rgb(8,8,8); so do we */
   --raise:#13141c;          /* a panel has to read as an object, not a hole */
   --text:#f2f2f2;
-  --muted:#8b8b95;
-  --faint:#55555f;
+  /* Measured, not chosen. --faint at #55555f ran 2.72:1 on --ink and 2.42:1
+     on the receipt's paper, against a 4.5:1 floor for body text, and it is
+     the site's second most-used text colour: 188 uses in this sheet, 184 of
+     them `color:`. Lifting the ground made it marginally worse, because a
+     lighter background closes on a mid-grey rather than opening away from it.
+     #7f7f89 is the smallest lift on the same hue that clears 4.5 on EVERY
+     surface here (5.05 / 4.83 / 4.63 / 4.50). --muted has to move with it or
+     the two collapse into one step; at #a7a7b1 the gap is 40 levels instead
+     of 54 and the three-step hierarchy survives. */
+  --muted:#a7a7b1;
+  --faint:#7f7f89;
   --rule:rgba(242,242,242,.08);
   --rule-2:rgba(242,242,242,.16);
   --navy:#6b8fe0;
@@ -1416,6 +1425,14 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
 
 .lu-legend{margin:16px 0 0;font-size:11.5px;line-height:1.7;color:var(--faint)}
 .lu-teams{display:grid;grid-template-columns:1fr 1fr;gap:clamp(16px,2.4vw,30px);margin-top:26px}
+/* The two columns were the only lu- names the module emits that nothing styled
+   (9 of its 11 had rules). A grid child defaults to min-width:auto, so it
+   cannot shrink below its own content: one long chip in the bench row and the
+   1fr column stops being 1fr and pushes the grid wide. It does not bite at
+   today's names -- the chips wrap, so the floor is the widest single chip --
+   but it is the same shape as the two overflows fixed on the board, and a
+   guard costs nothing. */
+.lu-team{min-width:0}
 .lu-tname{display:flex;align-items:center;gap:9px;margin-bottom:12px;
   font-family:var(--disp);font-weight:700;text-transform:uppercase;font-size:17px;letter-spacing:.03em}
 .lu-tname .dot{width:9px;height:9px;border-radius:50%;flex:none}
@@ -1974,12 +1991,15 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
    which is what eight identical outlines never let you do.
 
    None of this uses --faint. At 9.5px, bold, uppercase and tracked to .14em,
-   #55555f on #080809 is about 2.8:1, and the count inside it was that again at
-   opacity .5 — near 1.6:1, which is why "MORE EUROPE 38" read as a black box
-   with something in it. 4.5:1 is the floor for text this size, so all three
-   states were under it. They are set by measured contrast now: live ~9.8:1,
-   empty ~3.8:1 against its own fainter ring, gold for the one you are on.
-   --faint keeps its value, because half the site leans on it. */
+   the OLD #55555f on #080809 was about 2.8:1, and the count inside it was that
+   again at opacity .5 — near 1.6:1, which is why "MORE EUROPE 38" read as a
+   black box with something in it. 4.5:1 is the floor for text this size, so
+   all three states were under it. They are set by measured contrast now: live
+   ~9.8:1, empty ~3.8:1 against its own fainter ring, gold for the one you are
+   on. The line that used to sit here said --faint keeps its value because half
+   the site leans on it — that was the reason to fix the chips locally and
+   leave the token alone, and it is exactly why the token has now been fixed
+   instead: a colour 184 rules deep is the last one you want wrong. */
 .filt button{appearance:none;border:0;cursor:pointer;
   display:inline-flex;align-items:center;gap:7px;padding:7px 12px;
   font:700 9.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#b4b4bf;

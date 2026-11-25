@@ -2177,6 +2177,19 @@
     if (kind === "cs" && /^\d-\d$/.test(rest || "")) return [126, rest, "Yes"];
     return null;
   }
+  /* The line TYPES the price book carries on this fixture, at ANY value.
+     bookPrices answers "did Bet365 quote the exact line HAWK built"; this
+     answers "does Bet365 run this market here at all", and the two are not
+     the same question. HAWK builds handicaps at 1.5 and 2.5 only, while
+     Bet365's Asian lines sit at -0.25, -0.5, -0.75: type 11 is plainly
+     there and no HAWK leg will ever match a value, so asking the first
+     question and recording the answer to the second says the market does
+     not exist. See engine/bookdepth.mjs. */
+  function bookTypes(an, book = PRICE_BOOK) {
+    const out = new Set();
+    for (const q of (an.quotes || [])) if (q.book === book) out.add(String(q.type));
+    return out;
+  }
   function bookPrices(an, legs, book = PRICE_BOOK, which = "prices") {
     const quotes = {};
     for (const q of an.quotes) if (q.book === book) quotes[`${q.type}|${q.value}`] = q[which] || {};
@@ -2839,9 +2852,14 @@
     const Mm = an.lamModel && an.sameLeague ? scoreMatrix(...an.lamModel) : null;
     const model = Mm ? { home: sumCells(Mm, (i, j) => i > j), draw: sumCells(Mm, (i, j) => i === j), away: sumCells(Mm, (i, j) => i < j) } : null;
     const prices = bookPrices(an, legs), opens = bookPrices(an, legs, PRICE_BOOK, "opens");
+    const offered = bookTypes(an);
     // Keep Bet365's prices on the legs themselves too: "Value first" builds use them.
     for (const [id, leg] of Object.entries(legs)) {
       leg.bookPrice = prices[id] || null; leg.bookOpen = opens[id] || null;
+      // Whether the BOOK runs this market here, independent of the line HAWK
+      // asked for. Only the depth tally reads it.
+      const bl = bookLine(id);
+      leg.bookMarketSeen = !!(bl && offered.has(String(bl[0])));
       leg.agree = marketAgrees(leg);
       // No price, AND the book is measured not to price this market in this
       // league. The leg is real and HAWK's number for it is real; what does not

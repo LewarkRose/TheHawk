@@ -42,6 +42,24 @@
   const bankrollLog = () => { const v = load(LOG_KEY, []); return Array.isArray(v) ? v : []; };
   const removedBets = () => new Set(load(REMOVED_KEY, []) || []);
 
+  /* A ticket you deleted, remembered by id so a sync from the other device
+     does not post it straight back. applySyncData has read this list since
+     it was written -- but NOTHING had ever written to it, here or anywhere
+     else in the site, because until now there was no way to delete a ticket
+     at all. So the promise that "one you deleted is never put back" rested
+     on a list that was always empty, and would have been broken the first
+     time it was needed. Capped, because it only grows: an id is 17 bytes,
+     so 2,000 of them is 34KB and the oldest fall off the front. */
+  const FORGET_CAP = 2000;
+  function forgetBet(id) {
+    if (!id) return false;
+    const was = load(REMOVED_KEY, []);
+    const list = Array.isArray(was) ? was : [];
+    if (list.indexOf(id) >= 0) return true;
+    list.push(id);
+    return save(REMOVED_KEY, list.slice(-FORGET_CAP));
+  }
+
   /* ------------------------------------------------------------- packing */
   const b64url = (bytes) => {
     let s = "";
@@ -281,6 +299,6 @@
     SYNC_LEARN, syncData, packSync, unpackSync,
     qrFrames, qrSvg, qrCollector, QR_CHUNK,
     syncRank, newer, applySyncData, applyCode, applyText, fromHash,
-    syncMark, setSyncMark, newCount, logEdit, bankrollLog, removedBets,
+    syncMark, setSyncMark, newCount, logEdit, bankrollLog, removedBets, forgetBet,
   };
 })();

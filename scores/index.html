@@ -192,9 +192,17 @@
     const have = Number.isFinite(sh) && Number.isFinite(sa);
     const hc = have && sh < sa ? " lost" : "", ac = have && sa < sh ? " lost" : "";
     const mid = have ? `${sh}<em>–</em>${sa}` : b === "done" ? "–<em>–</em>–" : "v";
+    /* The kick-off is already in the left rail. Printing it again here put
+       the same "21:00" twice on 13 of the 14 rows on the card -- once faint
+       on the left and once at 17px on the right -- which is the single
+       loudest thing making a board look unfinished. This column's job is
+       what the match is DOING: a clock while it runs, FT when it is over.
+       Before kick-off it has nothing to say, so it says nothing. TBC is the
+       one exception: with no kick-off time the left rail is empty too, and
+       a row has to state that the time is unknown rather than look blank. */
     const state = b === "live" ? liveClock(g.clock)
       : b === "done" ? "FT"
-      : esc(hhmm(g.kickoff) || "TBC");
+      : hhmm(g.kickoff) ? "" : "TBC";
     const href = `${b === "live" ? "../live/" : "../match/"}`
       + `?league=${encodeURIComponent(g.league || "")}&id=${encodeURIComponent(g.id)}`;
 

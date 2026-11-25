@@ -742,6 +742,8 @@
     const n = items.length;
 
     return `<div class="rcpt ${cls}">
+      <button class="rx" type="button" data-del="${esc(b.id)}"
+        title="Remove this ticket" aria-label="Remove this ticket">×</button>
       <div class="rhd">
         <h4>${esc(where || "Ticket")}</h4>
         <div class="rwhen">${esc(when)}${n > 1 ? ` · ${plural(n, "leg")}` : ""}</div>
@@ -971,6 +973,52 @@
     if (SY() && Math.abs(S.bank - was) >= 0.005)
       SY().logEdit(was, S.bank, `Edited a ticket: ${money(oldStake)} @ ${oldOdds.toFixed(2)} → ${money(stake)} @ ${odds.toFixed(2)}`, true);
     S.editing = null;
+    draw();
+  }
+
+  /* =================================================== REMOVE A TICKET
+     A slip that should not be in the record: one the builder logged twice
+     when a tap registered twice, or one you never actually placed. There
+     was no way to do this, which is why hawk_removed was never written.
+
+     The money is the whole of the care here. A ticket's stake came off the
+     bankroll the moment it was logged, and a WON or CASHED_OUT one paid
+     back in on top -- so removing it has to undo BOTH, or deleting a winner
+     leaves its winnings behind and the balance becomes a figure that no
+     ticket on the page explains. Same arithmetic as editTicket, and it
+     lands in the bankroll log for the same reason: a balance that moved
+     without a line saying why is the one thing this page must never do. */
+  function removeTicket(id) {
+    const b = S.bets.find((x) => x.id === id);
+    if (!b) return;
+    const back = round2((+b.stake || 0) - payout(b));
+    const word = (STATE[b.status] || ["", b.status || "—"])[1];
+    const where = [...new Set((b.legs || []).map((l) => l.fixture).filter(Boolean))].join(" · ");
+    const says = Math.abs(back) < 0.005 ? "Your bankroll does not change."
+      : back > 0 ? `${money(back)} goes back on your bankroll.`
+                 : `${money(-back)} comes off your bankroll.`;
+    if (!confirm(`Remove this ticket?
+
+${where || "Ticket"}
+`
+      + `${money(b.stake)} at ${(+b.odds || 0).toFixed(2)} · ${word}
+
+${says}
+
+`
+      + `It will not come back on the next sync either. This cannot be undone.`)) return;
+
+    const was = S.bank;
+    S.bets = S.bets.filter((x) => x.id !== id);
+    S.bank = round2(S.bank + back);
+    if (!save()) return;
+    if (SY()) {
+      SY().forgetBet(id);
+      if (Math.abs(S.bank - was) >= 0.005)
+        SY().logEdit(was, S.bank, `Removed a ticket: ${where || "no fixture"} — `
+          + `${money(b.stake)} @ ${(+b.odds || 0).toFixed(2)}`, true);
+    }
+    S.editing = null; S.cashing = null;
     draw();
   }
 
@@ -1771,6 +1819,9 @@
 
     const re = e.target.closest("[data-reuse]");
     if (re) { reuse(re.dataset.reuse); return; }
+
+    const del = e.target.closest("[data-del]");
+    if (del) { removeTicket(del.dataset.del); return; }
 
     /* ---- bankroll, sync and the checks ---- */
     if (e.target.closest("#bkSet")) { setBank(); return; }

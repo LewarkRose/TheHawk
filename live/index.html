@@ -279,6 +279,24 @@
       `${money(stake)} is ${Math.round(100 * stake / bank)}% of your ${money(bank)} bankroll.\n\nLog it anyway?`)) return false;
 
     const id = legId(r, d), price = +r.price, p = +r.p, edge = price / r.fair - 1;
+
+    /* A tap that registers twice logs the ticket twice. On 25 Nov two
+       identical Slavia Praha v Villarreal slips landed in the Vault 78
+       milliseconds apart -- too close together to be two decisions -- and
+       the stake came off the bankroll both times. The newest ticket is
+       always at the head of the list, so one comparison catches it.
+       Fifteen seconds is far longer than a double tap and far shorter than
+       deciding to back the same slip a second time on purpose. */
+    const last = bets[0];
+    const lastAt = last ? +((/^bet_(\d{12,})/.exec(last.id || "") || [])[1] || 0) : 0;
+    if (last && Date.now() - lastAt < 15000
+        && Math.abs((+last.stake || 0) - stake) < 0.005
+        && Math.abs((+last.odds || 0) - price) < 0.005
+        && ((last.legs || [])[0] || {}).selection === r.label) {
+      toast("That one is already in the Vault — this would have logged it twice.");
+      return false;
+    }
+
     bets.unshift({
       id: "bet_" + Date.now(),
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),

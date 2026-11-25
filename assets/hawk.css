@@ -15,7 +15,7 @@
    =========================================================================== */
 :root{
   --ink:#080809;            /* fighterready.com sits at rgb(8,8,8); so do we */
-  --raise:#0e0f13;
+  --raise:#13141c;          /* a panel has to read as an object, not a hole */
   --text:#f2f2f2;
   --muted:#8b8b95;
   --faint:#55555f;
@@ -57,11 +57,17 @@ body{margin:0;background:var(--ink);color:var(--text);
    one layer lights a Vault whatever length it grows to. It sits at -1,
    behind everything in the normal flow, and any panel with a background
    of its own simply covers it, which is what gives them their edge. */
+/* TURNED UP. The pools were right in kind and far too weak in degree: at
+   .10 over #080809 the hottest point of the main one computes to #12161f,
+   a lift of ten levels, and it is gone by 68% of the radius. The page was
+   therefore #080809 almost everywhere, which is what "too much black" was.
+   Same three pools, same places, roughly double the light. Still light and
+   not paint -- the hottest point is #1c242f, nowhere near a navy panel. */
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:
-    radial-gradient(62% 48% at 14% 8%,rgba(107,143,224,.10),transparent 68%),
-    radial-gradient(54% 44% at 88% 34%,rgba(212,169,78,.055),transparent 66%),
-    radial-gradient(72% 52% at 50% 104%,rgba(107,143,224,.07),transparent 70%)}
+    radial-gradient(62% 48% at 14% 8%,rgba(107,143,224,.20),transparent 68%),
+    radial-gradient(54% 44% at 88% 34%,rgba(212,169,78,.11),transparent 66%),
+    radial-gradient(72% 52% at 50% 104%,rgba(107,143,224,.14),transparent 70%)}
 a{color:inherit}
 img{display:block;max-width:100%}
 .wrap{width:100%;max-width:var(--max);margin:0 auto}
@@ -446,7 +452,17 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
    Calmer than the old site, not louder. Space instead of borders, no glow
    on data, hairlines sparingly, one accent at a time.
    ======================================================================== */
-.calm{padding:clamp(56px,8.5vw,112px) var(--gut);border-top:1px solid var(--rule)}
+/* .calm had NO background at all, so below the hero a page was bare ink for
+   its whole length and the only thing lighting it was one fixed layer you
+   had already scrolled past the bright part of. A Vault is four thousand
+   pixels tall; a card of forty matches is longer.
+
+   So each section catches its own light at its top edge and falls away over
+   420px. It repeats down the page, which is the point -- the room stays lit
+   however far you scroll -- and it is still light falling on black rather
+   than a panel painted navy, which is the rule the sheet runs on. */
+.calm{padding:clamp(56px,8.5vw,112px) var(--gut);border-top:1px solid var(--rule);
+  background:linear-gradient(180deg,rgba(107,143,224,.055),rgba(107,143,224,0) 420px)}
 .lede{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:clamp(24px,3.6vw,38px)}
 .lede h3{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;
   font-size:clamp(22px,2.8vw,32px);line-height:1;letter-spacing:.02em}

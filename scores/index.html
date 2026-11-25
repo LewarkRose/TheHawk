@@ -268,7 +268,11 @@
           ? `<span class="verdict ${dogSurvived ? "hit" : "miss"}"><span class="lt">⚡</span>${
               dogSurvived ? `called it · <b>${notLose}%</b>` : "missed"}</span>`
           : "";
-        read = `<span class="read3 done" title="HAWK before kick-off: ${esc(g.home)} ${v[0]}% · draw ${v[1]}% · ${esc(g.away)} ${v[2]}%">
+        /* hit/miss goes on the element as well as into the tick, so the ROW
+           can carry it: a finished card then reads as a column of greens and
+           reds down its left edge, which is HAWK's day at a glance and the
+           same thing the tick says one row at a time. */
+        read = `<span class="read3 done ${hit ? "hit" : "miss"}" title="HAWK before kick-off: ${esc(g.home)} ${v[0]}% · draw ${v[1]}% · ${esc(g.away)} ${v[2]}%">
           <span class="sbar"><i class="h" style="flex:${p.home || 0}"></i><i class="d" style="flex:${
             p.draw || 0}"></i><i class="a" style="flex:${p.away || 0}"></i></span>
           <span class="trio"><span class="mark">🦅</span>${trio}<i class="${

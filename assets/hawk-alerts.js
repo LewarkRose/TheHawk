@@ -66,7 +66,13 @@
   // of the way sooner; on a PC they sit in the corner and can linger.
   const SHOW_MS = phone() ? 8000 : 15000;
   const FOLLOW_MS = 3 * 3600e3;
-  const LOG_KEEP = 20;
+  // 120, not 20. Twenty is a day's worth of two matches; eight followed on a
+  // Saturday spend it before the 17:30 kick-offs, and the alert you actually
+  // want ends up underneath Tuesday's. The bell still shows the newest dozen,
+  // because a popover is no place for a long list -- the rest is for the
+  // strip on Scores, which has the room for it.
+  const LOG_KEEP = 120;
+  const POP_KEEP = 12;                  // the newest, in the bell
 
   /* =================================================== the two-feed rules
      Kept from the old builder verbatim in behaviour, because they were
@@ -408,10 +414,16 @@
   }
 
   // Everything HAWK has beeped about, kept so a card you miss is still
-  // readable afterwards under the bell. Last 20, oldest dropped.
-  function logAlert(icon, word, text) {
+  // readable afterwards -- under the bell, and on the board. Last 120.
+  //
+  // `href` is where the CARD would have taken you. card() works it out and
+  // this threw it away, which left a history of things that had happened
+  // with no way to go and look at any of them. `tone` rides along so the
+  // glyph keeps the colour it had while it was on screen.
+  function logAlert(icon, word, text, href, tone) {
     const list = loadPref("hawk.alertLog", []);
-    list.unshift({ icon, word, text: String(text || "").replace(/\s+/g, " ").trim().slice(0, 160), at: Date.now() });
+    list.unshift({ icon, word, text: String(text || "").replace(/\s+/g, " ").trim().slice(0, 160),
+                   at: Date.now(), href: href || "", tone: tone || "" });
     savePref("hawk.alertLog", list.slice(0, LOG_KEEP));
     paintBell();
   }
@@ -469,6 +481,16 @@
   };
   const glyph = (icon) => GLYPH[icon] || esc(icon || "");
 
+  /* One row of the history, drawn the same in the bell and on the board.
+     An <a> when the alert had somewhere to go and a <div> when it did not:
+     a dead link that looks live is worse than no link at all. */
+  const logRow = (a) => {
+    const t = a.href ? "a" : "div", h = a.href ? ` href="${esc(a.href)}"` : "";
+    return `<${t} class="lg${a.tone ? ` t-${esc(a.tone)}` : ""}"${h}><span class="i">${glyph(a.icon)}</span>
+      <span class="tx"><b>${esc(a.word || "")}</b>${esc(a.text || "")}</span>
+      <time>${ago(a.at)}</time></${t}>`;
+  };
+
   function card({ tone = "good", icon, word, g, clock, body, bet, href, hit, voice }) {
     const el = document.createElement("div");
     el.className = `ac t-${tone}`;
@@ -496,7 +518,7 @@
     const flat = document.createElement("div"); flat.innerHTML = body;
     logAlert(icon, word, g
       ? `${g.home} ${g.score && g.score[0] != null ? `${g.score[0]}-${g.score[1]}` : "v"} ${g.away} · ${flat.textContent}`
-      : flat.textContent);
+      : flat.textContent, go, tone);
     add(el);
     // `voice` wins when the caller knows something the word does not — a goal
     // is a goal, but only the caller knows whose goal it was good for.
@@ -1165,6 +1187,11 @@
      and the place a card you missed can still be read. */
   let bell = null, pop = null;
   function paintBell() {
+    // The strip repaints with the bell rather than on a clock of its own:
+    // every path that changes what the bell says -- a new alert, the switch,
+    // a match followed -- comes through here, and the two must never
+    // disagree about whether alerts are on.
+    paintStrip();
     if (!bell) return;
     // Always shown, because it is the master switch as well as the count —
     // a hidden bell is how you end up not knowing alerts are off.
@@ -1212,11 +1239,164 @@
         while a HAWK tab is open. Allow them in the padlock menu beside the address bar.</p>` : ""}
       ${log.length ? `<div class="lghd"><span class="k">${plural(log.length, "alert")}</span>
           <button data-al="clear">Clear</button></div>` : ""}
-      ${log.length ? log.map((a) => `<div class="lg"><span class="i">${a.icon || "🔔"}</span>
-        <span class="tx"><b>${esc(a.word || "")}</b>${esc(a.text || "")}</span>
-        <time>${ago(a.at)}</time></div>`).join("")
-        : `<div class="lg"><span class="tx">Nothing yet.</span></div>`}`;
+      ${log.length ? log.slice(0, POP_KEEP).map(logRow).join("")
+        : `<div class="lg"><span class="tx">Nothing yet.</span></div>`}
+      ${log.length > POP_KEEP ? `<div class="lg q"><span class="tx">${
+        log.length - POP_KEEP} older, kept until you clear them</span></div>` : ""}`;
   }
+  /* ====================================== THE ALERTS YOU HAVE, on the board
+     One question answered where it is asked: what is HAWK going to interrupt
+     me about, and why? The bell in the bar counted them in a sentence and
+     never named one.
+
+     GROUPED, because the three kinds are not the same promise and you cannot
+     act on them the same way:
+
+       Your bets   armed by having money on it. Cannot be turned off -- that
+                   is the rule everywhere else in this file, so those rows
+                   have a mark and no cross to press and be refused by.
+       Lineups     the bell on Scores before kick-off. The one alert that
+                   fires BEFORE a match, and the only one worth being woken
+                   by: the last moment a build is still worth making, and the
+                   moment a player leg can quietly die.
+       Goals       the bell once it is under way, or kept on after you leave.
+                   Three hours, then it expires by itself.
+
+     A match in two of them is listed once, in the strongest: a bet beats a
+     lineup watch beats a goal follow. The count at the top is matches, not
+     promises, so it is the same number followedGames() has always returned.
+
+     `opts.lookup` is the page's own fixture list: (id) => {home, away,
+     league, kickoff, status, clock} or null. Optional -- the watch list
+     stores names and a bet leg stores its fixture, so without it the block
+     is still right, just quieter. */
+  let nameOf = () => null;
+  /* Soonest first, anything with no kick-off to go on at the bottom. NOT
+     `Date.parse(kickoff || 0) || LAST`: Date.parse(0) coerces to the string
+     "0", which V8 reads as the year 2000 rather than as nothing, so the
+     fallback never fires and every unknown match sorts to 1 Jan 2000. */
+  const koAt = (m) => { const t = Date.parse(m.kickoff || "");
+    return Number.isFinite(t) ? t : 8.64e15; };
+
+  function alertGroups() {
+    const watch = new Map(watchList().filter(Boolean).map((w) => [String(w.id), w]));
+    const bets = new Map();
+    for (const b of vaultBets()) {
+      if (b.status !== "PENDING") continue;
+      for (const l of b.legs || []) if (l && l.hawk && l.hawk.game)
+        bets.set(String(l.hawk.game),
+          { fixture: l.fixture || "", league: l.hawk.league || "", kickoff: l.hawk.kickoff || "" });
+    }
+    const mk = (id) => {
+      let g = null;
+      try { g = nameOf(id) || null; } catch { g = null; }   // a page's lookup is not ours to trust
+      const w = watch.get(id), b = bets.get(id);
+      const home = (g && g.home) || (w && w.home) || "";
+      const away = (g && g.away) || (w && w.away) || "";
+      return { id,
+        name: home && away ? `${home} v ${away}` : (b && b.fixture) || `Match ${id}`,
+        league: (g && g.league) || (w && w.league) || (b && b.league) || "",
+        kickoff: (g && g.kickoff) || (b && b.kickoff) || "",
+        status: g && g.status, clock: (g && g.clock) || "",
+        locked: bets.has(id), xi: watch.has(id) };
+    };
+    const out = { bet: [], xi: [], goal: [] };
+    for (const id of followedGames())
+      out[bets.has(id) ? "bet" : watch.has(id) ? "xi" : "goal"].push(mk(id));
+    for (const k of Object.keys(out)) out[k].sort((p, q) => koAt(p) - koAt(q));
+    return out;
+  }
+
+  const hhmm = (iso) => { const t = Date.parse(iso);
+    return Number.isFinite(t) ? new Date(t).toLocaleTimeString(undefined,
+      { hour: "2-digit", minute: "2-digit" }) : ""; };
+  /* What matters is when the next thing can happen. Once it is under way the
+     clock says that better than a kick-off time that has been and gone. */
+  const whenOf = (m) => m.status === 3 ? (m.clock || "under way")
+    : m.status === 4 ? "finished"
+    : m.kickoff ? hhmm(m.kickoff) : "";
+
+  const alertRow = (m) => `<a class="al-m" href="${m.status === 3
+      ? `../live/?league=${encodeURIComponent(m.league || "")}&id=${encodeURIComponent(m.id)}`
+      : `../match/?league=${encodeURIComponent(m.league || "")}&id=${encodeURIComponent(m.id)}`}">
+      <span class="nm">${esc(m.name)}</span>
+      <span class="lgn">${esc(m.league || "")}</span>
+      <time>${esc(whenOf(m))}</time>
+      ${m.locked
+        ? `<span class="lock" title="You have a bet on this match, so its alerts stay on">•</span>`
+        : `<button class="off" type="button" data-aloff="${esc(m.id)}"
+             title="Turn this one off">✕</button>`}</a>`;
+
+  // the order is what you can do least about first
+  const GROUPS = [
+    ["bet", "Your bets", "on automatically · cannot be turned off"],
+    ["xi", "Lineups", "the moment both XIs are confirmed"],
+    ["goal", "Goals", "goals and red cards, for three hours"],
+  ];
+
+  let strip = null;
+  function paintStrip() {
+    if (!strip) return;
+    const g = alertGroups();
+    const n = g.bet.length + g.xi.length + g.goal.length;
+    /* The line beside the count does not repeat it. "5 · 5 matches watched"
+       is the number said twice and the state said never. */
+    strip.className = `alog${G.on ? "" : " off"}`;
+    strip.innerHTML = `<div class="alog-h">
+        <span class="alog-i">${glyph(G.on ? "🔔" : "🔕")}</span>
+        <h3>Alerts</h3>
+        <span class="alog-c${n && G.on ? " has" : ""}">${n}</span>
+        <span class="alog-n">${!n ? "none set"
+          : `being watched${G.on ? "" : " — but alerts are off"}`}</span>
+        ${G.on ? "" : `<button class="tbtn" type="button" data-als="on">Turn alerts on</button>`}
+      </div>
+      ${n ? GROUPS.map(([k, word, what]) => g[k].length
+          ? `<div class="alog-g"><span class="k">${word}</span><span class="c">${g[k].length}</span>
+               <span class="d">${what}</span></div>` + g[k].map(alertRow).join("")
+          : "").join("")
+        : `<div class="lg q"><span class="tx">None set. Press the bell on a match
+            below: before kick-off it waits for both XIs to be confirmed, and after
+            it has started it watches for goals and red cards. A match you have a bet
+            on is watched without being asked, so you never have to remember to arm
+            the ones that cost you money.</span></div>`}`;
+  }
+  function mountStrip(into, opts = {}) {
+    if (!into || strip) return strip;
+    if (typeof opts.lookup === "function") nameOf = opts.lookup;
+    strip = document.createElement("div");
+    into.appendChild(strip);
+    paintStrip();
+    strip.addEventListener("click", async (e) => {
+      const off = e.target.closest("[data-aloff]");
+      if (off) {
+        // it sits inside the row's own link, so it has to claim the click
+        e.preventDefault(); e.stopPropagation();
+        const id = off.dataset.aloff;
+        const all = alertGroups(), m = [...all.xi, ...all.goal].find((x) => x.id === id);
+        /* Off the list it is actually on. A lineup watch and a goal follow
+           are two different keys, and toggleFollow on a watch would quietly
+           do nothing -- the row would sit there having visibly refused. */
+        if (m && m.xi) await toggleWatch({ id, league: m.league,
+          home: m.name.split(" v ")[0] || "", away: m.name.split(" v ")[1] || "" });
+        else if (m) await toggleFollow(id);
+        paintStrip();
+        return;
+      }
+      if (!e.target.closest('[data-als="on"]')) return;
+      G.on = true; savePref("hawk.goalAlerts", true);
+      /* Paint NOW, before asking the browser for permission -- that ask takes
+         as long as you take to answer it, and a switch that still reads the
+         way it did before you pressed it reads as a switch that did nothing.
+         Again afterwards, because the answer changes what the bell says. */
+      paintBell();                       // which paints this
+      await askPermission(); check(); checkLineups(); paintBell();
+    });
+    document.addEventListener("hawk:follow", paintStrip);
+    // kick-off times and clocks: "21:00" is a lie once it is 21:04
+    setInterval(paintStrip, 60000);
+    return strip;
+  }
+
   function mountBell(into) {
     if (bell) return bell;
     bell = document.createElement("button");
@@ -1259,8 +1439,8 @@
         }
         if (b.dataset.al === "toggle") {
           G.on = !G.on; savePref("hawk.goalAlerts", G.on);
-          if (G.on) { await askPermission(); check(); }
-          paintBell();
+          paintBell();                   // see the note on the strip's switch
+          if (G.on) { await askPermission(); check(); paintBell(); }
         } else if (b.dataset.al === "test") {
           const ok = await askPermission();
           paintPop();
@@ -1341,11 +1521,16 @@
   }
 
   window.HAWKAlerts = {
-    mountBell, followButton, followState, toggleFollow, followedGames,
+    mountBell, mountStrip, followButton, followState, toggleFollow, followedGames,
     // show() is the full card (a match, a score, your bet on it); notice() is
     // the plain one. Pages raise their own through these rather than inventing
     // a second kind of popup.
     show: card, notice, check, checkLineups, paintBell,
+    /* The strip is mounted before the board has fetched anything, so its
+       lookup finds nothing and the kick-off column comes up empty. The page
+       calls this when its fixtures land. It is a no-op where no strip is
+       mounted, which is everywhere except Scores. */
+    paintStrip,
     /* The Live page sees a dead ticket too — it calls ticketLive() every 15
        seconds and gets the same "lost" back. It must not grow a second copy
        of this: one function writes hawk_bets, and the two-consecutive-reads

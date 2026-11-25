@@ -50,6 +50,9 @@
     <div class="filt" id="groups"></div>
     <div class="filt" id="bands" style="margin-top:14px;border-bottom:0"></div>
     <div class="filt sub" id="comps"></div>
+    <!-- the alert history, above the board. Filled by hawk-alerts.js; empty
+         and invisible if that script ever fails to load. -->
+    <div id="albox" style="margin-top:26px"></div>
     <div id="board" style="margin-top:26px"><div class="skel">Reading…</div></div>
   </div>
 </section>
@@ -433,6 +436,10 @@
           cups.includes(gr.name) ? "Bracket" : "Table"}</button></div>
       ${gr.l.map(row).join("")}</section>`).join("");
     xiSweep(list);
+    /* The alert strip is mounted before any of this has been fetched, so its
+       lookup found nothing and its kick-off column came up blank until the
+       next minute ticked. The fixtures exist now. */
+    if (window.HAWKAlerts) window.HAWKAlerts.paintStrip();
   }
 
   /* ===================================================== the XI mark
@@ -594,6 +601,20 @@
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) clearTimeout(S.timer); else load();
   });
+
+  /* The alert history lives here and nowhere else. The bell in the bar keeps
+     the switches; the LIST belongs where the matches are, because a popover
+     closes the moment you look away. Not a sixth nav link: alerts are not
+     somewhere you go, and the bar wraps to two rows at 1139px as it is. */
+  /* The day's fixtures are the only place the NAMES live: hawk.goalFollow
+     stores an id and a timestamp, so without this the strip could count your
+     alerts and not say what any of them was. S.games is whatever the board is
+     currently showing, so the lookup reads it live rather than closing over
+     one load of it. */
+  if (window.HAWKAlerts)
+    window.HAWKAlerts.mountStrip($("#albox"), {
+      lookup: (id) => (S.games || []).find((g) => String(g.id) === String(id)) || null,
+    });
 
   $("#pick").value = S.day;
   load();

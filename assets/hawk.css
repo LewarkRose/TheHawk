@@ -30,6 +30,15 @@
   --faint:#7f7f89;
   --rule:rgba(242,242,242,.08);
   --rule-2:rgba(242,242,242,.16);
+  /* The line a competition's name sits on. It has been asked for since the
+     board was written -- `.lg-h` has said `1px solid var(--rule-gold)` all
+     along -- and never defined anywhere, so the token did not resolve, the
+     whole declaration was dropped, and border-bottom-style computed to
+     `none`: measured 0px on the live sheet. Every heading on Scores has been
+     floating. At .26 it is a hairline that separates one competition from the
+     next and is the same colour as the crest beside it; it repeats twenty
+     times down a Saturday, which is why it is not stronger. */
+  --rule-gold:rgba(212,169,78,.26);
   --navy:#6b8fe0;
   --navy-hi:#a8c0f3;
   --gold:#d4a94e;
@@ -2880,6 +2889,120 @@ a.btr:hover{background:rgba(242,242,242,.04)}
 .bellpop .lg .tx b{display:block;color:var(--text);font:700 9.5px/1.4 var(--mono);
   letter-spacing:.1em;text-transform:uppercase}
 .bellpop .lg time{margin-left:auto;flex:none;font:400 10px/1.5 var(--mono);color:var(--faint)}
+/* A row is a link when the alert had a match behind it, which is almost
+   always. It must not look like a link until you are on it: sixteen gold
+   underlines down the history would read as a menu. */
+.bellpop a.lg{text-decoration:none;transition:color .25s var(--film)}
+.bellpop a.lg:hover .tx{color:var(--text)}
+.bellpop .lg.q .tx{color:var(--faint)}
+.bellpop .lg.q a{color:var(--gold-hi)}
+
+/* ===================================================== ALERTS, ON THE BOARD
+   The history out of the popover and onto Scores, directly above the first
+   competition. Shaped like a competition block on purpose -- glyph, name,
+   a word on the right, a .tbtn where the TABLE button sits -- because it
+   lands against one, and a second visual language there would read as a
+   different site rather than as a new section of this one.
+
+   The SWITCHES are not duplicated here. Sound, the phone test and the
+   per-alert previews stay under the bell: this is the list, and the bell is
+   the settings. One of each. */
+.alog{margin:0}
+.alog-h{display:flex;align-items:center;gap:12px;padding-bottom:11px;
+  border-bottom:1px solid var(--rule-gold);margin-bottom:2px}
+.alog-h h3{margin:0;font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  font-size:clamp(17px,2.2vw,21px);line-height:1;letter-spacing:.02em}
+.alog-h .alog-i{display:flex;align-items:center;flex:none;color:var(--gold);
+  font-size:clamp(15px,1.9vw,19px);transition:color .3s var(--film)}
+.alog-h .alog-i svg{display:block;width:1.3em;height:1.3em}
+.alog.off .alog-h .alog-i{color:var(--faint)}
+/* the state in words, because a lit bell cannot say "three matches followed" */
+.alog-h .alog-n{margin-left:auto;text-align:right;color:var(--faint);
+  font:700 9px/1.5 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+.alog-h .tbtn{flex:none}
+.alog .lg{display:flex;gap:11px;align-items:center;padding:11px 2px;
+  border-bottom:1px solid var(--rule);text-decoration:none;
+  font:400 12.5px/1.5 var(--sans);color:var(--muted)}
+.alog a.lg{transition:background .25s var(--film),color .25s var(--film)}
+.alog a.lg:hover{background:rgba(242,242,242,.03);color:var(--text)}
+.alog .lg .i{flex:none;display:flex;align-items:center;color:var(--tone,var(--faint))}
+.alog .lg .tx{min-width:0}
+.alog .lg .tx b{display:block;margin-bottom:2px;color:var(--text);
+  font:700 9.5px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.alog .lg time{margin-left:auto;flex:none;font:400 10.5px/1.5 var(--mono);color:var(--faint)}
+/* nothing has happened yet: a sentence, not an empty box */
+.alog .lg.q{border-bottom:0}
+.alog .lg.q .tx{color:var(--faint);max-width:70ch;font-size:11.5px}
+/* HOW MANY. The number is the point of the block, so it is drawn as a count
+   and not as a sentence: lit when you have any, flat when you do not. Every
+   bare class under here is scoped to .alog .al-m on purpose -- `.off`, `.nm`
+   and `.why` are the kind of two- and three-letter names that leak across a
+   flat sheet like this one. */
+.alog-h .alog-c{flex:none;padding:5px 8px;color:var(--faint);
+  font:700 11px/1 var(--mono);letter-spacing:.08em;
+  box-shadow:inset 0 0 0 1px var(--rule);
+  transition:color .3s var(--film),box-shadow .3s var(--film)}
+.alog-h .alog-c.has{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
+
+/* The three kinds, each with its own head. Not a tab strip and not three
+   boxes: they are one list, sectioned, because the question is "what is HAWK
+   going to interrupt me about" and the answer reads top to bottom. The rule
+   above a head is heavier than the rule between rows so the break is a break
+   and not another fixture. */
+.alog-g{display:flex;align-items:baseline;gap:10px;padding:15px 2px 7px;
+  border-bottom:1px solid var(--rule-2)}
+.alog-h + .alog-g{padding-top:11px}
+.alog-g .k{color:var(--muted);font:700 8.5px/1 var(--mono);
+  letter-spacing:.18em;text-transform:uppercase}
+.alog-g .c{color:var(--gold-hi);font:700 8.5px/1 var(--mono);letter-spacing:.1em}
+/* what the group promises, in one line, because "Goals" alone does not say
+   that it lapses after three hours or that a bet's cannot be switched off */
+.alog-g .d{margin-left:auto;text-align:right;color:var(--faint);
+  font:400 10.5px/1.4 var(--sans)}
+
+/* One watched match. Laid out as a row of the board is, because that is what
+   it is -- the same fixtures, narrowed to the ones HAWK is holding an alert
+   for. The group above says why; the row does not repeat it. */
+.alog .al-m{display:grid;grid-template-columns:minmax(0,1fr) auto auto 26px;
+  align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--rule);
+  text-decoration:none;color:var(--muted);font:400 13px/1.4 var(--sans);
+  transition:background .25s var(--film),color .25s var(--film)}
+.alog .al-m:hover{background:rgba(242,242,242,.03);color:var(--text)}
+.alog .al-m .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--text)}
+.alog .al-m .lgn{white-space:nowrap;color:var(--faint);
+  font:700 8.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+/* the kick-off, because that is when the XIs are due */
+.alog .al-m time{white-space:nowrap;color:var(--muted);font:400 11px/1 var(--mono)}
+.alog .al-m .off{appearance:none;border:0;background:none;cursor:pointer;padding:4px;
+  color:var(--faint);font:400 12px/1 var(--sans);transition:color .25s var(--film)}
+.alog .al-m .off:hover{color:var(--down)}
+/* a bet's alerts cannot be turned off, so that row gets a mark and no button
+   -- a cross that refuses you is worse than no cross */
+.alog .al-m .lock{text-align:center;color:var(--gold);font-size:11px}
+
+/* The glyph's colour, in both places it is drawn. Same five tones the card
+   itself used -- the row is the card's own memory of itself, so a goal is
+   still the live red and a lost leg is still --down. */
+.bellpop .lg .i,.alog .lg .i{color:var(--tone,var(--faint))}
+.bellpop .lg .i svg,.alog .lg .i svg{display:block;width:15px;height:15px}
+.bellpop .lg.t-good,.alog .lg.t-good{--tone:var(--up)}
+.bellpop .lg.t-bad,.alog .lg.t-bad{--tone:var(--down)}
+.bellpop .lg.t-warn,.alog .lg.t-warn{--tone:var(--gold)}
+.bellpop .lg.t-info,.alog .lg.t-info{--tone:var(--navy-hi)}
+.bellpop .lg.t-goal,.alog .lg.t-goal{--tone:var(--live)}
+
+@media (max-width:560px){
+  .alog-h{flex-wrap:wrap;gap:9px}
+  .alog-h .alog-n{order:3;width:100%;margin-left:0;text-align:left}
+  .alog .lg{font-size:12px}
+  /* the competition goes first on a phone: the fixture names say it anyway,
+     and they are the thing you are looking for */
+  .alog .al-m{grid-template-columns:minmax(0,1fr) auto 22px;gap:9px;font-size:12.5px}
+  .alog .al-m .lgn{display:none}
+  /* the group's promise is the first thing to go: the word carries it */
+  .alog-g .d{display:none}
+}
 
 /* the 🔔 follow button on a match */
 .fol{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border:0;

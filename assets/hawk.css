@@ -223,10 +223,32 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
 
    space-between, not a gap: five items spread across 375px put the outer two
    under the thumbs that reach them and need no measuring to stay centred. */
-@media (max-width:760px){
+/* 1139, NOT 760. The second row was written for phones and the bar needed it
+   from far higher up: measured, the one-row bar only fits at 1140px and over.
+   Below that `.nav .links` carries `min-width:0`, so the links BOX shrinks
+   while the links themselves are `white-space:nowrap` and cannot -- they
+   overflow their own box, and `.right` is placed by `margin-left:auto` from
+   the shrunken box, so the two groups are laid on top of each other:
+
+       1140px+  clean          1010px   74px of overlap
+       1100px   1px            780px   164px -- Board and Vault printed
+                                        straight through My bets
+
+   That is every page of the site across a 380px band of ordinary laptop
+   widths. The fix is the row that already existed, started where it is
+   actually needed. min-width:0 is left alone on purpose: once the links have
+   a row to themselves there is nothing for them to collide with, and taking
+   it away would trade an overlap for a page that scrolls sideways. */
+@media (max-width:1139px){
   .nav .in{flex-wrap:wrap;row-gap:0;padding-top:11px;padding-bottom:0}
-  .nav .links{display:flex;order:3;width:100%;margin:0;gap:2px;
-    justify-content:space-between;border-top:1px solid var(--rule);padding:1px 0 2px}
+  .nav .links{display:flex;order:3;width:100%;margin:0;
+    border-top:1px solid var(--rule);padding:1px 0 2px}
+}
+/* and on a phone they are squeezed out to the thumbs that reach them. This
+   half stays at 760: spreading five links across a 1,100px bar would park
+   them a hand's width apart for no reason. */
+@media (max-width:760px){
+  .nav .links{gap:2px;justify-content:space-between}
   .nav .links a{font-size:10px;letter-spacing:.06em;padding:9px 2px;gap:5px}
   .nav .links a i{font-size:13px}
 }
@@ -256,13 +278,21 @@ body.drawn .alerts{transform:translate3d(-400px,0,0);transition:transform .5s va
   padding:clamp(72px,11vh,130px) var(--gut) clamp(46px,7vh,84px)}
 /* Clearing the fixed bar on a phone — and it has to be HERE, after the
    shorthand above, or it loses to it (see the note up by the nav).
-   --navh is the bar's measured height, set by hawk-nav.js, because a phone bar
+   --navh is the bar's measured height, set by hawk-nav.js, because the bar
    wraps: two rows at 375px, and on a narrow one the top row can wrap too. No
    fixed number survives that, which is why the old one was 24px of clearance
    at 65px and would have been none at 126px. The fallback is the common case,
-   so the headline lands right even in the frame before the script runs. */
-@media (max-width:760px){
-  .hero{padding-top:calc(var(--navh,91px) + 28px)}
+   so the headline lands right even in the frame before the script runs.
+
+   1139, matching the nav. This used to stop at 760 because that was where the
+   bar stopped being one row -- above it the hero fell back to its own
+   clamp(72px,11vh,130px), which is fine against a 71px bar and NOT fine
+   against the 93px one the second row now makes. Measured before this line
+   was written: at 1010x800 the hero sat 5px UNDER the bar, and at 1010x680,
+   where 11vh is only 75px, 18px under it. Fallback 93, because that is the
+   tallest the bar now gets. */
+@media (max-width:1139px){
+  .hero{padding-top:calc(var(--navh,93px) + 28px)}
 }
 .hero.tall{min-height:min(92vh,880px)}
 /* the canvas carries the depth: drawn, not gradients faking it. The

@@ -1334,31 +1334,52 @@
     ["goal", "Goals", "goals and red cards, for three hours"],
   ];
 
-  let strip = null;
+  const CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+    + ' stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M5 9l7 7 7-7"/></svg>';
+
+  /* IT FOLDS, and it remembers. A Thursday with the whole Europa League on it
+     is twenty watched matches, and twenty rows above the board is a block
+     that has to be scrolled PAST to reach the thing it sits on top of.
+
+     Folded it is one line, and that line still carries the number and the
+     mix -- "18 lineups · 2 goals" -- because a count you have to open
+     something to read is not a count. Open, the list is bounded and scrolls
+     inside itself, so the board stays one flick away however many you set. */
+  const SHUT_KEY = "hawk.alertStripShut";
+  let strip = null, shut = loadPref(SHUT_KEY, false) === true;
+
   function paintStrip() {
     if (!strip) return;
     const g = alertGroups();
     const n = g.bet.length + g.xi.length + g.goal.length;
-    /* The line beside the count does not repeat it. "5 · 5 matches watched"
-       is the number said twice and the state said never. */
-    strip.className = `alog${G.on ? "" : " off"}`;
+    /* Open, the line beside the count does not repeat it -- "5 · 5 matches
+       watched" is the number said twice and the state said never. Folded, it
+       is the only thing left to say what the number is made of. */
+    const mix = GROUPS.filter(([k]) => g[k].length)
+      .map(([k, word]) => `${g[k].length} ${word.toLowerCase()}`).join(" · ");
+    strip.className = `alog${G.on ? "" : " off"}${shut ? " shut" : ""}`;
     strip.innerHTML = `<div class="alog-h">
         <span class="alog-i">${glyph(G.on ? "🔔" : "🔕")}</span>
         <h3>Alerts</h3>
         <span class="alog-c${n && G.on ? " has" : ""}">${n}</span>
         <span class="alog-n">${!n ? "none set"
-          : `being watched${G.on ? "" : " — but alerts are off"}`}</span>
+          : (shut ? mix : "being watched") + (G.on ? "" : " — but alerts are off")}</span>
         ${G.on ? "" : `<button class="tbtn" type="button" data-als="on">Turn alerts on</button>`}
+        <button class="alog-fold" type="button" data-als="fold"
+          aria-expanded="${String(!shut)}"
+          title="${shut ? "Show them" : "Fold this away"}">${CHEVRON}</button>
       </div>
-      ${n ? GROUPS.map(([k, word, what]) => g[k].length
-          ? `<div class="alog-g"><span class="k">${word}</span><span class="c">${g[k].length}</span>
-               <span class="d">${what}</span></div>` + g[k].map(alertRow).join("")
-          : "").join("")
+      <div class="alog-body">${n
+        ? GROUPS.map(([k, word, what]) => g[k].length
+            ? `<div class="alog-g"><span class="k">${word}</span><span class="c">${g[k].length}</span>
+                 <span class="d">${what}</span></div>` + g[k].map(alertRow).join("")
+            : "").join("")
         : `<div class="lg q"><span class="tx">None set. Press the bell on a match
             below: before kick-off it waits for both XIs to be confirmed, and after
             it has started it watches for goals and red cards. A match you have a bet
             on is watched without being asked, so you never have to remember to arm
-            the ones that cost you money.</span></div>`}`;
+            the ones that cost you money.</span></div>`}</div>`;
   }
   function mountStrip(into, opts = {}) {
     if (!into || strip) return strip;
@@ -1380,6 +1401,10 @@
           home: m.name.split(" v ")[0] || "", away: m.name.split(" v ")[1] || "" });
         else if (m) await toggleFollow(id);
         paintStrip();
+        return;
+      }
+      if (e.target.closest('[data-als="fold"]')) {
+        shut = !shut; savePref(SHUT_KEY, shut); paintStrip();
         return;
       }
       if (!e.target.closest('[data-als="on"]')) return;

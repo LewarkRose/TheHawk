@@ -2944,6 +2944,24 @@ a.btr:hover{background:rgba(242,242,242,.04)}
   transition:color .3s var(--film),box-shadow .3s var(--film)}
 .alog-h .alog-c.has{color:var(--gold-hi);box-shadow:inset 0 0 0 1px var(--gold)}
 
+/* IT FOLDS. Twenty watched matches is a block you scroll past to reach the
+   board it sits on top of. Folded it is one line that still carries the
+   count and the mix; open, the body is bounded and scrolls inside itself,
+   so the board is never more than a flick away. */
+.alog-fold{flex:none;display:flex;align-items:center;padding:6px;appearance:none;
+  border:0;background:none;cursor:pointer;color:var(--faint);
+  transition:color .3s var(--film)}
+.alog-fold:hover{color:var(--gold-hi)}
+.alog-fold svg{display:block;width:14px;height:14px;transition:transform .35s var(--film)}
+.alog.shut .alog-fold svg{transform:rotate(-90deg)}
+/* The floor is not decoration. vh on a short window -- a laptop with the
+   browser half-height, a phone in landscape -- shrinks this to a two-row
+   slot that is worse than no bound at all, and 260px is five rows. */
+.alog-body{max-height:max(260px,min(58vh,520px));overflow-y:auto;overscroll-behavior:contain}
+.alog-body::-webkit-scrollbar{width:6px}
+.alog-body::-webkit-scrollbar-thumb{background:rgba(242,242,242,.14)}
+.alog.shut .alog-body{display:none}
+
 /* The three kinds, each with its own head. Not a tab strip and not three
    boxes: they are one list, sectioned, because the question is "what is HAWK
    going to interrupt me about" and the answer reads top to bottom. The rule
@@ -2995,6 +3013,10 @@ a.btr:hover{background:rgba(242,242,242,.04)}
 @media (max-width:560px){
   .alog-h{flex-wrap:wrap;gap:9px}
   .alog-h .alog-n{order:3;width:100%;margin-left:0;text-align:left}
+  /* the state drops to its own line here, which left the fold stranded
+     mid-row beside the count instead of out at the edge where a control
+     belongs -- and 26px is a small thing to hit with a thumb */
+  .alog-h .alog-fold{margin-left:auto;padding:9px 4px 9px 12px}
   .alog .lg{font-size:12px}
   /* the competition goes first on a phone: the fixture names say it anyway,
      and they are the thing you are looking for */

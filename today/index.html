@@ -324,7 +324,13 @@
     const todayN = rows.filter((r) => r.today).length;
 
     $("#runN").textContent = `${plural(pending.length, "ticket")} · ${money(atRisk)} at risk`;
-    $("#run").innerHTML = rows.slice(0, 6).map((r) => {
+    /* ALL of them. This was rows.slice(0, 6) while the line above it printed
+       the true total, so ten tickets and thirty euros at risk came with six
+       cards and nothing saying where the other four went. A cap on a list of
+       matches is an editorial choice; a cap on the money you currently have
+       on is a page that is wrong. They are sorted live-first, then today,
+       then soonest, so the ones that can still move are at the top of it. */
+    $("#run").innerHTML = rows.map((r) => {
       const b = r.b;
       const sel = (b.legs || []).map((l) => l.selection || "").filter(Boolean).join(" + ") || "—";
       const where = (b.legs || []).map((l) => l.fixture || "").filter(Boolean)[0] || "";

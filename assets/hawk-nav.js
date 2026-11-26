@@ -91,7 +91,10 @@
           ${hawk.length ? `<ul class="dl">${hawk.slice(0, 8).map((h) => {
             const [c, mk] = MARK[h.result] || ["o", "·"];
             return `<li><i class="${c}">${mk}</i>${esc(h.label || "")}</li>`;
-          }).join("")}</ul>` : ""}
+          }).join("")
+          // eight legs is as much as a drawer can hold, but a list that just
+          // stops is a ticket you think has eight legs on it
+          + (hawk.length > 8 ? `<li><i class="o">·</i>and ${hawk.length - 8} more</li>` : "")}</ul>` : ""}
           <div class="f"><span>${money(b.stake)} on${
             hawk.length ? ` · ${done} of ${hawk.length} legs home` : ""}</span>
             <b>${money(b.potentialReturn)}</b></div></a>`;

@@ -1278,6 +1278,41 @@
   const koAt = (m) => { const t = Date.parse(m.kickoff || "");
     return Number.isFinite(t) ? t : 8.64e15; };
 
+  /* The engine's own competition order -- the Top 5 ahead of the rest, the
+     same order the board below sorts its sections into. Read lazily and
+     kept, because on a page where the engine has not finished loading the
+     answer would be frozen wrong for the session; a miss here just leaves
+     the order to settle on the next paint, a minute later at worst. */
+  let RANK = null;
+  const groupRank = (league) => {
+    if (!RANK) {
+      const gs = (window.HAWK && window.HAWK.LEAGUE_GROUPS) || null;
+      if (!gs) return 99;
+      RANK = {};
+      gs.forEach((gr, i) => (gr.leagues || []).forEach((l) => { RANK[l] = i; }));
+    }
+    return league in RANK ? RANK[league] : 98;
+  };
+
+  /* Kick-off alone was not an order. Ten bets all kicking off at 18:45 came
+     out in whatever order the Vault happened to hold them, so two
+     competitions sat interleaved down the list and the eye had to read every
+     league label to find the one it wanted.
+
+       1. what can still happen  -- in play, then to come, then finished
+       2. which competition      -- engine order, then by name so two in the
+                                    same band do not interleave either
+       3. soonest, then by name  -- so the same list comes back the same way
+
+     Finished last and not hidden: a watch on a match that is over is about
+     to be cleared, and until it is, it is still an alert you have. */
+  const phase = (m) => m.status === 3 ? 0 : m.status === 4 ? 2 : 1;
+  const inOrder = (p, q) => phase(p) - phase(q)
+    || groupRank(p.league) - groupRank(q.league)
+    || String(p.league || "").localeCompare(String(q.league || ""))
+    || koAt(p) - koAt(q)
+    || String(p.name || "").localeCompare(String(q.name || ""));
+
   function alertGroups() {
     const watch = new Map(watchList().filter(Boolean).map((w) => [String(w.id), w]));
     const bets = new Map();
@@ -1303,7 +1338,7 @@
     const out = { bet: [], xi: [], goal: [] };
     for (const id of followedGames())
       out[bets.has(id) ? "bet" : watch.has(id) ? "xi" : "goal"].push(mk(id));
-    for (const k of Object.keys(out)) out[k].sort((p, q) => koAt(p) - koAt(q));
+    for (const k of Object.keys(out)) out[k].sort(inOrder);
     return out;
   }
 
@@ -1316,7 +1351,10 @@
     : m.status === 4 ? "finished"
     : m.kickoff ? hhmm(m.kickoff) : "";
 
-  const alertRow = (m) => `<a class="al-m" href="${m.status === 3
+  /* `lead` marks the first row of a competition inside a group. It draws a
+     heavier rule above itself rather than a second heading: the league is
+     already on every row, so what was missing was the BREAK, not the word. */
+  const alertRow = (m, lead) => `<a class="al-m${lead ? " lead" : ""}" href="${m.status === 3
       ? `../live/?league=${encodeURIComponent(m.league || "")}&id=${encodeURIComponent(m.id)}`
       : `../match/?league=${encodeURIComponent(m.league || "")}&id=${encodeURIComponent(m.id)}`}">
       <span class="nm">${esc(m.name)}</span>
@@ -1373,7 +1411,13 @@
       <div class="alog-body">${n
         ? GROUPS.map(([k, word, what]) => g[k].length
             ? `<div class="alog-g"><span class="k">${word}</span><span class="c">${g[k].length}</span>
-                 <span class="d">${what}</span></div>` + g[k].map(alertRow).join("")
+                 <span class="d">${what}</span></div>`
+              + g[k].map((m, i, all) =>
+                  // `lead` is "opens a competition run", the first row of the
+                  // group included: on a phone that row is the only thing
+                  // carrying the league name. Its RULE is killed separately,
+                  // by .alog-g + .al-m, because the head already drew one.
+                  alertRow(m, i === 0 || all[i - 1].league !== m.league)).join("")
             : "").join("")
         : `<div class="lg q"><span class="tx">None set. Press the bell on a match
             below: before kick-off it waits for both XIs to be confirmed, and after

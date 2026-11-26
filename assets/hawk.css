@@ -2981,17 +2981,30 @@ a.btr:hover{background:rgba(242,242,242,.04)}
 /* One watched match. Laid out as a row of the board is, because that is what
    it is -- the same fixtures, narrowed to the ones HAWK is holding an alert
    for. The group above says why; the row does not repeat it. */
-.alog .al-m{display:grid;grid-template-columns:minmax(0,1fr) auto auto 26px;
-  align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--rule);
+/* The rule goes on the TOP of a row, not the bottom. That is the only way
+   one boundary can be drawn by one line: the group head already draws the
+   line under itself, the row after it draws nothing, and a row that opens a
+   new competition draws a heavier one. Bottom borders would have given the
+   head a double rule and left the list closing on a line that separates
+   nothing. */
+/* FIXED columns, not auto. Every row here is its own grid, so auto tracks
+   size to their own content and "CONFERENCE LEAGUE" pushed the clock 24px
+   further left than "EUROPA LEAGUE" did on the row above it -- a list whose
+   right-hand edge moved on every line. The board next to this one is built
+   on every score landing on the same vertical, and this is the same list. */
+.alog .al-m{display:grid;grid-template-columns:minmax(0,1fr) 116px 62px 26px;
+  align-items:center;gap:12px;padding:11px 2px;border-top:1px solid var(--rule);
   text-decoration:none;color:var(--muted);font:400 13px/1.4 var(--sans);
   transition:background .25s var(--film),color .25s var(--film)}
+.alog .alog-g + .al-m{border-top:0}
+.alog .al-m.lead{border-top-color:var(--rule-2)}
 .alog .al-m:hover{background:rgba(242,242,242,.03);color:var(--text)}
 .alog .al-m .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   color:var(--text)}
-.alog .al-m .lgn{white-space:nowrap;color:var(--faint);
-  font:700 8.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+.alog .al-m .lgn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;
+  color:var(--faint);font:700 8.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase}
 /* the kick-off, because that is when the XIs are due */
-.alog .al-m time{white-space:nowrap;color:var(--muted);font:400 11px/1 var(--mono)}
+.alog .al-m time{white-space:nowrap;text-align:right;color:var(--muted);font:400 11px/1 var(--mono)}
 .alog .al-m .off{appearance:none;border:0;background:none;cursor:pointer;padding:4px;
   color:var(--faint);font:400 12px/1 var(--sans);transition:color .25s var(--film)}
 .alog .al-m .off:hover{color:var(--down)}
@@ -3021,7 +3034,14 @@ a.btr:hover{background:rgba(242,242,242,.04)}
   /* the competition goes first on a phone: the fixture names say it anyway,
      and they are the thing you are looking for */
   .alog .al-m{grid-template-columns:minmax(0,1fr) auto 22px;gap:9px;font-size:12.5px}
+  /* The league came off the row here to buy width back. Now that the list is
+     sorted by competition that label is the thing explaining the heavier
+     rule, so it comes back on the row that OPENS a competition and stays off
+     the rest -- a ledger, not a column. Without this the break on a phone is
+     a line with nothing saying what it divides. */
   .alog .al-m .lgn{display:none}
+  .alog .al-m.lead{grid-template-columns:minmax(0,1fr) auto auto 22px}
+  .alog .al-m.lead .lgn{display:block}
   /* the group's promise is the first thing to go: the word carries it */
   .alog-g .d{display:none}
 }
